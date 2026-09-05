@@ -1,10 +1,13 @@
 package dev.codedrill.judge.runner.execution
 
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.Measurements
 import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.TestCaseResult
+import dev.codedrill.judge.protocol.TraceCapture
+import dev.codedrill.judge.protocol.TraceEvent
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.platform.problempackage.StopPolicy
 import dev.codedrill.platform.problempackage.TestCase
@@ -46,6 +49,9 @@ class ExecutionEngine(
         val sourceDir = sandboxDir.resolve("src").also { it.createDirectories() }
         val classesDir = sandboxDir.resolve("classes").also { it.createDirectories() }
         sourceDir.resolve("Solution.kt").writeText(request.source)
+        // 계측 SDK 는 두 모드에서 같은 이름·같은 시그니처로 컴파일된다. 판정 모드에서
+        // 컴파일이 깨지면 사용자는 계측 호출을 지워버릴 것이다 (§7.1).
+        sourceDir.resolve(TraceSdk.FILE_NAME).writeText(TraceSdk.source(request.mode))
         sourceDir.resolve("Main.kt").writeText(
             HarnessGenerator.generate(request.signature, request.groups),
         )
@@ -64,8 +70,25 @@ class ExecutionEngine(
         // 정책대로 멈춘 그룹을 구분할 수 없게 된다. 그룹별 격리는 한 그룹의 OOM 이 다른
         // 그룹의 측정치를 오염시키지 않는 효과도 있다.
         val classpath = RuntimeClasspath.all.plusElement(classesDir)
-        val results = request.groups.flatMap { group ->
-            runGroup(request, group, classpath, sandboxDir)
+
+        // 트레이스 실행은 공개 케이스에서만 돈다. 숨은 입력의 상태 변화를 사용자에게
+        // 되짚어 보여주면 테스트가 그대로 새어나간다 (§7.1).
+        val executedGroups = when (request.mode) {
+            ExecutionMode.JUDGE -> request.groups
+            // 리플레이는 실행 하나를 되짚는 것이다. 공개 그룹의 첫 케이스만 계측한다.
+            ExecutionMode.TRACE -> request.groups
+                .filter { it.policy.exposesInput }
+                .take(1)
+                .map { it.copy(cases = it.cases.take(1)) }
+        }
+
+        val events = mutableListOf<TraceEvent>()
+        val results = executedGroups.flatMap { group ->
+            runGroup(request, group, classpath, sandboxDir, events)
+        }
+
+        if (request.mode == ExecutionMode.TRACE) {
+            return traceResult(request, results, events)
         }
 
         return ExecutionResult(
@@ -106,6 +129,7 @@ class ExecutionEngine(
         group: RequestedGroup,
         classpath: List<Path>,
         sandboxDir: Path,
+        events: MutableList<TraceEvent>,
     ): List<TestCaseResult> {
         val byId = group.cases.associateBy { it.qualifiedId() }
         val outputLimit = request.limits.outputBytes
@@ -116,6 +140,7 @@ class ExecutionEngine(
             perCaseTimeoutMillis = (request.limits.timeMillis * group.policy.limitMultiplier.time).toLong(),
             memoryMb = (request.limits.memoryMb * group.policy.limitMultiplier.memory).toInt(),
             outputByteLimit = outputLimit,
+            onEvent = { _, line -> TraceSdk.parse(line)?.let(events::add) },
         ) { caseId, outcome ->
             // 기대 출력은 자식에게 넘기지 않으므로 정답 비교는 여기서만 일어난다.
             val passed = verdictOf(outcome, byId.getValue(caseId), outputLimit) == Verdict.ACCEPTED
@@ -134,6 +159,41 @@ class ExecutionEngine(
                 message = messageOf(outcome, group.policy.exposesInput),
             )
         }
+    }
+
+    /**
+     * 트레이스 실행 결과.
+     *
+     * 트레이스는 판정과 독립이다. 이벤트가 하나도 없어도 실패로 만들지 않고 그 사실만
+     * 진단으로 남긴다. 계측을 강제하면 사용자는 계측을 지우게 된다 (§7.3, §12.2).
+     */
+    private fun traceResult(
+        request: ExecutionRequest,
+        results: List<TestCaseResult>,
+        events: List<TraceEvent>,
+    ): ExecutionResult {
+        val truncated = events.size >= TraceCapture.EVENT_BUDGET
+        return ExecutionResult(
+            executionId = request.executionId,
+            submissionId = request.submissionId,
+            attempt = request.attempt,
+            fencingToken = request.fencingToken,
+            terminalVerdict = null,
+            compileLog = null,
+            cases = results,
+            resultDigest = digestOf(results),
+            mode = ExecutionMode.TRACE,
+            trace = TraceCapture(
+                caseId = results.firstOrNull()?.let { it.groupId + "/" + it.caseId } ?: "",
+                events = events,
+                truncated = truncated,
+                diagnostics = when {
+                    events.isEmpty() -> "계측 호출이 없어 트레이스가 비어 있다"
+                    truncated -> "이벤트 예산 " + TraceCapture.EVENT_BUDGET + "개를 넘겨 이후를 잘랐다"
+                    else -> null
+                },
+            ),
+        )
     }
 
     private companion object {

@@ -50,6 +50,7 @@ class SubmissionService(
             problemVersion = command.problemVersion,
             language = command.language,
             source = command.source,
+            requestTrace = command.requestTrace,
         )
 
         val inserted = repository.insertWithOutbox(
@@ -77,6 +78,8 @@ class SubmissionService(
     }
 
     fun find(id: UUID): Submission? = repository.findById(id)
+
+    fun trace(id: UUID): String? = repository.findTrace(id)
 
     fun recent(userId: String, limit: Int = 20): List<Submission> = repository.recentFor(userId, limit)
 
@@ -107,4 +110,5 @@ data class CreateSubmission(
     val problemVersion: Int,
     val language: Language,
     val source: String,
+    val requestTrace: Boolean = true,
 )

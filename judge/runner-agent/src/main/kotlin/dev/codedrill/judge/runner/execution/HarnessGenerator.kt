@@ -23,7 +23,9 @@ object HarnessGenerator {
         appendLine("import java.io.OutputStream")
         appendLine("import java.io.PrintStream")
         appendLine()
-        appendLine("private val ${P}Protocol: PrintStream = System.out")
+        // 계측 SDK 가 사용자 출력 리다이렉션 이전의 원본 스트림을 잡을 수 있도록 internal 로 연다.
+        appendLine("internal val ${P}Protocol: PrintStream = System.out")
+        appendLine("internal fun ${P}ProtocolStream(): PrintStream = ${P}Protocol")
         appendLine()
         // 사용자 출력은 세기만 하고 버린다. 무제한 버퍼링은 그 자체로 OOM 을 유발해
         // OUTPUT_LIMIT 이어야 할 상황을 MEMORY_LIMIT 으로 오분류한다.

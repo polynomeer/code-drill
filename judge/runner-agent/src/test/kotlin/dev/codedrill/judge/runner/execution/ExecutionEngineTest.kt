@@ -1,5 +1,6 @@
 package dev.codedrill.judge.runner.execution
 
+import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Language
@@ -155,7 +156,44 @@ class ExecutionEngineTest {
         assertEquals(first.resultDigest, second.resultDigest)
     }
 
-    private fun request(source: String, limits: Limits = pkg.manifest.limits) = ExecutionRequest(
+    // --- 트레이스 (§7) ---
+
+    @Test
+    fun `계측 호출은 판정 실행에서 no-op 으로 컴파일된다`() {
+        val result = engine.execute(request(INSTRUMENTED))
+
+        assertTrue(result.cases.all { it.verdict == Verdict.ACCEPTED }, "판정: ${result.cases}")
+        assertEquals(null, result.trace, "판정 모드는 트레이스를 만들지 않는다")
+    }
+
+    @Test
+    fun `트레이스 모드는 공개 케이스만 계측한다`() {
+        val result = engine.execute(request(INSTRUMENTED, mode = ExecutionMode.TRACE))
+        val capture = assertNotNull(result.trace)
+
+        assertTrue(capture.events.isNotEmpty(), "계측 이벤트가 있어야 한다")
+        assertTrue(
+            result.cases.all { it.groupId == "sample" },
+            "숨은 그룹은 트레이스에서 실행되지 않는다: ${result.cases.map { it.groupId }.distinct()}",
+        )
+        assertEquals(false, capture.truncated)
+        assertTrue(capture.events.first().seq == 1L, "순번은 1부터 이어진다")
+    }
+
+    @Test
+    fun `계측하지 않은 풀이는 빈 트레이스와 사유를 남긴다`() {
+        val result = engine.execute(request(REFERENCE, mode = ExecutionMode.TRACE))
+        val capture = assertNotNull(result.trace)
+
+        assertTrue(capture.events.isEmpty())
+        assertNotNull(capture.diagnostics, "왜 비었는지 남겨야 한다")
+    }
+
+    private fun request(
+        source: String,
+        limits: Limits = pkg.manifest.limits,
+        mode: ExecutionMode = ExecutionMode.JUDGE,
+    ) = ExecutionRequest(
         executionId = "exec-test",
         submissionId = "sub-test",
         attempt = 1,
@@ -168,6 +206,7 @@ class ExecutionEngineTest {
         signature = pkg.manifest.signature,
         limits = limits,
         groups = pkg.groups.map { RequestedGroup(it.policy, it.cases) },
+        mode = mode,
     )
 
     private companion object {
@@ -177,6 +216,23 @@ class ExecutionEngineTest {
                 for (i in nums.indices) {
                     val j = seen[target - nums[i]]
                     if (j != null) return intArrayOf(j, i)
+                    seen.putIfAbsent(nums[i], i)
+                }
+                error("정답은 항상 존재한다")
+            }
+        """.trimIndent()
+
+        val INSTRUMENTED = """
+            fun twoSum(nums: IntArray, target: Int): IntArray {
+                val seen = HashMap<Int, Int>()
+                for (i in nums.indices) {
+                    Drill.visit(i, nums[i])
+                    val j = seen[target - nums[i]]
+                    if (j != null) {
+                        Drill.match(j, i)
+                        return intArrayOf(j, i)
+                    }
+                    Drill.compare(i, target - nums[i])
                     seen.putIfAbsent(nums[i], i)
                 }
                 error("정답은 항상 존재한다")

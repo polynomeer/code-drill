@@ -11,6 +11,17 @@
 fun twoSum(nums: IntArray, target: Int): IntArray
 ```
 
+## 실행 리플레이 계측 (선택)
+
+풀이 과정을 시각적으로 되짚고 싶으면 `Drill` SDK 를 호출한다. 채점 실행에서는
+no-op 으로 컴파일되므로 시간·메모리 판정에 영향을 주지 않는다.
+
+```kotlin
+Drill.visit(index, value)     // 원소를 살펴봤다
+Drill.compare(index, other)   // 짝을 찾아봤다
+Drill.match(left, right)      // 답을 찾았다
+```
+
 ## 제약
 
 - `2 <= nums.size <= 100_000`

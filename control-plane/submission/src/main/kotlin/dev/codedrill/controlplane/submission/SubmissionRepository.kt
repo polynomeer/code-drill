@@ -42,6 +42,14 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
         return 1
     }
 
+    /** 트레이스를 붙인다. 판정 상태는 건드리지 않는다 (§7.1 판정과 독립). */
+    fun attachTrace(id: UUID, traceJson: String): Int =
+        jdbc.update("UPDATE submission SET trace = ?::jsonb WHERE id = ?", traceJson, id)
+
+    fun findTrace(id: UUID): String? =
+        jdbc.query("SELECT trace FROM submission WHERE id = ?", { rs, _ -> rs.getString(1) }, id)
+            .firstOrNull()
+
     fun updateSource(id: UUID, source: String) {
         jdbc.update("UPDATE submission SET source = ? WHERE id = ?", source, id)
     }

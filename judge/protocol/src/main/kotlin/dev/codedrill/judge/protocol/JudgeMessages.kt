@@ -20,6 +20,8 @@ data class SubmissionQueued(
      * 참조와 digest 만 실어야 한다 (§8.3).
      */
     val source: String,
+    /** 판정이 끝난 뒤 학습용 트레이스를 이어서 만들지 (§9.3 requestTrace). */
+    val requestTrace: Boolean = false,
 ) {
     companion object {
         const val SCHEMA_VERSION = "1.0"

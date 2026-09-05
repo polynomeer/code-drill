@@ -4,6 +4,7 @@ import dev.codedrill.judge.orchestrator.JudgeGateway
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
+import dev.codedrill.judge.protocol.TraceReady
 import dev.codedrill.platform.messaging.JudgeQueues
 import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.stereotype.Component
@@ -20,4 +21,7 @@ class AmqpJudgeGateway(private val rabbit: RabbitTemplate) : JudgeGateway {
 
     override fun publishCompleted(completed: JudgeCompleted) =
         rabbit.convertAndSend(JudgeQueues.PROGRESS, completed)
+
+    override fun publishTraceReady(ready: TraceReady) =
+        rabbit.convertAndSend(JudgeQueues.PROGRESS, ready)
 }

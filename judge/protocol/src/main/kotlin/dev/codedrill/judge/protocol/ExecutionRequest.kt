@@ -26,6 +26,8 @@ data class ExecutionRequest(
     val signature: Signature,
     val limits: Limits,
     val groups: List<RequestedGroup>,
+    /** JUDGE 는 계측 없이, TRACE 는 공개 케이스만 계측해 실행한다 (§7.1). */
+    val mode: ExecutionMode = ExecutionMode.JUDGE,
 ) {
     companion object {
         const val SCHEMA_VERSION = "1.0"

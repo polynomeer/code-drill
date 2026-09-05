@@ -47,6 +47,7 @@ class SubmissionController(
                 problemVersion = request.problemVersion,
                 language = request.language,
                 source = request.source,
+                requestTrace = request.requestTrace,
             ),
         )
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(SubmissionResponse.of(submission, json))
@@ -67,6 +68,13 @@ class SubmissionController(
      * 상태 스트림. 구독 직후 현재 상태를 한 번 흘려보내, 구독 이전에 지나간 전이를
      * 놓친 클라이언트도 즉시 수렴한다.
      */
+    /** 실행 트레이스. 아직 준비되지 않았으면 204 다 — 오류가 아니다 (§12.2). */
+    @GetMapping("/{id}/trace")
+    fun trace(@PathVariable id: UUID): ResponseEntity<Any> {
+        val trace = service.trace(id) ?: return ResponseEntity.noContent().build()
+        return ResponseEntity.ok(json.readTree(trace))
+    }
+
     @GetMapping("/{id}/events")
     fun events(@PathVariable id: UUID): SseEmitter {
         val emitter = events.subscribe(id.toString())
@@ -92,6 +100,8 @@ data class CreateSubmissionRequest(
     val problemVersion: Int,
     val language: Language,
     @field:NotBlank val source: String,
+    /** 판정 뒤 학습용 트레이스를 이어서 만들지 (§9.3). */
+    val requestTrace: Boolean = true,
 )
 
 data class SubmissionResponse(

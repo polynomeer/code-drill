@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.submission
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
+import dev.codedrill.judge.protocol.TraceReady
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.platform.observability.CorrelationIds
 import org.slf4j.LoggerFactory
@@ -62,6 +63,20 @@ class JudgeProgressListener(
             ?.let { SubmissionResponse.of(it, json) }
             ?: return
         events.publish(message.submissionId, "completed", payload)
+        // 트레이스가 뒤따라올 수 있으므로 스트림을 여기서 닫지 않는다.
+    }
+
+    /**
+     * 트레이스 도착.
+     *
+     * 판정과 독립이므로 제출 상태를 건드리지 않는다. 트레이스가 영영 오지 않아도
+     * 사용자는 판정 결과를 온전히 본다 (§12.2 장애 격리).
+     */
+    @RabbitHandler
+    fun onTraceReady(message: TraceReady) {
+        val id = UUID.fromString(message.submissionId)
+        repository.attachTrace(id, json.writeValueAsString(message.capture))
+        events.publish(message.submissionId, "trace", message.capture)
         events.close(message.submissionId)
     }
 }

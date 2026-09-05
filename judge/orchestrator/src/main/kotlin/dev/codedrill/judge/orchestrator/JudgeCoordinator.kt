@@ -3,6 +3,7 @@ package dev.codedrill.judge.orchestrator
 import dev.codedrill.judge.orchestrator.aggregation.VerdictAggregator
 import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
 import dev.codedrill.judge.protocol.CompletedGroup
+import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.JudgeCompleted
@@ -10,12 +11,14 @@ import dev.codedrill.judge.protocol.JudgeProgressed
 import dev.codedrill.judge.protocol.JudgeStatus
 import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.SubmissionQueued
+import dev.codedrill.judge.protocol.TraceReady
 import dev.codedrill.platform.observability.CorrelationIds
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.problempackage.Visibility
 import org.slf4j.LoggerFactory
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -32,6 +35,15 @@ class JudgeCoordinator(
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val progressSeq = AtomicLong()
+
+    /**
+     * 판정이 끝난 뒤 트레이스를 이어 만들기 위해 원 요청을 잠시 들고 있는다.
+     *
+     * 슬라이스는 메모리에 둔다. 오케스트레이터가 재시작하면 대기 중이던 트레이스 요청은
+     * 사라지지만, 판정은 이미 끝났고 트레이스는 재요청할 수 있으므로 사용자에게 남는
+     * 피해가 없다 (§12.2 장애 격리).
+     */
+    private val pendingTrace = ConcurrentHashMap<String, ExecutionRequest>()
 
     /** 제출을 임대하고 Runner 에게 실행을 요청한다. */
     fun onSubmissionQueued(message: SubmissionQueued) {
@@ -62,6 +74,7 @@ class JudgeCoordinator(
             .addKeyValue(CorrelationIds.ATTEMPT, lease.attempt)
             .log("실행을 임대하고 Runner 에 요청한다")
 
+        if (message.requestTrace) pendingTrace[message.submissionId] = request
         gateway.requestExecution(request)
         gateway.publishProgress(
             JudgeProgressed(
@@ -80,6 +93,22 @@ class JudgeCoordinator(
      * 만들지 않기 위해서다 — 스테일 결과는 다시 받아도 여전히 스테일이다.
      */
     fun onExecutionResult(result: ExecutionResult, correlationId: String) {
+        // 트레이스는 판정이 아니다. 임대·fencing 검사를 거치지 않고, 실패해도 판정에
+        // 영향을 주지 않는다 (§7.1, §12.2).
+        if (result.mode == ExecutionMode.TRACE) {
+            result.trace?.let { capture ->
+                gateway.publishTraceReady(
+                    TraceReady(
+                        submissionId = result.submissionId,
+                        executionId = result.executionId,
+                        correlationId = correlationId,
+                        capture = capture,
+                    ),
+                )
+            }
+            return
+        }
+
         when (val acceptance = registry.accept(result)) {
             AttemptRegistry.Acceptance.Accepted -> complete(result, correlationId)
 
@@ -103,6 +132,7 @@ class JudgeCoordinator(
     }
 
     private fun complete(result: ExecutionResult, correlationId: String) {
+        dispatchTrace(result.submissionId)
         val pkg = packageOf(result)
         val aggregated = VerdictAggregator.aggregate(pkg.groups.map { it.policy }, result)
 
@@ -130,6 +160,22 @@ class JudgeCoordinator(
         )
     }
 
+    /**
+     * 판정이 끝난 뒤 학습용 트레이스를 별도 작업으로 띄운다 (§7.1).
+     *
+     * 저우선순위 큐로 분리하는 것이 다음 단계다. 지금은 같은 큐를 쓰되, 계측 오버헤드가
+     * 판정 실행에 섞이지 않는다는 본질은 모드 분리로 지켜진다.
+     */
+    private fun dispatchTrace(submissionId: String) {
+        val original = pendingTrace.remove(submissionId) ?: return
+        gateway.requestExecution(
+            original.copy(
+                executionId = UUID.randomUUID().toString(),
+                mode = ExecutionMode.TRACE,
+            ),
+        )
+    }
+
     /** 제출이 어떤 문제를 풀고 있었는지. 슬라이스는 문제가 하나뿐이라 단순하다. */
     private fun packageOf(result: ExecutionResult): ProblemPackage {
         check(result.submissionId.isNotBlank())
@@ -150,4 +196,5 @@ interface JudgeGateway {
     fun requestExecution(request: ExecutionRequest)
     fun publishProgress(progress: JudgeProgressed)
     fun publishCompleted(completed: JudgeCompleted)
+    fun publishTraceReady(ready: TraceReady)
 }

@@ -18,6 +18,9 @@ data class ExecutionResult(
     val compileLog: String?,
     val cases: List<TestCaseResult>,
     val resultDigest: String,
+    val mode: ExecutionMode = ExecutionMode.JUDGE,
+    /** TRACE 모드에서만 채워진다. 트레이스 실패가 판정을 흔들면 안 된다 (§12.2). */
+    val trace: TraceCapture? = null,
 ) {
     companion object {
         const val SCHEMA_VERSION = "1.0"

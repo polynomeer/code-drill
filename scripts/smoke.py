@@ -27,8 +27,13 @@ ACCEPTED_SOURCE = """
 fun twoSum(nums: IntArray, target: Int): IntArray {
     val seen = HashMap<Int, Int>()
     for (i in nums.indices) {
+        Drill.visit(i, nums[i])
         val j = seen[target - nums[i]]
-        if (j != null) return intArrayOf(j, i)
+        if (j != null) {
+            Drill.match(j, i)
+            return intArrayOf(j, i)
+        }
+        Drill.compare(i, target - nums[i])
         seen.putIfAbsent(nums[i], i)
     }
     error("정답은 항상 존재한다")
@@ -99,6 +104,18 @@ def read_events(submission_id: str, limit: int = 4) -> list[str]:
     return seen
 
 
+def await_trace(submission_id: str) -> dict | None:
+    """트레이스는 판정 뒤 별도 작업으로 온다. 없으면 204 라서 None 이 돌아온다."""
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        req = urllib.request.Request(f"{BASE}/submissions/{submission_id}/trace")
+        with urllib.request.urlopen(req, timeout=10) as response:
+            if response.status == 200:
+                return json.loads(response.read())
+        time.sleep(0.5)
+    return None
+
+
 def check(label: str, actual, expected) -> bool:
     ok = actual == expected
     print(f"  {'PASS' if ok else 'FAIL'}  {label}: {actual}" + ("" if ok else f" (기대: {expected})"))
@@ -130,6 +147,16 @@ def main() -> int:
             hidden = [g for g in final["groups"] if g["groupId"] != "sample"]
             leaked = [g for g in hidden if g["cases"]]
             results.append(check("  숨은 그룹 케이스 비노출", leaked, []))
+
+    print("\n실행 트레이스 (§7)")
+    traced = submit(ACCEPTED_SOURCE)
+    await_verdict(traced["id"])
+    capture = await_trace(traced["id"])
+    results.append(check("트레이스 도착", capture is not None, True))
+    if capture:
+        results.append(check("이벤트 있음", len(capture["events"]) > 0, True))
+        results.append(check("잘리지 않음", capture["truncated"], False))
+        results.append(check("공개 케이스만", capture["caseId"].startswith("sample/"), True))
 
     print("\n멱등성 (§4.3)")
     key = str(uuid.uuid4())
