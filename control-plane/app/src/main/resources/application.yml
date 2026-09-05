@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: code-drill-control-plane
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/codedrill}
+    username: ${DB_USER:codedrill}
+    password: ${DB_PASSWORD:codedrill}
+  flyway:
+    enabled: true
+    # expand → dual-compatible deploy → backfill → contract 순서를 지킨다 (§15.2).
+    # 배포 중 이전 버전 애플리케이션과 호환되어야 하므로 파괴적 변경을 한 번에 넣지 않는다.
+    baseline-on-migrate: false
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+  rabbitmq:
+    addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  tracing:
+    sampling:
+      probability: ${TRACE_SAMPLE_RATE:1.0}
+
+logging:
+  # 구조화 JSON 과 안정적인 event name 을 쓴다. 사용자 stdout/stderr 는 이 스트림에
+  # 섞지 않고 제한된 별도 객체로 저장한다 (§13.3).
+  level:
+    root: INFO
