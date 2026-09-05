@@ -1,0 +1,4 @@
+# esbuild 는 설치 시 플랫폼 바이너리를 준비하는 빌드 스크립트가 필요하다.
+# pnpm 은 기본으로 빌드 스크립트를 막으므로 명시적으로 허용한다.
+allowBuilds:
+  esbuild: true
