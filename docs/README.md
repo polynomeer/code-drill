@@ -12,9 +12,10 @@
 | [project-context.md](project-context.md) | 이 제품은 무엇이고 어떤 용어·스택을 쓰는가 | 에이전트·신규 기여자 |
 | [commit-convention.md](commit-convention.md) | 커밋 메시지를 어떻게 쓰는가 | 에이전트·기여자 |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | 사람이 처음 무엇을 읽고 설정하는가 | 사람 기여자 |
+| [specs/](specs/) | 제품·기술·디자인 결정의 원본은 어디 있나 | 상세가 필요할 때 |
 | [archive/](archive/) | 예전 규칙은 무엇이었나 | 이력 추적 시에만 |
 
-저장소 루트의 `code_drill_*.docx` 5종(기획서·PRD·기술 설계서·디자인 설계서·UI 문서)이
+[specs/](specs/)의 `.docx` 5종(기획서·PRD·기술 설계서·디자인 설계서·UI 문서)이
 제품의 상위 기준 문서다. `docs/`의 Markdown은 그 문서를 대체하지 않고, 코드를 쓸 때
 매번 필요한 결정만 뽑아 캐시한다. 둘이 어긋나면 `.docx`가 이긴다.
 
