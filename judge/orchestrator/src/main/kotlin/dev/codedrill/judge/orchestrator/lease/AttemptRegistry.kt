@@ -1,0 +1,99 @@
+package dev.codedrill.judge.orchestrator.lease
+
+import dev.codedrill.judge.protocol.ExecutionResult
+import dev.codedrill.judge.protocol.FencingToken
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * 실행 임대와 fencing 토큰을 관리한다 (기술 설계서 §4.3).
+ *
+ * 작업은 at-least-once 로 전달되고 워커는 언제든 사라질 수 있다. 그래서 "지금 유효한
+ * 실행이 무엇인가"를 한 곳에서 정하고, 그 판단을 [FencingToken] 이라는 단조 증가 값으로
+ * 표현한다. 잃어버린 줄 알았던 워커가 살아 돌아와도 토큰이 낮으면 결과가 거절된다.
+ *
+ * 슬라이스는 프로세스 메모리에 둔다. 운영에서는 Redis 의 원자적 INCR 또는 실행 영역
+ * 자체 저장소로 옮겨야 여러 오케스트레이터 replica 사이에서도 같은 불변식이 선다.
+ */
+class AttemptRegistry(
+    private val clock: Clock = Clock.systemUTC(),
+    private val leaseDuration: Duration = Duration.ofMinutes(2),
+) {
+
+    private val active = ConcurrentHashMap<String, Lease>()
+    private val completed = ConcurrentHashMap<String, String>()
+
+    /**
+     * 새 실행을 임대한다. 같은 제출을 다시 임대하면 attempt 와 토큰이 함께 올라가고,
+     * 이전 임대는 그 순간 무효가 된다.
+     */
+    fun lease(submissionId: String): Lease {
+        val next = active.compute(submissionId) { _, previous ->
+            val attempt = (previous?.attempt ?: 0) + 1
+            Lease(
+                submissionId = submissionId,
+                attempt = attempt,
+                token = FencingToken((previous?.token?.value ?: 0) + 1),
+                expiresAt = clock.instant().plus(leaseDuration),
+            )
+        }
+        return checkNotNull(next)
+    }
+
+    /** 임대가 만료됐는지. 만료된 임대는 재임대 대상이다 (§4.3 워커 유실). */
+    fun isExpired(submissionId: String): Boolean {
+        val lease = active[submissionId] ?: return false
+        return clock.instant().isAfter(lease.expiresAt)
+    }
+
+    /**
+     * 도착한 결과를 받아들일지 판단한다.
+     *
+     * 순서가 중요하다. 중복 판정을 fencing 검사보다 먼저 해야, 같은 결과의 재전달이
+     * 스테일로 잘못 기록되지 않는다.
+     */
+    fun accept(result: ExecutionResult): Acceptance {
+        completed[result.submissionId]?.let { digest ->
+            return if (digest == result.resultDigest) Acceptance.Duplicate else Acceptance.AlreadyCompleted
+        }
+
+        val lease = active[result.submissionId]
+            ?: return Acceptance.Stale("임대 기록이 없다")
+
+        if (result.fencingToken < lease.token) {
+            return Acceptance.Stale(
+                "fencing 토큰이 낮다: 받은 ${result.fencingToken.value}, 현재 ${lease.token.value}",
+            )
+        }
+        if (result.attempt != lease.attempt) {
+            return Acceptance.Stale("attempt 가 다르다: 받은 ${result.attempt}, 현재 ${lease.attempt}")
+        }
+
+        completed[result.submissionId] = result.resultDigest
+        active.remove(result.submissionId)
+        return Acceptance.Accepted
+    }
+
+    data class Lease(
+        val submissionId: String,
+        val attempt: Int,
+        val token: FencingToken,
+        val expiresAt: Instant,
+    )
+
+    sealed interface Acceptance {
+        /** 유효한 결과다. 집계로 넘긴다. */
+        data object Accepted : Acceptance
+
+        /** 같은 결과가 다시 왔다. no-op 이며 오류가 아니다 (§4.3 결과 중복). */
+        data object Duplicate : Acceptance
+
+        /** 종료된 제출에 다른 결과가 왔다. 감사 기록 대상이다. */
+        data object AlreadyCompleted : Acceptance
+
+        /** 유효하지 않은 실행에서 온 결과다. 폐기하고 감사 기록만 남긴다. */
+        data class Stale(val reason: String) : Acceptance
+    }
+}
