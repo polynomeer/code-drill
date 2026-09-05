@@ -29,4 +29,18 @@ Claude가 만든 커밋은 마지막 줄에 `Co-Authored-By: Claude Opus 5 <nore
 
 ## 명령어
 
-빌드·테스트 도구 미도입. 도구를 세팅하면 실제 명령어를 이 섹션에 기록한다.
+```bash
+./gradlew build              # 백엔드 전체 빌드 + 테스트 + 모듈 경계 검사
+./gradlew test               # 테스트만
+./gradlew checkModuleBoundaries   # 도메인 모듈이 서로를 참조하는지 검사
+./gradlew :control-plane:app:bootRun
+docker compose -f deploy/docker-compose.yml up -d   # postgres, redis, rabbitmq, minio
+```
+
+```bash
+cd web && pnpm install && pnpm build   # tsc --noEmit + vite build
+cd web && pnpm dev                     # :8080 으로 /api 프록시
+```
+
+Gradle 데몬 JVM 은 `gradle/gradle-daemon-jvm.properties` 가 21 로 고정한다. 로컬 기본
+JDK 가 더 높아도 `./gradlew` 는 설치된 21 을 찾아 쓴다.

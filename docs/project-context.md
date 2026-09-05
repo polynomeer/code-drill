@@ -40,6 +40,21 @@
 MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafka, 서비스 메시,
 요청마다 Kubernetes Job 생성(상시 워커 풀을 쓴다).
 
+## 배포 단위
+
+저장소는 신뢰 경계를 따라 나뉜다. 같은 저장소에 있어도 **배포 단위는 따로다**.
+
+| 경로 | 배포 단위 | 경계 |
+|---|---|---|
+| `platform/` | 라이브러리 | 세 영역이 공유하는 기반(오류 코드·아웃박스·상관관계 ID) |
+| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 8개를 조립하는 모듈형 모놀리스 |
+| `judge/orchestrator`, `judge/runner-agent` | 각각 별도 앱 | Control DB·인터넷에 직접 접근하지 않는 실행 영역 |
+| `judge/protocol` | 라이브러리 | orchestrator ↔ runner 결과 봉투 계약 |
+| `web/` | 정적 자산 | React + TS + Monaco |
+
+도메인 모듈이 서로를 직접 참조하면 `./gradlew checkModuleBoundaries` 가 빌드를 깬다.
+협력은 조립 지점인 `:control-plane:app` 에서 연결한다.
+
 ## 모듈 경계
 
 제어 영역은 모듈형 모놀리스다. 각 모듈은 자기 데이터만 소유하고, 아래 금지 의존성을 넘지 않는다.
