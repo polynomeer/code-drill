@@ -1,5 +1,7 @@
 package dev.codedrill.platform.problempackage
 
+import com.fasterxml.jackson.annotation.JsonIgnore
+
 /**
  * 로딩된 문제 패키지 (기술 설계서 §6.1).
  *
@@ -13,6 +15,7 @@ data class ProblemPackage(
     val groups: List<TestGroup>,
     val packageDigest: String,
 ) {
+    @get:JsonIgnore
     val problemVersionId: String get() = "${manifest.id}@${manifest.version}"
 
     /** 사용자에게 노출해도 되는 케이스만 추린다. 숨은 입력은 DTO 단계에서 제거한다 (§9.1). */

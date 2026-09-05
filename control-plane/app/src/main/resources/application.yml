@@ -16,6 +16,12 @@ spring:
   rabbitmq:
     addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
 
+codedrill:
+  content:
+    root: ${CONTENT_ROOT:content/problems}
+  outbox:
+    poll-interval-ms: 200
+
 server:
   port: ${PORT:8080}
 

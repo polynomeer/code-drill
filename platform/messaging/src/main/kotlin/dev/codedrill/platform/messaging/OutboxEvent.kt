@@ -1,5 +1,7 @@
 package dev.codedrill.platform.messaging
 
+import com.fasterxml.jackson.annotation.JsonIgnore
+
 import java.time.Instant
 import java.util.UUID
 
@@ -19,5 +21,6 @@ data class OutboxEvent(
     val occurredAt: Instant,
     val publishedAt: Instant? = null,
 ) {
+    @get:JsonIgnore
     val published: Boolean get() = publishedAt != null
 }

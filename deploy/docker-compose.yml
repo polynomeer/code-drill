@@ -2,6 +2,10 @@
 #
 # 운영 토폴로지(§2.3)의 신뢰 경계는 재현하지 않는다. Runner 격리와 네트워크 분리는
 # 컨테이너 오케스트레이터 정책으로 다루며, 여기서는 Control Plane 이 붙을 상태 저장소만 띄운다.
+#
+# 호스트 포트는 전부 환경변수로 바꿀 수 있다. 개발 머신에 이미 같은 포트를 쓰는 스택이
+# 떠 있는 경우가 흔하다:
+#   POSTGRES_PORT=55432 REDIS_PORT=56379 docker compose -f deploy/docker-compose.yml up -d
 
 name: code-drill
 
@@ -12,7 +16,7 @@ services:
       POSTGRES_DB: codedrill
       POSTGRES_USER: codedrill
       POSTGRES_PASSWORD: codedrill
-    ports: ["5432:5432"]
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
     volumes: ["postgres-data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U codedrill"]
@@ -24,7 +28,7 @@ services:
     image: redis:7-alpine
     # 쿼터 카운터와 짧은 캐시에만 쓴다. 진실의 원천은 항상 DB 다 (§10.1).
     command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports: ["6379:6379"]
+    ports: ["${REDIS_PORT:-6379}:6379"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -37,7 +41,7 @@ services:
       RABBITMQ_DEFAULT_USER: codedrill
       RABBITMQ_DEFAULT_PASS: codedrill
     # 채점 작업 큐는 운영에서 quorum queue 로 선언한다 (§0.1, §12.3).
-    ports: ["5672:5672", "15672:15672"]
+    ports: ["${RABBITMQ_PORT:-5672}:5672", "${RABBITMQ_UI_PORT:-15672}:15672"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -51,7 +55,7 @@ services:
       MINIO_ROOT_USER: codedrill
       MINIO_ROOT_PASSWORD: codedrill
     # 소스·테스트 번들·로그·트레이스는 DB 가 아니라 여기에 두고 참조와 digest 만 보관한다 (§8.3).
-    ports: ["9000:9000", "9001:9001"]
+    ports: ["${MINIO_PORT:-9000}:9000", "${MINIO_UI_PORT:-9001}:9001"]
     volumes: ["minio-data:/data"]
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]

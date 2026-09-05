@@ -1,5 +1,7 @@
 package dev.codedrill.platform.problempackage
 
+import com.fasterxml.jackson.annotation.JsonIgnore
+
 /**
  * Problem Package manifest (기술 설계서 §6.1).
  *
@@ -52,7 +54,13 @@ data class GroupPolicy(
     val stopPolicy: StopPolicy,
     val limitMultiplier: LimitMultiplier = LimitMultiplier(),
 ) {
-    /** 공개 그룹만 입력·기대 출력을 사용자에게 보여줄 수 있다 (§7.1, §11.1). */
+    /**
+     * 공개 그룹만 입력·기대 출력을 사용자에게 보여줄 수 있다 (§7.1, §11.1).
+     *
+     * 파생값이므로 와이어에 싣지 않는다. 직렬화하면 수신 측에서 알 수 없는 필드가 되고,
+     * 무엇보다 진실의 원천이 두 곳이 된다.
+     */
+    @get:JsonIgnore
     val exposesInput: Boolean get() = visibility == Visibility.PUBLIC
 }
 

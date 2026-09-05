@@ -11,5 +11,6 @@ dependencies {
     implementation(libs.spring.boot.starter)
     implementation(libs.spring.boot.starter.amqp)
     implementation(libs.spring.boot.starter.actuator)
-    implementation(libs.aws.s3)
+    // health·prometheus 엔드포인트를 노출하려면 web 이 필요하다 (§13.2 기본 대시보드).
+    implementation(libs.spring.boot.starter.web)
 }

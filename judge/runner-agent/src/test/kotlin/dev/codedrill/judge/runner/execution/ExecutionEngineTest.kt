@@ -79,7 +79,7 @@ class ExecutionEngineTest {
     }
 
     @Test
-    fun `제한 시간을 넘기면 TIME_LIMIT 이고 뒤 케이스는 오답이 되지 않는다`() {
+    fun `제한 시간을 넘기면 TIME_LIMIT 이고 실행되지 못한 케이스는 결과에 없다`() {
         val source = """
             fun twoSum(nums: IntArray, target: Int): IntArray {
                 while (true) { }
@@ -89,8 +89,12 @@ class ExecutionEngineTest {
         val result = engine.execute(request(source, limits = FAST_LIMITS))
 
         assertEquals(Verdict.TIME_LIMIT, result.cases.first().verdict)
-        // 실행되지 못한 케이스를 WRONG_ANSWER 로 만들면 사용자에게 거짓말이 된다.
-        assertEquals(1, result.cases.size, "중단 이후 케이스는 결과에 실리지 않는다")
+        // 그룹마다 별도 프로세스이므로 세 그룹이 각각 시간 초과로 끝난다.
+        assertEquals(3, result.cases.size, "그룹당 첫 케이스에서 멈춘 결과만 남는다")
+        assertTrue(
+            result.cases.all { it.verdict == Verdict.TIME_LIMIT },
+            "실행되지 못한 케이스가 오답으로 둔갑하면 안 된다: ${result.cases}",
+        )
     }
 
     @Test

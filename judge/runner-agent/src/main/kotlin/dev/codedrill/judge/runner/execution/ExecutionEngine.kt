@@ -3,6 +3,7 @@ package dev.codedrill.judge.runner.execution
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.Measurements
+import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.TestCaseResult
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.platform.problempackage.StopPolicy
@@ -56,44 +57,15 @@ class ExecutionEngine(
             KotlinSourceCompiler.CompileOutcome.Success -> Unit
         }
 
-        // execute
-        val cases = request.groups.flatMap { group -> group.cases.map { group.policy to it } }
-        val expectedById = cases.associate { (_, case) -> case.qualifiedId() to case }
-        val policyById = cases.associate { (policy, case) -> case.qualifiedId() to policy }
-
-        val sandbox = SandboxProcess(
-            // plusElement 로 붙인다. Path 는 Iterable<Path> 라서 `+ classesDir` 는 경로를
-            // 세그먼트별로 쪼개 넣는다.
-            classpath = RuntimeClasspath.all.plusElement(classesDir),
-            workDir = sandboxDir,
-        )
-        val timeLimit = request.groups.maxOf { (request.limits.timeMillis * it.policy.limitMultiplier.time).toLong() }
-        val memoryLimit = request.limits.memoryMb
-
-        val outcomes = sandbox.run(
-            caseIds = cases.map { (_, case) -> case.qualifiedId() },
-            perCaseTimeoutMillis = timeLimit,
-            memoryMb = memoryLimit,
-            outputByteLimit = request.limits.outputBytes,
-        ) { caseId, outcome ->
-            // check 를 스트리밍 중에 수행해 FAIL_FAST 그룹은 첫 실패에서 멈춘다 (§6.2).
-            val policy = policyById.getValue(caseId)
-            val passed = verdictOf(outcome, expectedById.getValue(caseId), request.limits.outputBytes) ==
-                Verdict.ACCEPTED
-            passed || policy.stopPolicy != StopPolicy.FAIL_FAST
-        }
-
-        // check
-        val results = outcomes.mapNotNull { (caseId, outcome) ->
-            if (outcome is CaseOutcome.NotRun) return@mapNotNull null
-            val case = expectedById.getValue(caseId)
-            TestCaseResult(
-                caseId = case.id,
-                groupId = case.groupId,
-                verdict = verdictOf(outcome, case, request.limits.outputBytes),
-                measurements = measurementsOf(outcome),
-                message = messageOf(outcome, policyById.getValue(caseId).exposesInput),
-            )
+        // execute: 그룹마다 별도 샌드박스를 띄운다.
+        //
+        // stop_policy 는 그룹 단위 정책이다 (§6.2). 한 프로세스에서 전부 돌리면 앞 그룹의
+        // FAIL_FAST 나 TIME_LIMIT 이 뒤 그룹까지 통째로 날려버려, 채점하지 못한 그룹과
+        // 정책대로 멈춘 그룹을 구분할 수 없게 된다. 그룹별 격리는 한 그룹의 OOM 이 다른
+        // 그룹의 측정치를 오염시키지 않는 효과도 있다.
+        val classpath = RuntimeClasspath.all.plusElement(classesDir)
+        val results = request.groups.flatMap { group ->
+            runGroup(request, group, classpath, sandboxDir)
         }
 
         return ExecutionResult(
@@ -126,6 +98,42 @@ class ExecutionEngine(
         CaseOutcome.OutputExceeded -> Verdict.OUTPUT_LIMIT
         is CaseOutcome.Broken -> Verdict.SYSTEM_ERROR
         CaseOutcome.NotRun -> Verdict.SYSTEM_ERROR
+    }
+
+    /** 그룹 하나를 자기 프로세스에서 실행하고 케이스 결과로 바꾼다. */
+    private fun runGroup(
+        request: ExecutionRequest,
+        group: RequestedGroup,
+        classpath: List<Path>,
+        sandboxDir: Path,
+    ): List<TestCaseResult> {
+        val byId = group.cases.associateBy { it.qualifiedId() }
+        val outputLimit = request.limits.outputBytes
+
+        val outcomes = SandboxProcess(classpath, sandboxDir).run(
+            groupId = group.policy.id,
+            caseIds = group.cases.map { it.qualifiedId() },
+            perCaseTimeoutMillis = (request.limits.timeMillis * group.policy.limitMultiplier.time).toLong(),
+            memoryMb = (request.limits.memoryMb * group.policy.limitMultiplier.memory).toInt(),
+            outputByteLimit = outputLimit,
+        ) { caseId, outcome ->
+            // 기대 출력은 자식에게 넘기지 않으므로 정답 비교는 여기서만 일어난다.
+            val passed = verdictOf(outcome, byId.getValue(caseId), outputLimit) == Verdict.ACCEPTED
+            passed || group.policy.stopPolicy != StopPolicy.FAIL_FAST
+        }
+
+        return outcomes.mapNotNull { (caseId, outcome) ->
+            // 실행되지 못한 케이스는 결과에 싣지 않는다. 오답으로 만들면 거짓말이 된다.
+            if (outcome is CaseOutcome.NotRun) return@mapNotNull null
+            val case = byId.getValue(caseId)
+            TestCaseResult(
+                caseId = case.id,
+                groupId = case.groupId,
+                verdict = verdictOf(outcome, case, outputLimit),
+                measurements = measurementsOf(outcome),
+                message = messageOf(outcome, group.policy.exposesInput),
+            )
+        }
     }
 
     private companion object {

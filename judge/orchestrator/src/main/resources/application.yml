@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: code-drill-judge-orchestrator
+  rabbitmq:
+    addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
+
+codedrill:
+  content:
+    root: ${CONTENT_ROOT:content/problems}
+
+server:
+  port: ${PORT:8081}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}

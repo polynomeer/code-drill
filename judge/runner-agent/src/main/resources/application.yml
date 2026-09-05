@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: code-drill-runner-agent
+  rabbitmq:
+    addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
+    listener:
+      simple:
+        # 실행은 CPU 를 통째로 쓴다. 한 에이전트가 동시에 여러 샌드박스를 띄우면
+        # 측정치가 서로 오염된다 (§5.2 CPU/wall 동시 측정).
+        concurrency: 1
+        max-concurrency: 1
+        prefetch: 1
+
+server:
+  port: ${PORT:8082}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}

@@ -10,6 +10,8 @@ dependencies {
     implementation(project(":platform:common"))
     implementation(project(":platform:messaging"))
     implementation(project(":platform:observability"))
+    implementation(project(":platform:problem-package"))
+    implementation(project(":judge:protocol"))
 
     implementation(project(":control-plane:identity"))
     implementation(project(":control-plane:problem"))
@@ -22,9 +24,7 @@ dependencies {
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)
-    implementation(libs.spring.boot.starter.security)
     implementation(libs.spring.boot.starter.jdbc)
-    implementation(libs.spring.boot.starter.data.redis)
     implementation(libs.spring.boot.starter.amqp)
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.jackson.kotlin)

@@ -2,5 +2,6 @@ plugins { alias(libs.plugins.kotlin.spring) }
 
 dependencies {
     implementation(project(":platform:common"))
-    implementation(libs.spring.boot.starter)
+    implementation(project(":platform:problem-package"))
+    implementation(libs.spring.boot.starter.web)
 }

@@ -59,14 +59,19 @@ object HarnessGenerator {
         appendLine("    ${P}Protocol.flush()")
         appendLine("}")
         appendLine()
-        appendLine("fun main() {")
+        // 그룹 id 를 인자로 받아 해당 그룹만 실행한다. Runner 가 그룹마다 별도 프로세스를
+        // 띄우므로(§6.2 그룹 단위 stop_policy) 한 번 컴파일한 산출물을 그대로 재사용한다.
+        appendLine("fun main(args: Array<String>) {")
+        appendLine("    val group = args.getOrNull(0)")
         // 사용자의 println 이 프로토콜 스트림을 오염시키지 않도록 분리한다 (§13.3).
         appendLine("    System.setOut(PrintStream(${P}UserOut, true))")
         for (group in groups) {
+            appendLine("    if (group == null || group == ${quote(group.policy.id)}) {")
             for (case in group.cases) {
                 val call = "${signature.name}(${literals(signature, case.args)})"
-                appendLine("    ${P}case(${quote(case.qualifiedId())}) { ${P}encode($call) }")
+                appendLine("        ${P}case(${quote(case.qualifiedId())}) { ${P}encode($call) }")
             }
+            appendLine("    }")
         }
         appendLine("    ${P}Protocol.println(\"DONE\")")
         appendLine("    ${P}Protocol.flush()")
