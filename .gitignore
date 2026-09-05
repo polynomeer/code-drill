@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs & temp
+*.log
+tmp/
+temp/
+
+# Dependencies / build output (언어 추가 시 확장)
+node_modules/
+dist/
+build/
+out/
+target/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Claude Code (개인 로컬 설정은 커밋하지 않음)
+.claude/settings.local.json
