@@ -19,6 +19,9 @@ temp/
 build/
 out/
 
+# Kotlin 컴파일러 세션 파일 (빌드 중에만 존재)
+.kotlin/
+
 # Node
 node_modules/
 dist/
