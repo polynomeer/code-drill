@@ -40,6 +40,25 @@ DB_URL=jdbc:postgresql://localhost:5432/codedrill ./gradlew :control-plane:app:b
 judge/runner-agent/build/install/runner-agent/bin/runner-agent
 ```
 
+**Runner 는 컨테이너로 채점한다.** 기동 로그에 어떤 이미지로 격리하는지, digest 까지
+찍힌다. 이미지가 로컬에 없으면 경고와 함께 프로세스 샌드박스로 내려가므로, 로그를 보고
+격리가 실제로 섰는지 확인한다.
+
+```bash
+docker pull eclipse-temurin:21-jre
+docker pull python:3.12-alpine
+```
+
+다른 이미지를 쓰려면 환경변수로 바꾼다.
+
+```bash
+KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=python:3.12-slim \
+  judge/runner-agent/build/install/runner-agent/bin/runner-agent
+```
+
+공개 환경에서는 `REQUIRE_ISOLATION=true` 로 두어, 컨테이너 런타임이 없으면 기동 자체가
+중단되게 한다.
+
 **Runner 만 fat jar 가 아니다.** `kotlin-compiler-embeddable` 이 자기 jar 안의
 `extensions/compiler.xml` 을 클래스패스에서 직접 찾는데, Spring Boot fat jar 의 중첩 jar
 안에서는 찾지 못하고 컴파일이 통째로 실패한다. 그래서 `installDist` 로 평범한
@@ -65,8 +84,8 @@ cd web && pnpm install && pnpm dev
 python3 scripts/smoke.py
 ```
 
-판정 5종(AC/WA/CE/RE/TLE), 트레이스, 멱등성, SSE, 숨은 테스트 비노출까지 실제 서비스로
-확인한다. 16개 항목이 전부 통과해야 한다.
+판정 5종(AC/WA/CE/RE/TLE), 3개 언어, 부분 점수, 트레이스, 멱등성, SSE, 숨은 테스트
+비노출까지 실제 서비스로 확인한다. 24개 항목이 전부 통과해야 한다.
 
 ## 겪게 되는 것들
 
@@ -76,3 +95,5 @@ python3 scripts/smoke.py
 | 제출이 `QUEUED` 에서 멈춘다 | Orchestrator 가 안 떴거나 `CONTENT_ROOT` 가 틀렸다 |
 | 모든 제출이 `COMPILE_ERROR` | Runner 를 fat jar 로 띄웠다. `installDist` 배포를 쓴다 |
 | 판정은 오는데 리플레이가 없다 | 풀이가 `Drill.*` 를 호출하지 않는다. 계측은 선택이다 |
+| 기동 로그에 "프로세스 샌드박스로 내려간다" | 런타임 이미지가 로컬에 없다. 미리 pull 한다 |
+| Python 만 MEMORY_LIMIT 이 안 잡힌다 | macOS 는 RLIMIT_AS 를 낮추지 못한다. 컨테이너로 돌려야 한다 |

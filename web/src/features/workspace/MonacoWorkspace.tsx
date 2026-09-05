@@ -6,14 +6,16 @@ setupMonaco()
 
 export default function MonacoWorkspace({
   source,
+  language,
   onChange,
 }: {
   source: string
+  language: string
   onChange: (next: string) => void
 }) {
   return (
     <Editor
-      language="kotlin"
+      language={language}
       theme="vs-dark"
       value={source}
       onChange={(next) => onChange(next ?? '')}

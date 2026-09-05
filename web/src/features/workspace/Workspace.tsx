@@ -1,4 +1,6 @@
 import { Suspense, lazy } from 'react'
+import { EDITOR_LANGUAGE, LANGUAGE_LABEL } from '../../shared/types'
+import type { SubmissionLanguage } from '../../shared/types'
 
 /**
  * 코칭 Workspace (디자인 설계서 §2.1).
@@ -13,12 +15,16 @@ const MonacoWorkspace = lazy(() => import('./MonacoWorkspace'))
 
 export function Workspace({
   source,
+  language,
   onChange,
+  onLanguageChange,
   onSubmit,
   submitting,
 }: {
   source: string
+  language: SubmissionLanguage
   onChange: (next: string) => void
+  onLanguageChange: (next: SubmissionLanguage) => void
   onSubmit: () => void
   submitting: boolean
 }) {
@@ -26,13 +32,33 @@ export function Workspace({
     <section className="panel editor-panel">
       <div className="editor-header">
         <h3>풀이</h3>
-        <button className="primary" onClick={onSubmit} disabled={submitting}>
-          {submitting ? '제출 중…' : '제출'}
-        </button>
+        <div className="editor-actions">
+          <label className="muted" htmlFor="language">
+            언어
+          </label>
+          <select
+            id="language"
+            value={language}
+            onChange={(event) => onLanguageChange(event.target.value as SubmissionLanguage)}
+          >
+            {(Object.keys(LANGUAGE_LABEL) as SubmissionLanguage[]).map((value) => (
+              <option key={value} value={value}>
+                {LANGUAGE_LABEL[value]}
+              </option>
+            ))}
+          </select>
+          <button className="primary" onClick={onSubmit} disabled={submitting}>
+            {submitting ? '제출 중…' : '제출'}
+          </button>
+        </div>
       </div>
       <div className="editor">
         <Suspense fallback={<p className="muted editor-loading">에디터를 불러오는 중…</p>}>
-          <MonacoWorkspace source={source} onChange={onChange} />
+          <MonacoWorkspace
+            source={source}
+            language={EDITOR_LANGUAGE[language]}
+            onChange={onChange}
+          />
         </Suspense>
       </div>
     </section>

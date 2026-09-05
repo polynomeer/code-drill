@@ -6,6 +6,8 @@
 
 검증하는 것:
   - 판정 정확성: AC / WA / CE / RE / TLE
+  - 다국어: Kotlin / Java / Python 이 같은 문제에서 같은 판정을 받는다
+  - 부분 점수: SUM 그룹이 통과 비율만큼 점수를 준다
   - 멱등성: 같은 Idempotency-Key 로 두 번 제출하면 제출이 하나만 생긴다
   - SSE: 상태 변화가 스트림으로 흘러나온다
   - 숨은 테스트 비노출: 응답에 숨은 그룹의 케이스 내역이 없다
@@ -56,6 +58,61 @@ fun twoSum(nums: IntArray, target: Int): IntArray {
 }
 """
 
+JAVA_ACCEPTED = """
+import java.util.HashMap;
+import java.util.Map;
+
+class Solution {
+    public int[] twoSum(int[] nums, int target) {
+        Map<Integer, Integer> seen = new HashMap<>();
+        for (int i = 0; i < nums.length; i++) {
+            Integer j = seen.get(target - nums[i]);
+            if (j != null) return new int[] { j, i };
+            seen.putIfAbsent(nums[i], i);
+        }
+        throw new IllegalStateException("no answer");
+    }
+}
+"""
+
+PYTHON_ACCEPTED = """
+def twoSum(nums, target):
+    seen = {}
+    for i, value in enumerate(nums):
+        j = seen.get(target - value)
+        if j is not None:
+            return [j, i]
+        seen.setdefault(value, i)
+    raise AssertionError("no answer")
+"""
+
+# 부분 점수 확인용. Kadane 는 전부 통과하고, O(n^2) 는 큰 입력에서 시간 초과가 난다.
+KADANE = """
+fun maxSubarray(nums: IntArray): Int {
+    var current = nums[0]
+    var best = nums[0]
+    for (i in 1 until nums.size) {
+        current = maxOf(nums[i], current + nums[i])
+        if (current > best) best = current
+    }
+    return best
+}
+"""
+
+QUADRATIC = """
+fun maxSubarray(nums: IntArray): Int {
+    var best = nums[0]
+    for (i in nums.indices) {
+        var sum = 0
+        for (j in i until nums.size) {
+            sum += nums[j]
+            if (sum > best) best = sum
+        }
+    }
+    return best
+}
+"""
+
 
 def request(method: str, path: str, body: dict | None = None, headers: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
@@ -67,11 +124,16 @@ def request(method: str, path: str, body: dict | None = None, headers: dict | No
         return json.loads(response.read())
 
 
-def submit(source: str, key: str | None = None) -> dict:
+def submit(
+    source: str,
+    key: str | None = None,
+    language: str = "KOTLIN",
+    problem: str = "two-sum",
+) -> dict:
     return request(
         "POST",
         "/submissions",
-        {"problemId": "two-sum", "problemVersion": 1, "language": "KOTLIN", "source": source},
+        {"problemId": problem, "problemVersion": 1, "language": language, "source": source},
         {"Idempotency-Key": key or str(uuid.uuid4())},
     )
 
@@ -127,7 +189,8 @@ def main() -> int:
 
     print("문제 조회")
     problems = request("GET", "/problems")
-    results.append(check("문제 수", len(problems), 1))
+    slugs = sorted(p["id"] for p in problems)
+    results.append(check("문제 목록", slugs, ["max-subarray", "two-sum"]))
     detail = request("GET", "/problems/two-sum")
     results.append(check("공개 샘플 수", len(detail["samples"]), 2))
     results.append(check("시그니처", detail["signature"], "fun twoSum(nums: IntArray, target: Int): IntArray"))
@@ -147,6 +210,29 @@ def main() -> int:
             hidden = [g for g in final["groups"] if g["groupId"] != "sample"]
             leaked = [g for g in hidden if g["cases"]]
             results.append(check("  숨은 그룹 케이스 비노출", leaked, []))
+
+    print("\n다국어 채점 (§1.1)")
+    for language, source in [
+        ("JAVA", JAVA_ACCEPTED),
+        ("PYTHON", PYTHON_ACCEPTED),
+    ]:
+        final = await_verdict(submit(source, language=language)["id"])
+        results.append(check(f"{language} 정답", final["verdict"], "ACCEPTED"))
+        results.append(check(f"  {language} 만점", final["score"], 100))
+
+    print("\n부분 점수 (§6.2 SUM)")
+    detail = request("GET", "/problems/max-subarray")
+    sum_groups = [g for g in detail["groups"] if g["aggregation"] == "SUM"]
+    results.append(check("SUM 그룹 존재", len(sum_groups), 1))
+
+    fast = await_verdict(submit(KADANE, problem="max-subarray")["id"])
+    results.append(check("O(n) 풀이 만점", fast["score"], 100))
+
+    slow = await_verdict(submit(QUADRATIC, problem="max-subarray")["id"])
+    perf = next(g for g in slow["groups"] if g["groupId"] == "performance")
+    results.append(check("O(n^2) 풀이 부분 점수", 0 < slow["score"] < 100, True))
+    results.append(check("  performance 부분 득점", 0 < perf["score"] < perf["maxScore"], True))
+    print(f"        (총점 {slow['score']}, performance {perf['score']}/{perf['maxScore']})")
 
     print("\n실행 트레이스 (§7)")
     traced = submit(ACCEPTED_SOURCE)

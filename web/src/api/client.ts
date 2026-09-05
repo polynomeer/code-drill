@@ -1,4 +1,11 @@
-import type { ApiError, Problem, Submission, TraceCapture } from '../shared/types'
+import type {
+  ApiError,
+  Problem,
+  ProblemSummary,
+  Submission,
+  SubmissionLanguage,
+  TraceCapture,
+} from '../shared/types'
 
 const BASE = '/api/v1'
 
@@ -17,6 +24,10 @@ async function json<T>(response: Response): Promise<T> {
     throw new ApiFailure(response.status, (await response.json()) as ApiError)
   }
   return (await response.json()) as T
+}
+
+export function listProblems(): Promise<ProblemSummary[]> {
+  return fetch(`${BASE}/problems`).then(json<ProblemSummary[]>)
 }
 
 export function getProblem(slug: string): Promise<Problem> {
@@ -42,13 +53,18 @@ export async function getTrace(id: string): Promise<TraceCapture | null> {
  * Idempotency-Key 는 선택이 아니다. 버튼 중복 클릭이나 네트워크 재시도가 제출을 두 번
  * 만들지 않게 하는 유일한 장치라서, 호출부가 빠뜨릴 수 없도록 여기서 항상 붙인다.
  */
-export function createSubmission(problemId: string, problemVersion: number, source: string) {
+export function createSubmission(
+  problemId: string,
+  problemVersion: number,
+  language: SubmissionLanguage,
+  source: string,
+) {
   return fetch(`${BASE}/submissions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Idempotency-Key': crypto.randomUUID(),
     },
-    body: JSON.stringify({ problemId, problemVersion, language: 'KOTLIN', source }),
+    body: JSON.stringify({ problemId, problemVersion, language, source }),
   }).then(json<Submission>)
 }

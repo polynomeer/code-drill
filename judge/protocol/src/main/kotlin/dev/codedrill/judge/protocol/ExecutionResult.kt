@@ -13,6 +13,13 @@ data class ExecutionResult(
     val submissionId: String,
     val attempt: Int,
     val fencingToken: FencingToken,
+    /**
+     * 무엇을 채점했는지. 집계는 이 버전의 그룹 정책으로 해야 한다.
+     *
+     * 오케스트레이터가 제출과 문제를 따로 기억하면 둘이 어긋날 수 있다. 결과 봉투가
+     * 스스로 말하게 해 두면 재채점과 감사에서도 근거가 하나로 남는다 (§8.1 판정 근거 고정).
+     */
+    val problemVersionId: String = "",
     /** 컴파일 실패나 플랫폼 장애처럼 케이스 실행 전에 끝난 경우에만 채운다. */
     val terminalVerdict: Verdict?,
     val compileLog: String?,

@@ -94,6 +94,51 @@ body {
   align-items: center;
 }
 
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.problem-picker {
+  margin-left: auto;
+}
+
+.group-weights {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.group-weights li {
+  display: flex;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+/* 부분 점수는 막대로도 보여준다. 숫자만으로는 얼마나 남았는지 읽기 어렵다. */
+.score-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.score-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
 .editor-loading {
   padding: 16px;
 }

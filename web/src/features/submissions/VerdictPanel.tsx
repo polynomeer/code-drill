@@ -36,6 +36,7 @@ export function VerdictPanel({ submission }: { submission: Submission }) {
               <th>그룹</th>
               <th>판정</th>
               <th>점수</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -45,6 +46,13 @@ export function VerdictPanel({ submission }: { submission: Submission }) {
                 <td>{VERDICT_LABEL[group.verdict]}</td>
                 <td>
                   {group.score} / {group.maxScore}
+                </td>
+                <td>
+                  {group.maxScore > 0 && (
+                    <div className="score-bar" aria-hidden="true">
+                      <span style={{ width: `${(group.score / group.maxScore) * 100}%` }} />
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

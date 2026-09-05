@@ -35,7 +35,7 @@
 | Artifact store | S3 호환 오브젝트 스토리지 |
 | Realtime | SSE 우선, 필요 시 WebSocket |
 | Observability | OpenTelemetry + Prometheus + Grafana |
-| 채점 지원 언어 | Java, Kotlin, Python |
+| 채점 지원 언어 | Java, Kotlin, Python (언어별 `RuntimeAdapter` 구현 하나씩) |
 
 MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafka, 서비스 메시,
 요청마다 Kubernetes Job 생성(상시 워커 풀을 쓴다).
@@ -111,3 +111,11 @@ Runner는 Control Plane 자격증명을 갖지 않고, 인터넷과 Control DB�
 cgroup v2 CPU·메모리 제한을 전제한다.
 
 공식 채점 실행에는 트레이스 계측을 넣지 않는다 — 학습용 트레이스는 별도 저우선순위 실행이다.
+
+격리는 컨테이너 런타임에 위임한다. `codedrill.sandbox.require-isolation=true` 이면 런타임이
+없을 때 기동을 중단하고, false 이면 경고와 함께 프로세스 샌드박스로 내려간다. **프로세스
+샌드박스는 개발 편의용이며 §5.2 의 통제를 거의 갖추지 못한다.**
+
+아직 남은 것: 언어별 seccomp allowlist 프로파일. 그전까지 §11.4 Sandbox regression 게이트는
+완전하지 않다. 컴파일은 여전히 Runner 호스트에서 돈다 — 파서만 도는 단계지만 §5.5 는 이것도
+런타임 이미지 안에서 하기를 요구한다.

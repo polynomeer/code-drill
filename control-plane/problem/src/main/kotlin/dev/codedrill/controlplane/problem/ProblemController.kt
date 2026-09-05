@@ -2,6 +2,12 @@ package dev.codedrill.controlplane.problem
 
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
+import org.springframework.beans.factory.annotation.Value
+import java.nio.file.Path
+import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.name
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -16,24 +22,31 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @RequestMapping("/api/v1/problems")
-class ProblemController(private val packages: ProblemPackageLoader) {
+class ProblemController(
+    private val packages: ProblemPackageLoader,
+    @Value("\${codedrill.content.root}") private val contentRoot: String,
+) {
 
+    /**
+     * 콘텐츠 디렉터리를 그대로 목록으로 쓴다.
+     *
+     * 검색·역량 필터·cursor 페이지네이션(§9.2)은 Problem 모듈이 DB 를 갖게 되는 단계에
+     * 붙인다. 그때까지 목록의 진실 원천은 패키지 디렉터리다.
+     */
     @GetMapping
-    fun list(): List<ProblemSummary> = SLICE_PROBLEMS.map { ProblemSummary.of(packages.load(it)) }
+    fun list(): List<ProblemSummary> = availableProblems().map { ProblemSummary.of(packages.load(it)) }
 
     @GetMapping("/{slug}")
     fun detail(@PathVariable slug: String): ResponseEntity<ProblemDetail> {
-        if (slug !in SLICE_PROBLEMS) return ResponseEntity.notFound().build()
+        if (slug !in availableProblems()) return ResponseEntity.notFound().build()
         return ResponseEntity.ok(ProblemDetail.of(packages.load(slug)))
     }
 
-    private companion object {
-        /**
-         * 슬라이스는 문제 하나만 다룬다 (§16.2). 문제 목록·검색은 Problem 모듈이 DB 를
-         * 갖게 되는 단계에서 붙인다.
-         */
-        val SLICE_PROBLEMS = listOf("two-sum")
-    }
+    private fun availableProblems(): List<String> =
+        Path.of(contentRoot).listDirectoryEntries()
+            .filter { it.isDirectory() && it.resolve("manifest.yaml").exists() }
+            .map { it.name }
+            .sorted()
 }
 
 data class ProblemSummary(val id: String, val version: Int, val title: String) {
@@ -55,6 +68,8 @@ data class ProblemDetail(
     val memoryMb: Int,
     val signature: String,
     val samples: List<SampleCase>,
+    /** 그룹별 배점과 채점 방식. 부분 점수 문제는 이게 보여야 전략을 세울 수 있다 (§6.2). */
+    val groups: List<GroupInfo>,
 ) {
     companion object {
         fun of(pkg: ProblemPackage): ProblemDetail {
@@ -74,6 +89,10 @@ data class ProblemDetail(
                 // 값을 그대로 내려보낸다. Kotlin 의 toString() 을 클라이언트가 되파싱하게
                 // 만들면 표현 방식이 바뀔 때마다 조용히 깨진다.
                 samples = pkg.publicCases().map { SampleCase(it.id, it.args, it.expected) },
+                // 케이스 내용은 싣지 않는다. 배점 구조만 공개해도 전략은 세울 수 있다.
+                groups = pkg.groups.map {
+                    GroupInfo(it.policy.id, it.policy.weight, it.policy.aggregation.name, it.cases.size)
+                },
             )
         }
 
@@ -85,3 +104,5 @@ data class ProblemDetail(
 }
 
 data class SampleCase(val id: String, val args: List<Any>, val expected: Any)
+
+data class GroupInfo(val id: String, val weight: Int, val aggregation: String, val caseCount: Int)

@@ -176,18 +176,17 @@ class JudgeCoordinator(
         )
     }
 
-    /** 제출이 어떤 문제를 풀고 있었는지. 슬라이스는 문제가 하나뿐이라 단순하다. */
+    /** 결과 봉투가 말하는 문제 버전을 그대로 연다. `<id>@<version>` 형식이다. */
     private fun packageOf(result: ExecutionResult): ProblemPackage {
-        check(result.submissionId.isNotBlank())
-        return packages.load(SLICE_PROBLEM_ID)
-    }
-
-    private companion object {
-        /**
-         * 첫 vertical slice 는 문제 하나만 다룬다 (§16.2). 실행 결과 봉투에 문제 버전을
-         * 실어 보내도록 넓히는 것이 다음 단계다.
-         */
-        const val SLICE_PROBLEM_ID = "two-sum"
+        val problemId = result.problemVersionId.substringBefore('@')
+        require(problemId.isNotBlank()) {
+            "결과 봉투에 문제 버전이 없다: ${result.executionId}"
+        }
+        val pkg = packages.load(problemId)
+        require(pkg.problemVersionId == result.problemVersionId) {
+            "채점한 문제 버전과 로드한 패키지가 다르다: ${result.problemVersionId} != ${pkg.problemVersionId}"
+        }
+        return pkg
     }
 }
 

@@ -57,6 +57,36 @@ export interface Problem {
   signature: string
   /** 공개 샘플만 담긴다. 숨은 케이스는 서버가 애초에 내려보내지 않는다 (§9.1). */
   samples: { id: string; args: unknown[]; expected: unknown }[]
+  groups: GroupInfo[]
+}
+
+/** 그룹별 배점. `SUM` 은 통과 비율만큼 부분 점수를 준다 (§6.2). */
+export interface GroupInfo {
+  id: string
+  weight: number
+  aggregation: 'ALL_OR_NOTHING' | 'SUM'
+  caseCount: number
+}
+
+export interface ProblemSummary {
+  id: string
+  version: number
+  title: string
+}
+
+export type SubmissionLanguage = 'KOTLIN' | 'JAVA' | 'PYTHON'
+
+export const LANGUAGE_LABEL: Record<SubmissionLanguage, string> = {
+  KOTLIN: 'Kotlin',
+  JAVA: 'Java',
+  PYTHON: 'Python',
+}
+
+/** Monaco 언어 id. 채점 언어와 이름이 같지는 않다. */
+export const EDITOR_LANGUAGE: Record<SubmissionLanguage, string> = {
+  KOTLIN: 'kotlin',
+  JAVA: 'java',
+  PYTHON: 'python',
 }
 
 export interface CaseResult {
