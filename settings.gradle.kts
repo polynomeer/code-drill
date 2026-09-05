@@ -8,6 +8,7 @@ include(
     ":platform:common",
     ":platform:messaging",
     ":platform:observability",
+    ":platform:problem-package",
 
     // 제어 영역: 모듈형 모놀리스 (§3.1)
     ":control-plane:app",
