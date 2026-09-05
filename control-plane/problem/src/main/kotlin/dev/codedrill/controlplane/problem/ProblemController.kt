@@ -71,7 +71,9 @@ data class ProblemDetail(
                     append(signature.parameters.joinToString(", ") { "${it.name}: ${it.type.kotlinType()}" })
                     append("): ").append(signature.returns.kotlinType())
                 },
-                samples = pkg.publicCases().map { SampleCase(it.id, it.args.toString(), it.expected.toString()) },
+                // 값을 그대로 내려보낸다. Kotlin 의 toString() 을 클라이언트가 되파싱하게
+                // 만들면 표현 방식이 바뀔 때마다 조용히 깨진다.
+                samples = pkg.publicCases().map { SampleCase(it.id, it.args, it.expected) },
             )
         }
 
@@ -82,4 +84,4 @@ data class ProblemDetail(
     }
 }
 
-data class SampleCase(val id: String, val args: String, val expected: String)
+data class SampleCase(val id: String, val args: List<Any>, val expected: Any)

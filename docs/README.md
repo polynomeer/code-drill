@@ -11,6 +11,7 @@
 | [../CLAUDE.md](../CLAUDE.md) | 이 저장소에서 에이전트는 어떻게 일하는가 | Claude Code (매 턴 로드) |
 | [project-context.md](project-context.md) | 이 제품은 무엇이고 어떤 용어·스택을 쓰는가 | 에이전트·신규 기여자 |
 | [commit-convention.md](commit-convention.md) | 커밋 메시지를 어떻게 쓰는가 | 에이전트·기여자 |
+| [running-locally.md](running-locally.md) | 내 머신에서 어떻게 띄우고 확인하는가 | 에이전트·기여자 |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | 사람이 처음 무엇을 읽고 설정하는가 | 사람 기여자 |
 | [specs/](specs/) | 제품·기술·디자인 결정의 원본은 어디 있나 | 상세가 필요할 때 |
 | [archive/](archive/) | 예전 규칙은 무엇이었나 | 이력 추적 시에만 |
@@ -50,7 +51,8 @@
 
 | 이런 일이 생기면 | 이 문서를 고친다 |
 |---|---|
-| 빌드·테스트·실행 명령이 생기거나 바뀜 | `CLAUDE.md` 명령어 섹션 |
+| 빌드·테스트 명령이 생기거나 바뀜 | `CLAUDE.md` 명령어 섹션 |
+| 실행 절차·포트·필수 도구가 바뀜 | `running-locally.md` |
 | 에이전트 작업 절차가 바뀜 (커밋·브랜치·검증 방식) | `CLAUDE.md` |
 | 커밋 type·형식 규칙이 바뀜 | `commit-convention.md`, `.gitmessage` |
 | 스택 선택, 모듈 경계, 도메인 용어가 바뀜 | `project-context.md` |

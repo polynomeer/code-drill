@@ -49,11 +49,16 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | `platform/` | 라이브러리 | 세 영역이 공유하는 기반(오류 코드·아웃박스·상관관계 ID) |
 | `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 8개를 조립하는 모듈형 모놀리스 |
 | `judge/orchestrator`, `judge/runner-agent` | 각각 별도 앱 | Control DB·인터넷에 직접 접근하지 않는 실행 영역 |
-| `judge/protocol` | 라이브러리 | orchestrator ↔ runner 결과 봉투 계약 |
+| `judge/protocol` | 라이브러리 | 제어 영역 ↔ 실행 영역 메시지 계약 |
+| `content/` | 데이터 | 문제 패키지. 실행 영역의 read-only 아티팩트 자리 |
 | `web/` | 정적 자산 | React + TS + Monaco |
 
 도메인 모듈이 서로를 직접 참조하면 `./gradlew checkModuleBoundaries` 가 빌드를 깬다.
 협력은 조립 지점인 `:control-plane:app` 에서 연결한다.
+
+**실행 영역에는 JDBC 가 들어가면 안 된다.** Runner 와 Orchestrator 는 Control DB 에
+접근하지 않는다 (§2.3). 공유 모듈에 JDBC 의존성을 넣으면 이 경계가 조용히 무너진다 —
+아웃박스 퍼블리셔가 `control-plane/app` 에 있는 이유다.
 
 ## 모듈 경계
 

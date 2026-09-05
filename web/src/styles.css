@@ -1,0 +1,262 @@
+/*
+ * 디자인 설계서 §1.2: State over decoration.
+ * 상태와 변화가 시각 강조의 근거다. 의미 없는 다색 카드를 만들지 않는다.
+ */
+
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #262b36;
+  --text: #e6e8ec;
+  --muted: #8b93a3;
+  --ok: #3fb950;
+  --bad: #f85149;
+  --accent: #4d8ef7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.app {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.top {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(480px, 1.4fr);
+  gap: 16px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.warn {
+  color: var(--bad);
+}
+
+.statement-body {
+  white-space: pre-wrap;
+  font: inherit;
+  margin: 0;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editor-loading {
+  padding: 16px;
+}
+
+.editor {
+  height: 340px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.verdict {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.verdict.ok {
+  color: var(--ok);
+}
+
+.verdict.bad {
+  color: var(--bad);
+}
+
+.score {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.log {
+  background: #0b0d11;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  overflow: auto;
+  max-height: 200px;
+  white-space: pre-wrap;
+}
+
+table.groups {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+table.groups th,
+table.groups td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cases {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.cases li {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.cells {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+  padding: 8px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0b0d11;
+}
+
+.cell-index {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cell-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 색만으로 구분하지 않는다. 테두리 굵기와 라벨이 같은 정보를 전달한다. */
+.cell.visited {
+  border-color: var(--muted);
+}
+
+.cell.cursor {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.cell.matched {
+  border-color: var(--ok);
+  border-width: 2px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.controls input[type='range'] {
+  flex: 1;
+}
+
+.event-line {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  margin: 8px 0 0;
+}

@@ -1,7 +1,7 @@
 /**
  * Control Plane 과 공유하는 값 타입.
  *
- * 백엔드의 `SubmissionStatus`(§4.2), `Verdict`(§14.1), `ErrorCode`(§9.4)와 짝을 이룬다.
+ * 백엔드의 `SubmissionStatus`(§4.2), `Verdict`(§14.1), `TraceEvent`(§7.2)와 짝을 이룬다.
  * 한쪽만 바꾸면 계약이 깨지므로 함께 고친다.
  */
 
@@ -26,7 +26,7 @@ export type Verdict =
   | 'OUTPUT_LIMIT'
   | 'SYSTEM_ERROR'
 
-/** 진행 중 상태. 이 동안 UI 는 판정 결과를 단정하지 않는다. */
+/** 진행 중 상태. 이 동안 UI 는 판정 결과를 단정하지 않는다 (§0.2 No false precision). */
 export const IN_FLIGHT: ReadonlySet<SubmissionStatus> = new Set([
   'CREATED',
   'QUEUED',
@@ -35,6 +35,78 @@ export const IN_FLIGHT: ReadonlySet<SubmissionStatus> = new Set([
   'RUNNING',
   'AGGREGATING',
 ])
+
+export const VERDICT_LABEL: Record<Verdict, string> = {
+  ACCEPTED: '정답',
+  WRONG_ANSWER: '오답',
+  COMPILE_ERROR: '컴파일 실패',
+  RUNTIME_ERROR: '런타임 오류',
+  TIME_LIMIT: '시간 초과',
+  MEMORY_LIMIT: '메모리 초과',
+  OUTPUT_LIMIT: '출력 초과',
+  SYSTEM_ERROR: '시스템 오류',
+}
+
+export interface Problem {
+  id: string
+  version: number
+  title: string
+  statement: string
+  timeMillis: number
+  memoryMb: number
+  signature: string
+  /** 공개 샘플만 담긴다. 숨은 케이스는 서버가 애초에 내려보내지 않는다 (§9.1). */
+  samples: { id: string; args: unknown[]; expected: unknown }[]
+}
+
+export interface CaseResult {
+  caseId: string
+  groupId: string
+  verdict: Verdict
+  measurements: { wallTimeMillis: number; peakMemoryBytes: number }
+  message: string | null
+}
+
+export interface GroupResult {
+  groupId: string
+  verdict: Verdict
+  score: number
+  maxScore: number
+  cases: CaseResult[]
+}
+
+export interface Submission {
+  id: string
+  problemId: string
+  problemVersion: number
+  language: string
+  status: SubmissionStatus
+  verdict: Verdict | null
+  score: number | null
+  compileLog: string | null
+  groups: GroupResult[] | null
+}
+
+export type TraceEventType = 'VISIT' | 'COMPARE' | 'MATCH'
+
+export interface TraceEvent {
+  seq: number
+  logicalTime: number
+  eventType: TraceEventType
+  /** `array:<index>` 형식 (§7.2 target). */
+  target: string
+  before: string | null
+  after: string | null
+  importance: number
+}
+
+export interface TraceCapture {
+  schemaVersion: string
+  caseId: string
+  events: TraceEvent[]
+  truncated: boolean
+  diagnostics: string | null
+}
 
 /** 표준 오류 응답 (§9.1). traceId 는 문의·조사에 그대로 쓴다. */
 export interface ApiError {
