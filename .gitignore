@@ -14,16 +14,14 @@
 tmp/
 temp/
 
-# Dependencies / build output (언어 추가 시 확장)
-node_modules/
-dist/
+# Gradle
+.gradle/
 build/
 out/
-target/
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+
+# Node
+node_modules/
+dist/
 
 # Env & secrets
 .env
