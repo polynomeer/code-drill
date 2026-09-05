@@ -1,5 +1,7 @@
 package dev.codedrill.judge.runner.execution
 
+import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
+
 import java.nio.file.Path
 import org.jetbrains.kotlin.cli.common.ExitCode
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
@@ -19,7 +21,7 @@ import kotlin.io.path.absolutePathString
  */
 class KotlinSourceCompiler(private val stdlibJars: List<Path>) {
 
-    fun compile(sourceDir: Path, outputDir: Path): CompileOutcome {
+    fun compile(sourceDir: Path, outputDir: Path): RuntimeAdapter.CompileOutcome {
         val collector = CollectingMessageCollector()
         val arguments = K2JVMCompilerArguments().apply {
             freeArgs = listOf(sourceDir.absolutePathString())
@@ -33,17 +35,10 @@ class KotlinSourceCompiler(private val stdlibJars: List<Path>) {
 
         val exitCode = K2JVMCompiler().exec(collector, Services.EMPTY, arguments)
         return if (exitCode == ExitCode.OK) {
-            CompileOutcome.Success
+            RuntimeAdapter.CompileOutcome.Success
         } else {
-            CompileOutcome.Failure(collector.errors())
+            RuntimeAdapter.CompileOutcome.Failure(collector.errors())
         }
-    }
-
-    sealed interface CompileOutcome {
-        data object Success : CompileOutcome
-
-        /** 사용자에게 그대로 보여줄 수 있는 컴파일 로그. 내부 경로는 담지 않는다. */
-        data class Failure(val log: String) : CompileOutcome
     }
 
     private class CollectingMessageCollector : MessageCollector {

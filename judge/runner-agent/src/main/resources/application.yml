@@ -11,6 +11,16 @@ spring:
         max-concurrency: 1
         prefetch: 1
 
+codedrill:
+  sandbox:
+    # 공개 환경에서는 반드시 true. 컨테이너 런타임이 없으면 기동을 중단한다 (§5.2).
+    require-isolation: ${REQUIRE_ISOLATION:false}
+    images:
+      # 운영에서는 태그가 아니라 digest 로 고정한다 (§5.5).
+      kotlin: ${KOTLIN_IMAGE:eclipse-temurin:21-jre}
+      java: ${JAVA_IMAGE:eclipse-temurin:21-jre}
+      python: ${PYTHON_IMAGE:python:3.12-alpine}
+
 server:
   port: ${PORT:8082}
 

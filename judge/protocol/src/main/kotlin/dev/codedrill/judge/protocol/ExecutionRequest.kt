@@ -37,5 +37,10 @@ data class ExecutionRequest(
 /** 그룹 정책과 그 그룹에 속한 케이스. 실행 순서는 목록 순서를 따른다. */
 data class RequestedGroup(val policy: GroupPolicy, val cases: List<TestCase>)
 
-/** MVP 지원 언어 (§1.1). 슬라이스는 KOTLIN 하나만 구현한다. */
-enum class Language { KOTLIN }
+/**
+ * MVP 지원 언어 (§1.1).
+ *
+ * 언어마다 [dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter] 구현이 하나씩
+ * 있다. 시그니처와 테스트 데이터는 언어 중립이므로 문제 패키지는 언어를 알지 못한다.
+ */
+enum class Language { KOTLIN, JAVA, PYTHON }

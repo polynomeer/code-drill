@@ -1,0 +1,42 @@
+# 부분 점수를 쓰는 문제 (기술 설계서 §6.2 aggregation: SUM).
+#
+# performance 그룹은 SUM 이라 통과한 만큼 점수를 준다. 느린 풀이도 "전부 0점"이 아니라
+# 어디까지 되는지가 드러나야 코칭이 가능하다 (§0.2 학습 집중).
+
+id: max-subarray
+version: 1
+title: 최대 부분합
+statement: statement.md
+
+limits:
+  timeMillis: 2000
+  memoryMb: 256
+  outputBytes: 65536
+
+signature:
+  name: maxSubarray
+  parameters:
+    - name: nums
+      type: INT_ARRAY
+  returns: INT
+
+groups:
+  - id: sample
+    weight: 0
+    visibility: PUBLIC
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: FAIL_FAST
+  - id: boundary
+    weight: 40
+    visibility: HIDDEN
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: CONTINUE
+  - id: performance
+    weight: 60
+    visibility: HIDDEN
+    # 통과한 케이스 비율만큼 점수를 준다. 규모가 커질수록 어려워지도록 배치했다.
+    aggregation: SUM
+    stopPolicy: CONTINUE
+    limitMultiplier:
+      time: 1.0
+      memory: 1.0
