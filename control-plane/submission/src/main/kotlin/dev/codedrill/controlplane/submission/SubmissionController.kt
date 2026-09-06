@@ -2,6 +2,9 @@ package dev.codedrill.controlplane.submission
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.Language
+import dev.codedrill.controlplane.submission.trace.TraceRepository
+import dev.codedrill.judge.protocol.TraceChunk
+import dev.codedrill.judge.protocol.TraceManifest
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
@@ -32,6 +35,7 @@ import java.util.UUID
 class SubmissionController(
     private val service: SubmissionService,
     private val events: SubmissionEventStream,
+    private val traces: TraceRepository,
     private val json: ObjectMapper,
 ) {
 
@@ -77,11 +81,26 @@ class SubmissionController(
      * 상태 스트림. 구독 직후 현재 상태를 한 번 흘려보내, 구독 이전에 지나간 전이를
      * 놓친 클라이언트도 즉시 수렴한다.
      */
-    /** 실행 트레이스. 아직 준비되지 않았으면 204 다 — 오류가 아니다 (§12.2). */
+    /**
+     * 트레이스 목차 (§9.2 `GET /traces/{id}/manifest`).
+     *
+     * 아직 준비되지 않았으면 204 다 — 오류가 아니다. 트레이스는 판정 뒤에 별도 작업으로
+     * 만들어지고, 영영 오지 않을 수도 있다 (§12.2).
+     */
     @GetMapping("/{id}/trace")
-    fun trace(@PathVariable id: UUID): ResponseEntity<Any> {
-        val trace = service.trace(id) ?: return ResponseEntity.noContent().build()
-        return ResponseEntity.ok(json.readTree(trace))
+    fun traceManifest(@PathVariable id: UUID): ResponseEntity<TraceManifest> {
+        val manifest = traces.findManifest(id) ?: return ResponseEntity.noContent().build()
+        return ResponseEntity.ok(manifest)
+    }
+
+    /** 트레이스 청크 (§9.2 `GET /traces/{id}/chunks/{seq}`). */
+    @GetMapping("/{id}/trace/chunks/{index}")
+    fun traceChunk(
+        @PathVariable id: UUID,
+        @PathVariable index: Int,
+    ): ResponseEntity<TraceChunk> {
+        val chunk = traces.findChunk(id, index) ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(chunk)
     }
 
     @GetMapping("/{id}/events")

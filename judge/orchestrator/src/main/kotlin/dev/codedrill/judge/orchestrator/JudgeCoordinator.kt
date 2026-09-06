@@ -11,6 +11,7 @@ import dev.codedrill.judge.protocol.JudgeProgressed
 import dev.codedrill.judge.protocol.JudgeStatus
 import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.SubmissionQueued
+import dev.codedrill.judge.orchestrator.trace.TraceProcessor
 import dev.codedrill.judge.protocol.TraceReady
 import dev.codedrill.platform.observability.CorrelationIds
 import dev.codedrill.platform.problempackage.ProblemPackage
@@ -97,12 +98,26 @@ class JudgeCoordinator(
         // 영향을 주지 않는다 (§7.1, §12.2).
         if (result.mode == ExecutionMode.TRACE) {
             result.trace?.let { capture ->
+                // 가공은 판정 경로 밖에서 한다 (§7.3). 실패해도 판정에 영향을 주지 않도록
+                // 예외를 밖으로 흘리지 않는다 — 브로커가 재전달해도 같은 결과다.
+                val processed = runCatching {
+                    TraceProcessor.process(
+                        traceId = result.executionId,
+                        submissionId = result.submissionId,
+                        capture = capture,
+                    )
+                }.getOrElse { error ->
+                    log.warn("트레이스 가공에 실패했다: {}", error.message)
+                    return
+                }
+
                 gateway.publishTraceReady(
                     TraceReady(
                         submissionId = result.submissionId,
                         executionId = result.executionId,
                         correlationId = correlationId,
-                        capture = capture,
+                        manifest = processed.manifest,
+                        chunks = processed.chunks,
                     ),
                 )
             }

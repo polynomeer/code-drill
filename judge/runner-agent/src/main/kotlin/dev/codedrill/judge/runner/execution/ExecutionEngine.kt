@@ -8,6 +8,7 @@ import dev.codedrill.judge.protocol.Measurements
 import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.TestCaseResult
 import dev.codedrill.judge.protocol.TraceCapture
+import dev.codedrill.judge.protocol.TraceManifest
 import dev.codedrill.judge.protocol.TraceEvent
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
@@ -235,7 +236,7 @@ class ExecutionEngine(
         results: List<TestCaseResult>,
         events: List<TraceEvent>,
     ): ExecutionResult {
-        val truncated = events.size >= TraceCapture.EVENT_BUDGET
+        val truncated = events.size >= TraceManifest.EVENT_BUDGET
         return ExecutionResult(
             executionId = request.executionId,
             submissionId = request.submissionId,
@@ -253,7 +254,7 @@ class ExecutionEngine(
                 truncated = truncated,
                 diagnostics = when {
                     events.isEmpty() -> "계측 호출이 없어 트레이스가 비어 있다"
-                    truncated -> "이벤트 예산 " + TraceCapture.EVENT_BUDGET + "개를 넘겨 이후를 잘랐다"
+                    truncated -> "이벤트 예산 " + TraceManifest.EVENT_BUDGET + "개를 넘겨 이후를 잘랐다"
                     else -> null
                 },
             ),

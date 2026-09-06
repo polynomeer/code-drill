@@ -90,51 +90,52 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
     // --- 코드 생성 ---
 
     private fun drill(mode: ExecutionMode): String = if (!mode.instrumented()) {
-        """
-        # 공식 판정 실행용 no-op 계측 (§7.1).
-        class Drill:
-            @staticmethod
-            def visit(index, value=0): pass
-
-            @staticmethod
-            def compare(left, right): pass
-
-            @staticmethod
-            def match(left, right): pass
-        """.trimIndent()
+        // 공식 판정 실행용 no-op 계측 (§7.1). 시그니처는 계측 버전과 같아야 한다.
+        "class Drill:\n" + methods(instrumented = false)
     } else {
-        """
-        import sys
+        buildString {
+            appendLine("import sys")
+            appendLine()
+            appendLine()
+            appendLine("class Drill:")
+            appendLine("    _seq = 0")
+            appendLine("    _budget_left = $EVENT_BUDGET")
+            appendLine("    _out = sys.__stdout__")
+            appendLine()
+            appendLine("    @classmethod")
+            appendLine("    def _emit(cls, kind, ref, after, importance):")
+            appendLine("        if cls._budget_left <= 0:")
+            appendLine("            return")
+            appendLine("        cls._budget_left -= 1")
+            appendLine("        cls._seq += 1")
+            appendLine("        cls._out.write(")
+            appendLine("            \"${SandboxProtocol.EVENT}\\t%d\\t%s\\t%s\\t\\t%s\\t%d\\n\"")
+            appendLine("            % (cls._seq, kind, ref, after, importance)")
+            appendLine("        )")
+            appendLine("        cls._out.flush()")
+            appendLine()
+            appendLine(methods(instrumented = true))
+        }
+    }
 
-        class Drill:
-            _seq = 0
-            _budget_left = $EVENT_BUDGET
-            _out = sys.__stdout__
+    /** 계측 메서드는 [TraceApi] 에서 생성한다. */
+    private fun methods(instrumented: Boolean): String = TraceApi.methods.joinToString("\n\n") { method ->
+        val params = method.params.joinToString(", ") { param ->
+            param.name + (param.default?.let { "=$it" } ?: "")
+        }
+        if (!instrumented) {
+            "    @staticmethod\n    def ${method.name}($params):\n        pass"
+        } else {
+            "    @classmethod\n    def ${method.name}(cls, $params):\n" +
+                "        cls._emit(\"${method.eventType}\", ${expr(method.ref)}, ${expr(method.after)}, " +
+                "${method.eventType.defaultImportance})"
+        }
+    }
 
-            @classmethod
-            def _emit(cls, kind, target, after, importance):
-                if cls._budget_left <= 0:
-                    return
-                cls._budget_left -= 1
-                cls._seq += 1
-                cls._out.write(
-                    "${SandboxProtocol.EVENT}\t%d\t%s\t%s\t\t%s\t%d\n"
-                    % (cls._seq, kind, target, after, importance)
-                )
-                cls._out.flush()
-
-            @classmethod
-            def visit(cls, index, value=0):
-                cls._emit("VISIT", "array:%d" % index, str(value), 1)
-
-            @classmethod
-            def compare(cls, left, right):
-                cls._emit("COMPARE", "array:%d" % left, str(right), 2)
-
-            @classmethod
-            def match(cls, left, right):
-                cls._emit("MATCH", "array:%d" % left, str(right), 3)
-        """.trimIndent()
+    private fun expr(reference: String?): String = when {
+        reference == null -> "\"\""
+        TraceApi.isLiteral(reference) -> "\"${TraceApi.literalValue(reference)}\""
+        else -> "str($reference)"
     }
 
     private fun harness(signature: Signature): String = buildString {

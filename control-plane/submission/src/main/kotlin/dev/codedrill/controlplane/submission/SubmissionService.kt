@@ -81,8 +81,6 @@ class SubmissionService(
 
     fun find(id: UUID): Submission? = repository.findById(id)
 
-    fun trace(id: UUID): String? = repository.findTrace(id)
-
     /**
      * 제출 기록 한 페이지 (§9.1).
      *

@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.submission
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
+import dev.codedrill.controlplane.submission.trace.TraceRepository
 import dev.codedrill.judge.protocol.TraceReady
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.platform.observability.CorrelationIds
@@ -24,6 +25,7 @@ class JudgeProgressListener(
     private val service: SubmissionService,
     private val events: SubmissionEventStream,
     private val repository: SubmissionRepository,
+    private val traces: TraceRepository,
     private val json: ObjectMapper,
 ) {
 
@@ -74,9 +76,9 @@ class JudgeProgressListener(
      */
     @RabbitHandler
     fun onTraceReady(message: TraceReady) {
-        val id = UUID.fromString(message.submissionId)
-        repository.attachTrace(id, json.writeValueAsString(message.capture))
-        events.publish(message.submissionId, "trace", message.capture)
+        traces.save(message.manifest, message.chunks)
+        // SSE 로는 목차만 알린다. 청크는 클라이언트가 필요한 위치만 내려받는다 (§7.5).
+        events.publish(message.submissionId, "trace", message.manifest)
         events.close(message.submissionId)
     }
 }

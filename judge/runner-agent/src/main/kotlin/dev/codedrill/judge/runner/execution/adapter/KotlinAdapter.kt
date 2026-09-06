@@ -69,36 +69,54 @@ class KotlinAdapter(
     // --- 코드 생성 ---
 
     private fun drill(mode: ExecutionMode): String = if (!mode.instrumented()) {
-        """
-        // 공식 판정 실행용 no-op 계측 (§7.1).
-        object Drill {
-            fun visit(index: Int, value: Int = 0) {}
-            fun compare(left: Int, right: Int) {}
-            fun match(left: Int, right: Int) {}
-        }
-        """.trimIndent()
+        // 공식 판정 실행용 no-op 계측 (§7.1). 시그니처는 계측 버전과 같아야 한다 —
+        // 다르면 계측을 넣은 코드가 채점에서만 컴파일 실패한다.
+        "object Drill {\n" + methods(instrumented = false) + "\n}"
     } else {
-        """
-        import java.io.PrintStream
-
-        object Drill {
-            private val out: PrintStream = __cdProtocolStream()
-            private var seq = 0L
-            private var budgetLeft = $EVENT_BUDGET
-
-            private fun emit(type: String, target: String, after: String, importance: Int) {
-                if (budgetLeft <= 0) return
-                budgetLeft -= 1
-                seq += 1
-                out.println("${SandboxProtocol.EVENT}\t" + seq + "\t" + type + "\t" + target + "\t\t" + after + "\t" + importance)
-                out.flush()
-            }
-
-            fun visit(index: Int, value: Int = 0) = emit("VISIT", "array:" + index, value.toString(), 1)
-            fun compare(left: Int, right: Int) = emit("COMPARE", "array:" + left, right.toString(), 2)
-            fun match(left: Int, right: Int) = emit("MATCH", "array:" + left, right.toString(), 3)
+        buildString {
+            appendLine("import java.io.PrintStream")
+            appendLine()
+            appendLine("object Drill {")
+            appendLine("    private val out: PrintStream = __cdProtocolStream()")
+            appendLine("    private var seq = 0L")
+            appendLine("    private var budgetLeft = $EVENT_BUDGET")
+            appendLine()
+            appendLine("    private fun emit(type: String, ref: String, after: String, importance: Int) {")
+            appendLine("        if (budgetLeft <= 0) return")
+            appendLine("        budgetLeft -= 1")
+            appendLine("        seq += 1")
+            appendLine("        out.println(")
+            appendLine("            \"${SandboxProtocol.EVENT}\\t\" + seq + \"\\t\" + type + \"\\t\" + ref +")
+            appendLine("                \"\\t\\t\" + after + \"\\t\" + importance")
+            appendLine("        )")
+            appendLine("        out.flush()")
+            appendLine("    }")
+            appendLine()
+            appendLine(methods(instrumented = true))
+            appendLine("}")
         }
-        """.trimIndent()
+    }
+
+    /** 계측 메서드는 [TraceApi] 에서 생성한다. 세 언어가 같은 표면을 갖게 하는 장치다. */
+    private fun methods(instrumented: Boolean): String = TraceApi.methods.joinToString("\n") { method ->
+        val params = method.params.joinToString(", ") { param ->
+            val type = if (param.type == TraceApi.SdkType.INT) "Int" else "String"
+            "${param.name}: $type" + (param.default?.let { " = $it" } ?: "")
+        }
+        if (!instrumented) {
+            "    fun ${method.name}($params) {}"
+        } else {
+            "    fun ${method.name}($params) = " +
+                "emit(\"${method.eventType}\", ${expr(method.ref)}, ${expr(method.after)}, " +
+                "${method.eventType.defaultImportance})"
+        }
+    }
+
+    /** 파라미터 이름이면 문자열로, 리터럴이면 따옴표로 감싼다. */
+    private fun expr(reference: String?): String = when {
+        reference == null -> "\"\""
+        TraceApi.isLiteral(reference) -> "\"${TraceApi.literalValue(reference)}\""
+        else -> "$reference.toString()"
     }
 
     private fun harness(signature: Signature, groups: List<RequestedGroup>): String = buildString {

@@ -110,7 +110,10 @@ fun ExecutionMode.instrumented(): Boolean = this == ExecutionMode.TRACE
 /**
  * 계측 이벤트 줄을 되돌린다 (§7.2).
  *
- * `EVENT <seq> <type> <target> <before> <after> <importance>`
+ * `EVENT <seq> <eventType> <targetRef> <before> <after> <importance>`
+ *
+ * `targetKind` 는 싣지 않는다. 이벤트 종류가 이미 종류를 결정하므로, 함께 보내면 둘이
+ * 어긋날 수 있는 자리를 만드는 셈이다.
  *
  * 세 언어의 SDK 가 모두 이 형식으로 찍는다. 파싱이 한 곳에 있어야 언어를 늘려도
  * 리플레이 클라이언트가 그대로 동작한다.
@@ -128,10 +131,11 @@ fun parseTraceEvent(line: String): dev.codedrill.judge.protocol.TraceEvent? {
         // 슬라이스는 논리 시각을 순번과 같이 둔다. 병렬 실행이 들어오면 갈라져야 한다.
         logicalTime = seq,
         eventType = type,
-        target = parts[3],
+        targetKind = type.kind,
+        targetRef = parts[3],
         before = parts[4].takeIf { it.isNotEmpty() },
         after = parts[5].takeIf { it.isNotEmpty() },
-        importance = parts[6].toIntOrNull() ?: 1,
+        importance = parts[6].toIntOrNull() ?: type.defaultImportance,
     )
 }
 

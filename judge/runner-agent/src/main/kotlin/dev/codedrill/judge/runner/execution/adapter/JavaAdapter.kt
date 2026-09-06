@@ -89,38 +89,70 @@ class JavaAdapter : RuntimeAdapter {
     // --- 코드 생성 ---
 
     private fun drill(mode: ExecutionMode): String = if (!mode.instrumented()) {
-        """
-        // 공식 판정 실행용 no-op 계측 (§7.1).
-        final class Drill {
-            static void visit(int index, int value) {}
-            static void visit(int index) {}
-            static void compare(int left, int right) {}
-            static void match(int left, int right) {}
-        }
-        """.trimIndent()
+        // 공식 판정 실행용 no-op 계측 (§7.1). 시그니처는 계측 버전과 같아야 한다.
+        "final class Drill {\n" + methods(instrumented = false) + "\n}"
     } else {
-        """
-        import java.io.PrintStream;
-
-        final class Drill {
-            private static long seq = 0;
-            private static int budgetLeft = $EVENT_BUDGET;
-
-            private static void emit(String type, String target, String after, int importance) {
-                if (budgetLeft <= 0) return;
-                budgetLeft -= 1;
-                seq += 1;
-                PrintStream out = Main.protocol();
-                out.println("${SandboxProtocol.EVENT}\t" + seq + "\t" + type + "\t" + target + "\t\t" + after + "\t" + importance);
-                out.flush();
-            }
-
-            static void visit(int index, int value) { emit("VISIT", "array:" + index, String.valueOf(value), 1); }
-            static void visit(int index) { visit(index, 0); }
-            static void compare(int left, int right) { emit("COMPARE", "array:" + left, String.valueOf(right), 2); }
-            static void match(int left, int right) { emit("MATCH", "array:" + left, String.valueOf(right), 3); }
+        buildString {
+            appendLine("import java.io.PrintStream;")
+            appendLine()
+            appendLine("final class Drill {")
+            appendLine("    private static long seq = 0;")
+            appendLine("    private static int budgetLeft = $EVENT_BUDGET;")
+            appendLine()
+            appendLine("    private static void emit(String type, String ref, String after, int importance) {")
+            appendLine("        if (budgetLeft <= 0) return;")
+            appendLine("        budgetLeft -= 1;")
+            appendLine("        seq += 1;")
+            appendLine("        PrintStream out = Main.protocol();")
+            appendLine("        out.println(\"${SandboxProtocol.EVENT}\\t\" + seq + \"\\t\" + type + \"\\t\" + ref")
+            appendLine("            + \"\\t\\t\" + after + \"\\t\" + importance);")
+            appendLine("        out.flush();")
+            appendLine("    }")
+            appendLine()
+            appendLine(methods(instrumented = true))
+            appendLine("}")
         }
-        """.trimIndent()
+    }
+
+    /**
+     * 계측 메서드는 [TraceApi] 에서 생성한다.
+     *
+     * Java 에는 기본값이 없으므로 오버로드를 함께 만든다. 없으면 Kotlin·Python 에서는
+     * 되는 `Drill.visit(i)` 가 Java 에서만 컴파일 실패한다.
+     */
+    private fun methods(instrumented: Boolean): String = TraceApi.methods.flatMap { method ->
+        val overloads = mutableListOf(method.params)
+        if (method.params.any { it.default != null }) {
+            overloads += method.params.filter { it.default == null }
+        }
+        overloads.map { params -> render(method, params, instrumented) }
+    }.joinToString("\n")
+
+    private fun render(
+        method: TraceApi.Method,
+        params: List<TraceApi.Param>,
+        instrumented: Boolean,
+    ): String {
+        val declared = params.joinToString(", ") { param ->
+            val type = if (param.type == TraceApi.SdkType.INT) "int" else "String"
+            "$type ${param.name}"
+        }
+        val head = "    static void ${method.name}($declared)"
+        if (!instrumented) return "$head {}"
+
+        val supplied = params.map { it.name }.toSet()
+        // 생략된 파라미터는 기본값으로 채운다.
+        fun value(reference: String?): String = when {
+            reference == null -> "\"\""
+            TraceApi.isLiteral(reference) -> "\"${TraceApi.literalValue(reference)}\""
+            reference !in supplied ->
+                "String.valueOf(${method.params.first { it.name == reference }.default})"
+            method.params.first { it.name == reference }.type == TraceApi.SdkType.INT ->
+                "String.valueOf($reference)"
+            else -> reference
+        }
+        return "$head { emit(\"${method.eventType}\", ${value(method.ref)}, ${value(method.after)}, " +
+            "${method.eventType.defaultImportance}); }"
     }
 
     private fun harness(signature: Signature): String = buildString {
