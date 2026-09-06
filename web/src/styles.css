@@ -382,3 +382,115 @@ table.groups td {
 .bad {
   color: var(--bad);
 }
+
+/* --- P4: 리플레이 렌더러 --- */
+
+.renderer {
+  margin: 10px 0;
+}
+
+.renderer h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* 배열 셀: 색만으로 구분하지 않고 테두리 굵기와 라벨을 함께 쓴다. */
+.cell.compared {
+  border-color: var(--muted);
+  border-style: dashed;
+}
+
+.cell-pointer {
+  font-size: 10px;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.stack-view,
+.queue-view {
+  display: flex;
+  gap: 6px;
+}
+
+.stack-view {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+}
+
+.slot {
+  position: relative;
+  min-width: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #0b0d11;
+  font-variant-numeric: tabular-nums;
+}
+
+.slot.top,
+.slot.head {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.slot-label {
+  position: absolute;
+  top: -8px;
+  right: 4px;
+  font-size: 9px;
+  color: var(--accent);
+  background: var(--panel);
+  padding: 0 3px;
+}
+
+.graph-view {
+  width: 180px;
+  height: 180px;
+}
+
+.graph-edge {
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.graph-node circle {
+  fill: #0b0d11;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.graph-node.current circle {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.graph-node text {
+  fill: var(--text);
+  font-size: 9px;
+}
+
+.call-view {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.call-view li {
+  padding: 2px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.call-view .open {
+  color: var(--accent);
+}
+
+.event-fallback {
+  max-height: 200px;
+  overflow: auto;
+  padding-left: 18px;
+  margin: 8px 0 0;
+}

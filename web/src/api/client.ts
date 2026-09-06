@@ -1,3 +1,4 @@
+import type { TraceChunk, TraceManifest } from '../features/replay/traceTypes'
 import type {
   ApiError,
   Draft,
@@ -7,7 +8,6 @@ import type {
   ProblemSummary,
   Submission,
   SubmissionLanguage,
-  TraceCapture,
 } from '../shared/types'
 
 const BASE = '/api/v1'
@@ -78,12 +78,17 @@ export function getSubmission(id: string): Promise<Submission> {
 }
 
 /**
- * 트레이스는 판정과 독립이라 아직 없을 수 있다. 없는 것은 오류가 아니므로 null 이다.
+ * 트레이스 목차. 판정과 독립이라 아직 없을 수 있고, 없는 것은 오류가 아니므로 null 이다.
  */
-export async function getTrace(id: string): Promise<TraceCapture | null> {
+export async function getTraceManifest(id: string): Promise<TraceManifest | null> {
   const response = await fetch(`${BASE}/submissions/${id}/trace`)
   if (response.status === 204) return null
-  return json<TraceCapture>(response)
+  return json<TraceManifest>(response)
+}
+
+/** 이벤트 청크. 현재 위치 주변만 내려받는다 (§7.5). */
+export function getTraceChunk(id: string, index: number): Promise<TraceChunk> {
+  return fetch(`${BASE}/submissions/${id}/trace/chunks/${index}`).then(json<TraceChunk>)
 }
 
 /**

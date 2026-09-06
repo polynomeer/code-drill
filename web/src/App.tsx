@@ -40,6 +40,12 @@ export function App() {
     getProblem(slug).then(setProblem).catch((e: Error) => setError(e.message))
   }, [slug])
 
+  // ?submission=<id> 로 바로 들어오면 고른 문제가 없다. 제출이 어떤 문제였는지 알고
+  // 있으므로 그것으로 채운다 — 문제 없이는 리플레이가 배열을 그릴 입력조차 없다.
+  useEffect(() => {
+    if (submission && !slug) setSlug(submission.problemId)
+  }, [submission, slug])
+
   const refreshHistory = useCallback(() => {
     if (!slug) return
     listSubmissions(slug)
@@ -175,7 +181,9 @@ export function App() {
             submitting={submitting || !problem}
           />
           {submission && <VerdictPanel submission={submission} />}
-          {trace && <ReplayView capture={trace} input={replayInput} />}
+          {trace && submissionId && (
+            <ReplayView submissionId={submissionId} manifest={trace} input={replayInput} />
+          )}
           <HistoryPanel
             submissions={history}
             currentId={submissionId}

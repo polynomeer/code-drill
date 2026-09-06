@@ -6,6 +6,7 @@
 
 검증하는 것:
   - 판정 정확성: AC / WA / CE / RE / TLE
+  - 트레이스: 목차·청크·요약 예산, 다섯 자료구조 종류
   - 다국어: Kotlin / Java / Python 이 같은 문제에서 같은 판정을 받는다
   - 부분 점수: SUM 그룹이 통과 비율만큼 점수를 준다
   - 멱등성: 같은 Idempotency-Key 로 두 번 제출하면 제출이 하나만 생긴다
@@ -24,6 +25,9 @@ import urllib.request
 import uuid
 
 BASE = "http://localhost:8080/api/v1"
+
+# 이 스모크가 실제로 제출하는 문제들.
+REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count"]
 TIMEOUT = 60
 
 ACCEPTED_SOURCE = """
@@ -184,13 +188,12 @@ def read_events(submission_id: str, limit: int = 4) -> list[str]:
 
 
 def await_trace(submission_id: str) -> dict | None:
-    """트레이스는 판정 뒤 별도 작업으로 온다. 없으면 204 라서 None 이 돌아온다."""
+    """트레이스 목차. 판정 뒤 별도 작업으로 오므로 없으면 204 다."""
     deadline = time.time() + 20
     while time.time() < deadline:
-        req = urllib.request.Request(f"{BASE}/submissions/{submission_id}/trace")
-        with urllib.request.urlopen(req, timeout=10) as response:
-            if response.status == 200:
-                return json.loads(response.read())
+        status, manifest = raw_request("GET", f"/submissions/{submission_id}/trace")
+        if status == 200:
+            return manifest
         time.sleep(0.5)
     return None
 
@@ -207,7 +210,9 @@ def main() -> int:
     print("문제 조회")
     problems = request("GET", "/problems")["items"]
     slugs = sorted(p["id"] for p in problems)
-    results.append(check("문제 목록", slugs, ["max-subarray", "two-sum"]))
+    # 목록을 통째로 고정하면 문제를 추가할 때마다 스모크가 깨진다. 이 스모크가 실제로
+    # 쓰는 문제들이 들어 있는지만 본다.
+    results.append(check("문제 목록", set(REQUIRED_PROBLEMS) <= set(slugs), True))
     detail = request("GET", "/problems/two-sum")
     results.append(check("공개 샘플 수", len(detail["samples"]), 2))
     results.append(check("시그니처", detail["signature"], "fun twoSum(nums: IntArray, target: Int): IntArray"))
@@ -301,12 +306,42 @@ def main() -> int:
     print("\n실행 트레이스 (§7)")
     traced = submit(ACCEPTED_SOURCE)
     await_verdict(traced["id"])
-    capture = await_trace(traced["id"])
-    results.append(check("트레이스 도착", capture is not None, True))
-    if capture:
-        results.append(check("이벤트 있음", len(capture["events"]) > 0, True))
-        results.append(check("잘리지 않음", capture["truncated"], False))
-        results.append(check("공개 케이스만", capture["caseId"].startswith("sample/"), True))
+    manifest = await_trace(traced["id"])
+    results.append(check("트레이스 목차 도착", manifest is not None, True))
+    if manifest:
+        results.append(check("상태", manifest["status"], "READY"))
+        results.append(check("스키마", manifest["schemaVersion"], "2.0"))
+        results.append(check("이벤트 있음", manifest["eventCount"] > 0, True))
+        results.append(check("공개 케이스만", manifest["caseId"].startswith("sample/"), True))
+        results.append(check("요약 예산 준수", len(manifest["summary"]) <= 1000, True))
+
+        # 목차의 청크를 실제로 받아 seq 범위와 맞는지 본다 (§7.5).
+        chunks = manifest["chunks"]
+        results.append(check("청크 목차 있음", len(chunks) > 0, True))
+        status, chunk = raw_request("GET", f"/submissions/{traced['id']}/trace/chunks/0")
+        results.append(check("청크 조회", status, 200))
+        if chunk:
+            events = chunk["events"]
+            results.append(check("  목차와 개수 일치", len(events), chunks[0]["eventCount"]))
+            results.append(check("  목차와 첫 seq 일치", events[0]["seq"], chunks[0]["firstSeq"]))
+            kinds = sorted({e["targetKind"] for e in events})
+            results.append(check("  자료구조 종류", kinds, ["ARRAY"]))
+
+    # 다섯 렌더러를 모두 쓰는 문제로 종류가 전부 나오는지 본다 (§1.1, §7.5).
+    islands = submit(
+        open("content/problems/island-count/solutions/reference.kt").read(),
+        problem="island-count",
+    )
+    final = await_verdict(islands["id"])
+    results.append(check("다중 자료구조 문제 정답", final["verdict"], "ACCEPTED"))
+    rich = await_trace(islands["id"])
+    if rich:
+        kinds = sorted({e["targetKind"] for e in rich["summary"]})
+        results.append(
+            check("  다섯 종류 모두", kinds, ["ARRAY", "CALL", "GRAPH", "QUEUE", "STACK"])
+        )
+        status, missing = raw_request("GET", f"/submissions/{traced['id']}/trace/chunks/999")
+        results.append(check("  없는 청크는 404", status, 404))
 
     print("\n멱등성 (§4.3)")
     key = str(uuid.uuid4())

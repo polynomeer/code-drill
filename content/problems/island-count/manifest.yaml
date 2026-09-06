@@ -1,0 +1,40 @@
+# 다섯 렌더러를 모두 쓰는 문제 (기술 설계서 §1.1 배열·포인터·스택·큐·그래프·재귀).
+#
+# 격자를 1차원 배열로 주고 BFS/DFS 로 연결 요소를 센다. 계측을 붙이면 배열·큐(BFS)·
+# 스택(DFS)·그래프(연결 관계)·재귀(호출)가 한 트레이스에 함께 나타난다.
+
+id: island-count
+version: 1
+title: 섬의 개수
+statement: statement.md
+
+limits:
+  timeMillis: 2000
+  memoryMb: 256
+  outputBytes: 65536
+
+signature:
+  name: countIslands
+  parameters:
+    - name: grid
+      type: INT_ARRAY
+    - name: width
+      type: INT
+  returns: INT
+
+groups:
+  - id: sample
+    weight: 0
+    visibility: PUBLIC
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: FAIL_FAST
+  - id: boundary
+    weight: 50
+    visibility: HIDDEN
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: CONTINUE
+  - id: hidden
+    weight: 50
+    visibility: HIDDEN
+    aggregation: SUM
+    stopPolicy: CONTINUE

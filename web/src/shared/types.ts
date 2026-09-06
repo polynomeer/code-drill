@@ -117,26 +117,8 @@ export interface Submission {
   groups: GroupResult[] | null
 }
 
-export type TraceEventType = 'VISIT' | 'COMPARE' | 'MATCH'
-
-export interface TraceEvent {
-  seq: number
-  logicalTime: number
-  eventType: TraceEventType
-  /** `array:<index>` 형식 (§7.2 target). */
-  target: string
-  before: string | null
-  after: string | null
-  importance: number
-}
-
-export interface TraceCapture {
-  schemaVersion: string
-  caseId: string
-  events: TraceEvent[]
-  truncated: boolean
-  diagnostics: string | null
-}
+/* 트레이스 타입은 features/replay/traceTypes.ts 에 있다. 렌더러와 함께 두어야
+   스키마를 바꿀 때 그리는 쪽과 계약이 같이 움직인다. */
 
 /** cursor 페이지네이션 응답 (§9.1). nextCursor 가 null 이면 마지막 페이지다. */
 export interface Page<T> {

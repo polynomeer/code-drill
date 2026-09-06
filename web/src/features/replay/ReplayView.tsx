@@ -1,101 +1,159 @@
-import { useState } from 'react'
-import type { TraceCapture, TraceEventType } from '../../shared/types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { applyAll } from './reducer'
+import { EventFallback, renderersFor } from './renderers'
+import { kindsIn, useTrace } from './useTrace'
+import { schemaSupported } from './traceTypes'
+import type { TraceManifest } from './traceTypes'
 
-const TYPE_LABEL: Record<TraceEventType, string> = {
+const TYPE_LABEL: Record<string, string> = {
   VISIT: '살펴봄',
-  COMPARE: '짝을 찾아봄',
+  COMPARE: '비교',
+  SWAP: '교환',
+  WRITE: '기록',
+  POINTER: '포인터 이동',
+  PUSH: 'push',
+  POP: 'pop',
+  ENQUEUE: 'enqueue',
+  DEQUEUE: 'dequeue',
+  NODE: '정점 방문',
+  EDGE: '간선',
+  CALL: '호출',
+  RETURN: '반환',
   MATCH: '답을 찾음',
 }
 
 /**
  * 실행 리플레이 (기술 설계서 §7.5, 디자인 설계서 §0.2 관찰 가능).
  *
- * 이벤트를 처음부터 적용해 현재 상태를 복원한다. 원본 설계의 checkpoint 기반 seek 은
- * 아직 없다 — 이벤트 수가 예산(1,000) 안이라 전체 재생이 충분히 싸다.
+ * manifest 와 요약을 먼저 받아 타임라인을 그리고, 상세 이벤트는 현재 위치 주변만
+ * 내려받는다. 스키마를 모르거나 상태를 그릴 수 없으면 텍스트 이벤트 목록으로 폴백한다.
+ *
+ * 키보드로도 조작할 수 있어야 한다 (§14.3 접근성). ←/→ 는 한 걸음, Home/End 는 처음과 끝.
  */
-export function ReplayView({ capture, input }: { capture: TraceCapture; input: number[] }) {
+export function ReplayView({
+  submissionId,
+  manifest,
+  input,
+}: {
+  submissionId: string
+  manifest: TraceManifest
+  input: number[]
+}) {
   const [step, setStep] = useState(0)
+  const { events, error, ensureLoaded } = useTrace(submissionId, manifest)
+  const container = useRef<HTMLElement>(null)
 
-  if (capture.events.length === 0) {
+  useEffect(() => {
+    void ensureLoaded(step)
+  }, [step, ensureLoaded])
+
+  useEffect(() => setStep(0), [manifest.traceId])
+
+  const state = useMemo(() => applyAll(events, step), [events, step])
+  const kinds = useMemo(() => kindsIn(events, manifest), [events, manifest])
+  const renderers = useMemo(() => renderersFor(kinds), [kinds])
+  const current = step > 0 ? events[step - 1] : null
+
+  if (manifest.status === 'EMPTY') {
     return (
       <section className="panel">
         <h3>실행 리플레이</h3>
-        <p className="muted">{capture.diagnostics ?? '트레이스가 없습니다.'}</p>
+        <p className="muted">{manifest.diagnostics ?? '트레이스가 없습니다.'}</p>
       </section>
     )
   }
 
-  const applied = capture.events.slice(0, step)
-  const current = capture.events[step - 1]
-  const indexOf = (target: string) => Number(target.split(':')[1] ?? -1)
+  if (manifest.status === 'INVALID' || !schemaSupported(manifest.schemaVersion)) {
+    return (
+      <section className="panel">
+        <h3>실행 리플레이</h3>
+        <EventFallback
+          events={manifest.summary}
+          reason={
+            manifest.status === 'INVALID'
+              ? `트레이스를 신뢰할 수 없어 상태를 그리지 않습니다: ${manifest.diagnostics ?? ''}`
+              : `이 버전(${manifest.schemaVersion})을 아직 그릴 수 없습니다.`
+          }
+        />
+      </section>
+    )
+  }
 
-  const visited = new Set(applied.filter((e) => e.eventType === 'VISIT').map((e) => indexOf(e.target)))
-  const matched = new Set(
-    applied
-      .filter((e) => e.eventType === 'MATCH')
-      .flatMap((e) => [indexOf(e.target), Number(e.after)]),
-  )
-  const cursor = current ? indexOf(current.target) : -1
+  const total = manifest.eventCount
+  const clamp = (next: number) => Math.max(0, Math.min(total, next))
 
   return (
-    <section className="panel">
+    <section
+      className="panel"
+      ref={container}
+      tabIndex={0}
+      role="group"
+      aria-label="실행 리플레이"
+      onKeyDown={(event) => {
+        const moves: Record<string, number | undefined> = {
+          ArrowRight: step + 1,
+          ArrowLeft: step - 1,
+          Home: 0,
+          End: total,
+        }
+        const next = moves[event.key]
+        if (next === undefined) return
+        event.preventDefault()
+        setStep(clamp(next))
+      }}
+    >
       <h3>
-        실행 리플레이 <span className="muted">{capture.caseId}</span>
+        실행 리플레이 <span className="muted">{manifest.caseId}</span>
       </h3>
 
-      <div className="cells">
-        {input.map((value, index) => {
-          const state = matched.has(index)
-            ? 'matched'
-            : index === cursor
-              ? 'cursor'
-              : visited.has(index)
-                ? 'visited'
-                : ''
-          return (
-            <div key={index} className={`cell ${state}`}>
-              <span className="cell-index">{index}</span>
-              <span className="cell-value">{value}</span>
-            </div>
-          )
-        })}
-      </div>
+      {error && <p className="warn">{error}</p>}
+
+      {renderers.map((renderer) => (
+        <div key={renderer.kind} className="renderer">
+          <h4>{renderer.title}</h4>
+          {renderer.render(state, input)}
+        </div>
+      ))}
+
+      {state.unknown > 0 && (
+        <p className="warn">해석하지 못한 이벤트 {state.unknown}건은 상태에 반영하지 않았습니다.</p>
+      )}
 
       <div className="controls">
         <button onClick={() => setStep(0)} disabled={step === 0}>
           처음
         </button>
-        <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
+        <button onClick={() => setStep(clamp(step - 1))} disabled={step === 0}>
           이전
         </button>
         <input
           type="range"
           min={0}
-          max={capture.events.length}
+          max={total}
           value={step}
-          onChange={(e) => setStep(Number(e.target.value))}
+          onChange={(event) => setStep(clamp(Number(event.target.value)))}
           aria-label="재생 위치"
         />
-        <button
-          onClick={() => setStep((s) => Math.min(capture.events.length, s + 1))}
-          disabled={step === capture.events.length}
-        >
+        <button onClick={() => setStep(clamp(step + 1))} disabled={step >= total}>
           다음
         </button>
-        <span className="muted">
-          {step} / {capture.events.length}
+        <span className="muted mono">
+          {step} / {total}
         </span>
       </div>
 
       <p className="event-line">
         {current
-          ? `#${current.seq} ${TYPE_LABEL[current.eventType]} — ${current.target}${
-              current.after ? ` → ${current.after}` : ''
-            }`
+          ? `#${current.seq} ${TYPE_LABEL[current.eventType] ?? current.eventType} — ${
+              current.targetRef
+            }${current.after ? ` → ${current.after}` : ''}`
           : '재생 전'}
+        {step > events.length && <span className="muted"> (구간을 불러오는 중…)</span>}
       </p>
 
-      {capture.truncated && <p className="warn">이벤트 예산을 넘겨 이후가 잘렸습니다.</p>}
+      {manifest.truncated && (
+        <p className="warn">이벤트 예산을 넘겨 이후가 잘렸습니다. 요약만 완전합니다.</p>
+      )}
     </section>
   )
 }

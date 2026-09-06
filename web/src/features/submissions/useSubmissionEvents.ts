@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { getSubmission, getTrace } from '../../api/client'
-import type { Submission, TraceCapture } from '../../shared/types'
+import { getSubmission, getTraceManifest } from '../../api/client'
+import type { TraceManifest } from '../replay/traceTypes'
+import type { Submission } from '../../shared/types'
 
 /**
  * 제출 상태 구독 (기술 설계서 §9.1).
@@ -11,7 +12,7 @@ import type { Submission, TraceCapture } from '../../shared/types'
  */
 export function useSubmissionEvents(submissionId: string | null) {
   const [submission, setSubmission] = useState<Submission | null>(null)
-  const [trace, setTrace] = useState<TraceCapture | null>(null)
+  const [trace, setTrace] = useState<TraceManifest | null>(null)
   const sourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
@@ -24,6 +25,10 @@ export function useSubmissionEvents(submissionId: string | null) {
       getSubmission(submissionId).then((next) => {
         if (!cancelled) setSubmission(next)
       })
+      // 완료된 제출을 나중에 다시 열면 SSE 로는 trace 이벤트가 오지 않는다. 조회로 채운다.
+      getTraceManifest(submissionId).then((next) => {
+        if (!cancelled && next) setTrace(next)
+      })
     }
 
     const source = new EventSource(`/api/v1/submissions/${submissionId}/events`)
@@ -31,7 +36,7 @@ export function useSubmissionEvents(submissionId: string | null) {
     source.addEventListener('status', refresh)
     source.addEventListener('completed', refresh)
     source.addEventListener('trace', () => {
-      getTrace(submissionId).then((next) => {
+      getTraceManifest(submissionId).then((next) => {
         if (!cancelled) setTrace(next)
       })
     })
