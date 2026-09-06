@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.SubmissionQueued
+import dev.codedrill.platform.common.Cursor
 import dev.codedrill.platform.common.IdempotencyKey
+import dev.codedrill.platform.common.Page
 import dev.codedrill.platform.messaging.OutboxEvent
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -81,7 +83,28 @@ class SubmissionService(
 
     fun trace(id: UUID): String? = repository.findTrace(id)
 
-    fun recent(userId: String, limit: Int = 20): List<Submission> = repository.recentFor(userId, limit)
+    /**
+     * 제출 기록 한 페이지 (§9.1).
+     *
+     * 커서가 가리키는 항목 **다음**부터 [limit] 개를 읽는다. 커서는 권한을 담지 않으므로
+     * 소유자 조건은 여기서 다시 건다.
+     */
+    fun history(userId: String, problemId: String?, cursor: String?, limit: Int?): Page<Submission> {
+        val size = Cursor.limitOf(limit)
+        val after = Cursor.decode(cursor)?.let { parts ->
+            runCatching { Instant.parse(parts[0]) to UUID.fromString(parts[1]) }.getOrNull()
+        }
+
+        // 한 건 더 읽어 다음 페이지가 있는지 본다. count(*) 보다 싸고 정확하다.
+        val rows = repository.page(userId, problemId, after, size + 1)
+        val items = rows.take(size)
+        val nextCursor = if (rows.size > size) {
+            items.last().let { Cursor.encode(it.createdAt.toString(), it.id.toString()) }
+        } else {
+            null
+        }
+        return Page(items, nextCursor)
+    }
 
     /**
      * 채점 종료를 반영한다.

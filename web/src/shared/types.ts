@@ -138,6 +138,26 @@ export interface TraceCapture {
   diagnostics: string | null
 }
 
+/** cursor 페이지네이션 응답 (§9.1). nextCursor 가 null 이면 마지막 페이지다. */
+export interface Page<T> {
+  items: T[]
+  nextCursor: string | null
+}
+
+/** 작업 중인 초안. version 은 CAS 용이며 저장할 때마다 오른다 (§8.2). */
+export interface Draft {
+  problemId: string
+  language: string
+  code: string
+  version: number
+  updatedAt: string
+}
+
+export interface DraftConflict {
+  error: ApiError
+  current: Draft
+}
+
 /** 표준 오류 응답 (§9.1). traceId 는 문의·조사에 그대로 쓴다. */
 export interface ApiError {
   errorCode: string

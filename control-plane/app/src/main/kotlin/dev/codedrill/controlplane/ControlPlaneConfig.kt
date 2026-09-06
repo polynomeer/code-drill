@@ -2,7 +2,6 @@ package dev.codedrill.controlplane
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.controlplane.outbox.OutboxRoute
@@ -18,8 +17,8 @@ import java.nio.file.Path
 @EnableScheduling
 class ControlPlaneConfig {
 
-    @Bean
-    fun objectMapper(): ObjectMapper = ObjectMapper().registerKotlinModule()
+    // ObjectMapper 는 Spring Boot 가 만든 것을 그대로 쓴다. 여기서 새로 만들면 Boot 가
+    // 등록해 주는 JavaTimeModule 이 빠져 Instant 직렬화가 런타임에 깨진다.
 
     @Bean
     fun problemPackageLoader(@Value("\${codedrill.content.root}") root: String) =

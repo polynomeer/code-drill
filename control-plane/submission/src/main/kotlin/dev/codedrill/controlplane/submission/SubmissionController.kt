@@ -5,6 +5,7 @@ import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
+import dev.codedrill.platform.common.Page
 import jakarta.validation.constraints.NotBlank
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.util.UUID
@@ -59,10 +61,17 @@ class SubmissionController(
         return ResponseEntity.ok(SubmissionResponse.of(submission, json))
     }
 
+    /** 제출 기록 (§9.1). 정렬 키가 고정된 cursor 페이지네이션이다. */
     @GetMapping
-    fun recent(
+    fun history(
         @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
-    ): List<SubmissionResponse> = service.recent(userId).map { SubmissionResponse.of(it, json) }
+        @RequestParam(required = false) problemId: String?,
+        @RequestParam(required = false) cursor: String?,
+        @RequestParam(required = false) limit: Int?,
+    ): Page<SubmissionResponse> {
+        val page = service.history(userId, problemId, cursor, limit)
+        return Page(page.items.map { SubmissionResponse.of(it, json) }, page.nextCursor)
+    }
 
     /**
      * 상태 스트림. 구독 직후 현재 상태를 한 번 흘려보내, 구독 이전에 지나간 전이를

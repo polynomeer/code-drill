@@ -1,5 +1,8 @@
 import type {
   ApiError,
+  Draft,
+  DraftConflict,
+  Page,
   Problem,
   ProblemSummary,
   Submission,
@@ -26,8 +29,44 @@ async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
-export function listProblems(): Promise<ProblemSummary[]> {
-  return fetch(`${BASE}/problems`).then(json<ProblemSummary[]>)
+export function listProblems(query?: string): Promise<Page<ProblemSummary>> {
+  const params = query ? `?query=${encodeURIComponent(query)}` : ''
+  return fetch(`${BASE}/problems${params}`).then(json<Page<ProblemSummary>>)
+}
+
+export function listSubmissions(problemId?: string): Promise<Page<Submission>> {
+  const params = problemId ? `?problemId=${encodeURIComponent(problemId)}` : ''
+  return fetch(`${BASE}/submissions${params}`).then(json<Page<Submission>>)
+}
+
+export async function getDraft(problemId: string, language: string): Promise<Draft | null> {
+  const response = await fetch(`${BASE}/workspaces/${problemId}/${language}`)
+  if (response.status === 204) return null
+  return json<Draft>(response)
+}
+
+/**
+ * 초안 저장 (§9.2 PUT /workspaces).
+ *
+ * 409 는 오류가 아니라 결과의 한 종류다. 그 사이에 다른 곳에서 저장됐다는 뜻이고,
+ * 서버의 현재 초안이 함께 온다. 조용히 덮어쓰지 않는 것이 이 API 의 목적이다.
+ */
+export async function saveDraft(
+  problemId: string,
+  language: string,
+  code: string,
+  version: number | null,
+): Promise<{ saved: true; version: number } | { saved: false; conflict: DraftConflict }> {
+  const response = await fetch(`${BASE}/workspaces/${problemId}/${language}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, version }),
+  })
+  if (response.status === 409) {
+    return { saved: false, conflict: (await response.json()) as DraftConflict }
+  }
+  const body = await json<{ version: number }>(response)
+  return { saved: true, version: body.version }
 }
 
 export function getProblem(slug: string): Promise<Problem> {

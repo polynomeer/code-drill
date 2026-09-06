@@ -1,6 +1,7 @@
 package dev.codedrill.platform.messaging
 
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.amqp.core.Declarables
@@ -36,6 +37,8 @@ class AmqpConfig {
         Jackson2JsonMessageConverter(
             ObjectMapper()
                 .registerKotlinModule()
+                // 메시지에 시간 타입이 늘어나도 런타임에 깨지지 않게 미리 등록한다.
+                .registerModule(JavaTimeModule())
                 // 소비자는 N/N-1 스키마를 함께 지원해야 한다. 새 필드가 생겼다고 구버전
                 // 소비자가 메시지를 거절하면 배포 중에 채점이 멈춘다 (§15.3).
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),

@@ -19,6 +19,7 @@ import json
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -114,6 +115,22 @@ fun maxSubarray(nums: IntArray): Int {
 """
 
 
+def raw_request(method: str, path: str, body: dict | None = None, headers: dict | None = None):
+    """상태 코드까지 봐야 하는 경로용. 409 는 오류가 아니라 결과의 한 종류다."""
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
+    req.add_header("Content-Type", "application/json")
+    for key, value in (headers or {}).items():
+        req.add_header(key, value)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            payload = response.read()
+            return response.status, (json.loads(payload) if payload else None)
+    except urllib.error.HTTPError as error:
+        payload = error.read()
+        return error.code, (json.loads(payload) if payload else None)
+
+
 def request(method: str, path: str, body: dict | None = None, headers: dict | None = None) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
@@ -188,7 +205,7 @@ def main() -> int:
     results: list[bool] = []
 
     print("문제 조회")
-    problems = request("GET", "/problems")
+    problems = request("GET", "/problems")["items"]
     slugs = sorted(p["id"] for p in problems)
     results.append(check("문제 목록", slugs, ["max-subarray", "two-sum"]))
     detail = request("GET", "/problems/two-sum")
@@ -233,6 +250,53 @@ def main() -> int:
     results.append(check("O(n^2) 풀이 부분 점수", 0 < slow["score"] < 100, True))
     results.append(check("  performance 부분 득점", 0 < perf["score"] < perf["maxScore"], True))
     print(f"        (총점 {slow['score']}, performance {perf['score']}/{perf['maxScore']})")
+
+    print("\n초안 자동 저장 CAS (§9.2, §9.4)")
+    user = f"smoke-{uuid.uuid4().hex[:8]}"
+    headers = {"X-User-Id": user}
+
+    status, saved = raw_request(
+        "PUT", "/workspaces/two-sum/KOTLIN", {"code": "fun a() {}", "version": None}, headers
+    )
+    results.append(check("첫 저장", (status, saved["version"]), (200, 1)))
+
+    status, saved = raw_request(
+        "PUT", "/workspaces/two-sum/KOTLIN", {"code": "fun b() {}", "version": 1}, headers
+    )
+    results.append(check("기대 버전으로 덮어쓰기", (status, saved["version"]), (200, 2)))
+
+    # 다른 탭이 낡은 버전으로 저장하려는 상황. 조용히 이기면 안 된다.
+    status, conflict = raw_request(
+        "PUT", "/workspaces/two-sum/KOTLIN", {"code": "fun stale() {}", "version": 1}, headers
+    )
+    results.append(check("낡은 버전은 충돌", status, 409))
+    results.append(check("  오류 코드", conflict["error"]["errorCode"], "DRAFT_VERSION_CONFLICT"))
+    results.append(check("  현재 초안 동봉", conflict["current"]["code"], "fun b() {}"))
+
+    status, draft = raw_request("GET", "/workspaces/two-sum/KOTLIN", None, headers)
+    results.append(check("초안 조회", draft["code"], "fun b() {}"))
+    results.append(check("  덮어쓰기 실패가 남긴 흔적 없음", draft["version"], 2))
+
+    status, missing = raw_request("GET", "/workspaces/two-sum/PYTHON", None, headers)
+    results.append(check("초안 없으면 204", status, 204))
+
+    print("\n문제 목록·제출 기록 (§9.1 cursor)")
+    needle = urllib.parse.quote("부분")
+    page = request("GET", f"/problems?query={needle}")
+    results.append(check("제목 검색", [p["id"] for p in page["items"]], ["max-subarray"]))
+
+    first = request("GET", "/problems?limit=1")
+    results.append(check("limit 반영", len(first["items"]), 1))
+    results.append(check("  다음 커서 있음", first["nextCursor"] is not None, True))
+    second = request("GET", f"/problems?limit=1&cursor={first['nextCursor']}")
+    results.append(
+        check("  커서로 이어보기", first["items"][0]["id"] != second["items"][0]["id"], True)
+    )
+
+    history = request("GET", "/submissions?problemId=two-sum&limit=3")
+    results.append(check("제출 기록 조회", len(history["items"]) <= 3, True))
+    verdicts = [item["verdict"] for item in history["items"]]
+    results.append(check("  최신 제출이 먼저", verdicts[0] is not None, True))
 
     print("\n실행 트레이스 (§7)")
     traced = submit(ACCEPTED_SOURCE)

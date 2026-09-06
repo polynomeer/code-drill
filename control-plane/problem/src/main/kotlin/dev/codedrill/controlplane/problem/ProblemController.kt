@@ -2,6 +2,8 @@ package dev.codedrill.controlplane.problem
 
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
+import dev.codedrill.platform.common.Cursor
+import dev.codedrill.platform.common.Page
 import org.springframework.beans.factory.annotation.Value
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -12,6 +14,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /**
@@ -28,13 +31,30 @@ class ProblemController(
 ) {
 
     /**
-     * 콘텐츠 디렉터리를 그대로 목록으로 쓴다.
+     * 문제 목록 (기술 설계서 §9.2 검색·cursor 목록).
      *
-     * 검색·역량 필터·cursor 페이지네이션(§9.2)은 Problem 모듈이 DB 를 갖게 되는 단계에
-     * 붙인다. 그때까지 목록의 진실 원천은 패키지 디렉터리다.
+     * 목록의 진실 원천은 아직 패키지 디렉터리다. 역량 필터는 Problem 모듈이 DB 와 역량
+     * 태그를 갖게 되는 단계에 붙는다. 정렬 키는 id 오름차순으로 고정한다 — 커서가 의미를
+     * 가지려면 같은 요청이 늘 같은 순서를 내야 한다 (§9.1).
      */
     @GetMapping
-    fun list(): List<ProblemSummary> = availableProblems().map { ProblemSummary.of(packages.load(it)) }
+    fun list(
+        @RequestParam(required = false) query: String?,
+        @RequestParam(required = false) cursor: String?,
+        @RequestParam(required = false) limit: Int?,
+    ): Page<ProblemSummary> {
+        val size = Cursor.limitOf(limit)
+        val after = Cursor.decode(cursor)?.firstOrNull()
+
+        val matched = availableProblems()
+            .map { ProblemSummary.of(packages.load(it)) }
+            .filter { it.matches(query) }
+            .filter { after == null || it.id > after }
+
+        val items = matched.take(size)
+        val nextCursor = if (matched.size > size) Cursor.encode(items.last().id) else null
+        return Page(items, nextCursor)
+    }
 
     @GetMapping("/{slug}")
     fun detail(@PathVariable slug: String): ResponseEntity<ProblemDetail> {
@@ -50,6 +70,14 @@ class ProblemController(
 }
 
 data class ProblemSummary(val id: String, val version: Int, val title: String) {
+
+    /** 제목과 id 에서 부분 일치를 본다. 대소문자는 구분하지 않는다. */
+    fun matches(query: String?): Boolean {
+        if (query.isNullOrBlank()) return true
+        val needle = query.trim().lowercase()
+        return title.lowercase().contains(needle) || id.lowercase().contains(needle)
+    }
+
     companion object {
         fun of(pkg: ProblemPackage) = ProblemSummary(
             id = pkg.manifest.id,

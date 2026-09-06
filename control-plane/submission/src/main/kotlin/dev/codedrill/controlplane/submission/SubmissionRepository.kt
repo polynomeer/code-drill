@@ -5,6 +5,7 @@ import dev.codedrill.platform.messaging.OutboxEvent
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Repository
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -67,11 +68,42 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
             MAPPER, userId, key,
         ).firstOrNull()
 
-    fun recentFor(userId: String, limit: Int): List<Submission> =
-        jdbc.query(
-            "SELECT * FROM submission WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-            MAPPER, userId, limit,
+    /**
+     * 제출 기록 (기술 설계서 §9.1 cursor pagination, §8.2 INDEX(user_id, created_at desc)).
+     *
+     * 정렬 키를 `(created_at desc, id desc)` 로 고정한다. created_at 만으로는 같은 밀리초에
+     * 들어온 제출의 순서가 흔들려, 커서로 이어볼 때 항목을 건너뛰거나 중복해서 보게 된다.
+     */
+    fun page(
+        userId: String,
+        problemId: String?,
+        after: Pair<Instant, UUID>?,
+        limit: Int,
+    ): List<Submission> {
+        val conditions = mutableListOf("user_id = ?")
+        val args = mutableListOf<Any>(userId)
+
+        problemId?.let {
+            conditions += "problem_id = ?"
+            args += it
+        }
+        after?.let { (createdAt, id) ->
+            conditions += "(created_at, id) < (?, ?)"
+            args += java.sql.Timestamp.from(createdAt)
+            args += id
+        }
+        args += limit
+
+        return jdbc.query(
+            """
+            SELECT * FROM submission
+             WHERE ${conditions.joinToString(" AND ")}
+             ORDER BY created_at DESC, id DESC
+             LIMIT ?
+            """.trimIndent(),
+            MAPPER, *args.toTypedArray(),
         )
+    }
 
     /**
      * 상태를 낙관적으로 옮긴다 (§3.2).
