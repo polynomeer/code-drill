@@ -37,7 +37,8 @@ python3 scripts/smoke.py          # E2E 스모크 (앱 세 개가 떠 있어야 
 ```
 
 ```bash
-cd web && pnpm build   # tsc --noEmit + vite build
+cd web && pnpm build   # tsc --noEmit + vitest + vite build
+cd web && pnpm test    # 리플레이 리듀서 불변식
 cd web && pnpm dev     # :8080 으로 /api 프록시
 ```
 
