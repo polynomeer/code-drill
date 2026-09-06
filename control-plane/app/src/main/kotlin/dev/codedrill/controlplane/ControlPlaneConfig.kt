@@ -6,6 +6,8 @@ import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.controlplane.outbox.OutboxRoute
 import dev.codedrill.controlplane.outbox.OutboxRoutes
+import dev.codedrill.controlplane.admin.PublishService
+import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
@@ -23,6 +25,14 @@ class ControlPlaneConfig {
     @Bean
     fun problemPackageLoader(@Value("\${codedrill.content.root}") root: String) =
         ProblemPackageLoader(Path.of(root))
+
+    /**
+     * Problem 모듈이 공개 여부를 묻는 창구를 Admin 의 상태에 연결한다 (§3.1 조립 지점).
+     *
+     * 두 모듈은 서로를 모른 채로 남고, 둘을 잇는 결정은 여기 한 줄에 모인다.
+     */
+    @Bean
+    fun publishedProblems(publish: PublishService) = PublishedProblems { publish.publishedProblemIds() }
 
     /**
      * 아웃박스 이벤트를 어느 큐로, 어떤 타입으로 보낼지 (§3.3).

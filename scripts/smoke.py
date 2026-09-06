@@ -303,6 +303,71 @@ def main() -> int:
     verdicts = [item["verdict"] for item in history["items"]]
     results.append(check("  최신 제출이 먼저", verdicts[0] is not None, True))
 
+    print("\n콘텐츠 공개와 2인 승인 (§3.2, §11.2, §13.3)")
+    editor = {"X-Actor": "editor-" + uuid.uuid4().hex[:6]}
+    publisher = {"X-Actor": "publisher-" + uuid.uuid4().hex[:6]}
+    pid = "smoke-" + uuid.uuid4().hex[:8]
+    digest = uuid.uuid4().hex
+    report = uuid.uuid4().hex
+
+    status, registered = raw_request(
+        "POST", f"/admin/problems/{pid}/versions",
+        {"version": 1, "packageDigest": digest, "reportDigest": report}, editor,
+    )
+    results.append(check("버전 등록", (status, registered["versionId"]), (200, f"{pid}@1")))
+
+    status, denied = raw_request(
+        "POST", f"/admin/problems/{pid}/publish", {"version": 1, "reportDigest": report}, editor,
+    )
+    results.append(check("등록자 본인 공개 거부", status, 409))
+    results.append(check("  사유에 2인 승인 언급", "두 사람" in denied["reason"], True))
+
+    status, stale = raw_request(
+        "POST", f"/admin/problems/{pid}/publish",
+        {"version": 1, "reportDigest": uuid.uuid4().hex}, publisher,
+    )
+    results.append(check("보고서 digest 불일치 거부", status, 409))
+
+    status, published = raw_request(
+        "POST", f"/admin/problems/{pid}/publish", {"version": 1, "reportDigest": report}, publisher,
+    )
+    results.append(check("다른 사람이 공개", (status, published["publishedVersionId"]), (200, f"{pid}@1")))
+
+    state = request("GET", f"/admin/problems/{pid}")
+    results.append(check("  공개 버전 반영", state["publishedVersionId"], f"{pid}@1"))
+
+    trail = request("GET", f"/admin/audit?subject={pid}@1")
+    actions = [entry["action"] for entry in trail]
+    results.append(check("감사 로그", sorted(actions), ["PROBLEM_PUBLISHED", "PROBLEM_VERSION_REGISTERED"]))
+
+    # 공개된 문제만 목록에 나온다. 디렉터리에 파일을 놓는 것만으로 공개되면 §6.3 검증과
+    # §11.2 승인이 모두 우회된다.
+    listed = [p["id"] for p in request("GET", "/problems")["items"]]
+    results.append(check("공개된 문제만 목록에", pid not in listed, True))
+    results.append(check("  검증·공개된 문제는 보인다", "two-sum" in listed, True))
+
+    print("\n재채점 승인 (§4.2, §11.2)")
+    operator = {"X-Actor": "operator-" + uuid.uuid4().hex[:6]}
+    approver = {"X-Actor": "approver-" + uuid.uuid4().hex[:6]}
+
+    status, job = raw_request(
+        "POST", "/admin/rejudges",
+        {"scope": "problem:two-sum", "reason": "테스트 데이터 수정"}, operator,
+    )
+    results.append(check("재채점 요청", job["status"], "REQUESTED"))
+
+    status, self_approve = raw_request("POST", f"/admin/rejudges/{job['id']}/approve", None, operator)
+    results.append(check("본인 승인 거부", status, 409))
+
+    status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets")
+    results.append(check("승인 전 대상 없음", targets["count"], 0))
+
+    status, approved = raw_request("POST", f"/admin/rejudges/{job['id']}/approve", None, approver)
+    results.append(check("다른 사람이 승인", (status, approved["status"]), (200, "APPROVED")))
+
+    status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets")
+    results.append(check("승인 후 대상 있음", targets["count"] > 0, True))
+
     print("\n실행 트레이스 (§7)")
     traced = submit(ACCEPTED_SOURCE)
     await_verdict(traced["id"])

@@ -24,6 +24,9 @@ class ProcessSandbox : Sandbox {
 
     override fun available() = true
 
+    /** JVM 이나 인터프리터 기동 시간만 감안한다. */
+    override fun startupGraceMillis() = 5_000L
+
     override fun run(
         spec: SandboxSpec,
         caseIds: List<String>,
@@ -39,6 +42,7 @@ class ProcessSandbox : Sandbox {
             process = process,
             caseIds = caseIds,
             perCaseTimeoutMillis = spec.perCaseTimeoutMillis,
+            startupGraceMillis = startupGraceMillis(),
             outputByteLimit = spec.outputByteLimit,
             onEvent = onEvent,
             shouldContinue = shouldContinue,

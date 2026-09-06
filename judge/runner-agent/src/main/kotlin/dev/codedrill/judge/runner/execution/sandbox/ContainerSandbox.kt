@@ -46,6 +46,14 @@ class ContainerSandbox(
      */
     override fun available(): Boolean = daemonReachable() && imagePresent()
 
+    /**
+     * 컨테이너 생성 + 런타임 기동을 함께 기다린다.
+     *
+     * 데몬이 바쁠 때 `docker run` 이 수 초씩 걸린다. 유예가 짧으면 채점 서버가 바쁠 때만
+     * 멀쩡한 풀이가 시간 초과로 떨어진다.
+     */
+    override fun startupGraceMillis() = 20_000L
+
     private fun daemonReachable(): Boolean = runCatching {
         val probe = ProcessBuilder(runtimeBinary, "version", "--format", "{{.Server.Version}}")
             .redirectErrorStream(true)
@@ -89,6 +97,7 @@ class ContainerSandbox(
             process = process,
             caseIds = caseIds,
             perCaseTimeoutMillis = spec.perCaseTimeoutMillis,
+            startupGraceMillis = startupGraceMillis(),
             outputByteLimit = spec.outputByteLimit,
             onEvent = onEvent,
             shouldContinue = shouldContinue,

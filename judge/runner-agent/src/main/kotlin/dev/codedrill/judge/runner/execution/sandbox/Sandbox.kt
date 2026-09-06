@@ -19,6 +19,18 @@ interface Sandbox {
     /** 이 샌드박스가 지금 이 머신에서 쓸 수 있는지. */
     fun available(): Boolean
 
+    /**
+     * 첫 케이스를 기다릴 때 더 주는 시간.
+     *
+     * 런타임을 띄우는 데 걸리는 시간은 사용자 코드의 실행 시간이 아니다. 이 유예가
+     * 모자라면 멀쩡한 풀이가 TIME_LIMIT 을 받는다 — 그것도 채점 서버가 바쁠 때만
+     * 재현되는, 가장 나쁜 종류의 오판이다.
+     *
+     * 유예를 늘리는 것은 대증요법이다. 근본 해법은 §0.3 이 말하는 **상시 워커 풀**이며,
+     * 실행마다 컨테이너를 새로 만드는 지금 구조는 그 지연을 피할 수 없다.
+     */
+    fun startupGraceMillis(): Long
+
     fun run(
         spec: SandboxSpec,
         caseIds: List<String>,

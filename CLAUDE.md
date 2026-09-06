@@ -33,6 +33,7 @@ Claude가 만든 커밋은 마지막 줄에 `Co-Authored-By: Claude Opus 5 <nore
 ./gradlew build                   # 백엔드 전체 빌드 + 테스트 + 모듈 경계 검사
 ./gradlew test                    # 테스트만
 ./gradlew checkModuleBoundaries   # 도메인 모듈이 서로를 참조하는지 검사
+./gradlew :judge:runner-agent:validateContent   # 콘텐츠 검증 (§6.3)
 python3 scripts/smoke.py          # E2E 스모크 (앱 세 개가 떠 있어야 한다)
 ```
 

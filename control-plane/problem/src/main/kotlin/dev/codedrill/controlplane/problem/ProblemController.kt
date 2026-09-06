@@ -27,7 +27,16 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/problems")
 class ProblemController(
     private val packages: ProblemPackageLoader,
+    private val published: PublishedProblems,
     @Value("\${codedrill.content.root}") private val contentRoot: String,
+    /**
+     * 공개 상태를 강제할지.
+     *
+     * `true` 면 §3.2 의 공개 흐름을 통과한 문제만 목록과 상세에 나온다. 개발 편의로 끌 수
+     * 있게 두되, **기본값은 강제**다 — 검증하지 않은 문제가 사용자에게 보이는 경로를
+     * 기본값으로 열어 두면 안 된다.
+     */
+    @Value("\${codedrill.content.require-publish:true}") private val requirePublish: Boolean,
 ) {
 
     /**
@@ -62,11 +71,22 @@ class ProblemController(
         return ResponseEntity.ok(ProblemDetail.of(packages.load(slug)))
     }
 
-    private fun availableProblems(): List<String> =
-        Path.of(contentRoot).listDirectoryEntries()
+    /**
+     * 사용자에게 보여도 되는 문제.
+     *
+     * 패키지가 디스크에 있다는 것과 공개됐다는 것은 다르다. 디렉터리에 파일을 놓는 것만으로
+     * 문제가 공개되면 §6.3 검증과 §11.2 2인 승인이 모두 우회된다.
+     */
+    private fun availableProblems(): List<String> {
+        val onDisk = Path.of(contentRoot).listDirectoryEntries()
             .filter { it.isDirectory() && it.resolve("manifest.yaml").exists() }
             .map { it.name }
             .sorted()
+
+        if (!requirePublish) return onDisk
+        val allowed = published.ids()
+        return onDisk.filter { it in allowed }
+    }
 }
 
 data class ProblemSummary(val id: String, val version: Int, val title: String) {
