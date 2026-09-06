@@ -33,5 +33,17 @@ application {
  *   ./gradlew :judge:runner-agent:installDist
  *   judge/runner-agent/build/install/runner-agent/bin/runner-agent
  */
+/**
+ * 콘텐츠 검증 (§6.3). 문제를 추가·수정한 사람이 돌리고 CI 도 같은 명령을 돌린다.
+ * 저장소 루트를 기준으로 동작하도록 workingDir 를 맞춘다.
+ */
+tasks.register<JavaExec>("validateContent") {
+    group = "verification"
+    description = "content/problems 의 모든 문제를 §6.3 파이프라인으로 검증한다"
+    mainClass = "dev.codedrill.judge.runner.content.ValidateContent"
+    classpath = sourceSets["main"].runtimeClasspath
+    workingDir = rootProject.projectDir
+}
+
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") { enabled = false }
 tasks.named<Jar>("jar") { enabled = true }

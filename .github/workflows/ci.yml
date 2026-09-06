@@ -24,6 +24,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       # checkModuleBoundaries 가 함께 돈다: 도메인 모듈이 서로를 참조하면 여기서 막힌다.
       - run: ./gradlew build
+      # 콘텐츠가 공개 가능한 상태인지 확인한다 (§6.3). 문제를 추가하면 자동으로 포함된다.
+      - run: ./gradlew :judge:runner-agent:validateContent
 
   web:
     runs-on: ubuntu-latest
