@@ -318,7 +318,7 @@ def main() -> int:
     status, _ = raw_request("GET", "/admin/audit")
     results.append(check("토큰 없는 요청 거부", status, 401))
     status, _ = raw_request(
-        "GET", "/admin/audit", None, {"Authorization": "Bearer 모르는토큰모르는토큰모르는토큰"},
+        "GET", "/admin/audit", None, {"Authorization": "Bearer unknown-token-that-is-long-enough"},
     )
     results.append(check("모르는 토큰 거부", status, 401))
     status, _ = raw_request(
@@ -370,7 +370,9 @@ def main() -> int:
     results.append(check("  검증·공개된 문제는 보인다", "two-sum" in listed, True))
 
     print("\n재채점 승인 (§4.2, §11.2)")
-    operator_op = operators.with_roles("JUDGE_OPERATOR")
+    # 요청과 승인을 둘 다 할 수 있는 계정. 권한이 열려 있어도 요청자·승인자 분리가
+    # 남아 있는지 보기 위해 이 계정으로 요청한다.
+    operator_op = operators.with_roles("JUDGE_OPERATOR", "REVIEWER")
     operator = operator_op.headers
     approver = operators.with_roles("REVIEWER", other_than=operator_op).headers
 
@@ -380,8 +382,12 @@ def main() -> int:
     )
     results.append(check("재채점 요청", job["status"], "REQUESTED"))
 
+    status, _ = raw_request("POST", f"/admin/rejudges/{job['id']}/approve", None, editor_only)
+    results.append(check("승인 역할 없는 계정 거부", status, 403))
+
     status, self_approve = raw_request("POST", f"/admin/rejudges/{job['id']}/approve", None, operator)
     results.append(check("본인 승인 거부", status, 409))
+    results.append(check("  사유에 2인 승인 언급", "두 사람" in self_approve["reason"], True))
 
     status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets", None, operator)
     results.append(check("승인 전 대상 없음", targets["count"], 0))

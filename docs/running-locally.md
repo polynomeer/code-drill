@@ -81,15 +81,15 @@ export ADMIN_OPERATORS="\
 content-editor:$(openssl rand -hex 16):CONTENT_EDITOR;\
 release-manager:$(openssl rand -hex 16):CONTENT_EDITOR,PUBLISHER;\
 release-approver:$(openssl rand -hex 16):PUBLISHER;\
-judge-operator:$(openssl rand -hex 16):JUDGE_OPERATOR;\
+judge-operator:$(openssl rand -hex 16):JUDGE_OPERATOR,REVIEWER;\
 judge-reviewer:$(openssl rand -hex 16):REVIEWER;\
 security-admin:$(openssl rand -hex 16):SECURITY_ADMIN"
 ```
 
-역할은 §11.2 의 다섯 가지다. 스모크가 2인 승인을 확인하려면 **PUBLISHER 를 가진 사람이
-둘, 그리고 CONTENT_EDITOR 와 PUBLISHER 를 함께 가진 사람이 하나** 있어야 한다 —
-마지막 계정은 권한이 과하게 열려 있어도 등록자·승인자 분리가 남아 있는지 보기 위한
-것이다.
+역할은 §11.2 의 다섯 가지다. 스모크는 각 역할을 가진 사람이 **둘씩** 있어야 2인 승인을
+확인할 수 있고, `release-manager` 와 `judge-operator` 처럼 **두 단계를 모두 할 수 있는
+계정**이 하나씩 있어야 한다 — 권한이 과하게 열린 계정에서도 등록자·승인자 분리가
+남아 있는지 보기 위한 것이다.
 
 토큰은 24자 이상이어야 하며, 짧으면 기동 시점에 거절된다.
 
