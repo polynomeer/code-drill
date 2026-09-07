@@ -8,17 +8,19 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 운영 API (기술 설계서 §3.1 Admin, §9.2).
+ * 운영 API (기술 설계서 §3.1 Admin, §9.2, §11.2).
  *
- * 슬라이스에는 인증이 없다. 행위자는 헤더로 받으며, Identity 모듈과 §11.2 의 관리자 역할
- * (Content Editor / Reviewer / Publisher / Judge Operator / Security Admin)이 붙으면 인증
- * 주체와 역할에서 가져오도록 바꾼다. **지금 이 API 를 공개 환경에 노출하면 안 된다.**
+ * 행위자는 [AdminAuthInterceptor] 가 토큰에서 확인한 이름이다. 컨트롤러는 자칭한 값을
+ * 받지 않으며, 감사 로그의 actor 도 이 이름이다.
+ *
+ * 아직 사용자 세션과 통합돼 있지 않다. 토큰은 설정에 든 장기 비밀이므로, Identity
+ * 모듈이 붙으면 워크로드 ID 와 짧은 수명 토큰으로 옮긴다 (§11.2).
  */
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -31,10 +33,11 @@ class AdminController(
     // --- 콘텐츠 수명주기 ---
 
     /** 검증을 통과한 버전을 등록한다 (§6.3 보고서 digest 를 함께 받는다). */
+    @RequiresRole(AdminRole.CONTENT_EDITOR)
     @PostMapping("/problems/{problemId}/versions")
     fun registerVersion(
         @PathVariable problemId: String,
-        @RequestHeader(value = "X-Actor", defaultValue = "unknown") actor: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: RegisterVersionRequest,
     ): ResponseEntity<Map<String, String>> =
         when (val outcome = publish.registerVersion(
@@ -48,10 +51,11 @@ class AdminController(
         }
 
     /** 공개. 등록자와 다른 사람이어야 한다 (§11.2). */
+    @RequiresRole(AdminRole.PUBLISHER)
     @PostMapping("/problems/{problemId}/publish")
     fun publishVersion(
         @PathVariable problemId: String,
-        @RequestHeader(value = "X-Actor", defaultValue = "unknown") actor: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: PublishRequest,
     ): ResponseEntity<Map<String, String>> =
         when (val outcome = publish.publish(problemId, request.version, request.reportDigest, actor)) {
@@ -62,10 +66,11 @@ class AdminController(
                 ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
         }
 
+    @RequiresRole(AdminRole.PUBLISHER)
     @PostMapping("/problems/{problemId}/archive")
     fun archive(
         @PathVariable problemId: String,
-        @RequestHeader(value = "X-Actor", defaultValue = "unknown") actor: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: ArchiveRequest,
     ): Map<String, String> {
         publish.archive(problemId, actor, request.reason)
@@ -78,16 +83,18 @@ class AdminController(
 
     // --- 재채점 ---
 
+    @RequiresRole(AdminRole.JUDGE_OPERATOR)
     @PostMapping("/rejudges")
     fun requestRejudge(
-        @RequestHeader(value = "X-Actor", defaultValue = "unknown") actor: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: RejudgeRequest,
     ): RejudgeJob = rejudge.request(request.scope, request.reason, actor)
 
+    @RequiresRole(AdminRole.REVIEWER)
     @PostMapping("/rejudges/{id}/approve")
     fun approveRejudge(
         @PathVariable id: UUID,
-        @RequestHeader(value = "X-Actor", defaultValue = "unknown") actor: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
     ): ResponseEntity<Any> =
         when (val outcome = rejudge.approve(id, actor)) {
             is RejudgeService.ApprovalOutcome.Approved -> ResponseEntity.ok(outcome.job)
@@ -95,10 +102,11 @@ class AdminController(
                 ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
         }
 
+    @RequiresRole(AdminRole.REVIEWER)
     @PostMapping("/rejudges/{id}/reject")
     fun rejectRejudge(
         @PathVariable id: UUID,
-        @RequestHeader(value = "X-Actor", defaultValue = "unknown") actor: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: ArchiveRequest,
     ): ResponseEntity<Any> =
         when (val outcome = rejudge.reject(id, actor, request.reason)) {
@@ -120,6 +128,7 @@ class AdminController(
 
     // --- 감사 로그 ---
 
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
     @GetMapping("/audit")
     fun auditTrail(
         @RequestParam(required = false) subject: String?,

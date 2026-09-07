@@ -64,6 +64,13 @@ enum class AuditAction {
     REJUDGE_REQUESTED,
     REJUDGE_APPROVED,
     REJUDGE_REJECTED,
+
+    /**
+     * 관리자 API 접근이 거부됐다 (§11.4).
+     *
+     * 성공만 남기면 공격의 앞부분 — 토큰을 찾아 두드리는 구간 — 이 통째로 비어 있다.
+     */
+    ADMIN_ACCESS_DENIED,
 }
 
 data class AuditEntry(

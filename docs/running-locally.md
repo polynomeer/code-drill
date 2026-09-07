@@ -70,7 +70,30 @@ KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=pyt
 `CONTENT_ROOT` 는 문제 패키지 경로다. 기본값은 `content/problems` 이며, 저장소 루트가
 아닌 곳에서 실행하면 절대 경로로 지정해야 한다.
 
-## 3. 문제 공개
+## 3. 관리자 토큰
+
+**운영자를 설정하지 않으면 관리자 API 는 통째로 닫힌다** (§11.2). 기본 토큰을 심어
+두면 그 토큰이 반드시 어느 운영 환경에 그대로 남기 때문이다. 제어 영역과 스크립트가
+같은 환경변수를 읽으므로, 두 터미널에서 같은 값을 export 한다.
+
+```bash
+export ADMIN_OPERATORS="\
+content-editor:$(openssl rand -hex 16):CONTENT_EDITOR;\
+release-manager:$(openssl rand -hex 16):CONTENT_EDITOR,PUBLISHER;\
+release-approver:$(openssl rand -hex 16):PUBLISHER;\
+judge-operator:$(openssl rand -hex 16):JUDGE_OPERATOR;\
+judge-reviewer:$(openssl rand -hex 16):REVIEWER;\
+security-admin:$(openssl rand -hex 16):SECURITY_ADMIN"
+```
+
+역할은 §11.2 의 다섯 가지다. 스모크가 2인 승인을 확인하려면 **PUBLISHER 를 가진 사람이
+둘, 그리고 CONTENT_EDITOR 와 PUBLISHER 를 함께 가진 사람이 하나** 있어야 한다 —
+마지막 계정은 권한이 과하게 열려 있어도 등록자·승인자 분리가 남아 있는지 보기 위한
+것이다.
+
+토큰은 24자 이상이어야 하며, 짧으면 기동 시점에 거절된다.
+
+## 4. 문제 공개
 
 **문제는 검증하고 공개해야 목록에 나온다** (§3.2). 디렉터리에 파일을 놓는 것만으로
 공개되면 §6.3 검증과 §11.2 2인 승인이 모두 우회되기 때문이다.
@@ -82,13 +105,13 @@ python3 scripts/publish-content.py
 
 앞 명령이 §6.3 파이프라인(스키마·공식 해답·결정성·제약 여유·mutant kill rate·시각화
 예산)을 돌려 보고서를 남기고, 뒤 명령이 통과한 버전만 등록·공개한다. 시딩 스크립트는
-두 서비스 계정을 쓰므로 로컬·CI 전용이다 — 사람이 하는 공개는 등록과 승인을 각각 다른
-사람이 해야 2인 승인이 의미를 갖는다.
+`ADMIN_OPERATORS` 에서 서로 다른 두 운영자를 골라 쓰므로 로컬·CI 전용이다 — 사람이 하는
+공개는 등록과 승인을 각각 다른 사람이 해야 2인 승인이 의미를 갖는다.
 
 개발 중에 공개 절차를 건너뛰려면 `codedrill.content.require-publish=false` 로 띄운다.
 **공개 환경에서는 절대 끄지 않는다.**
 
-## 4. 웹
+## 5. 웹
 
 ```bash
 cd web && pnpm install && pnpm dev
@@ -96,7 +119,7 @@ cd web && pnpm install && pnpm dev
 
 `http://localhost:5173` 에서 열린다. `/api` 는 8080 으로 프록시된다.
 
-## 5. 확인
+## 6. 확인
 
 ```bash
 python3 scripts/smoke.py
@@ -125,5 +148,8 @@ cd web && pnpm test
 | 초안 저장이 409 만 낸다 | 다른 탭이 같은 초안을 열고 있다. 충돌 배너에서 한쪽을 고른다 |
 | 리플레이가 텍스트 목록으로만 보인다 | 트레이스가 INVALID 이거나 스키마가 클라이언트보다 높다 |
 | 리플레이에 상자가 하나도 없다 | 풀이가 `Drill.*` 를 부르지 않았다. 계측은 선택이다 |
-| 문제 목록이 비어 있다 | 아직 공개하지 않았다. 위 3번 절차를 돌린다 |
+| 문제 목록이 비어 있다 | 아직 공개하지 않았다. 위 4번 절차를 돌린다 |
 | 공개가 409 로 거부된다 | 등록자와 승인자가 같거나 보고서 digest 가 다르다 |
+| 관리자 API 가 전부 503 | `ADMIN_OPERATORS` 를 앱 터미널에서 export 하지 않았다 |
+| 관리자 API 가 401 | 스크립트 터미널의 `ADMIN_OPERATORS` 가 앱의 것과 다르다 |
+| 관리자 API 가 403 | 그 토큰의 역할로는 못 하는 작업이다. 다른 운영자로 부른다 |

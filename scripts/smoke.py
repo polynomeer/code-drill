@@ -24,6 +24,8 @@ import urllib.parse
 import urllib.request
 import uuid
 
+import operators
+
 BASE = "http://localhost:8080/api/v1"
 
 # 이 스모크가 실제로 제출하는 문제들.
@@ -303,21 +305,42 @@ def main() -> int:
     verdicts = [item["verdict"] for item in history["items"]]
     results.append(check("  최신 제출이 먼저", verdicts[0] is not None, True))
 
+    print("\n관리자 API 인증 (§11.2, §11.4)")
+    # 등록과 공개를 모두 할 수 있는 계정. 권한이 과하게 열린 계정에서도 2인 승인이
+    # 남아 있는지 보기 위해 일부러 이런 계정으로 등록한다.
+    registrar_op = operators.with_roles("CONTENT_EDITOR", "PUBLISHER")
+    registrar = registrar_op.headers
+    publisher = operators.with_roles("PUBLISHER", other_than=registrar_op).headers
+    editor_only = operators.with_roles("CONTENT_EDITOR", other_than=registrar_op).headers
+    security = operators.with_roles("SECURITY_ADMIN").headers
+
+    # 토큰 없이는 아무것도 못 한다. 이전 슬라이스는 X-Actor 헤더를 자칭하면 통과했다.
+    status, _ = raw_request("GET", "/admin/audit")
+    results.append(check("토큰 없는 요청 거부", status, 401))
+    status, _ = raw_request(
+        "GET", "/admin/audit", None, {"Authorization": "Bearer 모르는토큰모르는토큰모르는토큰"},
+    )
+    results.append(check("모르는 토큰 거부", status, 401))
+    status, _ = raw_request(
+        "POST", "/admin/problems/x/publish", {"version": 1, "reportDigest": "x"}, editor_only,
+    )
+    results.append(check("역할 없는 호출 거부", status, 403))
+    status, _ = raw_request("GET", "/admin/audit", None, registrar)
+    results.append(check("감사 로그는 보안 역할만", status, 403))
+
     print("\n콘텐츠 공개와 2인 승인 (§3.2, §11.2, §13.3)")
-    editor = {"X-Actor": "editor-" + uuid.uuid4().hex[:6]}
-    publisher = {"X-Actor": "publisher-" + uuid.uuid4().hex[:6]}
     pid = "smoke-" + uuid.uuid4().hex[:8]
     digest = uuid.uuid4().hex
     report = uuid.uuid4().hex
 
     status, registered = raw_request(
         "POST", f"/admin/problems/{pid}/versions",
-        {"version": 1, "packageDigest": digest, "reportDigest": report}, editor,
+        {"version": 1, "packageDigest": digest, "reportDigest": report}, registrar,
     )
     results.append(check("버전 등록", (status, registered["versionId"]), (200, f"{pid}@1")))
 
     status, denied = raw_request(
-        "POST", f"/admin/problems/{pid}/publish", {"version": 1, "reportDigest": report}, editor,
+        "POST", f"/admin/problems/{pid}/publish", {"version": 1, "reportDigest": report}, registrar,
     )
     results.append(check("등록자 본인 공개 거부", status, 409))
     results.append(check("  사유에 2인 승인 언급", "두 사람" in denied["reason"], True))
@@ -333,10 +356,10 @@ def main() -> int:
     )
     results.append(check("다른 사람이 공개", (status, published["publishedVersionId"]), (200, f"{pid}@1")))
 
-    state = request("GET", f"/admin/problems/{pid}")
+    state = request("GET", f"/admin/problems/{pid}", None, publisher)
     results.append(check("  공개 버전 반영", state["publishedVersionId"], f"{pid}@1"))
 
-    trail = request("GET", f"/admin/audit?subject={pid}@1")
+    trail = request("GET", f"/admin/audit?subject={pid}@1", None, security)
     actions = [entry["action"] for entry in trail]
     results.append(check("감사 로그", sorted(actions), ["PROBLEM_PUBLISHED", "PROBLEM_VERSION_REGISTERED"]))
 
@@ -347,8 +370,9 @@ def main() -> int:
     results.append(check("  검증·공개된 문제는 보인다", "two-sum" in listed, True))
 
     print("\n재채점 승인 (§4.2, §11.2)")
-    operator = {"X-Actor": "operator-" + uuid.uuid4().hex[:6]}
-    approver = {"X-Actor": "approver-" + uuid.uuid4().hex[:6]}
+    operator_op = operators.with_roles("JUDGE_OPERATOR")
+    operator = operator_op.headers
+    approver = operators.with_roles("REVIEWER", other_than=operator_op).headers
 
     status, job = raw_request(
         "POST", "/admin/rejudges",
@@ -359,13 +383,13 @@ def main() -> int:
     status, self_approve = raw_request("POST", f"/admin/rejudges/{job['id']}/approve", None, operator)
     results.append(check("본인 승인 거부", status, 409))
 
-    status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets")
+    status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets", None, operator)
     results.append(check("승인 전 대상 없음", targets["count"], 0))
 
     status, approved = raw_request("POST", f"/admin/rejudges/{job['id']}/approve", None, approver)
     results.append(check("다른 사람이 승인", (status, approved["status"]), (200, "APPROVED")))
 
-    status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets")
+    status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets", None, operator)
     results.append(check("승인 후 대상 있음", targets["count"] > 0, True))
 
     print("\n실행 트레이스 (§7)")

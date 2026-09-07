@@ -17,6 +17,13 @@ spring:
     addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
 
 codedrill:
+  admin:
+    # 운영자 목록. 형식은 <이름>:<토큰>:<역할,역할> 을 ; 로 이은 것이다.
+    #
+    # **비어 있으면 관리자 API 전체가 닫힌다.** 기본 토큰을 심어 두면 그 토큰은 반드시
+    # 어딘가의 운영 환경에 그대로 남는다 (§11.1 비밀 유출). 로컬 설정은
+    # docs/running-locally.md 를 따른다.
+    operators: ${ADMIN_OPERATORS:}
   content:
     root: ${CONTENT_ROOT:content/problems}
   outbox:
