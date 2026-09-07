@@ -59,6 +59,10 @@ KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=pyt
 공개 환경에서는 `REQUIRE_ISOLATION=true` 로 두어, 컨테이너 런타임이 없으면 기동 자체가
 중단되게 한다.
 
+기동 로그에 언어별 seccomp 프로파일의 허용 개수와 digest 가 함께 찍힌다. `런타임 기본값`
+이라고 나오면 allowlist 가 걸리지 않은 것이다 — 그 상태는 §5.2 의 시스템 호출 통제만
+빠진 채 나머지가 다 서 있어서 로그를 보지 않으면 알아채기 어렵다.
+
 **Runner 만 fat jar 가 아니다.** `kotlin-compiler-embeddable` 이 자기 jar 안의
 `extensions/compiler.xml` 을 클래스패스에서 직접 찾는데, Spring Boot fat jar 의 중첩 jar
 안에서는 찾지 못하고 컴파일이 통째로 실패한다. 그래서 `installDist` 로 평범한
@@ -158,6 +162,8 @@ python3 scripts/drill.py all      # 장애 주입 훈련 — 컨테이너와 Run
 | 모든 제출이 `COMPILE_ERROR` | Runner 를 fat jar 로 띄웠다. `installDist` 배포를 쓴다 |
 | 판정은 오는데 리플레이가 없다 | 풀이가 `Drill.*` 를 호출하지 않는다. 계측은 선택이다 |
 | 기동 로그에 "프로세스 샌드박스로 내려간다" | 런타임 이미지가 로컬에 없다. 미리 pull 한다 |
+| 기동 로그에 seccomp "런타임 기본값" | 프로파일을 못 썼다. 임시 디렉터리 권한을 본다 |
+| 특정 풀이만 `Operation not permitted` | allowlist 가 좁다. `SeccompProfile` 에 근거와 함께 추가한다 |
 | Python 만 MEMORY_LIMIT 이 안 잡힌다 | macOS 는 RLIMIT_AS 를 낮추지 못한다. 컨테이너로 돌려야 한다 |
 | 초안 저장이 409 만 낸다 | 다른 탭이 같은 초안을 열고 있다. 충돌 배너에서 한쪽을 고른다 |
 | 리플레이가 텍스트 목록으로만 보인다 | 트레이스가 INVALID 이거나 스키마가 클라이언트보다 높다 |

@@ -39,6 +39,23 @@ Grafana `http://localhost:3001`, Prometheus `http://localhost:9090`.
 브로커를 되살리면 아웃박스가 스스로 재발행한다. 손으로 재발행하지 않는다 — 같은
 이벤트를 두 번 밀게 되고, 멱등성이 흡수하더라도 원인 추적이 어려워진다.
 
+### seccomp
+
+**증상**: 특정 언어·풀이만 `Operation not permitted` 로 실패한다.
+
+허용 목록(`SeccompProfile`)이 그 런타임이 실제로 쓰는 호출을 덮지 못한 것이다. 사용자
+코드 탓처럼 보이지만 우리 쪽 문제다.
+
+1. 같은 코드를 프로파일 없이 돌려 재현되는지 본다 — 재현되면 seccomp 문제가 아니다
+2. 컨테이너에서 `strace` 로 막힌 호출을 찾는다. 런타임 이미지에 없으면 `-alpine` 대신
+   도구가 든 이미지로 한 번만 재현한다
+3. `SeccompProfile` 에 **왜 필요한지와 함께** 추가한다. 근거 없이 늘어난 목록은 다시
+   줄일 수 없다
+4. `SeccompProfileTest` 가 금지 목록과 겹치지 않는지 확인한다
+
+급하면 `codedrill.sandbox.require-isolation=false` 로 내려갈 수 있지만, 그러면 격리가
+통째로 빠진다. **신뢰할 수 없는 코드를 받는 환경에서는 선택지가 아니다.**
+
 ### system-error-spike
 
 **증상**: SYSTEM_ERROR 비율이 오른다. 사용자 코드의 실패가 아니라 **우리 쪽 실패**다
