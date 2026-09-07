@@ -126,13 +126,20 @@ python3 scripts/smoke.py
 ```
 
 판정 5종(AC/WA/CE/RE/TLE), 3개 언어, 부분 점수, 초안 CAS, 목록 커서, 트레이스 목차·청크,
-콘텐츠 공개와 2인 승인, 재채점 승인, 멱등성, SSE, 숨은 테스트 비노출까지 실제 서비스로
-확인한다. 62개 항목이 전부 통과해야 한다.
+관리자 API 인증과 역할 분리, 콘텐츠 공개와 2인 승인, 재채점 승인, 멱등성, SSE, 숨은
+테스트 비노출까지 실제 서비스로 확인한다. 68개 항목이 전부 통과해야 한다.
 
 웹 리듀서 불변식은 따로 돈다.
 
 ```bash
 cd web && pnpm test
+```
+
+SLO 와 장애 회복은 별도 스크립트가 잰다. 절차와 해석은 [runbook.md](runbook.md) 에 있다.
+
+```bash
+python3 scripts/loadtest.py       # §12.1 SLO 네 가지
+python3 scripts/drill.py all      # 장애 주입 훈련 — 컨테이너와 Runner 를 실제로 죽인다
 ```
 
 ## 겪게 되는 것들
