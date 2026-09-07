@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner.execution.sandbox
 
 import dev.codedrill.judge.runner.execution.CaseOutcome
 import org.slf4j.LoggerFactory
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.absolutePathString
 
@@ -19,20 +20,27 @@ import kotlin.io.path.absolutePathString
  * | PID 제한, fork 폭탄 방어 | `--pids-limit` |
  * | CPU quota | `--cpus` |
  * | memory.max + swap 비활성 | `--memory` 와 같은 값의 `--memory-swap` |
+ * | 언어별 seccomp allowlist | `--security-opt seccomp=<프로파일>` |
  *
  * **메모리는 두 겹이다.** 언어 런타임의 상한(JVM `-Xmx`, Python `RLIMIT_AS`)이 먼저
  * 걸리고, 컨테이너 상한은 그것을 빠져나간 경우의 backstop 이다. 그래서 컨테이너 몫은
  * 사용자 한도보다 [MEMORY_HEADROOM_MB] 만큼 크다. 순서가 반대면 모든 초과가 exit 137
  * 로만 보여 어디서 샌 메모리인지 알 수 없게 된다.
  *
- * 남은 공백: seccomp allowlist 는 아직 언어별 프로파일이 없어 런타임 기본값을 쓴다.
- * §11.4 의 Sandbox regression 게이트는 이 프로파일이 생긴 뒤에야 완전해진다.
  */
 class ContainerSandbox(
     private val image: String,
     private val runtimeBinary: String = DEFAULT_RUNTIME,
     private val cpus: String = DEFAULT_CPUS,
     private val pidsLimit: Int = DEFAULT_PIDS_LIMIT,
+    /**
+     * 언어별 seccomp allowlist (§5.2 시스템 호출).
+     *
+     * null 이면 런타임 기본 프로파일을 쓴다. 기본 프로파일도 위험한 호출을 상당수
+     * 막지만 allowlist 가 아니므로, 공개 환경에서는 반드시 지정해야 한다 —
+     * [SandboxSelector] 가 그것을 강제한다.
+     */
+    private val seccompProfile: Path? = null,
 ) : Sandbox {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -149,6 +157,10 @@ class ContainerSandbox(
             // 사용자 코드가 느린 것처럼 보이는 것보다 낫다.
             "--pull", "never",
         )
+
+        // 프로파일이 없으면 옵션을 붙이지 않는다. 잘못된 경로를 넘기면 컨테이너 런타임이
+        // 실행을 거부하는데, 그 실패는 사용자 코드 탓처럼 보인다.
+        seccompProfile?.let { command += listOf("--security-opt", "seccomp=${it.absolutePathString()}") }
 
         // 들여보내는 경로는 이 목록이 전부다. 여기 없는 것은 실행 중인 코드가 볼 수 없다.
         val mapping = containerPaths(spec)

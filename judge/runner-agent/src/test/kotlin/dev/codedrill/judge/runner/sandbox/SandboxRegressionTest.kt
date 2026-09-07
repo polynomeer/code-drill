@@ -10,6 +10,7 @@ import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
 import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.sandbox.ContainerSandbox
+import dev.codedrill.judge.runner.execution.sandbox.SeccompProfile
 import dev.codedrill.judge.runner.golden.GoldenSources
 import dev.codedrill.platform.problempackage.Limits
 import dev.codedrill.platform.problempackage.ProblemPackage
@@ -35,6 +36,8 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
  * | 비밀 유출 — 쓰기 | `읽기 전용 파일시스템에 쓰지 못한다` |
  * | 샌드박스 탈출 — 권한 | `root 가 아닌 사용자로 실행된다` |
  * | 네트워크 | `외부로 연결하지 못한다` |
+ * | 시스템 호출 — allowlist 밖 | `허용 목록에 없는 시스템 호출은 막힌다` |
+ * | 샌드박스 탈출 — 네임스페이스·ptrace | `새 사용자 네임스페이스를 만들지 못한다` |
  *
  * 컨테이너 런타임이 없으면 통째로 건너뛴다. **건너뛴 것을 통과로 읽으면 안 된다** —
  * 이 스위트가 돌지 않은 빌드는 격리를 검증하지 않은 빌드다 (§14.4 Security 게이트).
@@ -59,13 +62,24 @@ class SandboxRegressionTest {
     private val jvmImage = pick("eclipse-temurin:21-jre", "gradle:8.10.2-jdk21")
     private val pythonImage = pick("python:3.12-alpine", "python:3.12-slim")
 
+    /**
+     * 실행에 쓰는 seccomp 프로파일 (§5.2 시스템 호출).
+     *
+     * 운영과 같은 것을 건다. 회귀 스위트가 프로파일 없이 돌면 격리를 검증한 것이
+     * 아니라 **프로파일 없는 격리**를 검증한 것이 된다.
+     */
+    private val profiles = SeccompProfile.materialize(Path.of("build/seccomp"))
+
     private val engine by lazy {
         val images = mapOf(
             Language.KOTLIN to jvmImage.orEmpty(),
             Language.JAVA to jvmImage.orEmpty(),
             Language.PYTHON to pythonImage.orEmpty(),
         )
-        ExecutionEngine(adapters = adapters, sandboxes = { ContainerSandbox(images.getValue(it)) })
+        ExecutionEngine(
+            adapters = adapters,
+            sandboxes = { ContainerSandbox(images.getValue(it), seccompProfile = profiles[it]) },
+        )
     }
 
     private fun requireContainers() {
@@ -106,6 +120,95 @@ class SandboxRegressionTest {
         val verdict = engine.execute(request(Language.KOTLIN, source)).cases.first().verdict
 
         assertEquals(Verdict.RUNTIME_ERROR, verdict, "네트워크가 열려 있으면 안 된다")
+    }
+
+    @Test
+    fun `허용 목록에 없는 시스템 호출은 막힌다`() {
+        requireContainers()
+
+        // 소켓 **생성**은 `--network none` 아래서도 성공한다. 연결할 곳이 없을 뿐이다.
+        // 그래서 이 호출이 실패한다는 것은 seccomp 가 실제로 걸려 있다는 뜻이며,
+        // 다른 통제로는 이 결과를 만들 수 없다.
+        val source = """
+            def twoSum(nums, target):
+                import socket
+                socket.socket()
+                return [0, 1]
+        """.trimIndent()
+
+        val result = engine.execute(request(Language.PYTHON, source))
+
+        assertEquals(
+            Verdict.RUNTIME_ERROR, result.cases.first().verdict,
+            "seccomp 프로파일이 걸려 있지 않다 — 소켓 생성이 성공했다",
+        )
+    }
+
+    @Test
+    fun `새 사용자 네임스페이스를 만들지 못한다`() {
+        requireContainers()
+
+        // 프로파일이 없으면 이 호출은 **성공한다**. 새 user namespace 안에서는 자기가
+        // root 가 되고, 거기서부터 커널 표면을 넓게 두드릴 수 있다 (§11.1 샌드박스 탈출).
+        // ptrace 도 같은 이유로 막는다 — 같은 컨테이너의 다른 프로세스를 들여다볼 수 있다.
+        val source = """
+            def twoSum(nums, target):
+                import ctypes
+                libc = ctypes.CDLL(None, use_errno=True)
+                if libc.unshare(0x10000000) == 0:
+                    raise AssertionError("user namespace 를 만들 수 있다")
+                if libc.ptrace(0, 0, 0, 0) == 0:
+                    raise AssertionError("ptrace 를 쓸 수 있다")
+                seen = {}
+                for i, value in enumerate(nums):
+                    j = seen.get(target - value)
+                    if j is not None:
+                        return [j, i]
+                    seen.setdefault(value, i)
+                raise AssertionError("정답은 항상 존재한다")
+        """.trimIndent()
+
+        val result = engine.execute(request(Language.PYTHON, source))
+
+        assertTrue(
+            result.cases.all { it.verdict == Verdict.ACCEPTED },
+            "탈출 경로가 열려 있다: ${result.cases.map { it.verdict to it.message }}",
+        )
+    }
+
+    @Test
+    fun `허용 목록 안의 시스템 호출은 그대로 통과한다`() {
+        requireContainers()
+
+        // 목록을 좁히다 보면 멀쩡한 코드를 막기 쉽다. 파일·스레드·시간은 풀이가 흔히
+        // 쓰는 것들이라, 이것이 막히면 사용자에게는 원인 모를 실패로 보인다.
+        val source = """
+            import threading
+            import time
+            import tempfile
+
+            def twoSum(nums, target):
+                done = []
+                worker = threading.Thread(target=lambda: done.append(time.monotonic()))
+                worker.start()
+                worker.join()
+                with tempfile.TemporaryFile() as handle:
+                    handle.write(b"ok")
+                seen = {}
+                for i, value in enumerate(nums):
+                    j = seen.get(target - value)
+                    if j is not None:
+                        return [j, i]
+                    seen.setdefault(value, i)
+                raise AssertionError("정답은 항상 존재한다")
+        """.trimIndent()
+
+        val result = engine.execute(request(Language.PYTHON, source))
+
+        assertTrue(
+            result.cases.all { it.verdict == Verdict.ACCEPTED },
+            "허용 목록이 너무 좁다: ${result.cases.map { it.verdict to it.message }}",
+        )
     }
 
     @Test
