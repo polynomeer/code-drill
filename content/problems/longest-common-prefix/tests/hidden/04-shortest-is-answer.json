@@ -1,0 +1,1 @@
+{"args": [["ab", "abcdef", "abzz"]], "expected": "ab"}

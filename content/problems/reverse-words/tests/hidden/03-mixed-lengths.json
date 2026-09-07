@@ -1,0 +1,1 @@
+{"args": [["a", "bb", "ccc", "dddd"]], "expected": ["dddd", "ccc", "bb", "a"]}

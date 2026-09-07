@@ -1,0 +1,1 @@
+{"args": [["abc", "de", "f"]], "expected": ["f", "ed", "cba"]}

@@ -34,7 +34,7 @@ BASE = "http://localhost:8080/api/v1"
 USER: accounts.Account | None = None
 
 # 이 스모크가 실제로 제출하는 문제들.
-REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count"]
+REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count", "is-palindrome"]
 TIMEOUT = 60
 
 ACCEPTED_SOURCE = """
@@ -52,6 +52,37 @@ fun twoSum(nums: IntArray, target: Int): IntArray {
     }
     error("정답은 항상 존재한다")
 }
+"""
+
+PALINDROME_KOTLIN = """
+fun isPalindrome(text: String): Int {
+    val kept = text.filter { it.isLetterOrDigit() }.lowercase()
+    return if (kept == kept.reversed()) 1 else 0
+}
+"""
+
+PALINDROME_JAVA = """
+class Solution {
+    public int isPalindrome(String text) {
+        StringBuilder kept = new StringBuilder();
+        for (char c : text.toCharArray()) {
+            if (Character.isLetterOrDigit(c)) kept.append(Character.toLowerCase(c));
+        }
+        String forward = kept.toString();
+        return forward.equals(kept.reverse().toString()) ? 1 : 0;
+    }
+}
+"""
+
+PALINDROME_PYTHON = """
+def isPalindrome(text):
+    kept = [c.lower() for c in text if c.isalnum()]
+    return 1 if kept == kept[::-1] else 0
+"""
+
+REVERSE_WORDS_KOTLIN = """
+fun reverseWords(words: Array<String>): Array<String> =
+    Array(words.size) { words[words.size - 1 - it].reversed() }
 """
 
 WRONG_SOURCE = "fun twoSum(nums: IntArray, target: Int): IntArray = intArrayOf(0, 0)"
@@ -295,6 +326,20 @@ def main() -> int:
         final = await_verdict(submit(source, language=language)["id"])
         results.append(check(f"{language} 정답", final["verdict"], "ACCEPTED"))
         results.append(check(f"  {language} 만점", final["score"], 100))
+
+    print("\n문자열 값 타입 (§6.1)")
+    # 탭·쉼표·비ASCII 가 든 경계 케이스를 통과해야 인코딩이 산 것이다. 그 케이스는
+    # 문제 패키지에 들어 있으므로, 전부 통과한다는 것이 곧 확인이다.
+    for language, source in [
+        ("KOTLIN", PALINDROME_KOTLIN),
+        ("JAVA", PALINDROME_JAVA),
+        ("PYTHON", PALINDROME_PYTHON),
+    ]:
+        final = await_verdict(submit(source, language=language, problem="is-palindrome")["id"])
+        results.append(check(f"{language} 문자열 입력", final["verdict"], "ACCEPTED"))
+
+    words = await_verdict(submit(REVERSE_WORDS_KOTLIN, problem="reverse-words")["id"])
+    results.append(check("문자열 배열 입출력", words["verdict"], "ACCEPTED"))
 
     print("\n부분 점수 (§6.2 SUM)")
     detail = request("GET", "/problems/max-subarray")

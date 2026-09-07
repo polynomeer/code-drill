@@ -62,13 +62,20 @@ class Problem:
         self.limits = limits or {"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536}
 
 
+# 값 타입 → 코틀린 타입. 서버의 ValueType.kotlinType() 과 같아야 한다.
+KOTLIN_TYPES = {
+    "INT": "Int",
+    "INT_ARRAY": "IntArray",
+    "STRING": "String",
+    "STRING_ARRAY": "Array<String>",
+}
+
+
 def kotlin_signature(problem) -> str:
     params = ", ".join(
-        f"{name}: {'IntArray' if kind == 'INT_ARRAY' else 'Int'}"
-        for name, kind in problem.signature["parameters"]
+        f"{name}: {KOTLIN_TYPES[kind]}" for name, kind in problem.signature["parameters"]
     )
-    returns = "IntArray" if problem.signature["returns"] == "INT_ARRAY" else "Int"
-    return f"fun {problem.signature['name']}({params}): {returns}"
+    return f"fun {problem.signature['name']}({params}): {KOTLIN_TYPES[problem.signature['returns']]}"
 
 
 def write_manifest(problem, directory):
@@ -163,14 +170,19 @@ def check_expected(problem, group, name, expected):
     """
     values = expected if isinstance(expected, list) else [expected]
     for value in values:
+        if isinstance(value, str):
+            continue
         if not (INT_MIN <= value <= INT_MAX):
             raise SystemExit(
                 f"{problem.id} {group}/{name}: 기대 출력이 Int 범위를 넘는다 ({value}). "
                 "입력을 줄이거나 문제의 제약을 바꾼다"
             )
 
-    # 하네스는 쉼표로 이어 한 줄로 내보낸다.
-    size = sum(len(str(v)) + 1 for v in values)
+    # 하네스는 쉼표로 이어 한 줄로 내보낸다. 문자열은 Base64 라 4/3 배로 늘어난다.
+    size = sum(
+        (len(v.encode("utf-8")) * 4 // 3 + 4) if isinstance(v, str) else (len(str(v)) + 1)
+        for v in values
+    )
     if size > problem.limits["outputBytes"]:
         raise SystemExit(
             f"{problem.id} {group}/{name}: 출력 {size}바이트가 한도 "
@@ -270,12 +282,13 @@ def catalog() -> list[Problem]:
     import catalog_graph
     import catalog_math
     import catalog_search
+    import catalog_strings
     import catalog_stack
 
     problems: list[Problem] = []
     for module in (
         catalog_arrays, catalog_dp, catalog_graph,
-        catalog_math, catalog_search, catalog_stack,
+        catalog_math, catalog_search, catalog_stack, catalog_strings,
     ):
         problems += module.PROBLEMS
 
