@@ -88,7 +88,7 @@ class AdminController(
     fun requestRejudge(
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: RejudgeRequest,
-    ): RejudgeJob = rejudge.request(request.scope, request.reason, actor)
+    ): RejudgeJob = rejudge.request(request.scope, request.reason, actor, request.dryRun)
 
     @RequiresRole(AdminRole.REVIEWER)
     @PostMapping("/rejudges/{id}/approve")
@@ -119,12 +119,38 @@ class AdminController(
     fun listRejudges(@RequestParam(required = false) limit: Int?): List<RejudgeJob> =
         rejudge.recent(limit ?: 20)
 
+    /**
+     * 실행. 승인만으로는 아무것도 돌지 않는다 (§11.2).
+     *
+     * 되돌릴 수 없는 일을 한 번의 클릭으로 시작하지 않기 위해 승인과 실행을 나눈다.
+     */
+    @RequiresRole(AdminRole.JUDGE_OPERATOR)
+    @PostMapping("/rejudges/{id}/dispatch")
+    fun dispatchRejudge(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+    ): ResponseEntity<Any> =
+        when (val outcome = rejudge.dispatch(id, actor)) {
+            is RejudgeService.DispatchOutcome.Dispatched ->
+                ResponseEntity.accepted().body(
+                    mapOf("job" to outcome.job, "targets" to outcome.targets),
+                )
+
+            is RejudgeService.DispatchOutcome.Rejected ->
+                ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
+        }
+
     /** 승인된 작업의 대상. 승인 전에는 비어 있다. */
     @GetMapping("/rejudges/{id}/targets")
     fun rejudgeTargets(@PathVariable id: UUID): Map<String, Any> {
         val targets = rejudge.targets(id)
         return mapOf("count" to targets.size, "submissionIds" to targets.map { it.toString() })
     }
+
+    /** 진행 상황과 바뀐 판정. dry-run 이면 "바뀌었을" 판정이다. */
+    @GetMapping("/rejudges/{id}")
+    fun rejudgeReport(@PathVariable id: UUID): ResponseEntity<RejudgeReport> =
+        rejudge.report(id)?.let { ResponseEntity.ok(it) } ?: ResponseEntity.notFound().build()
 
     // --- 감사 로그 ---
 
@@ -146,4 +172,9 @@ data class PublishRequest(val version: Int, @field:NotBlank val reportDigest: St
 
 data class ArchiveRequest(@field:NotBlank val reason: String)
 
-data class RejudgeRequest(@field:NotBlank val scope: String, @field:NotBlank val reason: String)
+data class RejudgeRequest(
+    @field:NotBlank val scope: String,
+    @field:NotBlank val reason: String,
+    /** 판정을 바꾸지 않고 무엇이 바뀔지만 본다 (§19.2 FR-721). */
+    val dryRun: Boolean = false,
+)

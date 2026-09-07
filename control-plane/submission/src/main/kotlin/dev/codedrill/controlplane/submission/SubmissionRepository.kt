@@ -113,6 +113,55 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
             to.name, id, from.name, version,
         )
 
+    /**
+     * 판정을 이력에 남긴다 (§4.2 INV-02).
+     *
+     * `execution_id` 가 유일하므로 같은 결과가 다시 와도 두 번 쌓이지 않는다. 0 을
+     * 돌려주면 이미 기록된 실행이라는 뜻이고, 호출부는 거기서 멈춰야 한다 — 그러지
+     * 않으면 중복 전달 한 번에 revision 이 하나씩 오른다 (§4.3).
+     */
+    fun recordJudgement(
+        id: UUID,
+        revision: Int,
+        executionId: String,
+        verdict: Verdict,
+        score: Int,
+        compileLog: String?,
+        groupsJson: String,
+        rejudgeJobId: UUID?,
+        applied: Boolean,
+    ): Int = jdbc.update(
+        """
+        INSERT INTO submission_judgement (
+            submission_id, revision, execution_id, verdict, score,
+            compile_log, groups, rejudge_job_id, applied
+        ) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
+        ON CONFLICT (execution_id) DO NOTHING
+        """.trimIndent(),
+        id, revision, executionId, verdict.name, score,
+        compileLog, groupsJson, rejudgeJobId, applied,
+    )
+
+    fun judgements(id: UUID): List<Judgement> = jdbc.query(
+        """
+        SELECT revision, execution_id, verdict, score, rejudge_job_id, applied, created_at
+          FROM submission_judgement WHERE submission_id = ?
+         ORDER BY created_at
+        """.trimIndent(),
+        { rs, _ ->
+            Judgement(
+                revision = rs.getInt("revision"),
+                executionId = rs.getString("execution_id"),
+                verdict = Verdict.valueOf(rs.getString("verdict")),
+                score = rs.getInt("score"),
+                rejudgeJobId = rs.getObject("rejudge_job_id", UUID::class.java)?.toString(),
+                applied = rs.getBoolean("applied"),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+            )
+        },
+        id,
+    )
+
     fun complete(
         id: UUID,
         verdict: Verdict,
@@ -130,6 +179,54 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
         id, SubmissionStatus.COMPLETED.name,
     )
 
+    /**
+     * 재채점 결과를 현재 판정으로 반영한다 (§8.1 revision).
+     *
+     * [complete] 와 달리 이미 COMPLETED 인 행을 대상으로 한다. 상태는 그대로 두고
+     * 판정만 갈아 끼우며 revision 을 올린다 — 종료는 불변이고, 바뀌는 것은 "무엇으로
+     * 판정됐는가"이지 "끝났는가"가 아니다 (§4.2).
+     */
+    fun revise(
+        id: UUID,
+        verdict: Verdict,
+        score: Int,
+        compileLog: String?,
+        groupsJson: String,
+    ): Int = jdbc.update(
+        """
+        UPDATE submission
+           SET verdict = ?, score = ?, compile_log = ?, groups = ?::jsonb,
+               revision = revision + 1, version = version + 1, updated_at = now()
+         WHERE id = ? AND status = ?
+        """.trimIndent(),
+        verdict.name, score, compileLog, groupsJson, id, SubmissionStatus.COMPLETED.name,
+    )
+
+    /** 문제 하나의 종료된 제출 전부. 재채점 대상 산출에 쓴다. */
+    fun completedIds(problemId: String): List<UUID> = jdbc.query(
+        "SELECT id FROM submission WHERE problem_id = ? AND status = ? ORDER BY created_at",
+        { rs, _ -> rs.getObject(1, UUID::class.java) },
+        problemId, SubmissionStatus.COMPLETED.name,
+    )
+
+    fun completedId(id: UUID): List<UUID> = jdbc.query(
+        "SELECT id FROM submission WHERE id = ? AND status = ?",
+        { rs, _ -> rs.getObject(1, UUID::class.java) },
+        id, SubmissionStatus.COMPLETED.name,
+    )
+
+    /** 아웃박스에 이벤트만 넣는다. 재채점은 제출 행을 새로 만들지 않는다. */
+    fun enqueueOutbox(event: OutboxEvent) {
+        jdbc.update(
+            """
+            INSERT INTO outbox_event (id, aggregate, aggregate_id, type, payload, occurred_at)
+            VALUES (?, ?, ?, ?, ?::jsonb, ?)
+            """.trimIndent(),
+            event.id, event.aggregate, event.aggregateId, event.type, event.payload,
+            java.sql.Timestamp.from(event.occurredAt),
+        )
+    }
+
     private companion object {
         val MAPPER = RowMapper { rs, _ ->
             Submission(
@@ -144,6 +241,7 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
                 score = rs.getObject("score") as? Int,
                 compileLog = rs.getString("compile_log"),
                 groupsJson = rs.getString("groups"),
+                revision = rs.getInt("revision"),
                 version = rs.getLong("version"),
                 createdAt = rs.getTimestamp("created_at").toInstant(),
             )

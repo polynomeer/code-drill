@@ -65,6 +65,12 @@ enum class AuditAction {
     REJUDGE_APPROVED,
     REJUDGE_REJECTED,
 
+    /** 승인된 재채점을 실제로 실행에 걸었다. 여기서부터 판정이 움직인다. */
+    REJUDGE_DISPATCHED,
+
+    /** 재채점이 판정을 바꿨다 (§13.3 판정 변경). 바뀐 것만 남긴다. */
+    JUDGEMENT_REVISED,
+
     /**
      * 관리자 API 접근이 거부됐다 (§11.4).
      *

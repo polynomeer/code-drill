@@ -200,6 +200,18 @@ def await_trace(submission_id: str) -> dict | None:
     return None
 
 
+def await_rejudge(job_id: str, headers: dict, timeout: int = TIMEOUT) -> dict:
+    """재채점 작업이 끝나기를 기다린다. 끝나지 않아도 마지막 보고서를 돌려준다."""
+    deadline = time.time() + timeout
+    report = request("GET", f"/admin/rejudges/{job_id}", None, headers)
+    while time.time() < deadline:
+        if report["job"]["status"] in ("COMPLETED", "REJECTED"):
+            return report
+        time.sleep(0.3)
+        report = request("GET", f"/admin/rejudges/{job_id}", None, headers)
+    return report
+
+
 def check(label: str, actual, expected) -> bool:
     ok = actual == expected
     print(f"  {'PASS' if ok else 'FAIL'}  {label}: {actual}" + ("" if ok else f" (기대: {expected})"))
@@ -397,6 +409,57 @@ def main() -> int:
 
     status, targets = raw_request("GET", f"/admin/rejudges/{job['id']}/targets", None, operator)
     results.append(check("승인 후 대상 있음", targets["count"] > 0, True))
+
+    print("\n재채점 실행 (§4.2 INV-02)")
+    # 방금 판정된 제출 하나를 대상으로 삼는다. 범위가 좁아야 무엇이 바뀌었는지 명확하다.
+    subject = submit(ACCEPTED_SOURCE)
+    before = await_verdict(subject["id"])
+    results.append(check("대상 최초 판정", (before["verdict"], before["revision"]), ("ACCEPTED", 1)))
+
+    history = request("GET", f"/submissions/{subject['id']}/judgements")
+    results.append(check("  최초 판정도 이력에 있다", len(history), 1))
+    results.append(check("  재채점 표시 없음", history[0]["rejudgeJobId"], None))
+
+    # dry-run: 판정을 바꾸지 않고 무엇이 바뀔지만 본다.
+    _, dry = raw_request(
+        "POST", "/admin/rejudges",
+        {"scope": f"submission:{subject['id']}", "reason": "dry-run 확인", "dryRun": True},
+        operator,
+    )
+    raw_request("POST", f"/admin/rejudges/{dry['id']}/approve", None, approver)
+    status, dispatched = raw_request("POST", f"/admin/rejudges/{dry['id']}/dispatch", None, operator)
+    results.append(check("dry-run 실행", (status, dispatched["targets"]), (202, 1)))
+
+    await_rejudge(dry["id"], operator)
+    after_dry = request("GET", f"/submissions/{subject['id']}")
+    results.append(check("  현재 판정 그대로", after_dry["revision"], 1))
+    dry_history = request("GET", f"/submissions/{subject['id']}/judgements")
+    results.append(check("  이력에는 남는다", len(dry_history), 2))
+    results.append(check("  반영되지 않음 표시", dry_history[1]["applied"], False))
+
+    # 실제 재채점: revision 이 오르고 이력이 쌓인다.
+    _, real = raw_request(
+        "POST", "/admin/rejudges",
+        {"scope": f"submission:{subject['id']}", "reason": "테스트 데이터 수정"}, operator,
+    )
+    raw_request("POST", f"/admin/rejudges/{real['id']}/approve", None, approver)
+    status, _ = raw_request("POST", f"/admin/rejudges/{real['id']}/dispatch", None, operator)
+    results.append(check("재채점 실행", status, 202))
+
+    report = await_rejudge(real["id"], operator)
+    results.append(check("  작업이 끝난다", report["job"]["status"], "COMPLETED"))
+    after = request("GET", f"/submissions/{subject['id']}")
+    results.append(check("  revision 이 오른다", after["revision"], 2))
+    results.append(check("  판정은 같다", after["verdict"], "ACCEPTED"))
+    results.append(check("  판정이 바뀌지 않았다고 보고", report["changes"], []))
+
+    final_history = request("GET", f"/submissions/{subject['id']}/judgements")
+    results.append(check("  이력 세 건", len(final_history), 3))
+    results.append(check("  마지막은 반영됨", final_history[2]["applied"], True))
+    results.append(check("  재채점 작업 표시", final_history[2]["rejudgeJobId"], real["id"]))
+
+    status, again = raw_request("POST", f"/admin/rejudges/{real['id']}/dispatch", None, operator)
+    results.append(check("끝난 작업은 다시 실행 못 함", status, 409))
 
     print("\n실행 트레이스 (§7)")
     traced = submit(ACCEPTED_SOURCE)

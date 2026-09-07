@@ -108,6 +108,18 @@ class SubmissionController(
         return ResponseEntity.ok(chunk)
     }
 
+    /**
+     * 판정 이력 (§4.2 INV-02).
+     *
+     * 재채점으로 점수가 바뀐 사용자가 "왜 바뀌었나"에 답을 얻는 곳이다. 최초 판정부터
+     * 전부 들어 있어야 무엇에서 무엇으로 바뀌었는지 스스로 볼 수 있다.
+     */
+    @GetMapping("/{id}/judgements")
+    fun judgements(@PathVariable id: UUID): ResponseEntity<List<Judgement>> {
+        service.find(id) ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(service.judgements(id))
+    }
+
     @GetMapping("/{id}/events")
     fun events(@PathVariable id: UUID): SseEmitter {
         val emitter = events.subscribe(id.toString())
@@ -147,6 +159,8 @@ data class SubmissionResponse(
     val score: Int?,
     val compileLog: String?,
     val groups: Any?,
+    /** 몇 번째 판정인지. 1 보다 크면 재채점을 거쳤다는 뜻이다 (§4.2). */
+    val revision: Int,
 ) {
     companion object {
         fun of(submission: Submission, json: ObjectMapper) = SubmissionResponse(
@@ -161,6 +175,7 @@ data class SubmissionResponse(
             // 숨은 그룹의 케이스 내역은 실행 영역에서 이미 잘려 왔다. 여기서 다시
             // 채우지 않는다 (§9.1 DTO 단계에서 제거).
             groups = submission.groupsJson?.let { json.readTree(it) },
+            revision = submission.revision,
         )
     }
 }

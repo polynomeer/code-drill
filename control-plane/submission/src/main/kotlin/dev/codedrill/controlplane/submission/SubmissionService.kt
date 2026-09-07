@@ -24,6 +24,7 @@ class SubmissionService(
     private val repository: SubmissionRepository,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
+    private val rejudges: RejudgeContext = RejudgeContext.NONE,
 ) {
 
     /**
@@ -111,22 +112,118 @@ class SubmissionService(
     }
 
     /**
-     * 채점 종료를 반영한다.
+     * 채점 종료를 반영한다 (§4.2 INV-02).
      *
-     * 이미 종료된 제출은 건드리지 않는다. 종료 상태는 불변이고, 재채점은 새 revision 을
-     * 만드는 별도 경로다 (§4.2).
+     * 최초 판정과 재채점 결과가 같은 경로를 지난다. 갈리는 것은 **현재 판정을 갈아
+     * 끼우는지**뿐이다.
+     *
+     * - 최초 판정: CREATED~AGGREGATING → COMPLETED 로 옮기고 판정을 채운다.
+     * - 재채점: 이미 COMPLETED 인 행의 판정만 갈아 끼우고 revision 을 올린다. 상태는
+     *   그대로다 — 바뀌는 것은 "무엇으로 판정됐는가"이지 "끝났는가"가 아니다.
+     * - dry-run 재채점: 이력에만 남기고 현재 판정은 건드리지 않는다.
+     *
+     * 어느 경우든 **이력을 먼저 남긴다.** 이력 삽입이 `execution_id` 로 중복을
+     * 걸러 주므로, 같은 결과가 다시 와도 revision 이 헛되이 오르지 않는다 (§4.3).
      */
     @Transactional
     fun complete(message: JudgeCompleted): Boolean {
         val id = UUID.fromString(message.submissionId)
-        val updated = repository.complete(
+        val current = repository.findById(id) ?: return false
+        val groupsJson = json.writeValueAsString(message.groups)
+
+        val pending = rejudges.pendingFor(id)
+        val apply = pending?.dryRun != true
+
+        // 이력의 revision 은 이 판정을 반영한 **뒤** 제출이 갖게 될 값이다. 최초 판정은
+        // 제출을 만들 때 이미 revision 1 이므로 올리지 않는다 — 올리면 아무도 재채점하지
+        // 않았는데 이력만 2 부터 시작한다.
+        val revised = apply && current.status == SubmissionStatus.COMPLETED
+
+        val recorded = repository.recordJudgement(
             id = id,
+            revision = if (revised) current.revision + 1 else current.revision,
+            executionId = message.executionId,
             verdict = message.verdict,
             score = message.score,
             compileLog = message.compileLog,
-            groupsJson = json.writeValueAsString(message.groups),
+            groupsJson = groupsJson,
+            rejudgeJobId = pending?.jobId,
+            applied = apply,
         )
+        // 이미 기록된 실행이다. 여기서 멈춰야 중복 전달이 revision 을 올리지 못한다.
+        if (recorded == 0) return false
+
+        val updated = when {
+            !apply -> 0
+            revised -> repository.revise(
+                id, message.verdict, message.score, message.compileLog, groupsJson,
+            )
+            else -> repository.complete(
+                id, message.verdict, message.score, message.compileLog, groupsJson,
+            )
+        }
+
+        pending?.let { job ->
+            rejudges.judged(
+                RejudgeContext.Outcome(
+                    submissionId = id,
+                    jobId = job.jobId,
+                    applied = apply,
+                    previousVerdict = current.verdict?.name,
+                    previousScore = current.score,
+                    verdict = message.verdict.name,
+                    score = message.score,
+                ),
+            )
+        }
+
+        // dry-run 은 현재 판정을 바꾸지 않았으므로 SSE 로 알릴 것도 없다.
         return updated > 0
+    }
+
+    /** 제출 하나의 판정 이력 (§4.2). 최초 판정부터 전부 들어 있다. */
+    fun judgements(id: UUID): List<Judgement> = repository.judgements(id)
+
+    /** 재채점 대상 산출 (§3.1). 제출 테이블을 아는 쪽이 답한다. */
+    fun completedFor(problemId: String): List<UUID> = repository.completedIds(problemId)
+
+    fun completed(submissionId: UUID): List<UUID> = repository.completedId(submissionId)
+
+    /**
+     * 종료된 제출을 다시 채점 큐에 올린다 (§3.2).
+     *
+     * 제출 행을 새로 만들지 않는다. 재채점은 같은 제출의 다음 revision 이지 새 제출이
+     * 아니며, 새로 만들면 사용자의 기록에 자기가 하지 않은 제출이 늘어난다.
+     */
+    @Transactional
+    fun requeue(ids: List<UUID>): Int = ids.count { id ->
+        val submission = repository.findById(id) ?: return@count false
+        val source = repository.findSource(id) ?: return@count false
+
+        repository.enqueueOutbox(
+            OutboxEvent(
+                id = UUID.randomUUID(),
+                aggregate = "submission",
+                aggregateId = id.toString(),
+                type = "SubmissionQueued",
+                payload = json.writeValueAsString(
+                    SubmissionQueued(
+                        submissionId = id.toString(),
+                        correlationId = UUID.randomUUID().toString(),
+                        queuedAt = Instant.now(),
+                        problemId = submission.problemId,
+                        problemVersion = submission.problemVersion,
+                        language = Language.valueOf(submission.language),
+                        source = source,
+                        // 재채점은 판정을 다시 내는 일이다. 학습용 트레이스까지 다시
+                        // 만들면 Runner 용량의 절반이 거기로 간다 (§7.1).
+                        requestTrace = false,
+                    ),
+                ),
+                occurredAt = Instant.now(),
+            ),
+        )
+        true
     }
 }
 
