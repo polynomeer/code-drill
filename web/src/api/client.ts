@@ -1,3 +1,4 @@
+import { getSession, refreshSession, setSession, type Session } from './session'
 import type { TraceChunk, TraceManifest } from '../features/replay/traceTypes'
 import type {
   ApiError,
@@ -29,6 +30,65 @@ async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T
 }
 
+/**
+ * 인증이 필요한 요청 (기술 설계서 §11.2).
+ *
+ * access token 이 만료되면 **한 번** 갱신하고 같은 요청을 다시 보낸다. 화면 어디서도
+ * 만료를 다루지 않게 하려는 것이며, 재시도를 한 번으로 제한해 갱신이 계속 실패할 때
+ * 무한 루프에 빠지지 않게 한다.
+ */
+export async function authed(path: string, init: RequestInit = {}): Promise<Response> {
+  const send = (token: string) =>
+    fetch(`${BASE}${path}`, {
+      ...init,
+      headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+    })
+
+  const session = getSession()
+  if (!session) throw new ApiFailure(401, {
+    errorCode: 'UNAUTHENTICATED',
+    message: '로그인이 필요하다',
+    traceId: '',
+  } as ApiError)
+
+  const first = await send(session.accessToken)
+  if (first.status !== 401) return first
+
+  const renewed = await refreshSession()
+  if (!renewed) return first
+  return send(renewed.accessToken)
+}
+
+// --- 인증 (§9.2) ---
+
+export async function register(email: string, displayName: string, password: string): Promise<Session> {
+  const response = await fetch(`${BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, displayName, password }),
+  })
+  const session = await json<Session>(response)
+  setSession(session)
+  return session
+}
+
+export async function login(email: string, password: string): Promise<Session> {
+  const response = await fetch(`${BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  const session = await json<Session>(response)
+  setSession(session)
+  return session
+}
+
+/** 로그아웃. 서버 호출이 실패해도 이 브라우저의 세션은 지운다. */
+export async function logout(): Promise<void> {
+  await authed('/auth/logout', { method: 'POST' }).catch(() => undefined)
+  setSession(null)
+}
+
 export function listProblems(query?: string): Promise<Page<ProblemSummary>> {
   const params = query ? `?query=${encodeURIComponent(query)}` : ''
   return fetch(`${BASE}/problems${params}`).then(json<Page<ProblemSummary>>)
@@ -36,11 +96,11 @@ export function listProblems(query?: string): Promise<Page<ProblemSummary>> {
 
 export function listSubmissions(problemId?: string): Promise<Page<Submission>> {
   const params = problemId ? `?problemId=${encodeURIComponent(problemId)}` : ''
-  return fetch(`${BASE}/submissions${params}`).then(json<Page<Submission>>)
+  return authed(`/submissions${params}`).then(json<Page<Submission>>)
 }
 
 export async function getDraft(problemId: string, language: string): Promise<Draft | null> {
-  const response = await fetch(`${BASE}/workspaces/${problemId}/${language}`)
+  const response = await authed(`/workspaces/${problemId}/${language}`)
   if (response.status === 204) return null
   return json<Draft>(response)
 }
@@ -57,7 +117,7 @@ export async function saveDraft(
   code: string,
   version: number | null,
 ): Promise<{ saved: true; version: number } | { saved: false; conflict: DraftConflict }> {
-  const response = await fetch(`${BASE}/workspaces/${problemId}/${language}`, {
+  const response = await authed(`/workspaces/${problemId}/${language}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, version }),
@@ -74,21 +134,21 @@ export function getProblem(slug: string): Promise<Problem> {
 }
 
 export function getSubmission(id: string): Promise<Submission> {
-  return fetch(`${BASE}/submissions/${id}`).then(json<Submission>)
+  return authed(`/submissions/${id}`).then(json<Submission>)
 }
 
 /**
  * 트레이스 목차. 판정과 독립이라 아직 없을 수 있고, 없는 것은 오류가 아니므로 null 이다.
  */
 export async function getTraceManifest(id: string): Promise<TraceManifest | null> {
-  const response = await fetch(`${BASE}/submissions/${id}/trace`)
+  const response = await authed(`/submissions/${id}/trace`)
   if (response.status === 204) return null
   return json<TraceManifest>(response)
 }
 
 /** 이벤트 청크. 현재 위치 주변만 내려받는다 (§7.5). */
 export function getTraceChunk(id: string, index: number): Promise<TraceChunk> {
-  return fetch(`${BASE}/submissions/${id}/trace/chunks/${index}`).then(json<TraceChunk>)
+  return authed(`/submissions/${id}/trace/chunks/${index}`).then(json<TraceChunk>)
 }
 
 /**
@@ -103,7 +163,7 @@ export function createSubmission(
   language: SubmissionLanguage,
   source: string,
 ) {
-  return fetch(`${BASE}/submissions`, {
+  return authed('/submissions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

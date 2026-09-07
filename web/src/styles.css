@@ -494,3 +494,111 @@ table.groups td {
   padding-left: 18px;
   margin: 8px 0 0;
 }
+
+/* --- 로그인 (기술 설계서 §11.2) --- */
+
+.signin {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.signin-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(380px, 100%);
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.signin-card h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.signin-lead {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.signin-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.signin-card input {
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: inherit;
+  font-size: 14px;
+}
+
+.signin-hint {
+  margin: -6px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* 실패는 눈에 띄어야 하지만, 사유를 나누지 않는다는 원칙은 문구가 지킨다. */
+.signin-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(220, 80, 80, 0.12);
+  color: #d05050;
+  font-size: 12px;
+}
+
+.signin-card button[type='submit'] {
+  margin-top: 4px;
+  padding: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.signin-card button[type='submit']:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.signin-switch {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.who {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.linklike {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getSubmission, getTraceManifest } from '../../api/client'
+import { subscribe } from '../../api/eventStream'
 import type { TraceManifest } from '../replay/traceTypes'
 import type { Submission } from '../../shared/types'
 
@@ -8,12 +9,13 @@ import type { Submission } from '../../shared/types'
  *
  * SSE 는 편의 채널이고 **최종 상태의 진실 원천은 DB 조회**다. 그래서 스트림이 끊기거나
  * 이벤트를 놓쳐도 UI 가 멈추지 않도록, 이벤트를 받을 때마다 조회로 수렴시킨다.
- * 재연결은 브라우저가 Last-Event-ID 로 처리한다.
+ *
+ * 스트림에 인증이 필요해 `EventSource` 대신 fetch 로 읽는다 (§11.2). 브라우저의 자동
+ * 재연결을 잃는 대신, 끊기면 조회로 수렴한다 — 원래 그것이 진실의 원천이다.
  */
 export function useSubmissionEvents(submissionId: string | null) {
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [trace, setTrace] = useState<TraceManifest | null>(null)
-  const sourceRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     setSubmission(null)
@@ -31,23 +33,24 @@ export function useSubmissionEvents(submissionId: string | null) {
       })
     }
 
-    const source = new EventSource(`/api/v1/submissions/${submissionId}/events`)
-    sourceRef.current = source
-    source.addEventListener('status', refresh)
-    source.addEventListener('completed', refresh)
-    source.addEventListener('trace', () => {
-      getTraceManifest(submissionId).then((next) => {
-        if (!cancelled) setTrace(next)
-      })
+    const close = subscribe(`/submissions/${submissionId}/events`, {
+      onEvent: (name) => {
+        if (name === 'trace') {
+          getTraceManifest(submissionId).then((next) => {
+            if (!cancelled) setTrace(next)
+          })
+        } else {
+          refresh()
+        }
+      },
+      // 스트림이 죽어도 결과를 보여줘야 한다. 조회가 진실의 원천이다.
+      onError: refresh,
     })
-    // 스트림이 죽어도 결과를 보여줘야 한다. 조회가 진실의 원천이다.
-    source.onerror = refresh
 
     refresh()
     return () => {
       cancelled = true
-      source.close()
-      sourceRef.current = null
+      close()
     }
   }, [submissionId])
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { createSubmission, getDraft, getProblem, listSubmissions } from './api/client'
+import { createSubmission, getDraft, getProblem, listSubmissions, logout } from './api/client'
+import { getSession, onSessionChange, type Session } from './api/session'
+import { SignIn } from './features/auth/SignIn'
 import { ProblemList } from './features/problems/ProblemList'
 import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
@@ -17,6 +19,19 @@ import type { Problem, Submission, SubmissionLanguage } from './shared/types'
  * Judge first 원칙에 따라 판정 결과가 항상 먼저 보이고, 리플레이와 기록은 그 아래에 붙는다.
  */
 export function App() {
+  // 세션이 없으면 아무것도 그리지 않는다. 제출·초안·기록이 전부 인증을 요구하므로,
+  // 로그인 전 화면은 실패한 요청 목록이 될 뿐이다.
+  const [session, setSession] = useState<Session | null>(getSession)
+
+  // 토큰 갱신이 끝내 실패하면 세션 모듈이 스스로 비운다. 그때 화면도 로그인으로
+  // 돌아가야 한다 — 그러지 않으면 사용자는 아무 반응 없는 화면을 보게 된다.
+  useEffect(() => onSessionChange(setSession), [])
+
+  if (!session) return <SignIn onSignedIn={setSession} />
+  return <Drill session={session} />
+}
+
+function Drill({ session }: { session: Session }) {
   const [slug, setSlug] = useState<string | null>(null)
   const [problem, setProblem] = useState<Problem | null>(null)
   const [language, setLanguage] = useState<SubmissionLanguage>('KOTLIN')
@@ -122,6 +137,12 @@ export function App() {
       <header className="top">
         <strong>CodeDrill</strong>
         <span className="muted">문제를 푸는 것이 아니라, 문제 해결 역량을 훈련합니다</span>
+        <span className="who">
+          {session.displayName}
+          <button type="button" className="linklike" onClick={() => void logout()}>
+            로그아웃
+          </button>
+        </span>
       </header>
 
       {error && <p className="warn">{error}</p>}
