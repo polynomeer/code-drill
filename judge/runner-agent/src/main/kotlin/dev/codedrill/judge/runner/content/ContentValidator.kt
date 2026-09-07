@@ -32,12 +32,44 @@ import kotlin.io.path.readText
 class ContentValidator(
     private val engine: ExecutionEngine,
     private val contentRoot: Path,
+    /**
+     * 무엇까지 검사할지.
+     *
+     * 성능 그룹은 20만 원소짜리 입력을 정답과 오답 여럿에 대해 돌리므로, 34개 문제를
+     * 전부 돌리면 몇십 분이 걸린다. 그 시간을 `./gradlew build` 마다 치르면 아무도
+     * 빌드를 돌리지 않게 되고, 그러면 빠른 검사도 함께 사라진다.
+     */
+    private val scope: Scope = Scope.FULL,
 ) {
 
     private val loader = ProblemPackageLoader(contentRoot)
 
+    /**
+     * 검사 범위.
+     *
+     * [FAST] 로 나온 보고서는 **공개에 쓸 수 없다.** digest 에 범위가 섞이므로, 제어
+     * 영역이 대조할 때 전체 검증으로 만든 digest 와 절대 같아지지 않는다 (§3.2).
+     * 빠른 검사를 통과한 것을 공개 가능으로 오해하는 경로 자체를 없애는 것이 목적이다.
+     */
+    enum class Scope {
+        /** 전부. 공개 전에 반드시 한 번 돌아야 한다 (§6.3). */
+        FULL,
+
+        /**
+         * 구조와 공식 해답만. 성능 그룹·돌연변이·결정성 재실행·트레이스를 뺀다.
+         *
+         * 답하는 질문이 다르다. 전체 검증은 "이 문제를 공개해도 되는가"를 묻고, 빠른
+         * 검사는 **"저장소의 문제들이 아직 앞뒤가 맞는가"**를 묻는다. 실제로 났던 사고는
+         * 후자였다 — 테스트 데이터를 고치다 기대값이 틀어져 정답 풀이가 오답을 받았다.
+         *
+         * 돌연변이 분석을 여기서 빼도 잃는 것이 없다. 공개는 전체 검증 보고서의 digest
+         * 대조를 통과해야만 되므로(§3.2), 오답을 잡지 못하는 문제가 공개될 길은 없다.
+         */
+        FAST,
+    }
+
     fun validate(problemId: String): ValidationReport {
-        val pkg = loader.load(problemId)
+        val pkg = inScope(loader.load(problemId))
         val checks = mutableListOf<Check>()
 
         checks += structure(problemId, pkg)
@@ -50,17 +82,24 @@ class ContentValidator(
 
         val judged = run(pkg, reference)
         checks += officialSolution(pkg, judged)
-        checks += determinism(pkg, reference, judged)
         checks += limitsHeadroom(pkg, judged)
 
-        val mutants = mutants(problemId).map { mutant ->
-            evaluate(pkg, mutant)
-        }
+        if (scope == Scope.FAST) return report(pkg, checks, emptyList())
+
+        checks += determinism(pkg, reference, judged)
+
+        val mutants = mutants(problemId).map { mutant -> evaluate(pkg, mutant) }
         checks += mutationKillRate(mutants)
 
         checks += traceBudget(pkg, reference)
 
         return report(pkg, checks, mutants)
+    }
+
+    /** 범위 밖의 그룹을 떼어 낸 패키지. 이후 단계는 이것만 본다. */
+    private fun inScope(pkg: ProblemPackage): ProblemPackage = when (scope) {
+        Scope.FULL -> pkg
+        Scope.FAST -> pkg.copy(groups = pkg.groups.filterNot { it.policy.id == PERFORMANCE_GROUP })
     }
 
     fun validateAll(): List<ValidationReport> =
@@ -289,6 +328,9 @@ class ContentValidator(
         val passed = checks.all { it.passed }
         val digest = MessageDigest.getInstance("SHA-256").apply {
             update(pkg.packageDigest.toByteArray())
+            // 범위를 섞는다. 빠른 검사로 만든 digest 가 공개 대조를 통과하면, 성능
+            // 그룹을 한 번도 돌리지 않은 문제가 공개될 수 있다.
+            update(scope.name.toByteArray())
             checks.sortedBy { it.stage }.forEach { update("${it.stage}=${it.passed}".toByteArray()) }
         }.digest().joinToString("") { "%02x".format(it) }
 
@@ -309,6 +351,8 @@ class ContentValidator(
     private companion object {
         /** 정답 풀이가 제한 시간의 이 비율을 넘게 쓰면 공개를 막는다. */
         const val MAX_REFERENCE_TIME_RATIO = 0.5
+
+        const val PERFORMANCE_GROUP = "performance"
     }
 }
 

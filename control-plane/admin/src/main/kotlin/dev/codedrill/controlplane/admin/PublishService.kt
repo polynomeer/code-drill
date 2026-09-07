@@ -82,8 +82,12 @@ class PublishService(private val jdbc: JdbcTemplate, private val audit: AuditLog
         val (registeredDigest, registeredBy) = row
 
         if (registeredDigest != reportDigest) {
+            // 두 가지가 이 상태를 만든다. 패키지를 고쳤거나, **검증 파이프라인 자체가
+            // 바뀌었거나**다. 후자는 등록된 모든 버전의 보고서를 한꺼번에 무효로 만드는데,
+            // "패키지가 바뀌었다"고만 말하면 바꾼 적 없는 패키지를 뒤지게 된다 (§15.3).
             return PublishOutcome.Rejected(
-                "검증 보고서 digest 가 다르다. 패키지가 바뀌었으면 다시 검증해야 한다 (§6.3)",
+                "검증 보고서 digest 가 다르다. 패키지를 고쳤거나 검증 파이프라인이 바뀌었다. " +
+                    "다시 검증한 뒤 새 버전으로 등록해야 한다 (§6.3, §15.3)",
             )
         }
         if (registeredBy == approver) {

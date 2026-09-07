@@ -117,6 +117,20 @@ python3 scripts/publish-content.py
 개발 중에 공개 절차를 건너뛰려면 `codedrill.content.require-publish=false` 로 띄운다.
 **공개 환경에서는 절대 끄지 않는다.**
 
+### 검증 파이프라인을 고친 뒤
+
+보고서 digest 는 파이프라인의 결과에서 나온다. 그래서 §6.3 의 검사를 고치면 **이미
+등록된 모든 버전의 보고서가 무효**가 되고, 공개가 409 로 거부된다. 패키지를 고친 적이
+없어도 그렇다 (§15.3).
+
+운영에서는 새 버전으로 다시 등록하는 것이 답이다. 로컬 시드는 그냥 지우고 다시 올린다.
+
+```bash
+docker exec code-drill-postgres-1 psql -U codedrill -c \
+  "UPDATE problem SET published_version_id = NULL; DELETE FROM problem_version;"
+./gradlew :judge:runner-agent:validateContent && python3 scripts/publish-content.py
+```
+
 ## 5. 웹
 
 ```bash
@@ -135,9 +149,10 @@ python3 scripts/smoke.py
 ```
 
 판정 5종(AC/WA/CE/RE/TLE), 3개 언어, 부분 점수, 초안 CAS, 목록 커서, 트레이스 목차·청크,
-사용자 인증과 객체 소유권, 관리자 API 인증과 역할 분리, 콘텐츠 공개와 2인 승인,
+사용자 인증과 객체 소유권, 문자열 값 타입의 3개 언어 왕복, 관리자 API 인증과 역할 분리,
+콘텐츠 공개와 2인 승인,
 재채점 승인·실행·dry-run, 멱등성, SSE, 숨은 테스트 비노출까지 실제 서비스로 확인한다.
-96개 항목이 전부 통과해야 한다.
+100개 항목이 전부 통과해야 한다.
 
 스크립트는 실행할 때마다 계정을 새로 만든다. 고정 계정을 두면 그 비밀번호가 저장소에
 남고, 실행할 때마다 남의 기록이 섞인다.
