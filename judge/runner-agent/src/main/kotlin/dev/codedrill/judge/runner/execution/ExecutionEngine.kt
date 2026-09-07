@@ -43,6 +43,14 @@ class ExecutionEngine(
     private val adapters: Map<Language, RuntimeAdapter>,
     private val sandboxes: (Language) -> Sandbox,
     private val workRoot: Path? = null,
+    /**
+     * 단계별 소요 시간을 받아 가는 곳 (§13.2 Runner: compile/execute time).
+     *
+     * 엔진은 미터 레지스트리를 모른다. 계측 방식이 바뀌어도 판정 규칙이 든 이 파일은
+     * 그대로여야 한다 — 여기 있는 코드가 판정을 정하기 때문이다.
+     */
+    private val onPhase: (phase: String, language: Language, outcome: String, nanos: Long) -> Unit =
+        { _, _, _, _ -> },
 ) {
 
     fun execute(request: ExecutionRequest): ExecutionResult {
@@ -74,9 +82,16 @@ class ExecutionEngine(
         adapter.prepare(request, sourceDir)
 
         // compile
-        when (val outcome = adapter.compile(sourceDir, outputDir)) {
+        val compileStart = System.nanoTime()
+        val compiled = adapter.compile(sourceDir, outputDir)
+        onPhase(
+            "compile", request.language,
+            if (compiled is RuntimeAdapter.CompileOutcome.Success) "success" else "failure",
+            System.nanoTime() - compileStart,
+        )
+        when (compiled) {
             is RuntimeAdapter.CompileOutcome.Failure ->
-                return terminal(request, Verdict.COMPILE_ERROR, outcome.log, reason = null)
+                return terminal(request, Verdict.COMPILE_ERROR, compiled.log, reason = null)
             RuntimeAdapter.CompileOutcome.Success -> Unit
         }
 
@@ -99,12 +114,17 @@ class ExecutionEngine(
         val results = mutableListOf<TestCaseResult>()
         val sandbox = sandboxes(request.language)
 
+        val executeStart = System.nanoTime()
         for (group in executedGroups) {
             val run = runGroup(request, adapter, sandbox, group, sourceDir, outputDir, events)
             // 케이스를 하나도 시작하지 못했다. 컴파일 단계가 잡지 못한 같은 부류의 실패다.
-            run.fatal?.let { return terminal(request, Verdict.COMPILE_ERROR, it, reason = null) }
+            run.fatal?.let {
+                onPhase("execute", request.language, "fatal", System.nanoTime() - executeStart)
+                return terminal(request, Verdict.COMPILE_ERROR, it, reason = null)
+            }
             results += toCaseResults(run, group, request.limits.outputBytes)
         }
+        onPhase("execute", request.language, request.mode.name.lowercase(), System.nanoTime() - executeStart)
 
         if (request.mode == ExecutionMode.TRACE) return traceResult(request, results, events)
 

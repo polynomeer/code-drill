@@ -23,6 +23,7 @@ import java.util.UUID
 class SubmissionService(
     private val repository: SubmissionRepository,
     private val json: ObjectMapper,
+    private val metrics: SubmissionMetrics,
 ) {
 
     /**
@@ -47,6 +48,9 @@ class SubmissionService(
 
         val queued = SubmissionQueued(
             submissionId = id.toString(),
+            // 큐 대기 시간의 기준점. 아웃박스 행과 같은 트랜잭션에 들어가므로, 커밋되지
+            // 않은 제출이 대기 시간에 섞이지 않는다 (§12.1 Queue wait).
+            queuedAt = Instant.now(),
             correlationId = correlationId,
             problemId = command.problemId,
             problemVersion = command.problemVersion,
@@ -68,10 +72,12 @@ class SubmissionService(
         )
 
         if (inserted == 0) {
+            metrics.created(command.language.name, idempotentHit = true)
             return requireNotNull(repository.findByIdempotencyKey(command.userId, key.value)) {
                 "멱등 충돌인데 기존 제출을 찾지 못했다"
             }
         }
+        metrics.created(command.language.name, idempotentHit = false)
 
         repository.updateSource(id, command.source)
         // CREATED → QUEUED. 아웃박스에 이벤트가 들어간 순간 큐에 오른 것으로 본다.

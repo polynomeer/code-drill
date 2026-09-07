@@ -18,6 +18,9 @@ import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.problempackage.Visibility
 import org.slf4j.LoggerFactory
+import dev.codedrill.judge.protocol.Verdict
+import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -32,6 +35,15 @@ class JudgeCoordinator(
     private val packages: ProblemPackageLoader,
     private val registry: AttemptRegistry,
     private val gateway: JudgeGateway,
+    private val metrics: JudgeMetrics = JudgeMetrics(),
+    /**
+     * 같은 제출을 몇 번까지 다시 실행할지.
+     *
+     * 무한 재시도는 장애를 감추기만 한다 — 사용자는 영영 끝나지 않는 채점을 보고,
+     * 대시보드에는 아무 이상도 뜨지 않는다. 한계를 넘으면 SYSTEM_ERROR 로 끝내
+     * 사용자에게도 경보에도 드러나게 한다 (§4.4).
+     */
+    private val maxAttempts: Int = 3,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -45,6 +57,15 @@ class JudgeCoordinator(
      * 피해가 없다 (§12.2 장애 격리).
      */
     private val pendingTrace = ConcurrentHashMap<String, ExecutionRequest>()
+
+    /**
+     * 아직 결과가 오지 않은 실행 요청.
+     *
+     * 워커가 죽으면 요청 자체가 사라지므로, 다시 띄우려면 원본을 들고 있어야 한다.
+     * pendingTrace 와 같은 이유로 메모리에 둔다 — 오케스트레이터가 재시작하면 이 맵이
+     * 비고, 그때는 제어 영역의 일관성 점검(§12.4)이 멈춘 제출을 찾아낸다.
+     */
+    private val inFlight = ConcurrentHashMap<String, ExecutionRequest>()
 
     /** 제출을 임대하고 Runner 에게 실행을 요청한다. */
     fun onSubmissionQueued(message: SubmissionQueued) {
@@ -75,7 +96,10 @@ class JudgeCoordinator(
             .addKeyValue(CorrelationIds.ATTEMPT, lease.attempt)
             .log("실행을 임대하고 Runner 에 요청한다")
 
+        message.queuedAt?.let { metrics.queueWait(Duration.between(it, Instant.now())) }
+
         if (message.requestTrace) pendingTrace[message.submissionId] = request
+        inFlight[message.submissionId] = request
         gateway.requestExecution(request)
         gateway.publishProgress(
             JudgeProgressed(
@@ -100,6 +124,7 @@ class JudgeCoordinator(
             result.trace?.let { capture ->
                 // 가공은 판정 경로 밖에서 한다 (§7.3). 실패해도 판정에 영향을 주지 않도록
                 // 예외를 밖으로 흘리지 않는다 — 브로커가 재전달해도 같은 결과다.
+                val startedAt = Instant.now()
                 val processed = runCatching {
                     TraceProcessor.process(
                         traceId = result.executionId,
@@ -107,9 +132,15 @@ class JudgeCoordinator(
                         capture = capture,
                     )
                 }.getOrElse { error ->
+                    metrics.traceInvalid(error::class.simpleName ?: "unknown")
                     log.warn("트레이스 가공에 실패했다: {}", error.message)
                     return
                 }
+                metrics.traceProcessed(
+                    took = Duration.between(startedAt, Instant.now()),
+                    captured = capture.events.size,
+                    kept = processed.manifest.eventCount,
+                )
 
                 gateway.publishTraceReady(
                     TraceReady(
@@ -124,7 +155,10 @@ class JudgeCoordinator(
             return
         }
 
-        when (val acceptance = registry.accept(result)) {
+        val acceptance = registry.accept(result)
+        metrics.acceptance(acceptance)
+
+        when (acceptance) {
             AttemptRegistry.Acceptance.Accepted -> complete(result, correlationId)
 
             AttemptRegistry.Acceptance.Duplicate ->
@@ -147,6 +181,7 @@ class JudgeCoordinator(
     }
 
     private fun complete(result: ExecutionResult, correlationId: String) {
+        inFlight.remove(result.submissionId)
         dispatchTrace(result.submissionId)
         val pkg = packageOf(result)
         val aggregated = VerdictAggregator.aggregate(pkg.groups.map { it.policy }, result)
@@ -173,6 +208,57 @@ class JudgeCoordinator(
                 },
             ),
         )
+    }
+
+    /**
+     * 만료된 임대를 회수한다 (§4.3 워커 유실, §12.4 고아 실행 회수).
+     *
+     * 워커가 죽으면 결과가 오지 않는다. 재임대는 attempt 와 fencing 토큰을 함께 올리므로,
+     * 죽은 줄 알았던 워커가 살아 돌아와 결과를 보내도 토큰이 낮아 거절된다. 그래서
+     * "다시 실행"과 "중복 판정"이 동시에 일어나지 않는다.
+     */
+    fun reclaimExpiredLeases() {
+        for (submissionId in registry.expired()) {
+            val previous = inFlight[submissionId] ?: continue
+
+            if (previous.attempt >= maxAttempts) {
+                inFlight.remove(submissionId)
+                registry.abandon(submissionId)
+                log.atError()
+                    .addKeyValue(CorrelationIds.SUBMISSION_ID, submissionId)
+                    .addKeyValue(CorrelationIds.ATTEMPT, previous.attempt)
+                    .log("재시도 한계를 넘었다. SYSTEM_ERROR 로 끝낸다")
+                gateway.publishCompleted(
+                    JudgeCompleted(
+                        submissionId = submissionId,
+                        executionId = previous.executionId,
+                        correlationId = previous.correlationId,
+                        verdict = Verdict.SYSTEM_ERROR,
+                        score = 0,
+                        compileLog = null,
+                        groups = emptyList(),
+                    ),
+                )
+                continue
+            }
+
+            val lease = registry.lease(submissionId)
+            val retry = previous.copy(
+                executionId = UUID.randomUUID().toString(),
+                attempt = lease.attempt,
+                fencingToken = lease.token,
+            )
+            inFlight[submissionId] = retry
+            metrics.leaseReclaimed(retry.language)
+
+            log.atWarn()
+                .addKeyValue(CorrelationIds.SUBMISSION_ID, submissionId)
+                .addKeyValue(CorrelationIds.EXECUTION_ID, retry.executionId)
+                .addKeyValue(CorrelationIds.ATTEMPT, retry.attempt)
+                .log("임대가 만료됐다. 실행을 다시 건다")
+
+            gateway.requestExecution(retry)
+        }
     }
 
     /**

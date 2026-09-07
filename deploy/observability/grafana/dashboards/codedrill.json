@@ -1,0 +1,453 @@
+{
+  "uid": "codedrill-judge",
+  "title": "CodeDrill 판정",
+  "description": "기술 설계서 §12.1 SLO 와 §13.2 핵심 메트릭. 패널 순서는 장애 조사 순서다 — SLO 위반 → 판정 품질 → 큐 → Runner → 일관성.",
+  "tags": [
+    "codedrill"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "제출 수락 p95 (SLO 1s)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codedrill_submission_accept_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "§12.1 Submit acceptance latency. API 수신 → submission/outbox 커밋."
+    },
+    {
+      "id": 2,
+      "title": "큐 대기 p95 (SLO 2s)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codedrill_queue_wait_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "§12.1 Queue wait. QUEUED → LEASED."
+    },
+    {
+      "id": 3,
+      "title": "판정 전파 p95 (SLO 1s)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codedrill_verdict_propagation_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "§12.1 Verdict propagation. 종료 수신 → 클라이언트 반영."
+    },
+    {
+      "id": 4,
+      "title": "판정 분포",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (verdict) (rate(codedrill_verdict_total[5m]))",
+          "legendFormat": "{{verdict}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "description": "§13.2 Judge Quality. 분포가 급변하면 최근 package/runtime 배포를 본다."
+    },
+    {
+      "id": 5,
+      "title": "플랫폼 오류율 (SLO 0.1%)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 7,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(codedrill_system_error_total[5m])) / clamp_min(sum(rate(codedrill_verdict_total[5m])), 0.001)",
+          "legendFormat": "SYSTEM_ERROR 비율",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "§12.1 Platform error rate. 사용자 오답과 다른 축이다 (§4.4)."
+    },
+    {
+      "id": 6,
+      "title": "아웃박스 적체",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "codedrill_outbox_pending",
+          "legendFormat": "미발행 건수",
+          "refId": "A"
+        },
+        {
+          "expr": "codedrill_outbox_oldest_age_seconds",
+          "legendFormat": "가장 오래된 건 나이(초)",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "description": "§13.4 Queue lag. 브로커가 죽으면 수와 나이가 함께 오른다."
+    },
+    {
+      "id": 7,
+      "title": "결과 수용 결과",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(codedrill_result_acceptance_total[5m]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "description": "§4.3. duplicate 는 정상, stale 은 워커 유실, already_completed 는 조사 대상."
+    },
+    {
+      "id": 8,
+      "title": "임대 회수",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (language) (rate(codedrill_lease_reclaimed_total[15m])) * 900",
+          "legendFormat": "{{language}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "description": "§4.3 워커 유실. 회수가 잦으면 Runner 용량이나 노드를 본다."
+    },
+    {
+      "id": 9,
+      "title": "컴파일·실행 p95",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, language) (rate(codedrill_runner_compile_seconds_bucket[5m])))",
+          "legendFormat": "compile {{language}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, language) (rate(codedrill_runner_execute_seconds_bucket[5m])))",
+          "legendFormat": "execute {{language}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "description": "§13.2 Runner. 둘을 나눠 봐야 런타임 이미지 변화와 문제 데이터 변화를 가른다."
+    },
+    {
+      "id": 10,
+      "title": "트레이스",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 7
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(codedrill_trace_process_seconds_bucket[5m])))",
+          "legendFormat": "가공 p95 (SLO 5s)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(codedrill_trace_events_total{outcome=\"dropped\"}[15m])) / clamp_min(sum(rate(codedrill_trace_events_total[15m])), 0.001)",
+          "legendFormat": "잘린 비율",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "description": "§12.1 Trace manifest ready, §7.4 예산. 트레이스 장애는 판정을 막지 않는다 (§12.2)."
+    },
+    {
+      "id": 11,
+      "title": "일관성 점검 위반",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "codedrill_consistency_violations",
+          "legendFormat": "{{check}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "description": "§12.4. 0 이 아니면 데이터가 어긋나 있다. docs/runbook.md#consistency"
+    }
+  ]
+}

@@ -49,6 +49,29 @@ class AttemptRegistry(
     }
 
     /**
+     * 만료된 임대 전부.
+     *
+     * 워커가 죽으면 결과가 영영 오지 않고, 제출은 LEASED 에서 멈춘 채 남는다. 임대에
+     * 만료를 두는 이유가 이것이므로, 만료를 **주기적으로 읽어 가는 쪽**이 있어야 한다.
+     * 만료 시각만 두고 아무도 보지 않으면 필드가 하나 늘었을 뿐이다.
+     */
+    fun expired(): List<String> {
+        val now = clock.instant()
+        return active.values.filter { now.isAfter(it.expiresAt) }.map { it.submissionId }
+    }
+
+    /**
+     * 더 재시도하지 않고 실행을 포기한다 (§4.2 종료는 불변).
+     *
+     * 종료로 표시해 두면 늦게 살아 돌아온 워커의 결과가 [Acceptance.AlreadyCompleted] 로
+     * 갈리고, 이미 사용자에게 보인 SYSTEM_ERROR 를 조용히 덮어쓰지 못한다.
+     */
+    fun abandon(submissionId: String) {
+        completed[submissionId] = ABANDONED
+        active.remove(submissionId)
+    }
+
+    /**
      * 도착한 결과를 받아들일지 판단한다.
      *
      * 순서가 중요하다. 중복 판정을 fencing 검사보다 먼저 해야, 같은 결과의 재전달이
@@ -82,6 +105,11 @@ class AttemptRegistry(
         val token: FencingToken,
         val expiresAt: Instant,
     )
+
+    private companion object {
+        /** 포기한 실행의 자리 표시. 어떤 실제 result digest 와도 같지 않다. */
+        const val ABANDONED = "abandoned"
+    }
 
     sealed interface Acceptance {
         /** 유효한 결과다. 집계로 넘긴다. */

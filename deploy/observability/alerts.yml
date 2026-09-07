@@ -1,0 +1,160 @@
+# 경보 규칙 (기술 설계서 §12.1 SLO, §13.4 경보와 런북).
+#
+# **SLO 목표값의 단일 출처는 이 파일이다.** 코드 주석이나 문서에 숫자를 또 적으면
+# 반드시 갈라진다. 각 규칙의 runbook 주석은 docs/runbook.md 의 절을 가리키며, 그
+# 문서가 첫 대응을 정한다.
+#
+# 규칙은 메트릭 이름에 직접 묶인다. platform/observability 의 Metrics 상수를 고치면
+# 여기도 같은 커밋에서 고친다 — 이름이 어긋나면 경보는 오류 없이 조용히 멈춘다.
+
+groups:
+  - name: codedrill-slo
+    rules:
+      # §12.1 Submit acceptance latency: p95 1초
+      - alert: SubmitAcceptanceSlow
+        expr: |
+          histogram_quantile(
+            0.95, sum by (le) (rate(codedrill_submission_accept_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "제출 수락 p95 가 1초를 넘었다"
+          runbook: "docs/runbook.md#db-saturation"
+
+      # §12.1 Queue wait: p95 2초
+      - alert: QueueWaitSlow
+        expr: |
+          histogram_quantile(
+            0.95, sum by (le) (rate(codedrill_queue_wait_seconds_bucket[5m]))
+          ) > 2
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "큐 대기 p95 가 2초를 넘었다"
+          runbook: "docs/runbook.md#queue-lag"
+
+      # §12.1 Verdict propagation: p95 1초
+      - alert: VerdictPropagationSlow
+        expr: |
+          histogram_quantile(
+            0.95, sum by (le) (rate(codedrill_verdict_propagation_seconds_bucket[5m]))
+          ) > 1
+        for: 5m
+        labels: { severity: ticket }
+        annotations:
+          summary: "판정 전파 p95 가 1초를 넘었다"
+          runbook: "docs/runbook.md#queue-lag"
+
+      # §12.1 Trace manifest ready: p95 5초
+      - alert: TraceProcessingSlow
+        expr: |
+          histogram_quantile(
+            0.95, sum by (le) (rate(codedrill_trace_process_seconds_bucket[5m]))
+          ) > 5
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "트레이스 목차 준비 p95 가 5초를 넘었다"
+          runbook: "docs/runbook.md#trace-overload"
+
+      # §12.1 Platform error rate: 0.1% 미만
+      - alert: PlatformErrorRateHigh
+        expr: |
+          sum(rate(codedrill_system_error_total[10m]))
+            / clamp_min(sum(rate(codedrill_verdict_total[10m])), 0.001) > 0.001
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "SYSTEM_ERROR 비율이 0.1% 를 넘었다"
+          runbook: "docs/runbook.md#system-error-spike"
+
+  - name: codedrill-operations
+    rules:
+      # §13.4 Queue lag: oldest age > 10초 5분
+      - alert: QueueLag
+        expr: codedrill_outbox_oldest_age_seconds > 10
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "발행되지 않은 아웃박스 이벤트가 10초 넘게 남아 있다"
+          runbook: "docs/runbook.md#queue-lag"
+
+      # §13.4 System error spike: 5분 비율 > 1%
+      - alert: SystemErrorSpike
+        expr: |
+          sum by (language) (rate(codedrill_system_error_total[5m]))
+            / clamp_min(sum by (language) (rate(codedrill_verdict_total[5m])), 0.001) > 0.01
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.language }} 의 SYSTEM_ERROR 비율이 1% 를 넘었다"
+          runbook: "docs/runbook.md#system-error-spike"
+
+      # §13.4 Verdict anomaly: 판정 분포 급변
+      #
+      # 절대 비율이 아니라 **자기 자신의 최근 기준선과의 차이**를 본다. 문제마다 정답률이
+      # 다르므로 고정 임계값은 쉬운 문제에서 늘 울리거나 어려운 문제에서 늘 침묵한다.
+      - alert: VerdictAnomaly
+        expr: |
+          (
+            sum by (language) (rate(codedrill_verdict_total{verdict="WRONG_ANSWER"}[30m]))
+              / clamp_min(sum by (language) (rate(codedrill_verdict_total[30m])), 0.001)
+          )
+          >
+          2 *
+          (
+            sum by (language) (rate(codedrill_verdict_total{verdict="WRONG_ANSWER"}[6h]))
+              / clamp_min(sum by (language) (rate(codedrill_verdict_total[6h])), 0.001)
+          )
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.language }} 의 오답률이 기준선의 2배가 됐다"
+          runbook: "docs/runbook.md#verdict-anomaly"
+
+      # §13.4 Trace overload
+      - alert: TraceOverload
+        expr: |
+          sum(rate(codedrill_trace_events_total{outcome="dropped"}[15m]))
+            / clamp_min(sum(rate(codedrill_trace_events_total[15m])), 0.001) > 0.5
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "트레이스 이벤트의 절반 이상이 예산에서 잘리고 있다"
+          runbook: "docs/runbook.md#trace-overload"
+
+      # §13.4 DB saturation
+      - alert: DbSaturation
+        expr: hikaricp_connections_pending > 0
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "DB 커넥션을 기다리는 스레드가 있다"
+          runbook: "docs/runbook.md#db-saturation"
+
+      # §4.3 워커 유실이 잦다. 회수가 동작한다는 뜻이지만 원인은 따로 있다.
+      - alert: LeaseReclaimFrequent
+        expr: sum(rate(codedrill_lease_reclaimed_total[15m])) * 900 > 5
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "15분 동안 임대 회수가 5건을 넘었다"
+          runbook: "docs/runbook.md#worker-loss"
+
+      # §4.3 종료된 제출에 다른 결과가 도착했다. 한 건이라도 조사 대상이다.
+      - alert: ConflictingResult
+        expr: increase(codedrill_result_acceptance_total{outcome="already_completed"}[1h]) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "종료된 제출에 다른 판정 결과가 도착했다"
+          runbook: "docs/runbook.md#conflicting-result"
+
+      # §12.4 일관성 점검
+      - alert: ConsistencyViolation
+        expr: codedrill_consistency_violations > 0
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "일관성 점검 {{ $labels.check }} 가 어긋난 행을 찾았다"
+          runbook: "docs/runbook.md#consistency"

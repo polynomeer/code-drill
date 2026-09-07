@@ -37,6 +37,7 @@ class SubmissionController(
     private val events: SubmissionEventStream,
     private val traces: TraceRepository,
     private val json: ObjectMapper,
+    private val metrics: SubmissionMetrics,
 ) {
 
     @PostMapping
@@ -45,17 +46,21 @@ class SubmissionController(
         @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
         @RequestBody request: CreateSubmissionRequest,
     ): ResponseEntity<SubmissionResponse> {
-        val submission = service.create(
-            CreateSubmission(
-                userId = userId,
-                idempotencyKey = idempotencyKey,
-                problemId = request.problemId,
-                problemVersion = request.problemVersion,
-                language = request.language,
-                source = request.source,
-                requestTrace = request.requestTrace,
-            ),
-        )
+        // 트랜잭션 경계가 서비스에 있으므로, 여기서 감싸야 커밋까지가 측정에 들어간다
+        // (§12.1 API 수신 → submission/outbox commit).
+        val submission = metrics.timeAccept {
+            service.create(
+                CreateSubmission(
+                    userId = userId,
+                    idempotencyKey = idempotencyKey,
+                    problemId = request.problemId,
+                    problemVersion = request.problemVersion,
+                    language = request.language,
+                    source = request.source,
+                    requestTrace = request.requestTrace,
+                ),
+            )
+        }
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(SubmissionResponse.of(submission, json))
     }
 

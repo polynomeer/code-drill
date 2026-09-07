@@ -1,5 +1,7 @@
 package dev.codedrill.judge.protocol
 
+import java.time.Instant
+
 /**
  * 제어 영역과 실행 영역 사이의 메시지 계약 (기술 설계서 §3.3 내부 이벤트).
  *
@@ -22,6 +24,14 @@ data class SubmissionQueued(
     val source: String,
     /** 판정이 끝난 뒤 학습용 트레이스를 이어서 만들지 (§9.3 requestTrace). */
     val requestTrace: Boolean = false,
+    /**
+     * 아웃박스에 커밋된 시각. 큐 대기 시간(§12.1 Queue wait)의 기준점이다.
+     *
+     * 실행 영역은 제어 영역의 시계를 볼 수 없으므로, 재는 쪽이 아니라 **찍는 쪽**이
+     * 시각을 실어 보내야 한다. 이전 버전 메시지에는 없으므로 null 을 허용하고, 없으면
+     * 측정을 건너뛴다 (§15.3 N/N-1).
+     */
+    val queuedAt: Instant? = null,
 ) {
     companion object {
         const val SCHEMA_VERSION = "1.0"

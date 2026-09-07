@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitHandler
 import org.springframework.amqp.rabbit.annotation.RabbitListener
 import org.springframework.stereotype.Component
+import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -27,6 +29,7 @@ class JudgeProgressListener(
     private val repository: SubmissionRepository,
     private val traces: TraceRepository,
     private val json: ObjectMapper,
+    private val metrics: SubmissionMetrics,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -48,6 +51,7 @@ class JudgeProgressListener(
 
     @RabbitHandler
     fun onCompleted(message: JudgeCompleted) {
+        val receivedAt = Instant.now()
         val changed = service.complete(message)
         if (!changed) {
             log.atInfo()
@@ -61,11 +65,18 @@ class JudgeProgressListener(
             .addKeyValue(CorrelationIds.EXECUTION_ID, message.executionId)
             .log("판정 완료: ${message.verdict} (${message.score}점)")
 
-        val payload = service.find(UUID.fromString(message.submissionId))
-            ?.let { SubmissionResponse.of(it, json) }
-            ?: return
-        events.publish(message.submissionId, "completed", payload)
+        val submission = service.find(UUID.fromString(message.submissionId)) ?: return
+        events.publish(message.submissionId, "completed", SubmissionResponse.of(submission, json))
         // 트레이스가 뒤따라올 수 있으므로 스트림을 여기서 닫지 않는다.
+
+        // 두 구간을 따로 잰다. 사용자가 기다린 전체 시간(제출→종료)과, 종료를 알고 나서
+        // 화면에 닿기까지 걸린 시간(§12.1 Verdict propagation)은 원인이 다른 지연이다.
+        metrics.completed(
+            language = submission.language,
+            verdict = message.verdict,
+            waited = Duration.between(submission.createdAt, receivedAt),
+            propagation = Duration.between(receivedAt, Instant.now()),
+        )
     }
 
     /**
