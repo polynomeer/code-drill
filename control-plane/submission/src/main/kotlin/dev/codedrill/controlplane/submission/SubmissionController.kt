@@ -9,6 +9,7 @@ import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
 import dev.codedrill.platform.common.Page
+import dev.codedrill.platform.common.Principal
 import jakarta.validation.constraints.NotBlank
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -25,10 +27,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
 import java.util.UUID
 
 /**
- * 제출 API (기술 설계서 §9.2).
+ * 제출 API (기술 설계서 §9.2, §11.4 객체 소유권).
  *
- * 슬라이스에는 로그인이 없다. 사용자 식별은 헤더로 받으며, Identity 모듈이 붙으면
- * 인증 주체에서 가져오도록 바꾼다.
+ * 호출자는 Identity 가 토큰에서 확인한 주체다. 자칭한 헤더가 아니다.
+ *
+ * **남의 제출은 없는 것처럼 보인다.** 소유자가 아닐 때 403 이 아니라 404 를 내는 것은
+ * 의도다 — 403 은 "그 제출은 있는데 네 것이 아니다"를 알려 주고, 그것만으로 ID 를
+ * 훑어 누가 무엇을 언제 제출했는지 셀 수 있다 (§11.1 소스 노출, §11.3 비공개 기본).
  */
 @RestController
 @RequestMapping("/api/v1/submissions")
@@ -43,7 +48,7 @@ class SubmissionController(
     @PostMapping
     fun create(
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
-        @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @RequestBody request: CreateSubmissionRequest,
     ): ResponseEntity<SubmissionResponse> {
         // 트랜잭션 경계가 서비스에 있으므로, 여기서 감싸야 커밋까지가 측정에 들어간다
@@ -51,7 +56,7 @@ class SubmissionController(
         val submission = metrics.timeAccept {
             service.create(
                 CreateSubmission(
-                    userId = userId,
+                    userId = principal.id,
                     idempotencyKey = idempotencyKey,
                     problemId = request.problemId,
                     problemVersion = request.problemVersion,
@@ -65,20 +70,23 @@ class SubmissionController(
     }
 
     @GetMapping("/{id}")
-    fun get(@PathVariable id: UUID): ResponseEntity<SubmissionResponse> {
-        val submission = service.find(id) ?: return ResponseEntity.notFound().build()
+    fun get(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<SubmissionResponse> {
+        val submission = ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(SubmissionResponse.of(submission, json))
     }
 
     /** 제출 기록 (§9.1). 정렬 키가 고정된 cursor 페이지네이션이다. */
     @GetMapping
     fun history(
-        @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @RequestParam(required = false) problemId: String?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
     ): Page<SubmissionResponse> {
-        val page = service.history(userId, problemId, cursor, limit)
+        val page = service.history(principal.id, problemId, cursor, limit)
         return Page(page.items.map { SubmissionResponse.of(it, json) }, page.nextCursor)
     }
 
@@ -93,7 +101,11 @@ class SubmissionController(
      * 만들어지고, 영영 오지 않을 수도 있다 (§12.2).
      */
     @GetMapping("/{id}/trace")
-    fun traceManifest(@PathVariable id: UUID): ResponseEntity<TraceManifest> {
+    fun traceManifest(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<TraceManifest> {
+        ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
         val manifest = traces.findManifest(id) ?: return ResponseEntity.noContent().build()
         return ResponseEntity.ok(manifest)
     }
@@ -103,7 +115,9 @@ class SubmissionController(
     fun traceChunk(
         @PathVariable id: UUID,
         @PathVariable index: Int,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
     ): ResponseEntity<TraceChunk> {
+        ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
         val chunk = traces.findChunk(id, index) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(chunk)
     }
@@ -115,21 +129,41 @@ class SubmissionController(
      * 전부 들어 있어야 무엇에서 무엇으로 바뀌었는지 스스로 볼 수 있다.
      */
     @GetMapping("/{id}/judgements")
-    fun judgements(@PathVariable id: UUID): ResponseEntity<List<Judgement>> {
-        service.find(id) ?: return ResponseEntity.notFound().build()
+    fun judgements(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<List<Judgement>> {
+        ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(service.judgements(id))
     }
 
+    /**
+     * 상태 스트림.
+     *
+     * 구독 직후 현재 상태를 한 번 흘려보내, 구독 이전에 지나간 전이를 놓친 클라이언트도
+     * 즉시 수렴한다. 남의 제출이면 구독조차 만들지 않는다 — 스트림을 열어 두면 판정이
+     * 언제 끝났는지가 새어 나간다.
+     */
     @GetMapping("/{id}/events")
-    fun events(@PathVariable id: UUID): SseEmitter {
+    fun events(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<SseEmitter> {
+        val current = ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
+
         val emitter = events.subscribe(id.toString())
-        service.find(id)?.let { current ->
-            emitter.send(
-                SseEmitter.event().name("status").data(SubmissionResponse.of(current, json)),
-            )
-        }
-        return emitter
+        emitter.send(SseEmitter.event().name("status").data(SubmissionResponse.of(current, json)))
+        return ResponseEntity.ok(emitter)
     }
+
+    /**
+     * 호출자의 제출이면 돌려주고, 아니면 null.
+     *
+     * "없다"와 "네 것이 아니다"를 호출부에서 같게 다루도록 한 곳에 모은다. 두 경우를
+     * 다르게 응답하는 순간 존재 여부가 새어 나간다.
+     */
+    private fun ownedBy(principal: Principal, id: UUID): Submission? =
+        service.find(id)?.takeIf { it.userId == principal.id }
 
     @ExceptionHandler(IllegalArgumentException::class)
     fun onInvalid(e: IllegalArgumentException): ResponseEntity<ApiError> =

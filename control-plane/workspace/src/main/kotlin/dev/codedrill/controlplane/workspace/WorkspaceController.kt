@@ -2,6 +2,7 @@ package dev.codedrill.controlplane.workspace
 
 import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
+import dev.codedrill.platform.common.Principal
 import jakarta.validation.constraints.NotBlank
 import java.time.Instant
 import java.util.UUID
@@ -11,15 +12,15 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestHeader
+import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * 초안 API (기술 설계서 §9.2).
+ * 초안 API (기술 설계서 §9.2, §11.4 객체 소유권).
  *
- * 슬라이스에는 로그인이 없다. 사용자 식별은 헤더로 받으며, Identity 모듈이 붙으면
- * 인증 주체에서 가져오도록 바꾼다.
+ * 초안은 사용자별로 키가 잡혀 있어, 호출자만 바로 잡으면 소유권이 저절로 지켜진다.
+ * 호출자는 Identity 가 토큰에서 확인한 주체다 — 자칭한 헤더가 아니다.
  */
 @RestController
 @RequestMapping("/api/v1/workspaces")
@@ -29,9 +30,9 @@ class WorkspaceController(private val service: WorkspaceService) {
     fun get(
         @PathVariable problemId: String,
         @PathVariable language: String,
-        @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
     ): ResponseEntity<DraftResponse> {
-        val draft = service.find(userId, problemId, language.uppercase())
+        val draft = service.find(principal.id, problemId, language.uppercase())
             ?: return ResponseEntity.noContent().build()
         return ResponseEntity.ok(DraftResponse.of(draft))
     }
@@ -39,8 +40,8 @@ class WorkspaceController(private val service: WorkspaceService) {
     /** 최근에 손댄 초안. "이어서 풀기" 목록이 된다. */
     @GetMapping
     fun recent(
-        @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
-    ): List<DraftResponse> = service.recent(userId).map(DraftResponse::of)
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): List<DraftResponse> = service.recent(principal.id).map(DraftResponse::of)
 
     /**
      * 초안 저장 (CAS).
@@ -52,10 +53,10 @@ class WorkspaceController(private val service: WorkspaceService) {
     fun save(
         @PathVariable problemId: String,
         @PathVariable language: String,
-        @RequestHeader(value = "X-User-Id", defaultValue = "demo-user") userId: String,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @RequestBody request: SaveDraftRequest,
     ): ResponseEntity<Any> =
-        when (val outcome = service.save(userId, problemId, language.uppercase(), request.code, request.version)) {
+        when (val outcome = service.save(principal.id, problemId, language.uppercase(), request.code, request.version)) {
             is WorkspaceService.SaveOutcome.Saved ->
                 ResponseEntity.ok(SaveDraftResponse(outcome.version, Instant.now()))
 
