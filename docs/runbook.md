@@ -153,24 +153,39 @@ curl -X POST -H "Authorization: Bearer $PUBLISHER_TOKEN" -H 'Content-Type: appli
 
 재채점은 이미 사용자에게 보여 준 판정을 바꾸는 행위다. 요청과 승인을 다른 사람이 한다.
 
+**먼저 dry-run 으로 무엇이 바뀔지 본다.** 몇 명의 점수가 움직이는지 모르는 채로 대량
+재채점을 돌리지 않는다.
+
 ```bash
-# 1. 요청 (JUDGE_OPERATOR)
+# 1. 요청 (JUDGE_OPERATOR). dryRun 이면 판정을 바꾸지 않고 바뀔 것만 본다
 curl -X POST -H "Authorization: Bearer $JUDGE_OPERATOR_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"scope": "problem:two-sum", "reason": "런타임 이미지 결함으로 SYSTEM_ERROR 다발"}' \
+  -d '{"scope": "problem:two-sum", "reason": "런타임 이미지 결함으로 SYSTEM_ERROR 다발", "dryRun": true}' \
   http://localhost:8080/api/v1/admin/rejudges
 
 # 2. 승인 (REVIEWER, 요청자와 다른 사람)
 curl -X POST -H "Authorization: Bearer $REVIEWER_TOKEN" \
   http://localhost:8080/api/v1/admin/rejudges/<id>/approve
 
-# 3. 대상 확인 — 승인 전에는 비어 있다
+# 3. 실행. 승인만으로는 아무것도 돌지 않는다
+curl -X POST -H "Authorization: Bearer $JUDGE_OPERATOR_TOKEN" \
+  http://localhost:8080/api/v1/admin/rejudges/<id>/dispatch
+
+# 4. 진행과 결과. changes 가 바뀐(또는 바뀔) 판정이다
 curl -H "Authorization: Bearer $JUDGE_OPERATOR_TOKEN" \
-  http://localhost:8080/api/v1/admin/rejudges/<id>/targets
+  http://localhost:8080/api/v1/admin/rejudges/<id>
 ```
 
-**아직 실제 재실행은 붙어 있지 않다.** 승인과 대상 산출까지가 구현돼 있고, 실행은
-아웃박스를 통해 나가야 한다. 지금 재채점이 필요하면 대상 목록을 받아 사람이 다시
-제출하는 것이 유일한 방법이다.
+dry-run 결과가 납득되면 `dryRun` 없이 같은 절차를 한 번 더 돌린다. 요청·승인·실행이
+세 단계인 것은 번거로우라고 둔 것이다 — 되돌릴 수 없는 일은 한 번의 클릭으로
+시작되지 않아야 한다.
+
+**제출은 덮어쓰이지 않는다.** 재채점은 `revision` 을 올리고 이전 판정을 이력에 남긴다
+(§4.2 INV-02). 사용자는 `GET /api/v1/submissions/{id}/judgements` 로 무엇에서 무엇으로
+바뀌었는지 직접 볼 수 있으므로, "왜 점수가 바뀌었나"에 답이 필요하면 그 링크를 준다.
+
+작업이 `RUNNING` 에서 멈춰 있으면 대상 중 일부가 아직 돌아오지 않은 것이다. 큐를 먼저
+보고([queue-lag](#queue-lag)), 큐가 비어 있는데도 멈춰 있으면 [consistency](#consistency)
+의 `stuck_in_flight` 를 확인한다.
 
 ### restore
 
