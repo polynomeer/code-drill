@@ -94,14 +94,35 @@ object SandboxProtocol {
 
     const val DONE = "DONE"
 
-    /** 기대 출력 비교에 쓰는 인코딩. 모든 언어의 하네스가 이 형식으로 값을 찍는다. */
+    /**
+     * 기대 출력 비교에 쓰는 인코딩. 모든 언어의 하네스가 이 형식으로 값을 찍는다.
+     *
+     * **문자열은 Base64 로 싣는다.** 프로토콜은 탭으로 필드를, 쉼표로 배열 원소를
+     * 나누는데 문자열에는 그 둘이 그냥 들어 있을 수 있다. 세 언어에서 똑같이 동작하는
+     * 이스케이프를 만드는 것보다, 구분자가 없는 알파벳으로 옮기는 편이 틀릴 자리가 적다.
+     * 개행과 비ASCII 도 함께 해결된다.
+     */
     fun encode(type: ValueType, value: Any): String = when (type) {
         ValueType.INT -> (value as Number).toInt().toString()
+
         ValueType.INT_ARRAY -> when (value) {
             is List<*> -> value.joinToString(",") { (it as Number).toInt().toString() }
             else -> error("INT_ARRAY 기대값이 배열이 아니다: $value")
         }
+
+        ValueType.STRING -> base64(value as String)
+
+        ValueType.STRING_ARRAY -> when (value) {
+            // 개수를 앞에 둔다. 개수가 없으면 빈 배열과 "빈 문자열 하나짜리 배열"이
+            // 똑같이 빈 필드가 되어 구분할 수 없다.
+            is List<*> -> (listOf(value.size.toString()) + value.map { base64(it as String) })
+                .joinToString(",")
+            else -> error("STRING_ARRAY 기대값이 배열이 아니다: $value")
+        }
     }
+
+    fun base64(value: String): String =
+        java.util.Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
 }
 
 /** 계측 SDK 가 모드에 따라 다른 구현으로 컴파일된다는 사실만 공유한다 (§7.1). */
@@ -153,7 +174,9 @@ fun parseTraceEvent(line: String): dev.codedrill.judge.protocol.TraceEvent? {
  * <caseId>  <arg0>  <arg1> ...
  * ```
  *
- * `INT_ARRAY` 는 쉼표로 이은 정수, `INT` 는 10진수다. 빈 배열은 빈 필드다.
+ * `INT` 는 10진수, `INT_ARRAY` 는 쉼표로 이은 정수이며 빈 배열은 빈 필드다.
+ * `STRING` 은 Base64, `STRING_ARRAY` 는 `<개수>,<Base64>,...` 다 — 문자열에는 탭과
+ * 쉼표가 그냥 들어 있을 수 있으므로 구분자가 없는 알파벳으로 옮긴다.
  */
 fun caseFileName(groupId: String): String = "cases_$groupId.txt"
 
@@ -168,10 +191,20 @@ fun encodeCaseLine(
         append('\t')
         when (parameter.type) {
             ValueType.INT -> append((args[index] as Number).toInt())
+
             ValueType.INT_ARRAY -> {
                 @Suppress("UNCHECKED_CAST")
                 val items = args[index] as List<Number>
                 append(items.joinToString(",") { it.toInt().toString() })
+            }
+
+            ValueType.STRING -> append(SandboxProtocol.base64(args[index] as String))
+
+            ValueType.STRING_ARRAY -> {
+                @Suppress("UNCHECKED_CAST")
+                val items = args[index] as List<String>
+                append(items.size)
+                items.forEach { append(',').append(SandboxProtocol.base64(it)) }
             }
         }
     }

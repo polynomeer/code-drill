@@ -139,6 +139,7 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
     }
 
     private fun harness(signature: Signature): String = buildString {
+        appendLine("import base64")
         appendLine("import io")
         appendLine("import os")
         appendLine("import resource")
@@ -164,14 +165,47 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
         appendLine("USER_OUT = Counting()")
         appendLine()
         appendLine("")
-        appendLine("def encode(value):")
-        appendLine("    if isinstance(value, (list, tuple)):")
-        appendLine("        return \",\".join(str(int(v)) for v in value)")
+        // 파이썬은 타입을 값에서 추론할 수 있지만 그러지 않는다. 사용자가 int 를
+        // 돌려줘야 할 자리에 문자열을 돌려주면 조용히 다른 형식으로 찍혀, 오답이
+        // "형식이 달라 틀렸다"가 아니라 "값이 틀렸다"로 보인다.
+        appendLine("def b64(value):")
+        appendLine("    return base64.b64encode(str(value).encode(\"utf-8\")).decode(\"ascii\")")
+        appendLine()
+        appendLine("")
+        appendLine("def encode_int(value):")
         appendLine("    return str(int(value))")
+        appendLine()
+        appendLine("")
+        appendLine("def encode_ints(value):")
+        appendLine("    return \",\".join(str(int(v)) for v in value)")
+        appendLine()
+        appendLine("")
+        appendLine("def encode_str(value):")
+        appendLine("    return b64(value)")
+        appendLine()
+        appendLine("")
+        appendLine("def encode_strs(value):")
+        appendLine("    items = list(value)")
+        appendLine("    return \",\".join([str(len(items))] + [b64(v) for v in items])")
         appendLine()
         appendLine("")
         appendLine("def ints(field):")
         appendLine("    return [int(x) for x in field.split(\",\")] if field else []")
+        appendLine()
+        appendLine("")
+        appendLine("def text(field):")
+        appendLine("    return base64.b64decode(field).decode(\"utf-8\")")
+        appendLine()
+        appendLine("")
+        appendLine("def texts(field):")
+        appendLine("    parts = field.split(\",\")")
+        appendLine("    count = int(parts[0])")
+        appendLine("    return [text(p) for p in parts[1:1 + count]]")
+        appendLine()
+        appendLine("")
+        // 반환 타입은 시그니처가 정한다. 값에서 추론하면 사용자가 엉뚱한 타입을 돌려줬을 때
+        // 조용히 다른 형식으로 찍혀, 형식 불일치가 값 오류로 보인다.
+        appendLine("encoder = ${encoder(signature.returns)}")
         appendLine()
         appendLine("")
         appendLine("def run_case(case_id, body):")
@@ -179,7 +213,7 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
         appendLine("    PROTOCOL.flush()")
         appendLine("    started = time.perf_counter()")
         appendLine("    try:")
-        appendLine("        outcome = \"OK\\t\" + encode(body())")
+        appendLine("        outcome = \"OK\\t\" + encoder(body())")
         appendLine("    except BaseException as error:")
         appendLine("        outcome = \"ERROR\\t\" + type(error).__module__ + \".\" + type(error).__name__")
         appendLine("    elapsed_ms = int((time.perf_counter() - started) * 1000)")
@@ -234,9 +268,18 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
             when (parameter.type) {
                 ValueType.INT -> "int(f[${index + 1}])"
                 ValueType.INT_ARRAY -> "ints(f[${index + 1}])"
+                ValueType.STRING -> "text(f[${index + 1}])"
+                ValueType.STRING_ARRAY -> "texts(f[${index + 1}])"
             }
         }
         return "${signature.name}(${args.joinToString(", ")})"
+    }
+
+    private fun encoder(returns: ValueType) = when (returns) {
+        ValueType.INT -> "encode_int"
+        ValueType.INT_ARRAY -> "encode_ints"
+        ValueType.STRING -> "encode_str"
+        ValueType.STRING_ARRAY -> "encode_strs"
     }
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

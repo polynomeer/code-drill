@@ -122,7 +122,9 @@ class ExecutionEngine(
                 onPhase("execute", request.language, "fatal", System.nanoTime() - executeStart)
                 return terminal(request, Verdict.COMPILE_ERROR, it, reason = null)
             }
-            results += toCaseResults(run, group, request.limits.outputBytes)
+            results += toCaseResults(
+                run, group, request.limits.outputBytes, request.signature.returns,
+            )
         }
         onPhase("execute", request.language, request.mode.name.lowercase(), System.nanoTime() - executeStart)
 
@@ -171,7 +173,9 @@ class ExecutionEngine(
             onEvent = { _, line -> parseTraceEvent(line)?.let(events::add) },
         ) { caseId, outcome ->
             // 기대 출력은 샌드박스에 넘기지 않으므로 정답 비교는 여기서만 일어난다.
-            val passed = verdictOf(outcome, byId.getValue(caseId), outputLimit) == Verdict.ACCEPTED
+            val passed =
+                verdictOf(outcome, byId.getValue(caseId), outputLimit, request.signature.returns) ==
+                    Verdict.ACCEPTED
             passed || group.policy.stopPolicy != StopPolicy.FAIL_FAST
         }
     }
@@ -180,6 +184,13 @@ class ExecutionEngine(
         run: SandboxRun,
         group: RequestedGroup,
         outputLimit: Long,
+        /**
+         * 기대 출력의 타입은 **시그니처가 정한다.**
+         *
+         * 기대값의 JSON 모양에서 추론하면 문자열과 정수를 구분할 수 없고, 무엇보다
+         * 문제가 무엇을 돌려주기로 했는지는 manifest 에 이미 적혀 있다.
+         */
+        returns: ValueType,
     ): List<TestCaseResult> {
         val byId = group.cases.associateBy { it.qualifiedId() }
         return run.outcomes.mapNotNull { (caseId, outcome) ->
@@ -189,7 +200,7 @@ class ExecutionEngine(
             TestCaseResult(
                 caseId = case.id,
                 groupId = case.groupId,
-                verdict = verdictOf(outcome, case, outputLimit),
+                verdict = verdictOf(outcome, case, outputLimit, returns),
                 measurements = measurementsOf(outcome),
                 message = messageOf(outcome, group.policy.exposesInput),
             )
@@ -197,13 +208,18 @@ class ExecutionEngine(
     }
 
     /** 기대 출력과 실제 출력을 맞춘다 (§5.3 check). 기본 checker 는 정확 일치다. */
-    private fun verdictOf(outcome: CaseOutcome, case: TestCase, outputLimit: Long): Verdict =
+    private fun verdictOf(
+        outcome: CaseOutcome,
+        case: TestCase,
+        outputLimit: Long,
+        returns: ValueType,
+    ): Verdict =
         when (outcome) {
             is CaseOutcome.Completed -> when {
                 // 출력 한도 초과는 정답 여부보다 먼저 판정한다. 한도를 넘긴 실행은 결과를
                 // 신뢰할 수 없다.
                 outcome.userOutputBytes > outputLimit -> Verdict.OUTPUT_LIMIT
-                outcome.output == SandboxProtocol.encode(case.expectedType(), case.expected) ->
+                outcome.output == SandboxProtocol.encode(returns, case.expected) ->
                     Verdict.ACCEPTED
                 else -> Verdict.WRONG_ANSWER
             }
@@ -324,6 +340,3 @@ class ExecutionEngine(
     }
 }
 
-/** 기대 출력의 타입. 시그니처 반환 타입과 같다. */
-private fun TestCase.expectedType() =
-    if (expected is List<*>) ValueType.INT_ARRAY else ValueType.INT

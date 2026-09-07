@@ -137,8 +137,15 @@ class KotlinAdapter(
         appendLine()
         appendLine("private val __cdUserOut = __cdCounting()")
         appendLine()
-        appendLine("private fun __cdEncode(v: IntArray): String = v.joinToString(\",\")")
-        appendLine("private fun __cdEncode(v: Int): String = v.toString()")
+        // 반환 타입마다 이름을 다르게 둔다. 오버로드로 두면 사용자 함수의 반환 타입이
+        // 조금만 달라도 해소가 흔들리고, 그 실패는 사용자에게 컴파일 오류로 보인다.
+        appendLine("private fun __cdB64(v: String): String =")
+        appendLine("    java.util.Base64.getEncoder().encodeToString(v.toByteArray(Charsets.UTF_8))")
+        appendLine("private fun __cdEncodeInt(v: Int): String = v.toString()")
+        appendLine("private fun __cdEncodeInts(v: IntArray): String = v.joinToString(\",\")")
+        appendLine("private fun __cdEncodeStr(v: String): String = __cdB64(v)")
+        appendLine("private fun __cdEncodeStrs(v: Array<String>): String =")
+        appendLine("    (listOf(v.size.toString()) + v.map { __cdB64(it) }).joinToString(\",\")")
         appendLine()
         appendLine("private fun __cdCase(id: String, body: () -> String) {")
         // START 를 먼저 흘려보내야, 데드라인으로 프로세스를 죽여도 어느 케이스에서
@@ -165,6 +172,15 @@ class KotlinAdapter(
         appendLine("    if (field.isEmpty()) IntArray(0)")
         appendLine("    else field.split(\",\").map { it.toInt() }.toIntArray()")
         appendLine()
+        appendLine("private fun __cdStr(field: String): String =")
+        appendLine("    String(java.util.Base64.getDecoder().decode(field), Charsets.UTF_8)")
+        appendLine()
+        appendLine("private fun __cdStrs(field: String): Array<String> {")
+        appendLine("    val parts = field.split(\",\")")
+        appendLine("    val count = parts[0].toInt()")
+        appendLine("    return Array(count) { __cdStr(parts[it + 1]) }")
+        appendLine("}")
+        appendLine()
         appendLine("fun main(args: Array<String>) {")
         appendLine("    val group = args[0]")
         appendLine("    val dir = java.io.File(args[1])")
@@ -173,7 +189,7 @@ class KotlinAdapter(
         appendLine("    for (line in lines) {")
         appendLine("        if (line.isEmpty()) continue")
         appendLine("        val f = line.split('\\t')")
-        appendLine("        __cdCase(f[0]) { __cdEncode(" + call(signature) + ") }")
+        appendLine("        __cdCase(f[0]) { ${encoder(signature.returns)}(" + call(signature) + ") }")
         appendLine("    }")
         appendLine("    __cdProtocol.println(\"${SandboxProtocol.DONE}\")")
         appendLine("    __cdProtocol.flush()")
@@ -183,12 +199,22 @@ class KotlinAdapter(
     /** 시그니처대로 필드를 풀어 사용자 함수를 부르는 표현식. */
     private fun call(signature: Signature): String {
         val args = signature.parameters.mapIndexed { index, parameter ->
+            val field = "f[${index + 1}]"
             when (parameter.type) {
-                ValueType.INT -> "f[${index + 1}].toInt()"
-                ValueType.INT_ARRAY -> "__cdInts(f[${index + 1}])"
+                ValueType.INT -> "$field.toInt()"
+                ValueType.INT_ARRAY -> "__cdInts($field)"
+                ValueType.STRING -> "__cdStr($field)"
+                ValueType.STRING_ARRAY -> "__cdStrs($field)"
             }
         }
         return "${signature.name}(${args.joinToString(", ")})"
+    }
+
+    private fun encoder(returns: ValueType) = when (returns) {
+        ValueType.INT -> "__cdEncodeInt"
+        ValueType.INT_ARRAY -> "__cdEncodeInts"
+        ValueType.STRING -> "__cdEncodeStr"
+        ValueType.STRING_ARRAY -> "__cdEncodeStrs"
     }
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

@@ -162,6 +162,7 @@ class JavaAdapter : RuntimeAdapter {
         appendLine("import java.nio.file.Files;")
         appendLine("import java.nio.file.Paths;")
         appendLine("import java.util.Arrays;")
+        appendLine("import java.util.Base64;")
         appendLine("import java.util.List;")
         appendLine("import java.util.stream.Collectors;")
         appendLine()
@@ -179,17 +180,43 @@ class JavaAdapter : RuntimeAdapter {
         appendLine("        @Override public void write(byte[] b, int off, int len) { total += len; }")
         appendLine("    }")
         appendLine()
-        appendLine("    private static String encode(int[] v) {")
+        appendLine("    private static String b64(String v) {")
+        appendLine("        return Base64.getEncoder().encodeToString(v.getBytes(StandardCharsets.UTF_8));")
+        appendLine("    }")
+        appendLine()
+        // 반환 타입마다 이름을 다르게 둔다. 오버로드로 두면 사용자 메서드의 반환 타입이
+        // 조금만 달라도 해소가 흔들리고, 그 실패는 사용자에게 컴파일 오류로 보인다.
+        appendLine("    private static String encodeInt(int v) { return Integer.toString(v); }")
+        appendLine()
+        appendLine("    private static String encodeInts(int[] v) {")
         appendLine("        return Arrays.stream(v).mapToObj(Integer::toString).collect(Collectors.joining(\",\"));")
         appendLine("    }")
         appendLine()
-        appendLine("    private static String encode(int v) { return Integer.toString(v); }")
+        appendLine("    private static String encodeStr(String v) { return b64(v); }")
+        appendLine()
+        appendLine("    private static String encodeStrs(String[] v) {")
+        appendLine("        StringBuilder out = new StringBuilder().append(v.length);")
+        appendLine("        for (String item : v) out.append(',').append(b64(item));")
+        appendLine("        return out.toString();")
+        appendLine("    }")
         appendLine()
         appendLine("    private static int[] ints(String field) {")
         appendLine("        if (field.isEmpty()) return new int[0];")
         appendLine("        String[] parts = field.split(\",\");")
         appendLine("        int[] out = new int[parts.length];")
         appendLine("        for (int i = 0; i < parts.length; i++) out[i] = Integer.parseInt(parts[i]);")
+        appendLine("        return out;")
+        appendLine("    }")
+        appendLine()
+        appendLine("    private static String str(String field) {")
+        appendLine("        return new String(Base64.getDecoder().decode(field), StandardCharsets.UTF_8);")
+        appendLine("    }")
+        appendLine()
+        appendLine("    private static String[] strs(String field) {")
+        appendLine("        String[] parts = field.split(\",\", -1);")
+        appendLine("        int count = Integer.parseInt(parts[0]);")
+        appendLine("        String[] out = new String[count];")
+        appendLine("        for (int i = 0; i < count; i++) out[i] = str(parts[i + 1]);")
         appendLine("        return out;")
         appendLine("    }")
         appendLine()
@@ -223,7 +250,7 @@ class JavaAdapter : RuntimeAdapter {
         appendLine("        for (String line : lines) {")
         appendLine("            if (line.isEmpty()) continue;")
         appendLine("            String[] f = line.split(\"\\\\t\", -1);")
-        appendLine("            runCase(f[0], () -> encode(" + call(signature) + "));")
+        appendLine("            runCase(f[0], () -> ${encoder(signature.returns)}(" + call(signature) + "));")
         appendLine("        }")
         appendLine("        PROTOCOL.println(\"${SandboxProtocol.DONE}\");")
         appendLine("        PROTOCOL.flush();")
@@ -237,9 +264,18 @@ class JavaAdapter : RuntimeAdapter {
             when (parameter.type) {
                 ValueType.INT -> "Integer.parseInt(f[${index + 1}])"
                 ValueType.INT_ARRAY -> "ints(f[${index + 1}])"
+                ValueType.STRING -> "str(f[${index + 1}])"
+                ValueType.STRING_ARRAY -> "strs(f[${index + 1}])"
             }
         }
         return "solution.${signature.name}(${args.joinToString(", ")})"
+    }
+
+    private fun encoder(returns: ValueType) = when (returns) {
+        ValueType.INT -> "encodeInt"
+        ValueType.INT_ARRAY -> "encodeInts"
+        ValueType.STRING -> "encodeStr"
+        ValueType.STRING_ARRAY -> "encodeStrs"
     }
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
