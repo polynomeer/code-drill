@@ -46,8 +46,14 @@ class AttemptRegistry(
     /**
      * 새 실행을 임대한다. 같은 제출을 다시 임대하면 attempt 와 토큰이 함께 올라가고,
      * 이전 임대는 그 순간 무효가 된다.
+     *
+     * **지난 완료 기록을 지운다.** 중복 판정은 "같은 실행의 결과가 두 번 왔다"를 잡는
+     * 장치이지, "이 제출은 이미 채점됐다"를 뜻하지 않는다. 지우지 않으면 재채점 결과가
+     * 지난 판정과 내용이 같을 때 — 재채점에서는 흔한 일이다 — 중복으로 오해받아 조용히
+     * 버려지고, 결과를 기다리던 재채점은 영영 끝나지 않는다.
      */
     fun lease(submissionId: String): Lease {
+        completed.remove(submissionId)
         val next = active.compute(submissionId) { _, previous ->
             val attempt = (previous?.attempt ?: 0) + 1
             Lease(

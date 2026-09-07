@@ -180,6 +180,29 @@ class LeaseRecoveryTest {
     }
 
     @Test
+    fun `다시 임대하면 지난 판정과 내용이 같아도 받아들인다`() {
+        val world = World()
+        world.queue()
+        world.pickUp()
+        val first = world.gateway.requests.single()
+        world.coordinator.onExecutionResult(world.resultOf(first), first.correlationId)
+        assertEquals(1, world.gateway.completed.size)
+
+        // 재채점. 같은 코드를 다시 돌리므로 결과 digest 도 같다 — 재채점에서는 흔한 일이다.
+        world.queue()
+        val again = world.gateway.requests.last()
+        world.coordinator.onExecutionResult(
+            world.resultOf(again).copy(resultDigest = world.resultOf(first).resultDigest),
+            again.correlationId,
+        )
+
+        assertEquals(
+            2, world.gateway.completed.size,
+            "중복 판정은 같은 실행의 재전달을 잡는 장치이지, 재채점을 막는 장치가 아니다",
+        )
+    }
+
+    @Test
     fun `결과가 온 실행은 회수 대상이 아니다`() {
         val world = World()
         world.queue()
