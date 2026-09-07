@@ -37,3 +37,7 @@ content/reports/
 
 # Claude Code (개인 로컬 설정은 커밋하지 않음)
 .claude/settings.local.json
+
+# Python 캐시. 스크립트를 import 한 흔적이지 산출물이 아니다.
+__pycache__/
+*.pyc
