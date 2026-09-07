@@ -266,10 +266,17 @@ def catalog() -> list[Problem]:
     바로 import 하면 순환이 된다.
     """
     import catalog_arrays
+    import catalog_dp
+    import catalog_graph
+    import catalog_math
+    import catalog_search
     import catalog_stack
 
     problems: list[Problem] = []
-    for module in (catalog_arrays, catalog_stack):
+    for module in (
+        catalog_arrays, catalog_dp, catalog_graph,
+        catalog_math, catalog_search, catalog_stack,
+    ):
         problems += module.PROBLEMS
 
     ids = [p.id for p in problems]

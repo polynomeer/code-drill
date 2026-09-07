@@ -262,10 +262,10 @@ def main() -> int:
     results.append(check("문제 목록은 공개", status, 200))
 
     print("문제 조회")
-    problems = request("GET", "/problems")["items"]
+    # 한 페이지 크기보다 문제가 많다. 목록을 통째로 고정하면 문제를 추가할 때마다
+    # 스모크가 깨지므로, 이 스모크가 실제로 쓰는 문제들이 있는지만 본다.
+    problems = request("GET", "/problems?limit=100")["items"]
     slugs = sorted(p["id"] for p in problems)
-    # 목록을 통째로 고정하면 문제를 추가할 때마다 스모크가 깨진다. 이 스모크가 실제로
-    # 쓰는 문제들이 들어 있는지만 본다.
     results.append(check("문제 목록", set(REQUIRED_PROBLEMS) <= set(slugs), True))
     detail = request("GET", "/problems/two-sum")
     results.append(check("공개 샘플 수", len(detail["samples"]), 2))
@@ -341,8 +341,14 @@ def main() -> int:
 
     print("\n문제 목록·제출 기록 (§9.1 cursor)")
     needle = urllib.parse.quote("부분")
-    page = request("GET", f"/problems?query={needle}")
-    results.append(check("제목 검색", [p["id"] for p in page["items"]], ["max-subarray"]))
+    page = request("GET", f"/problems?query={needle}&limit=100")
+    found = [p["id"] for p in page["items"]]
+    # 결과 목록을 통째로 고정하지 않는다. 제목에 같은 말이 든 문제를 추가할 때마다
+    # 깨지고, 그건 검색이 고장난 것이 아니다.
+    results.append(check("제목 검색이 찾는다", "max-subarray" in found, True))
+    results.append(
+        check("  결과가 전부 질의를 담는다", all("부분" in p["title"] for p in page["items"]), True)
+    )
 
     first = request("GET", "/problems?limit=1")
     results.append(check("limit 반영", len(first["items"]), 1))
@@ -439,7 +445,7 @@ def main() -> int:
 
     # 공개된 문제만 목록에 나온다. 디렉터리에 파일을 놓는 것만으로 공개되면 §6.3 검증과
     # §11.2 승인이 모두 우회된다.
-    listed = [p["id"] for p in request("GET", "/problems")["items"]]
+    listed = [p["id"] for p in request("GET", "/problems?limit=100")["items"]]
     results.append(check("공개된 문제만 목록에", pid not in listed, True))
     results.append(check("  검증·공개된 문제는 보인다", "two-sum" in listed, True))
 

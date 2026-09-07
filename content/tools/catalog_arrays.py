@@ -776,3 +776,161 @@ fun countSubarrays(nums: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 30. 0 을 k 개까지 뒤집어 만든 최장 1 구간 -------------------------------
+
+def _longest_ones(bits, k):
+    left = 0
+    zeros = 0
+    best = 0
+    for right, bit in enumerate(bits):
+        if bit == 0:
+            zeros += 1
+        while zeros > k:
+            if bits[left] == 0:
+                zeros -= 1
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="longest-ones-after-flip",
+    title="0을 k개까지 뒤집어 만든 최장 1 구간",
+    summary="""
+`0` 과 `1` 로만 이루어진 배열 `bits` 와 정수 `k` 가 주어진다. `0` 을 **최대 `k` 개까지**
+`1` 로 바꿀 수 있을 때, 만들 수 있는 가장 긴 연속 `1` 구간의 길이를 반환한다.
+""",
+    notes="""
+어떤 0 을 뒤집을지 고르는 문제가 아니라, **0 을 k 개 이하로 품는 가장 긴 창**을 찾는
+문제다. 창의 왼쪽 끝은 되돌아가지 않으므로 한 번 훑기로 끝난다.
+""",
+    drill_doc="""
+Drill.pointer("left", left)   // 창의 왼쪽
+Drill.pointer("right", right) // 창의 오른쪽
+Drill.write(0, best)          // 지금까지의 최장 길이
+""",
+    constraints="""
+- `1 <= bits.size <= 200_000`
+- `bits[i]` 는 `0` 또는 `1`
+- `0 <= k <= bits.size`
+""",
+    signature=dict(name="longestOnes", parameters=[("bits", "INT_ARRAY"), ("k", "INT")],
+                   returns="INT"),
+    groups=perf_groups(),
+    reference=_longest_ones,
+    cases={
+        "sample": [
+            ("01", [[1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0], 2]),
+            ("02", [[0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1], 3]),
+        ],
+        "boundary": [
+            # 뒤집을 수 없다. 원래 있는 1 구간이 답이다.
+            ("01-k-zero", [[1, 1, 0, 1, 1, 1], 0]),
+            # 전부 뒤집을 수 있다. 배열 전체가 답이다.
+            ("02-k-covers-all", [[0, 0, 0], 3]),
+            ("03-all-ones", [[1, 1, 1], 1]),
+            ("04-all-zeros-limited", [[0, 0, 0, 0], 2]),
+            ("05-single-zero", [[0], 0]),
+            ("06-single-one", [[1], 0]),
+            # 답이 맨 끝에서 끝난다. 창을 끝까지 재지 않으면 놓친다.
+            ("07-best-at-tail", [[0, 0, 1, 1, 1, 1], 1]),
+        ],
+        "hidden": [
+            ("01-alternating", [[i % 2 for i in range(40)], 5]),
+            ("02-sparse-zeros", [[0 if i % 17 == 0 else 1 for i in range(200)], 3]),
+            ("03-blocks", [[1] * 10 + [0] * 5 + [1] * 12 + [0] * 2 + [1] * 8, 4]),
+        ],
+        # 창의 왼쪽을 매번 처음부터 다시 미는 풀이는 O(n*k) 가 된다.
+        "performance": [
+            ("01-small", [[v % 2 for v in randoms(3000, 0, 9, salt=111)], 50]),
+            ("02-medium", [[1 if v > 2 else 0 for v in randoms(50000, 0, 9, salt=112)], 500]),
+            ("03-large", [[1 if v > 0 else 0 for v in randoms(200000, 0, 9, salt=113)], 5000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 슬라이딩 윈도우.
+//
+// 창이 품은 0 의 개수가 k 를 넘으면 왼쪽을 민다. 왼쪽 끝이 되돌아가지 않으므로 두
+// 포인터를 합쳐도 배열을 한 번 훑는 것과 같다.
+//
+// 답을 매번 갱신하는 것이 아니라 "지금 창의 길이"로 재는 것이 요령이다. 창은 절대
+// 줄어들지 않으므로 마지막 길이가 곧 최댓값이 되는 구현도 가능하지만, 여기서는
+// 읽기 쉬운 쪽을 골랐다.
+fun longestOnes(bits: IntArray, k: Int): Int {
+    var left = 0
+    var zeros = 0
+    var best = 0
+
+    for (right in bits.indices) {
+        if (bits[right] == 0) zeros += 1
+        Drill.pointer("right", right)
+
+        while (zeros > k) {
+            if (bits[left] == 0) zeros -= 1
+            left += 1
+            Drill.pointer("left", left)
+        }
+
+        val length = right - left + 1
+        if (length > best) {
+            best = length
+            Drill.write(0, best)
+        }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("counts-ones-only--ignores-flips", "MISSING_EDGE_CASE",
+         "이미 1 인 구간만 재고 뒤집기를 쓰지 않는다.",
+         """
+fun longestOnes(bits: IntArray, k: Int): Int {
+    var best = 0
+    var run = 0
+    for (bit in bits) {
+        run = if (bit == 1) run + 1 else 0
+        if (run > best) best = run
+    }
+    return best
+}
+"""),
+        ("off-by-one--window-too-short", "OFF_BY_ONE",
+         "창의 길이를 한 칸 짧게 센다.",
+         """
+fun longestOnes(bits: IntArray, k: Int): Int {
+    var left = 0
+    var zeros = 0
+    var best = 0
+    for (right in bits.indices) {
+        if (bits[right] == 0) zeros += 1
+        while (zeros > k) {
+            if (bits[left] == 0) zeros -= 1
+            left += 1
+        }
+        val length = right - left
+        if (length > best) best = length
+    }
+    return best
+}
+"""),
+        ("restart-left--quadratic", "PERFORMANCE",
+         "창이 넘칠 때마다 왼쪽을 처음부터 다시 민다. 작은 입력은 통과한다.",
+         """
+fun longestOnes(bits: IntArray, k: Int): Int {
+    var best = 0
+    for (start in bits.indices) {
+        var zeros = 0
+        for (end in start until bits.size) {
+            if (bits[end] == 0) zeros += 1
+            if (zeros > k) break
+            val length = end - start + 1
+            if (length > best) best = length
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

@@ -14,6 +14,7 @@
 | [running-locally.md](running-locally.md) | 내 머신에서 어떻게 띄우고 확인하는가 | 에이전트·기여자 |
 | [runbook.md](runbook.md) | 경보가 울리면 무엇을 보고 무엇을 하는가 | 당번·에이전트 |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | 사람이 처음 무엇을 읽고 설정하는가 | 사람 기여자 |
+| [../content/tools/README.md](../content/tools/README.md) | 문제 패키지를 어떻게 만들고 다시 뽑나 | 문제를 추가할 때 |
 | [specs/](specs/) | 제품·기술·디자인 결정의 원본은 어디 있나 | 상세가 필요할 때 |
 | [archive/](archive/) | 예전 규칙은 무엇이었나 | 이력 추적 시에만 |
 
@@ -57,6 +58,7 @@
 | 에이전트 작업 절차가 바뀜 (커밋·브랜치·검증 방식) | `CLAUDE.md` |
 | 커밋 type·형식 규칙이 바뀜 | `commit-convention.md`, `.gitmessage` |
 | 경보 규칙이 늘거나 복구 절차가 바뀜 | `runbook.md` |
+| 문제 저작 절차나 패키지 스키마가 바뀜 | `content/tools/README.md` |
 | SLO 목표값이 바뀜 | `deploy/observability/alerts.yml` (문서에 옮겨 적지 않는다) |
 | 스택 선택, 모듈 경계, 도메인 용어가 바뀜 | `project-context.md` |
 | 기획 `.docx`가 개정됨 | `project-context.md`에서 어긋난 항목만 |

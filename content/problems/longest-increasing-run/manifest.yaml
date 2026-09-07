@@ -1,0 +1,43 @@
+# Problem Package manifest (기술 설계서 §6.1).
+# 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
+
+id: longest-increasing-run
+version: 1
+title: 최장 증가 부분 수열의 길이
+statement: statement.md
+
+limits:
+  timeMillis: 2000
+  memoryMb: 256
+  outputBytes: 65536
+
+# 함수형 풀이. Runner 가 이 시그니처로 하네스를 생성한다 (§5.3 prepare).
+signature:
+  name: longestIncreasing
+  parameters:
+    - name: nums
+      type: INT_ARRAY
+  returns: INT
+
+# 테스트 그룹 정책 (§6.2). 총점은 weight 합이 100 이어야 한다.
+groups:
+  - id: sample
+    weight: 0
+    visibility: PUBLIC
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: FAIL_FAST
+  - id: boundary
+    weight: 20
+    visibility: HIDDEN
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: CONTINUE
+  - id: hidden
+    weight: 40
+    visibility: HIDDEN
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: CONTINUE
+  - id: performance
+    weight: 40
+    visibility: HIDDEN
+    aggregation: SUM
+    stopPolicy: CONTINUE
