@@ -29,6 +29,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+
+import accounts
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -62,11 +64,15 @@ fun twoSum(nums: IntArray, target: Int): IntArray {
 """
 
 
+# 부하 시험이 쓰는 계정. main() 이 새로 만든다.
+USER: accounts.Account | None = None
+
+
 def request(method: str, path: str, body: dict | None = None, headers: dict | None = None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
     req.add_header("Content-Type", "application/json")
-    for key, value in (headers or {}).items():
+    for key, value in {**(USER.headers if USER else {}), **(headers or {})}.items():
         req.add_header(key, value)
     with urllib.request.urlopen(req, timeout=30) as response:
         return json.loads(response.read())
@@ -189,6 +195,9 @@ def main() -> int:
         print(f"메트릭을 읽지 못했다: {error}")
         print("제어 영역과 오케스트레이터가 둘 다 떠 있어야 한다 (docs/running-locally.md).")
         return 2
+
+    global USER
+    USER = accounts.create("load")
 
     print(f"제출 {args.count}건, 동시 {args.concurrency}명, 문제 {args.problem}")
     print()

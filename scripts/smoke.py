@@ -24,9 +24,14 @@ import urllib.parse
 import urllib.request
 import uuid
 
+import accounts
 import operators
 
 BASE = "http://localhost:8080/api/v1"
+
+# 이 스모크가 쓰는 계정. main() 이 새로 만든다. 제출·초안·기록은 전부 인증을 요구하므로,
+# Authorization 을 따로 주지 않은 요청에는 이 계정의 토큰이 붙는다.
+USER: accounts.Account | None = None
 
 # 이 스모크가 실제로 제출하는 문제들.
 REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count"]
@@ -121,13 +126,23 @@ fun maxSubarray(nums: IntArray): Int {
 """
 
 
+def with_auth(headers: dict | None) -> dict:
+    """호출부가 신원을 지정하지 않았으면 기본 계정으로 보낸다."""
+    merged = dict(headers or {})
+    if USER and not any(k.lower() == "authorization" for k in merged):
+        merged.update(USER.headers)
+    return merged
+
+
 def raw_request(method: str, path: str, body: dict | None = None, headers: dict | None = None):
     """상태 코드까지 봐야 하는 경로용. 409 는 오류가 아니라 결과의 한 종류다."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
     req.add_header("Content-Type", "application/json")
-    for key, value in (headers or {}).items():
-        req.add_header(key, value)
+    for key, value in with_auth(headers).items():
+        # 빈 값은 "이 헤더 없이 보내라"는 뜻이다. 인증 없는 요청을 시험할 때 쓴다.
+        if value != "":
+            req.add_header(key, value)
     try:
         with urllib.request.urlopen(req, timeout=10) as response:
             payload = response.read()
@@ -141,8 +156,10 @@ def request(method: str, path: str, body: dict | None = None, headers: dict | No
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
     req.add_header("Content-Type", "application/json")
-    for key, value in (headers or {}).items():
-        req.add_header(key, value)
+    for key, value in with_auth(headers).items():
+        # 빈 값은 "이 헤더 없이 보내라"는 뜻이다. 인증 없는 요청을 시험할 때 쓴다.
+        if value != "":
+            req.add_header(key, value)
     with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read())
 
@@ -176,6 +193,9 @@ def read_events(submission_id: str, limit: int = 4) -> list[str]:
     """SSE 스트림에서 이벤트 이름을 모은다. 종료 이벤트를 만나면 멈춘다."""
     seen: list[str] = []
     req = urllib.request.Request(f"{BASE}/submissions/{submission_id}/events")
+    # 스트림도 소유자만 열 수 있다 (§11.4). 다른 요청과 같은 토큰을 실어 보낸다.
+    for key, value in with_auth(None).items():
+        req.add_header(key, value)
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as stream:
             for raw in stream:
@@ -220,6 +240,26 @@ def check(label: str, actual, expected) -> bool:
 
 def main() -> int:
     results: list[bool] = []
+
+    global USER
+    USER = accounts.create("smoke")
+    print(f"계정 {USER.display_name} <{USER.email}> 으로 진행한다")
+
+    print("\n인증과 소유권 (§11.2, §11.4)")
+    status, _ = raw_request("GET", "/submissions", None, {"Authorization": ""})
+    results.append(check("토큰 없는 제출 조회 거부", status, 401))
+    status, denied = raw_request(
+        "GET", "/submissions", None, {"Authorization": "Bearer not-a-real-token"},
+    )
+    results.append(check("모르는 토큰 거부", status, 401))
+    results.append(check("  오류 코드", denied["errorCode"], "UNAUTHENTICATED"))
+
+    me = request("GET", "/auth/me")
+    results.append(check("내 정보 조회", me["id"], USER.user_id))
+
+    # 문제 목록은 로그인 없이 열린다. 무엇을 풀 수 있는지 둘러보는 것은 공개 정보다.
+    status, _ = raw_request("GET", "/problems", None, {"Authorization": ""})
+    results.append(check("문제 목록은 공개", status, 200))
 
     print("문제 조회")
     problems = request("GET", "/problems")["items"]
@@ -271,8 +311,8 @@ def main() -> int:
     print(f"        (총점 {slow['score']}, performance {perf['score']}/{perf['maxScore']})")
 
     print("\n초안 자동 저장 CAS (§9.2, §9.4)")
-    user = f"smoke-{uuid.uuid4().hex[:8]}"
-    headers = {"X-User-Id": user}
+    # 초안은 사용자별로 키가 잡혀 있다. 신원은 토큰이 정한다.
+    headers = None
 
     status, saved = raw_request(
         "PUT", "/workspaces/two-sum/KOTLIN", {"code": "fun a() {}", "version": None}, headers
@@ -316,6 +356,28 @@ def main() -> int:
     results.append(check("제출 기록 조회", len(history["items"]) <= 3, True))
     verdicts = [item["verdict"] for item in history["items"]]
     results.append(check("  최신 제출이 먼저", verdicts[0] is not None, True))
+
+    print("\n수평 권한 (§11.4 객체 소유권)")
+    intruder = accounts.create("intruder")
+    mine = submit(ACCEPTED_SOURCE)
+    await_verdict(mine["id"])
+
+    for label, path in [
+        ("제출 조회", f"/submissions/{mine['id']}"),
+        ("판정 이력", f"/submissions/{mine['id']}/judgements"),
+        ("트레이스 목차", f"/submissions/{mine['id']}/trace"),
+        ("상태 스트림", f"/submissions/{mine['id']}/events"),
+    ]:
+        status, _ = raw_request("GET", path, None, intruder.headers)
+        # 403 이 아니라 404 다. "있는데 네 것이 아니다"를 알려 주면 ID 를 훑어
+        # 누가 무엇을 제출했는지 셀 수 있다 (§11.3 비공개 기본).
+        results.append(check(f"남의 {label} 는 없는 것처럼", status, 404))
+
+    others = request("GET", "/submissions", None, intruder.headers)
+    results.append(check("남의 기록은 안 보인다", others["items"], []))
+
+    others_draft = raw_request("GET", "/workspaces/two-sum/KOTLIN", None, intruder.headers)
+    results.append(check("남의 초안도 안 보인다", others_draft[0], 204))
 
     print("\n관리자 API 인증 (§11.2, §11.4)")
     # 등록과 공개를 모두 할 수 있는 계정. 권한이 과하게 열린 계정에서도 2인 승인이

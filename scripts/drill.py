@@ -33,6 +33,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+
+import accounts
 from concurrent.futures import ThreadPoolExecutor
 
 BASE = "http://localhost:8080/api/v1"
@@ -58,11 +60,15 @@ fun twoSum(nums: IntArray, target: Int): IntArray {
 
 # --- 기본 도구 -------------------------------------------------------------
 
+# 훈련이 쓰는 계정. main() 이 새로 만든다.
+USER: accounts.Account | None = None
+
+
 def request(method: str, path: str, body=None, headers=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
     req.add_header("Content-Type", "application/json")
-    for key, value in (headers or {}).items():
+    for key, value in {**(USER.headers if USER else {}), **(headers or {})}.items():
         req.add_header(key, value)
     with urllib.request.urlopen(req, timeout=30) as response:
         payload = response.read()
@@ -252,6 +258,8 @@ def drill_trace_loss(args) -> Drill:
     # 트레이스는 있어도 없어도 된다. 없다는 것이 오류로 나오지 않는 것이 요점이다.
     try:
         req = urllib.request.Request(f"{BASE}/submissions/{submission['id']}/trace")
+        for key, value in (USER.headers if USER else {}).items():
+            req.add_header(key, value)
         with urllib.request.urlopen(req, timeout=10) as response:
             code = response.status
     except urllib.error.HTTPError as error:
@@ -278,8 +286,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    global USER
     try:
         request("GET", "/problems?limit=1")
+        USER = accounts.create("drill")
     except urllib.error.URLError as error:
         print(f"제어 영역에 닿지 못했다: {error}")
         print("세 앱이 떠 있어야 한다 (docs/running-locally.md).")
