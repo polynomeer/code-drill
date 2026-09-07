@@ -14,6 +14,8 @@ spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" 
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+# 비밀번호 해싱만 쓴다. 필터 체인은 우리 인터셉터가 대신하므로 starter 전체는 넣지 않는다.
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
 spring-boot-starter-data-redis = { module = "org.springframework.boot:spring-boot-starter-data-redis" }
 spring-boot-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp" }

@@ -10,6 +10,12 @@ enum class ErrorCode(val category: Category, val retry: Retry) {
     INVALID_SIGNATURE(Category.VALIDATION, Retry.AFTER_FIX),
     SOURCE_TOO_LARGE(Category.VALIDATION, Retry.AFTER_FIX),
 
+    UNAUTHENTICATED(Category.AUTH, Retry.AFTER_FIX),
+    /** 만료된 access token. 클라이언트는 refresh 로 갱신하고 같은 요청을 다시 보낸다. */
+    TOKEN_EXPIRED(Category.AUTH, Retry.AFTER_REFRESH),
+    /** 인증은 됐지만 그 자원의 주인이 아니다. */
+    FORBIDDEN(Category.AUTH, Retry.AFTER_FIX),
+
     LANGUAGE_NOT_ALLOWED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
     QUOTA_EXCEEDED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
 
@@ -23,7 +29,7 @@ enum class ErrorCode(val category: Category, val retry: Retry) {
     ARTIFACT_FETCH_FAILED(Category.PLATFORM, Retry.AUTOMATIC),
     ;
 
-    enum class Category { VALIDATION, POLICY, CONFLICT, JUDGE, PLATFORM }
+    enum class Category { VALIDATION, AUTH, POLICY, CONFLICT, JUDGE, PLATFORM }
 
     /** 재시도 조건. 사용자 수정이 필요한 실패와 플랫폼이 스스로 회복할 실패를 가른다. */
     enum class Retry { AFTER_FIX, AFTER_POLICY_WINDOW, AFTER_REFRESH, AUTOMATIC }
