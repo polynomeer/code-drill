@@ -19,7 +19,25 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class AttemptRegistry(
     private val clock: Clock = Clock.systemUTC(),
+    /**
+     * 워커가 실행을 집어 든 뒤, 다음 심장 박동까지 기다리는 시간.
+     *
+     * 실행이 이보다 오래 걸려도 괜찮다 — 워커가 계속 박동을 보내는 한 임대는 연장된다.
+     * 이 값이 재는 것은 실행 시간이 아니라 **워커의 생존**이다.
+     */
     private val leaseDuration: Duration = Duration.ofMinutes(2),
+    /**
+     * 임대해 놓고 아무 워커도 집어 들지 않은 채로 기다리는 한계.
+     *
+     * 브로커 큐에서 차례를 기다리는 시간은 워커 유실이 아니다. 그래서 [leaseDuration]
+     * 과 따로 둔다 — 둘을 같은 값으로 묶으면, 큐가 밀렸을 뿐인 멀쩡한 제출이 유실로
+     * 오해받아 다시 돌고 결국 SYSTEM_ERROR 로 끝난다.
+     *
+     * 그렇다고 무한정 기다리지는 않는다. Runner 가 하나도 없으면 제출은 영영 끝나지
+     * 않고, 사용자에게도 대시보드에도 아무것도 드러나지 않는다. 이 한계를 넘는 것은
+     * 용량 문제이며 §10.2 backpressure 로 다뤄야 한다는 신호다.
+     */
+    private val dispatchTimeout: Duration = Duration.ofMinutes(10),
 ) {
 
     private val active = ConcurrentHashMap<String, Lease>()
@@ -36,7 +54,9 @@ class AttemptRegistry(
                 submissionId = submissionId,
                 attempt = attempt,
                 token = FencingToken((previous?.token?.value ?: 0) + 1),
-                expiresAt = clock.instant().plus(leaseDuration),
+                // 아직 아무도 집어 들지 않았다. 여기서부터는 큐 대기이지 실행이 아니다.
+                expiresAt = clock.instant().plus(dispatchTimeout),
+                started = false,
             )
         }
         return checkNotNull(next)
@@ -58,6 +78,24 @@ class AttemptRegistry(
     fun expired(): List<String> {
         val now = clock.instant()
         return active.values.filter { now.isAfter(it.expiresAt) }.map { it.submissionId }
+    }
+
+    /**
+     * 임대를 연장한다 (§4.3).
+     *
+     * 실행을 집어 든 워커가 살아 있다고 알려 올 때만 부른다. 토큰이 현재 임대와 다르면
+     * 연장하지 않는다 — 이미 무효가 된 워커가 자기 임대를 살려 두면, 재실행된 새 워커와
+     * 둘이 같은 제출을 붙들고 있게 된다.
+     */
+    fun renew(submissionId: String, token: FencingToken): Boolean {
+        val renewed = active.computeIfPresent(submissionId) { _, lease ->
+            if (lease.token != token) {
+                lease
+            } else {
+                lease.copy(expiresAt = clock.instant().plus(leaseDuration), started = true)
+            }
+        }
+        return renewed != null && renewed.token == token
     }
 
     /**
@@ -104,6 +142,8 @@ class AttemptRegistry(
         val attempt: Int,
         val token: FencingToken,
         val expiresAt: Instant,
+        /** 워커가 집어 들었는지. 만료의 의미가 이 값에 따라 달라진다. */
+        val started: Boolean = false,
     )
 
     private companion object {

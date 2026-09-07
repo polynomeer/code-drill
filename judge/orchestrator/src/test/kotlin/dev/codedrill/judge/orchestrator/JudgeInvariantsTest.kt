@@ -163,7 +163,7 @@ class JudgeInvariantsTest {
     }
 
     @Test
-    fun `임대는 시간이 지나면 만료된다`() {
+    fun `임대는 워커가 집어 든 뒤부터 시간을 잰다`() {
         val start = Instant.parse("2026-09-05T00:00:00Z")
         var now = start
         val registry = AttemptRegistry(
@@ -173,13 +173,20 @@ class JudgeInvariantsTest {
                 override fun instant() = now
             },
             leaseDuration = Duration.ofSeconds(30),
+            dispatchTimeout = Duration.ofMinutes(5),
         )
 
-        registry.lease(SUBMISSION)
+        val lease = registry.lease(SUBMISSION)
         assertTrue(!registry.isExpired(SUBMISSION), "방금 임대한 실행은 살아 있다")
 
+        // 아직 아무도 집어 들지 않았다. 이 구간은 큐 대기이지 워커 유실이 아니다.
         now = start.plusSeconds(31)
-        assertTrue(registry.isExpired(SUBMISSION), "임대 시간이 지나면 회수 대상이다")
+        assertTrue(!registry.isExpired(SUBMISSION), "큐에서 기다린 시간은 임대를 소모하지 않는다")
+
+        // 워커가 집어 들었다. 이제부터 만료는 "워커가 죽었다"를 뜻한다.
+        registry.renew(SUBMISSION, lease.token)
+        now = start.plusSeconds(62)
+        assertTrue(registry.isExpired(SUBMISSION), "심장 박동이 끊기면 회수 대상이다")
     }
 
     // --- 픽스처 ---

@@ -1,6 +1,7 @@
 package dev.codedrill.judge.orchestrator.messaging
 
 import dev.codedrill.judge.orchestrator.JudgeCoordinator
+import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
@@ -22,4 +23,7 @@ class JudgeListeners(private val coordinator: JudgeCoordinator) {
     @RabbitListener(queues = [JudgeQueues.RESULTS])
     fun onResult(result: ExecutionResult) =
         coordinator.onExecutionResult(result, correlationId = result.executionId)
+
+    @RabbitListener(queues = [JudgeQueues.HEARTBEATS])
+    fun onHeartbeat(heartbeat: ExecutionHeartbeat) = coordinator.onHeartbeat(heartbeat)
 }

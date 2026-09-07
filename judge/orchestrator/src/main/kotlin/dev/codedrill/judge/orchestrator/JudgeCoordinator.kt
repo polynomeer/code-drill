@@ -5,6 +5,7 @@ import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
 import dev.codedrill.judge.protocol.CompletedGroup
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
@@ -208,6 +209,24 @@ class JudgeCoordinator(
                 },
             ),
         )
+    }
+
+    /**
+     * Runner 가 실행을 붙들고 있다고 알려 왔다 (§4.3).
+     *
+     * 임대 만료가 뜻해야 하는 것은 "워커가 죽었다" 하나다. 브로커 큐에서 차례를
+     * 기다리는 시간까지 임대에 들어가면, 밀린 것뿐인 멀쩡한 실행이 유실로 오해받아
+     * 다시 돌고 결국 SYSTEM_ERROR 로 끝난다. 부하가 걸릴 때만 판정이 틀어지는 셈이라
+     * 평소 테스트로는 드러나지 않는다.
+     */
+    fun onHeartbeat(heartbeat: ExecutionHeartbeat) {
+        if (!registry.renew(heartbeat.submissionId, heartbeat.fencingToken)) {
+            // 이미 무효가 된 워커다. 곧 결과를 보내겠지만 fencing 이 거절한다.
+            log.atDebug()
+                .addKeyValue(CorrelationIds.SUBMISSION_ID, heartbeat.submissionId)
+                .addKeyValue(CorrelationIds.EXECUTION_ID, heartbeat.executionId)
+                .log("스테일 워커의 심장 박동을 무시한다")
+        }
     }
 
     /**

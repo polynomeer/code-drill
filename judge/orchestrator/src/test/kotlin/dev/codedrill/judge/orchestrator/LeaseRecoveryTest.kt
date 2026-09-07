@@ -1,6 +1,7 @@
 package dev.codedrill.judge.orchestrator
 
 import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
+import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
@@ -32,11 +33,27 @@ import kotlin.test.assertTrue
 class LeaseRecoveryTest {
 
     @Test
+    fun `큐에서 차례를 기다리는 것은 워커 유실이 아니다`() {
+        val world = World()
+        world.queue()
+
+        // 아무 워커도 집어 들지 않았다. Runner 가 다른 제출을 돌리는 동안의 정상 상태다.
+        world.advance(Duration.ofMinutes(2))
+        world.coordinator.reclaimExpiredLeases()
+
+        assertEquals(
+            1, world.gateway.requests.size,
+            "큐 대기를 유실로 세면, 바쁠 때만 멀쩡한 제출이 두 번 돌고 SYSTEM_ERROR 가 된다",
+        )
+    }
+
+    @Test
     fun `임대가 만료되면 실행을 다시 건다`() {
         val world = World()
 
         world.queue()
         assertEquals(1, world.gateway.requests.size)
+        world.pickUp()
 
         world.advance(Duration.ofSeconds(31))
         world.coordinator.reclaimExpiredLeases()
@@ -54,6 +71,7 @@ class LeaseRecoveryTest {
     fun `살아 돌아온 워커의 결과는 거절된다`() {
         val world = World()
         world.queue()
+        world.pickUp()
         val lost = world.gateway.requests.first()
 
         world.advance(Duration.ofSeconds(31))
@@ -69,6 +87,7 @@ class LeaseRecoveryTest {
     fun `재실행한 워커의 결과는 정상 판정이 된다`() {
         val world = World()
         world.queue()
+        world.pickUp()
 
         world.advance(Duration.ofSeconds(31))
         world.coordinator.reclaimExpiredLeases()
@@ -81,12 +100,71 @@ class LeaseRecoveryTest {
     }
 
     @Test
+    fun `심장 박동이 오는 동안에는 회수하지 않는다`() {
+        val world = World()
+        world.queue()
+        val request = world.gateway.requests.single()
+
+        // 실행이 임대보다 오래 걸린다. 워커는 살아서 붙들고 있다.
+        repeat(4) {
+            world.advance(Duration.ofSeconds(10))
+            world.coordinator.onHeartbeat(world.heartbeatFor(request))
+            world.coordinator.reclaimExpiredLeases()
+        }
+
+        assertEquals(
+            1, world.gateway.requests.size,
+            "밀린 실행을 워커 유실로 오해하면, 바쁠 때만 멀쩡한 제출이 SYSTEM_ERROR 가 된다",
+        )
+    }
+
+    @Test
+    fun `심장 박동이 끊기면 회수한다`() {
+        val world = World()
+        world.queue()
+        val request = world.gateway.requests.single()
+
+        world.advance(Duration.ofSeconds(20))
+        world.coordinator.onHeartbeat(world.heartbeatFor(request))
+        world.coordinator.reclaimExpiredLeases()
+        assertEquals(1, world.gateway.requests.size, "박동이 있는 동안은 살아 있다")
+
+        // 여기서 워커가 죽는다. 더 이상 박동이 오지 않는다.
+        world.advance(Duration.ofSeconds(31))
+        world.coordinator.reclaimExpiredLeases()
+
+        assertEquals(2, world.gateway.requests.size, "박동이 멈추면 유실이다")
+    }
+
+    @Test
+    fun `무효가 된 워커의 심장 박동은 임대를 살리지 못한다`() {
+        val world = World()
+        world.queue()
+        world.pickUp()
+        val lost = world.gateway.requests.first()
+
+        world.advance(Duration.ofSeconds(31))
+        world.coordinator.reclaimExpiredLeases()
+        val retry = world.gateway.requests.last()
+        world.pickUp()
+
+        // 죽은 줄 알았던 워커가 살아나 계속 박동을 보낸다.
+        world.advance(Duration.ofSeconds(31))
+        world.coordinator.onHeartbeat(world.heartbeatFor(lost))
+        world.coordinator.reclaimExpiredLeases()
+
+        assertEquals(3, world.gateway.requests.size, "스테일 워커가 현재 임대를 붙들면 안 된다")
+        assertTrue(world.gateway.requests.last().fencingToken > retry.fencingToken)
+    }
+
+    @Test
     fun `재시도 한계를 넘으면 SYSTEM_ERROR 로 끝낸다`() {
         val world = World(maxAttempts = 2)
         world.queue()
 
-        // 두 번 모두 워커가 사라진다.
+        // 매번 워커가 집어 들었다가 사라진다.
         repeat(3) {
+            world.pickUp()
             world.advance(Duration.ofSeconds(31))
             world.coordinator.reclaimExpiredLeases()
         }
@@ -105,6 +183,7 @@ class LeaseRecoveryTest {
     fun `결과가 온 실행은 회수 대상이 아니다`() {
         val world = World()
         world.queue()
+        world.pickUp()
         val request = world.gateway.requests.single()
         world.coordinator.onExecutionResult(world.resultOf(request), request.correlationId)
 
@@ -130,7 +209,11 @@ class LeaseRecoveryTest {
 
         val coordinator = JudgeCoordinator(
             packages = ProblemPackageLoader(Path.of(CONTENT_ROOT)),
-            registry = AttemptRegistry(clock = clock, leaseDuration = Duration.ofSeconds(30)),
+            registry = AttemptRegistry(
+                clock = clock,
+                leaseDuration = Duration.ofSeconds(30),
+                dispatchTimeout = Duration.ofMinutes(5),
+            ),
             gateway = gateway,
             maxAttempts = maxAttempts,
         )
@@ -149,6 +232,16 @@ class LeaseRecoveryTest {
                 source = "fun twoSum(nums: IntArray, target: Int) = intArrayOf(0, 1)",
                 requestTrace = false,
             ),
+        )
+
+        /** 가장 최근에 걸린 실행을 워커가 집어 들었다고 알린다. */
+        fun pickUp() = coordinator.onHeartbeat(heartbeatFor(gateway.requests.last()))
+
+        fun heartbeatFor(request: ExecutionRequest) = ExecutionHeartbeat(
+            submissionId = request.submissionId,
+            executionId = request.executionId,
+            attempt = request.attempt,
+            fencingToken = request.fencingToken,
         )
 
         /** 요청이 지목한 모든 케이스를 통과한 결과. */

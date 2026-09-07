@@ -75,3 +75,22 @@ data class CompletedGroup(
 
 /** 채점 진행 단계. 제출 상태 머신(§4.2)의 실행 영역 쪽 투영이다. */
 enum class JudgeStatus { LEASED, COMPILING, RUNNING, AGGREGATING }
+
+/**
+ * Runner 가 살아서 이 실행을 붙들고 있다 (기술 설계서 §4.3).
+ *
+ * 임대 만료는 "워커가 죽었다"를 뜻해야 한다. 그런데 요청이 브로커 큐에서 차례를
+ * 기다리는 시간도 임대 시간에 들어가면, 밀린 것뿐인 멀쩡한 실행이 유실로 오해받아
+ * 다시 돌고 결국 SYSTEM_ERROR 로 끝난다 — 바쁠 때만 정답이 틀리게 나오는, 가장 나쁜
+ * 종류의 오판이다.
+ *
+ * 그래서 실행을 **집어 든 워커만** 임대를 연장한다. 토큰이 실려 있으므로 이미
+ * 무효가 된 워커의 심장 박동은 현재 임대를 살려 두지 못한다.
+ */
+data class ExecutionHeartbeat(
+    val schemaVersion: String = SubmissionQueued.SCHEMA_VERSION,
+    val submissionId: String,
+    val executionId: String,
+    val attempt: Int,
+    val fencingToken: FencingToken,
+)

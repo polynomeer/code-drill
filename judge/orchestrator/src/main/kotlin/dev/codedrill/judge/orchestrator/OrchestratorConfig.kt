@@ -27,16 +27,23 @@ class OrchestratorConfig {
         ProblemPackageLoader(Path.of(root))
 
     /**
-     * 임대 기간은 설정으로 뺀다.
+     * 두 시간 한계는 재는 것이 다르다.
      *
-     * 기본 2분은 가장 느린 문제의 실행 시간보다 충분히 길어야 한다 — 짧으면 멀쩡히
-     * 돌고 있는 실행을 워커 유실로 오해해 같은 제출을 두 번 돌린다. DR 훈련에서는
-     * 짧게 줄여 회수 경로를 몇 초 안에 확인한다 (docs/runbook.md).
+     * `lease-seconds` 는 실행을 집어 든 워커의 생존을 재고, `dispatch-timeout-seconds`
+     * 는 아무도 집어 들지 않은 채 큐에서 기다린 시간을 잰다. 둘을 하나로 묶으면 큐가
+     * 밀렸을 뿐인 제출이 워커 유실로 처리돼, 바쁠 때만 멀쩡한 제출이 SYSTEM_ERROR 가 된다.
+     *
+     * DR 훈련은 `lease-seconds` 만 줄여 회수 경로를 몇 초 안에 확인한다
+     * (docs/runbook.md#worker-loss).
      */
     @Bean
     fun attemptRegistry(
         @Value("\${codedrill.judge.lease-seconds:120}") leaseSeconds: Long,
-    ) = AttemptRegistry(leaseDuration = Duration.ofSeconds(leaseSeconds))
+        @Value("\${codedrill.judge.dispatch-timeout-seconds:600}") dispatchSeconds: Long,
+    ) = AttemptRegistry(
+        leaseDuration = Duration.ofSeconds(leaseSeconds),
+        dispatchTimeout = Duration.ofSeconds(dispatchSeconds),
+    )
 
     @Bean
     fun judgeMetrics(registry: MeterRegistry) = JudgeMetrics(registry)

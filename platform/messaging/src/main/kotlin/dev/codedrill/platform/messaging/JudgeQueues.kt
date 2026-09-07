@@ -19,5 +19,13 @@ object JudgeQueues {
     /** 오케스트레이터 → 제어 영역: 진행과 종료 알림. */
     const val PROGRESS = "judge.progress"
 
-    val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS)
+    /**
+     * Runner → 오케스트레이터: 실행 중이라는 심장 박동 (§4.3).
+     *
+     * 결과와 큐를 나눈다. 심장 박동은 잦고 값이 낮으므로, 브로커가 밀렸을 때 판정
+     * 결과보다 앞에 서면 안 된다.
+     */
+    const val HEARTBEATS = "judge.heartbeats"
+
+    val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS)
 }
