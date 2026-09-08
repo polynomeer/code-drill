@@ -125,6 +125,16 @@ python3 scripts/publish-content.py
 
 운영에서는 새 버전으로 다시 등록하는 것이 답이다. 로컬 시드는 그냥 지우고 다시 올린다.
 
+### 값 타입을 늘렸으면 앱부터 다시 띄운다
+
+`ValueType` 에 값을 더하는 것은 **읽는 쪽에 대한 파괴적 변경**이다 (§15.3). 새 타입을 쓰는
+문제를 공개하면, 그 타입을 모르는 제어 영역은 manifest 를 파싱하지 못한다. 그런데 목록
+API 는 패키지를 전부 읽어 만들므로 **문제 하나가 목록 전체를 500 으로 만든다** — 새 문제만
+안 보이는 것이 아니다.
+
+그래서 순서가 있다. 빌드 → 세 앱 재기동 → `validateContent` → `publish-content.py`.
+거꾸로 하면 재기동 전까지 목록이 죽는다.
+
 ```bash
 docker exec code-drill-postgres-1 psql -U codedrill -c \
   "UPDATE problem SET published_version_id = NULL; DELETE FROM problem_version;"
@@ -149,7 +159,7 @@ python3 scripts/smoke.py
 ```
 
 판정 5종(AC/WA/CE/RE/TLE), 3개 언어, 부분 점수, 초안 CAS, 목록 커서, 트레이스 목차·청크,
-사용자 인증과 객체 소유권, 문자열 값 타입의 3개 언어 왕복, 관리자 API 인증과 역할 분리,
+사용자 인증과 객체 소유권, 문자열·격자 값 타입의 3개 언어 왕복, 관리자 API 인증과 역할 분리,
 콘텐츠 공개와 2인 승인,
 재채점 승인·실행·dry-run, 멱등성, SSE, 숨은 테스트 비노출까지 실제 서비스로 확인한다.
 100개 항목이 전부 통과해야 한다.
@@ -186,6 +196,7 @@ python3 scripts/drill.py all      # 장애 주입 훈련 — 컨테이너와 Run
 | 리플레이가 텍스트 목록으로만 보인다 | 트레이스가 INVALID 이거나 스키마가 클라이언트보다 높다 |
 | 리플레이에 상자가 하나도 없다 | 풀이가 `Drill.*` 를 부르지 않았다. 계측은 선택이다 |
 | 문제 목록이 비어 있다 | 아직 공개하지 않았다. 위 4번 절차를 돌린다 |
+| 문제 목록 전체가 500 | 앱이 새 값 타입을 모른다. 세 앱을 다시 띄운다 (아래) |
 | 공개가 409 로 거부된다 | 등록자와 승인자가 같거나 보고서 digest 가 다르다 |
 | 관리자 API 가 전부 503 | `ADMIN_OPERATORS` 를 앱 터미널에서 export 하지 않았다 |
 | 관리자 API 가 401 | 스크립트 터미널의 `ADMIN_OPERATORS` 가 앱의 것과 다르다 |

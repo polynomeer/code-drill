@@ -34,7 +34,7 @@ BASE = "http://localhost:8080/api/v1"
 USER: accounts.Account | None = None
 
 # 이 스모크가 실제로 제출하는 문제들.
-REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count", "is-palindrome"]
+REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count", "is-palindrome", "rotate-grid"]
 TIMEOUT = 60
 
 ACCEPTED_SOURCE = """
@@ -83,6 +83,54 @@ def isPalindrome(text):
 REVERSE_WORDS_KOTLIN = """
 fun reverseWords(words: Array<String>): Array<String> =
     Array(words.size) { words[words.size - 1 - it].reversed() }
+"""
+
+# 격자 왕복. 세 언어가 `<행>,<열>,<행 우선 원소>` 를 같게 읽고 쓰는지 본다.
+# 직사각형 케이스가 들어 있어 행과 열을 맞바꾸면 통과하지 못한다.
+ROTATE_KOTLIN = """
+fun rotate(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    return Array(cols) { c -> IntArray(rows) { r -> grid[rows - 1 - r][c] } }
+}
+"""
+
+ROTATE_JAVA = """
+class Solution {
+    public int[][] rotate(int[][] grid) {
+        int rows = grid.length;
+        int cols = rows == 0 ? 0 : grid[0].length;
+        int[][] out = new int[cols][rows];
+        for (int c = 0; c < cols; c++) {
+            for (int r = 0; r < rows; r++) out[c][r] = grid[rows - 1 - r][c];
+        }
+        return out;
+    }
+}
+"""
+
+ROTATE_PYTHON = """
+def rotate(grid):
+    return [list(row) for row in zip(*grid[::-1])]
+"""
+
+PERIMETER_KOTLIN = """
+fun perimeter(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    var total = 0
+    for (r in 0 until rows) {
+        for (c in 0 until cols) {
+            if (grid[r][c] != 1) continue
+            total += 4
+            if (r > 0 && grid[r - 1][c] == 1) total -= 1
+            if (r + 1 < rows && grid[r + 1][c] == 1) total -= 1
+            if (c > 0 && grid[r][c - 1] == 1) total -= 1
+            if (c + 1 < cols && grid[r][c + 1] == 1) total -= 1
+        }
+    }
+    return total
+}
 """
 
 WRONG_SOURCE = "fun twoSum(nums: IntArray, target: Int): IntArray = intArrayOf(0, 0)"
@@ -340,6 +388,24 @@ def main() -> int:
 
     words = await_verdict(submit(REVERSE_WORDS_KOTLIN, problem="reverse-words")["id"])
     results.append(check("문자열 배열 입출력", words["verdict"], "ACCEPTED"))
+
+    print("\n격자 값 타입 (§6.1)")
+    detail = request("GET", "/problems/rotate-grid")
+    results.append(
+        check("격자 시그니처", detail["signature"], "fun rotate(grid: Array<IntArray>): Array<IntArray>")
+    )
+    # 격자를 받아 격자를 돌려준다. 빈 격자와 직사각형 케이스가 패키지에 들어 있으므로
+    # 전부 통과한다는 것이 곧 크기가 제대로 실렸다는 확인이다.
+    for language, source in [
+        ("KOTLIN", ROTATE_KOTLIN),
+        ("JAVA", ROTATE_JAVA),
+        ("PYTHON", ROTATE_PYTHON),
+    ]:
+        final = await_verdict(submit(source, language=language, problem="rotate-grid")["id"])
+        results.append(check(f"{language} 격자 입출력", final["verdict"], "ACCEPTED"))
+
+    grid = await_verdict(submit(PERIMETER_KOTLIN, problem="island-perimeter")["id"])
+    results.append(check("격자 입력, 정수 출력", grid["verdict"], "ACCEPTED"))
 
     print("\n부분 점수 (§6.2 SUM)")
     detail = request("GET", "/problems/max-subarray")
