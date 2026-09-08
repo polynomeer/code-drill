@@ -119,10 +119,37 @@ object SandboxProtocol {
                 .joinToString(",")
             else -> error("STRING_ARRAY 기대값이 배열이 아니다: $value")
         }
+
+        ValueType.INT_MATRIX -> matrix(value)
     }
 
     fun base64(value: String): String =
         java.util.Base64.getEncoder().encodeToString(value.toByteArray(Charsets.UTF_8))
+
+    /**
+     * 격자를 `<행>,<열>,<행 우선 원소>` 로 싣는다.
+     *
+     * 행 구분자를 새로 만들지 않는다. 쉼표 하나로 끝나므로 기존 파서가 그대로 쓰이고,
+     * 무엇보다 **크기를 앞에 두면 들쭉날쭉한 격자를 표현할 수 없다** — 격자는 직사각형
+     * 이라는 약속이 형식 자체에 들어간다. 빈 격자는 `0,0` 이다.
+     *
+     * 사용자가 들쭉날쭉한 배열을 돌려주면 앞의 크기와 뒤의 원소 수가 어긋나 기대값과
+     * 절대 같아지지 않는다. 조용히 맞아떨어지는 경우가 없다는 뜻이다.
+     */
+    fun matrix(value: Any): String {
+        val rows = (value as? List<*>)?.map {
+            it as? List<*> ?: error("INT_MATRIX 의 행이 배열이 아니다: $it")
+        } ?: error("INT_MATRIX 기대값이 배열이 아니다: $value")
+
+        val columns = rows.firstOrNull()?.size ?: 0
+        val ragged = rows.firstOrNull { it.size != columns }
+        if (ragged != null) error("INT_MATRIX 의 행 길이가 다르다: $columns != ${ragged.size}")
+
+        return (
+            listOf(rows.size.toString(), columns.toString()) +
+                rows.flatten().map { (it as Number).toInt().toString() }
+            ).joinToString(",")
+    }
 }
 
 /** 계측 SDK 가 모드에 따라 다른 구현으로 컴파일된다는 사실만 공유한다 (§7.1). */
@@ -177,6 +204,7 @@ fun parseTraceEvent(line: String): dev.codedrill.judge.protocol.TraceEvent? {
  * `INT` 는 10진수, `INT_ARRAY` 는 쉼표로 이은 정수이며 빈 배열은 빈 필드다.
  * `STRING` 은 Base64, `STRING_ARRAY` 는 `<개수>,<Base64>,...` 다 — 문자열에는 탭과
  * 쉼표가 그냥 들어 있을 수 있으므로 구분자가 없는 알파벳으로 옮긴다.
+ * `INT_MATRIX` 는 `<행>,<열>,<행 우선 원소>` 다 ([SandboxProtocol.matrix]).
  */
 fun caseFileName(groupId: String): String = "cases_$groupId.txt"
 
@@ -206,6 +234,8 @@ fun encodeCaseLine(
                 append(items.size)
                 items.forEach { append(',').append(SandboxProtocol.base64(it)) }
             }
+
+            ValueType.INT_MATRIX -> append(SandboxProtocol.matrix(args[index]))
         }
     }
 }

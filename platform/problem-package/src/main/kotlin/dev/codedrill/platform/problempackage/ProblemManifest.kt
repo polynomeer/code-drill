@@ -49,7 +49,7 @@ data class Parameter(val name: String, val type: ValueType)
  * 바깥의 인코딩이 함께 늘어야 한다. 컴파일러가 `when` 을 빠짐없이 채우게 만들어 두어,
  * 하나를 빠뜨린 채로는 빌드가 되지 않는다.
  */
-enum class ValueType { INT, INT_ARRAY, STRING, STRING_ARRAY }
+enum class ValueType { INT, INT_ARRAY, STRING, STRING_ARRAY, INT_MATRIX }
 
 /** 테스트 그룹 정책 (§6.2). */
 data class GroupPolicy(

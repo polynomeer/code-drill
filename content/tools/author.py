@@ -68,6 +68,7 @@ KOTLIN_TYPES = {
     "INT_ARRAY": "IntArray",
     "STRING": "String",
     "STRING_ARRAY": "Array<String>",
+    "INT_MATRIX": "Array<IntArray>",
 }
 
 
@@ -157,6 +158,15 @@ no-op 으로 컴파일되므로 시간·메모리 판정에 영향을 주지 않
 INT_MIN, INT_MAX = -(2 ** 31), 2 ** 31 - 1
 
 
+def _leaves(value):
+    """중첩을 풀어 스칼라만 남긴다. 격자는 배열의 배열이라 한 겹으로는 부족하다."""
+    if isinstance(value, list):
+        for item in value:
+            yield from _leaves(item)
+    else:
+        yield value
+
+
 def check_expected(problem, group, name, expected):
     """기대 출력이 하네스와 제한을 지나갈 수 있는지 (§5.2 출력, §5.3 check).
 
@@ -168,7 +178,7 @@ def check_expected(problem, group, name, expected):
     - **출력 한도.** 배열을 돌려주는 문제는 원소 수가 곧 출력 크기다. 성능 케이스를
       키우다 보면 정답 풀이가 OUTPUT_LIMIT 으로 떨어진다.
     """
-    values = expected if isinstance(expected, list) else [expected]
+    values = list(_leaves(expected))
     for value in values:
         if isinstance(value, str):
             continue

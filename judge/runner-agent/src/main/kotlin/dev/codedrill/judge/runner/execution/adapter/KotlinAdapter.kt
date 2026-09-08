@@ -146,6 +146,12 @@ class KotlinAdapter(
         appendLine("private fun __cdEncodeStr(v: String): String = __cdB64(v)")
         appendLine("private fun __cdEncodeStrs(v: Array<String>): String =")
         appendLine("    (listOf(v.size.toString()) + v.map { __cdB64(it) }).joinToString(\",\")")
+        appendLine("private fun __cdEncodeGrid(v: Array<IntArray>): String {")
+        appendLine("    val cols = if (v.isEmpty()) 0 else v[0].size")
+        appendLine("    val out = StringBuilder().append(v.size).append(',').append(cols)")
+        appendLine("    for (row in v) for (x in row) out.append(',').append(x)")
+        appendLine("    return out.toString()")
+        appendLine("}")
         appendLine()
         appendLine("private fun __cdCase(id: String, body: () -> String) {")
         // START 를 먼저 흘려보내야, 데드라인으로 프로세스를 죽여도 어느 케이스에서
@@ -181,6 +187,13 @@ class KotlinAdapter(
         appendLine("    return Array(count) { __cdStr(parts[it + 1]) }")
         appendLine("}")
         appendLine()
+        appendLine("private fun __cdGrid(field: String): Array<IntArray> {")
+        appendLine("    val parts = field.split(\",\")")
+        appendLine("    val rows = parts[0].toInt()")
+        appendLine("    val cols = parts[1].toInt()")
+        appendLine("    return Array(rows) { r -> IntArray(cols) { c -> parts[2 + r * cols + c].toInt() } }")
+        appendLine("}")
+        appendLine()
         appendLine("fun main(args: Array<String>) {")
         appendLine("    val group = args[0]")
         appendLine("    val dir = java.io.File(args[1])")
@@ -205,6 +218,7 @@ class KotlinAdapter(
                 ValueType.INT_ARRAY -> "__cdInts($field)"
                 ValueType.STRING -> "__cdStr($field)"
                 ValueType.STRING_ARRAY -> "__cdStrs($field)"
+                ValueType.INT_MATRIX -> "__cdGrid($field)"
             }
         }
         return "${signature.name}(${args.joinToString(", ")})"
@@ -215,6 +229,7 @@ class KotlinAdapter(
         ValueType.INT_ARRAY -> "__cdEncodeInts"
         ValueType.STRING -> "__cdEncodeStr"
         ValueType.STRING_ARRAY -> "__cdEncodeStrs"
+        ValueType.INT_MATRIX -> "__cdEncodeGrid"
     }
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

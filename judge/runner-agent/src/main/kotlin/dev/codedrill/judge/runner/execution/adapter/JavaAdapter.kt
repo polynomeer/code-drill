@@ -212,6 +212,24 @@ class JavaAdapter : RuntimeAdapter {
         appendLine("        return new String(Base64.getDecoder().decode(field), StandardCharsets.UTF_8);")
         appendLine("    }")
         appendLine()
+        appendLine("    private static String encodeGrid(int[][] v) {")
+        appendLine("        int cols = v.length == 0 ? 0 : v[0].length;")
+        appendLine("        StringBuilder out = new StringBuilder().append(v.length).append(',').append(cols);")
+        appendLine("        for (int[] row : v) for (int x : row) out.append(',').append(x);")
+        appendLine("        return out.toString();")
+        appendLine("    }")
+        appendLine()
+        appendLine("    private static int[][] grid(String field) {")
+        appendLine("        String[] parts = field.split(\",\");")
+        appendLine("        int rows = Integer.parseInt(parts[0]);")
+        appendLine("        int cols = Integer.parseInt(parts[1]);")
+        appendLine("        int[][] out = new int[rows][cols];")
+        appendLine("        for (int r = 0; r < rows; r++) {")
+        appendLine("            for (int c = 0; c < cols; c++) out[r][c] = Integer.parseInt(parts[2 + r * cols + c]);")
+        appendLine("        }")
+        appendLine("        return out;")
+        appendLine("    }")
+        appendLine()
         appendLine("    private static String[] strs(String field) {")
         appendLine("        String[] parts = field.split(\",\", -1);")
         appendLine("        int count = Integer.parseInt(parts[0]);")
@@ -266,6 +284,7 @@ class JavaAdapter : RuntimeAdapter {
                 ValueType.INT_ARRAY -> "ints(f[${index + 1}])"
                 ValueType.STRING -> "str(f[${index + 1}])"
                 ValueType.STRING_ARRAY -> "strs(f[${index + 1}])"
+                ValueType.INT_MATRIX -> "grid(f[${index + 1}])"
             }
         }
         return "solution.${signature.name}(${args.joinToString(", ")})"
@@ -276,6 +295,7 @@ class JavaAdapter : RuntimeAdapter {
         ValueType.INT_ARRAY -> "encodeInts"
         ValueType.STRING -> "encodeStr"
         ValueType.STRING_ARRAY -> "encodeStrs"
+        ValueType.INT_MATRIX -> "encodeGrid"
     }
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

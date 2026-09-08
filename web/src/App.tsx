@@ -221,6 +221,19 @@ function functionName(signature: string): string {
   return signature.slice(signature.indexOf(' ') + 1, signature.indexOf('(')).trim()
 }
 
+/**
+ * 배열 렌더러가 시작 상태로 삼을 첫 인자.
+ *
+ * 격자는 행 우선으로 편다. 계측 이벤트의 인덱스가 `행 * 열 + 열` 이므로 편 배열과 자리가
+ * 맞는다 — 격자로 그리지는 못해도 어느 칸을 봤는지는 그대로 따라간다.
+ */
 function numberArray(value: unknown): number[] {
-  return Array.isArray(value) ? value.filter((item): item is number => typeof item === 'number') : []
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item) =>
+    Array.isArray(item)
+      ? item.filter((cell): cell is number => typeof cell === 'number')
+      : typeof item === 'number'
+        ? [item]
+        : [],
+  )
 }

@@ -149,6 +149,7 @@ data class ProblemDetail(
             dev.codedrill.platform.problempackage.ValueType.INT_ARRAY -> "IntArray"
             dev.codedrill.platform.problempackage.ValueType.STRING -> "String"
             dev.codedrill.platform.problempackage.ValueType.STRING_ARRAY -> "Array<String>"
+            dev.codedrill.platform.problempackage.ValueType.INT_MATRIX -> "Array<IntArray>"
         }
     }
 }

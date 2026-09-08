@@ -189,6 +189,13 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
         appendLine("    return \",\".join([str(len(items))] + [b64(v) for v in items])")
         appendLine()
         appendLine("")
+        appendLine("def encode_grid(value):")
+        appendLine("    grid = [list(row) for row in value]")
+        appendLine("    cols = len(grid[0]) if grid else 0")
+        appendLine("    head = [str(len(grid)), str(cols)]")
+        appendLine("    return \",\".join(head + [str(int(v)) for row in grid for v in row])")
+        appendLine()
+        appendLine("")
         appendLine("def ints(field):")
         appendLine("    return [int(x) for x in field.split(\",\")] if field else []")
         appendLine()
@@ -201,6 +208,15 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
         appendLine("    parts = field.split(\",\")")
         appendLine("    count = int(parts[0])")
         appendLine("    return [text(p) for p in parts[1:1 + count]]")
+        appendLine()
+        appendLine("")
+        appendLine("def grid(field):")
+        appendLine("    parts = field.split(\",\")")
+        appendLine("    rows = int(parts[0])")
+        appendLine("    cols = int(parts[1])")
+        appendLine("    return [")
+        appendLine("        [int(parts[2 + r * cols + c]) for c in range(cols)] for r in range(rows)")
+        appendLine("    ]")
         appendLine()
         appendLine("")
         // 반환 타입은 시그니처가 정한다. 값에서 추론하면 사용자가 엉뚱한 타입을 돌려줬을 때
@@ -270,6 +286,7 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
                 ValueType.INT_ARRAY -> "ints(f[${index + 1}])"
                 ValueType.STRING -> "text(f[${index + 1}])"
                 ValueType.STRING_ARRAY -> "texts(f[${index + 1}])"
+                ValueType.INT_MATRIX -> "grid(f[${index + 1}])"
             }
         }
         return "${signature.name}(${args.joinToString(", ")})"
@@ -280,6 +297,7 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
         ValueType.INT_ARRAY -> "encode_ints"
         ValueType.STRING -> "encode_str"
         ValueType.STRING_ARRAY -> "encode_strs"
+        ValueType.INT_MATRIX -> "encode_grid"
     }
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

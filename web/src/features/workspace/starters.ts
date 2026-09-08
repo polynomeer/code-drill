@@ -69,6 +69,8 @@ function javaType(kotlinType: string): string {
       return 'String'
     case 'Array<String>':
       return 'String[]'
+    case 'Array<IntArray>':
+      return 'int[][]'
     default:
       return 'int'
   }
