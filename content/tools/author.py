@@ -46,8 +46,10 @@ class Problem:
         notes="",
         drill_doc="",
         limits=None,
+        version=1,
     ):
         self.id = id
+        self.version = version
         self.title = title
         self.summary = summary
         self.signature = signature
@@ -102,7 +104,7 @@ def write_manifest(problem, directory):
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: {problem.id}
-version: 1
+version: {problem.version}
 title: {problem.title}
 statement: statement.md
 
@@ -202,6 +204,8 @@ def check_expected(problem, group, name, expected):
 
 
 def write_cases(problem, directory):
+    # 케이스를 고치면 패키지 digest 가 달라진다. 공개된 버전은 불변이므로(§6.1) 그때는
+    # version 을 올려야 하고, 올리지 않으면 등록이 "새 버전이어야 한다"로 거부된다.
     for group, cases in problem.cases.items():
         group_dir = directory / "tests" / group
         group_dir.mkdir(parents=True, exist_ok=True)

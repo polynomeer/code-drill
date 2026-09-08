@@ -128,15 +128,20 @@ fun countPrimes(n: Int): Int {
     return count
 }
 """),
-        ("trial-division--too-slow", "PERFORMANCE",
-         "수마다 나눠 본다. 작은 n 은 통과한다.",
+        # 2 부터 value-1 까지 전부 나눠 본다. 소수 판정을 처음 쓸 때 가장 흔한 형태다.
+        #
+        # 제곱근까지만 보는 형태는 오답으로 쓰지 않았다. n=10,000,000 에서 대략 10억 번을
+        # 도는데 그 10억 번이 2초 한도와 같은 자릿수라, 한가한 머신에서는 통과하고 바쁜
+        # 머신에서는 잡혔다 — 공개 게이트가 머신 속도에 좌우된다는 뜻이다 (§12.1).
+        ("trial-division--divides-by-everything", "PERFORMANCE",
+         "2 부터 value-1 까지 전부 나눠 본다. 소수 하나를 판정하는 데 값에 비례한다.",
          """
 fun countPrimes(n: Int): Int {
     var count = 0
     for (value in 2..n) {
         var prime = true
         var d = 2
-        while (d.toLong() * d <= value) {
+        while (d < value) {
             if (value % d == 0) { prime = false; break }
             d += 1
         }
@@ -503,16 +508,28 @@ fun gcdOfArray(nums: IntArray): Int {
     return current
 }
 """),
-        ("trial-divisor--too-slow", "PERFORMANCE",
-         "가장 작은 값부터 하나씩 나눠 본다. 값이 크면 무너진다.",
+        # 뺄셈식 유클리드. 교과서에 나오는 형태라 실제로 자주 쓰는데, 나눗셈식과 달리
+        # **값에 비례**한다 — gcd(1, 20억) 하나에 20억 번을 뺀다. 원소마다 그러므로
+        # 한도를 자릿수 단위로 넘긴다. 앞의 오답과 달리 머신이 아무리 빨라도 못 넘는다.
+        ("subtractive-gcd--linear-in-value", "PERFORMANCE",
+         "나눗셈 대신 뺄셈으로 유클리드를 돈다. 값이 크면 값에 비례해 느려진다.",
          """
 fun gcdOfArray(nums: IntArray): Int {
-    val values = nums.map { if (it < 0) -it else it }
-    val smallest = values.filter { it > 0 }.minOrNull() ?: return 0
-    for (candidate in smallest downTo 1) {
-        if (values.all { it % candidate == 0 }) return candidate
+    var result = 0
+    for (value in nums) {
+        var a = if (value < 0) -value else value
+        if (a == 0) continue
+        var b = result
+        if (b == 0) {
+            result = a
+            continue
+        }
+        while (a != b) {
+            if (a > b) a -= b else b -= a
+        }
+        result = a
     }
-    return 0
+    return result
 }
 """),
     ],
