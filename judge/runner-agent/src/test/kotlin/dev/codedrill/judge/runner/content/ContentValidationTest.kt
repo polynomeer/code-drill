@@ -85,6 +85,19 @@ class ContentValidationTest {
     }
 
     @Test
+    fun `보고서가 어느 파이프라인이 만든 것인지 밝힌다`() {
+        // digest 가 어긋났을 때 원인이 패키지인지 파이프라인인지 가르는 유일한 근거다
+        // (§15.3). 보고서에 없으면 제어 영역은 "패키지가 바뀌었다"고만 말할 수 있다.
+        val report = validator.validate("two-sum")
+
+        assertTrue(report.validatorVersion.isNotBlank(), "파이프라인 버전이 비어 있다")
+        assertTrue(
+            report.validatorVersion == ContentValidator.VALIDATOR_VERSION,
+            "보고서가 다른 파이프라인 버전을 말한다: ${report.validatorVersion}",
+        )
+    }
+
+    @Test
     fun `빠른 검사의 보고서로는 공개할 수 없다`() {
         // 범위가 digest 에 섞이지 않으면, 성능 그룹도 오답도 한 번 돌리지 않은 문제가
         // 공개될 수 있다 (§3.2 공개는 보고서 digest 대조를 통과해야 한다).

@@ -59,6 +59,15 @@ class AuditLog(private val jdbc: JdbcTemplate, private val json: ObjectMapper) {
 /** 감사 대상 행위 (§13.3). 새 행위를 추가하면 여기에 먼저 등록한다. */
 enum class AuditAction {
     PROBLEM_VERSION_REGISTERED,
+
+    /**
+     * 같은 패키지를 새 검증 파이프라인으로 다시 검증해 보고서를 갈아 끼웠다 (§15.3).
+     *
+     * 등록과 구분해 남긴다. 문제는 하나도 바뀌지 않았고 검사 기준만 바뀐 것이라,
+     * 둘을 같은 행위로 적으면 "언제 무엇이 바뀌었나"를 로그에서 되짚을 수 없다.
+     */
+    PROBLEM_VERSION_REVALIDATED,
+
     PROBLEM_PUBLISHED,
     PROBLEM_ARCHIVED,
     REJUDGE_REQUESTED,

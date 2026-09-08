@@ -70,10 +70,12 @@ def main() -> int:
                 "version": int(version),
                 "packageDigest": report["packageDigest"],
                 "reportDigest": report["reportDigest"],
+                "validatorVersion": report["validatorVersion"],
             },
             registrar,
         )
         # 이미 등록된 같은 버전은 정상이다. 시딩은 여러 번 돌아도 같은 결과여야 한다.
+        # 파이프라인만 바뀐 경우는 200 으로 보고서가 갈린다 (§15.3).
         if status not in (200, 409):
             print(f"FAIL  {report['problemVersionId']}: 등록 실패 {status} {body}")
             failures += 1
@@ -81,7 +83,11 @@ def main() -> int:
 
         status, body = post(
             f"/problems/{problem_id}/publish",
-            {"version": int(version), "reportDigest": report["reportDigest"]},
+            {
+                "version": int(version),
+                "reportDigest": report["reportDigest"],
+                "validatorVersion": report["validatorVersion"],
+            },
             publisher,
         )
         if status == 200:

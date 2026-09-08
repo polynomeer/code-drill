@@ -41,7 +41,8 @@ class AdminController(
         @RequestBody request: RegisterVersionRequest,
     ): ResponseEntity<Map<String, String>> =
         when (val outcome = publish.registerVersion(
-            problemId, request.version, request.packageDigest, request.reportDigest, actor,
+            problemId, request.version, request.packageDigest, request.reportDigest,
+            request.validatorVersion, actor,
         )) {
             is PublishService.RegisterOutcome.Registered ->
                 ResponseEntity.ok(mapOf("versionId" to outcome.versionId))
@@ -58,7 +59,9 @@ class AdminController(
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @RequestBody request: PublishRequest,
     ): ResponseEntity<Map<String, String>> =
-        when (val outcome = publish.publish(problemId, request.version, request.reportDigest, actor)) {
+        when (val outcome = publish.publish(
+            problemId, request.version, request.reportDigest, request.validatorVersion, actor,
+        )) {
             is PublishService.PublishOutcome.Published ->
                 ResponseEntity.ok(mapOf("publishedVersionId" to outcome.versionId))
 
@@ -166,9 +169,20 @@ data class RegisterVersionRequest(
     val version: Int,
     @field:NotBlank val packageDigest: String,
     @field:NotBlank val reportDigest: String,
+    /**
+     * 이 보고서를 만든 §6.3 파이프라인의 버전 (§15.3).
+     *
+     * 필수다. 없으면 digest 가 어긋났을 때 패키지가 바뀐 것인지 파이프라인이 바뀐 것인지
+     * 구분할 수 없고, 그 구분이 없으면 공개가 거부됐을 때 무엇을 고쳐야 하는지 알 수 없다.
+     */
+    @field:NotBlank val validatorVersion: String,
 )
 
-data class PublishRequest(val version: Int, @field:NotBlank val reportDigest: String)
+data class PublishRequest(
+    val version: Int,
+    @field:NotBlank val reportDigest: String,
+    @field:NotBlank val validatorVersion: String,
+)
 
 data class ArchiveRequest(@field:NotBlank val reason: String)
 

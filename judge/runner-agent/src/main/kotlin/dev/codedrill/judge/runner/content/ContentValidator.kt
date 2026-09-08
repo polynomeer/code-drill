@@ -331,6 +331,9 @@ class ContentValidator(
             // 범위를 섞는다. 빠른 검사로 만든 digest 가 공개 대조를 통과하면, 성능
             // 그룹을 한 번도 돌리지 않은 문제가 공개될 수 있다.
             update(scope.name.toByteArray())
+            // 파이프라인 버전을 섞는다. 기준이 바뀌었는데 옛 보고서가 그대로 통과하면
+            // 기준을 올린 의미가 없다 (§15.3).
+            update(VALIDATOR_VERSION.toByteArray())
             checks.sortedBy { it.stage }.forEach { update("${it.stage}=${it.passed}".toByteArray()) }
         }.digest().joinToString("") { "%02x".format(it) }
 
@@ -341,6 +344,7 @@ class ContentValidator(
             checks = checks,
             mutations = mutations,
             reportDigest = digest,
+            validatorVersion = VALIDATOR_VERSION,
         )
     }
 
@@ -348,11 +352,27 @@ class ContentValidator(
 
     private data class Mutant(val name: String, val kind: String, val source: String)
 
-    private companion object {
-        /** 정답 풀이가 제한 시간의 이 비율을 넘게 쓰면 공개를 막는다. */
-        const val MAX_REFERENCE_TIME_RATIO = 0.5
+    companion object {
+        /**
+         * 검증 파이프라인의 버전 (기술 설계서 §15.3 스키마·파이프라인 호환).
+         *
+         * **파이프라인의 판단이 달라지면 올린다.** 단계를 더하거나 빼는 것, 통과 기준을
+         * 바꾸는 것, digest 계산을 바꾸는 것이 그렇다. 로그 문구나 리팩터링은 아니다.
+         *
+         * 올리면 등록된 모든 버전의 보고서 digest 가 한꺼번에 무효가 된다. 그건 의도한
+         * 것이다 — 옛 파이프라인이 통과시킨 문제를 새 기준으로 다시 보지 않고 공개하면,
+         * 기준을 올린 의미가 없다. 다만 그때 제어 영역이 **"패키지가 바뀌었다"고만 말하면
+         * 바꾼 적 없는 패키지를 뒤지게 되므로**, 이 값을 보고서와 등록 행에 함께 실어
+         * 원인을 이름으로 구분한다.
+         *
+         * `"0"` 은 이 값을 기록하기 전에 등록된 행을 뜻한다 (V9 migration).
+         */
+        const val VALIDATOR_VERSION = "1"
 
-        const val PERFORMANCE_GROUP = "performance"
+        /** 정답 풀이가 제한 시간의 이 비율을 넘게 쓰면 공개를 막는다. */
+        private const val MAX_REFERENCE_TIME_RATIO = 0.5
+
+        private const val PERFORMANCE_GROUP = "performance"
     }
 }
 
@@ -361,6 +381,9 @@ class ContentValidator(
  *
  * [reportDigest] 는 패키지 내용과 각 단계의 결과에서 계산한다. 제어 영역은 공개할 때
  * 이 digest 를 대조하므로, 패키지를 고치면 보고서가 무효가 되어 다시 검증해야 한다.
+ *
+ * [validatorVersion] 도 함께 싣는다. digest 가 어긋나는 원인은 둘인데 — 패키지가 바뀌었거나
+ * 파이프라인이 바뀌었거나 — digest 만으로는 둘을 가를 수 없다 (§15.3).
  */
 data class ValidationReport(
     val problemVersionId: String,
@@ -369,6 +392,7 @@ data class ValidationReport(
     val checks: List<Check>,
     val mutations: List<MutationResult>,
     val reportDigest: String,
+    val validatorVersion: String = ContentValidator.VALIDATOR_VERSION,
 )
 
 data class Check(val stage: String, val passed: Boolean, val detail: String) {

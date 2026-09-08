@@ -513,7 +513,8 @@ def main() -> int:
     )
     results.append(check("모르는 토큰 거부", status, 401))
     status, _ = raw_request(
-        "POST", "/admin/problems/x/publish", {"version": 1, "reportDigest": "x"}, editor_only,
+        "POST", "/admin/problems/x/publish",
+        {"version": 1, "reportDigest": "x", "validatorVersion": "1"}, editor_only,
     )
     results.append(check("역할 없는 호출 거부", status, 403))
     status, _ = raw_request("GET", "/admin/audit", None, registrar)
@@ -523,36 +524,77 @@ def main() -> int:
     pid = "smoke-" + uuid.uuid4().hex[:8]
     digest = uuid.uuid4().hex
     report = uuid.uuid4().hex
+    validator = "1"
 
     status, registered = raw_request(
         "POST", f"/admin/problems/{pid}/versions",
-        {"version": 1, "packageDigest": digest, "reportDigest": report}, registrar,
+        {"version": 1, "packageDigest": digest, "reportDigest": report,
+         "validatorVersion": validator}, registrar,
     )
     results.append(check("버전 등록", (status, registered["versionId"]), (200, f"{pid}@1")))
 
     status, denied = raw_request(
-        "POST", f"/admin/problems/{pid}/publish", {"version": 1, "reportDigest": report}, registrar,
+        "POST", f"/admin/problems/{pid}/publish",
+        {"version": 1, "reportDigest": report, "validatorVersion": validator}, registrar,
     )
     results.append(check("등록자 본인 공개 거부", status, 409))
     results.append(check("  사유에 2인 승인 언급", "두 사람" in denied["reason"], True))
 
     status, stale = raw_request(
         "POST", f"/admin/problems/{pid}/publish",
-        {"version": 1, "reportDigest": uuid.uuid4().hex}, publisher,
+        {"version": 1, "reportDigest": uuid.uuid4().hex, "validatorVersion": validator}, publisher,
     )
     results.append(check("보고서 digest 불일치 거부", status, 409))
+    # digest 가 어긋나는 원인은 둘이다. 파이프라인이 같으면 패키지가 바뀐 것이고,
+    # 그 사실을 사유가 말해야 무엇을 고칠지 알 수 있다 (§15.3).
+    results.append(check("  사유가 패키지를 지목", "패키지가 바뀐 것" in stale["reason"], True))
+
+    status, moved = raw_request(
+        "POST", f"/admin/problems/{pid}/publish",
+        {"version": 1, "reportDigest": report, "validatorVersion": "99"}, publisher,
+    )
+    results.append(check("파이프라인 버전 불일치 거부", status, 409))
+    results.append(check("  사유가 파이프라인을 지목", "파이프라인이 바뀌었다" in moved["reason"], True))
+    results.append(check("  양쪽 버전을 밝힌다", "등록은 1, 지금은 99" in moved["reason"], True))
 
     status, published = raw_request(
-        "POST", f"/admin/problems/{pid}/publish", {"version": 1, "reportDigest": report}, publisher,
+        "POST", f"/admin/problems/{pid}/publish",
+        {"version": 1, "reportDigest": report, "validatorVersion": validator}, publisher,
     )
     results.append(check("다른 사람이 공개", (status, published["publishedVersionId"]), (200, f"{pid}@1")))
 
     state = request("GET", f"/admin/problems/{pid}", None, publisher)
     results.append(check("  공개 버전 반영", state["publishedVersionId"], f"{pid}@1"))
 
+    # 파이프라인만 바뀐 재검증은 새 버전이 아니라 새 보고서다 (§15.3).
+    revalidated = uuid.uuid4().hex
+    status, again = raw_request(
+        "POST", f"/admin/problems/{pid}/versions",
+        {"version": 1, "packageDigest": digest, "reportDigest": revalidated,
+         "validatorVersion": "2"}, registrar,
+    )
+    results.append(check("새 파이프라인으로 재검증 등록", (status, again["versionId"]), (200, f"{pid}@1")))
+    status, changed = raw_request(
+        "POST", f"/admin/problems/{pid}/versions",
+        {"version": 1, "packageDigest": uuid.uuid4().hex, "reportDigest": revalidated,
+         "validatorVersion": "2"}, registrar,
+    )
+    results.append(check("  패키지가 다르면 거부", status, 409))
+    results.append(check("  사유가 새 버전을 요구", "새 버전이어야" in changed["reason"], True))
+
     trail = request("GET", f"/admin/audit?subject={pid}@1", None, security)
     actions = [entry["action"] for entry in trail]
-    results.append(check("감사 로그", sorted(actions), ["PROBLEM_PUBLISHED", "PROBLEM_VERSION_REGISTERED"]))
+    results.append(check(
+        "감사 로그", sorted(actions),
+        ["PROBLEM_PUBLISHED", "PROBLEM_VERSION_REGISTERED", "PROBLEM_VERSION_REVALIDATED"],
+    ))
+    # detail 은 jsonb 를 문자열로 내려보낸다. 어느 파이프라인에서 어디로 옮겼는지가
+    # 남아야 "언제 기준이 바뀌었나"를 로그만으로 되짚을 수 있다 (§13.3).
+    revalidation = next(e for e in trail if e["action"] == "PROBLEM_VERSION_REVALIDATED")
+    results.append(check(
+        "  재검증이 파이프라인 이동을 남긴다",
+        "1 -> 2" in revalidation["detail"], True,
+    ))
 
     # 공개된 문제만 목록에 나온다. 디렉터리에 파일을 놓는 것만으로 공개되면 §6.3 검증과
     # §11.2 승인이 모두 우회된다.
