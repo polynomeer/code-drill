@@ -6,9 +6,11 @@ import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.RequestedGroup
+import dev.codedrill.judge.protocol.TestCaseResult
 import dev.codedrill.judge.protocol.TraceManifest
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.platform.problempackage.Limits
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import java.nio.file.Path
@@ -90,6 +92,7 @@ class ContentValidator(
 
         val mutants = mutants(problemId).map { mutant -> evaluate(pkg, mutant) }
         checks += mutationKillRate(mutants)
+        checks += performanceMargin(mutants)
 
         checks += traceBudget(pkg, reference)
 
@@ -217,6 +220,12 @@ class ContentValidator(
         val result = run(pkg, mutant.source)
         val killers = result.cases.filter { it.verdict != Verdict.ACCEPTED }
 
+        // 시간이 **유일한** 근거일 때만 여유를 잰다. 오답 하나가 값으로도 틀렸다면
+        // 그 판정은 머신 속도와 무관하므로 잴 것이 없다.
+        val decisive = result.terminalVerdict != null ||
+            killers.any { it.verdict != Verdict.TIME_LIMIT }
+        val timedOut = if (decisive) emptyList() else killers.filter { it.verdict == Verdict.TIME_LIMIT }
+
         return MutationResult(
             name = mutant.name,
             kind = mutant.kind,
@@ -224,7 +233,70 @@ class ContentValidator(
             // 어느 그룹이 잡았는지. 특정 그룹만 일하고 있으면 테스트 설계가 치우친 것이다.
             killedBy = killers.map { it.groupId }.distinct().sorted(),
             verdicts = killers.map { it.verdict.name }.distinct().sorted(),
+            timeMargin = widestMargin(pkg, mutant, timedOut),
         )
+    }
+
+    /**
+     * 시간으로 잡은 케이스들 중 **가장 크게 이긴** 여유.
+     *
+     * 케이스 하나하나가 넉넉할 필요는 없다. 작은 입력에서 느린 풀이가 아슬아슬하게
+     * 통과하거나 아슬아슬하게 걸리는 것은 부분 점수가 있는 그룹의 의도다 (§6.2).
+     * 물어야 할 것은 **"어디선가 확실히 잡히는가"**다.
+     *
+     * 큰 케이스가 뒤에 오므로 뒤에서부터 재고, 기준을 넘기면 거기서 멈춘다.
+     */
+    private fun widestMargin(
+        pkg: ProblemPackage,
+        mutant: Mutant,
+        timedOut: List<TestCaseResult>,
+    ): Double? {
+        if (timedOut.isEmpty()) return null
+
+        var widest = 0.0
+        for (case in timedOut.reversed()) {
+            widest = maxOf(widest, margin(pkg, mutant, case))
+            if (widest >= MARGIN_PROBE) return widest
+        }
+        return widest
+    }
+
+    /**
+     * 시간으로 잡은 오답이 한도를 **몇 배로** 넘겼는지 (§12.1 재현성).
+     *
+     * 데드라인에 죽은 실행은 걸린 시간을 말해 주지 않는다. 그래서 같은 케이스를 한도의
+     * [MARGIN_PROBE] 배로 한 번 더 돌린다. 거기서도 못 끝내면 여유는 그 배수 이상이고,
+     * 끝내면 실제 시간이 나온다.
+     *
+     * **재는 이유는 배로 이기는 오답이 머신을 타기 때문이다.** 한가한 머신에서는 통과하고
+     * 바쁜 머신에서는 잡히면, 공개 여부를 정한 것은 알고리즘이 아니라 그날의 부하다.
+     * 실제로 `gcd-of-array` 와 `count-primes` 가 그 상태로 공개까지 갔다.
+     *
+     * 비용은 오답 하나당 한도의 [MARGIN_PROBE] 배로 묶인다. 자릿수로 지는 오답은 그
+     * 시간을 다 쓰지만, 그 대가로 "어디서 돌려도 잡힌다"를 얻는다.
+     */
+    private fun margin(pkg: ProblemPackage, mutant: Mutant, killed: TestCaseResult): Double {
+        val group = pkg.groups.first { it.policy.id == killed.groupId }
+        val case = group.cases.first { it.id == killed.caseId }
+        val limitMillis = pkg.manifest.limits.timeMillis * group.policy.limitMultiplier.time
+
+        val probe = engine.execute(
+            request(
+                pkg = pkg,
+                source = mutant.source,
+                limits = pkg.manifest.limits.copy(
+                    timeMillis = (pkg.manifest.limits.timeMillis * MARGIN_PROBE).toLong(),
+                ),
+                groups = listOf(RequestedGroup(group.policy, listOf(case))),
+            ),
+        )
+
+        val outcome = probe.cases.firstOrNull()
+        // 늘린 데드라인에서도 못 끝냈으면 여유는 배수 이상이다. 정확한 값은 모르지만,
+        // 알아야 할 것은 "충분한가"이지 "정확히 몇 배인가"가 아니다.
+        if (outcome == null || outcome.verdict == Verdict.TIME_LIMIT) return MARGIN_PROBE
+
+        return outcome.measurements.wallTimeMillis / limitMillis
     }
 
     private fun mutationKillRate(results: List<MutationResult>): List<Check> {
@@ -246,6 +318,44 @@ class ContentValidator(
                     "mutation",
                     "살아남은 오답: " + survived.joinToString { "${it.name}(${it.kind})" } +
                         ". 이 오답을 잡는 테스트가 없다는 뜻이다",
+                )
+            },
+        )
+    }
+
+    /**
+     * 시간으로 잡은 오답이 한도를 넉넉히 넘겼는지 (§12.1 재현성).
+     *
+     * 자릿수로 지지 않고 배로 지는 오답은 **머신이 판정을 정한다.** 한가한 머신에서는
+     * 통과하고 바쁜 머신에서는 잡히므로, 그 문제의 공개 여부는 그날의 부하에 달린다.
+     *
+     * **경고로 둔다.** 공개를 막으면 지금 얇은 문제들이 한꺼번에 막히는데, 그 문제들은
+     * 잘못 채점하고 있는 것이 아니라 오답을 아슬아슬하게 잡고 있을 뿐이다. 어디까지
+     * 감수할지는 콘텐츠를 쥔 사람이 정할 일이지 검증기가 혼자 정할 일이 아니다.
+     */
+    private fun performanceMargin(results: List<MutationResult>): List<Check> {
+        val timed = results.filter { it.timeMargin != null }
+        if (timed.isEmpty()) {
+            return listOf(Check.pass("performance-margin", "시간으로만 잡는 오답이 없다"))
+        }
+
+        val thin = timed.filter { it.timeMargin!! < MIN_MARGIN }
+        val worst = timed.minOf { it.timeMargin!! }
+
+        return listOf(
+            if (thin.isEmpty()) {
+                Check.pass(
+                    "performance-margin",
+                    "시간으로 잡는 오답 ${timed.size}개, 가장 빠듯한 것도 한도의 " +
+                        "${"%.1f".format(worst)}배 이상",
+                )
+            } else {
+                Check.warn(
+                    "performance-margin",
+                    "한도를 겨우 넘는 오답: " +
+                        thin.joinToString { "${it.name}(${"%.1f".format(it.timeMargin)}배)" } +
+                        ". ${MIN_MARGIN.toInt()}배를 넘지 못하면 빠른 머신에서는 통과한다 — " +
+                        "케이스를 키우거나, 못 키우면 오답을 자릿수로 지는 것으로 바꾼다",
                 )
             },
         )
@@ -280,22 +390,29 @@ class ContentValidator(
         pkg: ProblemPackage,
         source: String,
         mode: ExecutionMode = ExecutionMode.JUDGE,
-    ): ExecutionResult = engine.execute(
-        ExecutionRequest(
-            executionId = "validate-${pkg.problemVersionId}",
-            submissionId = "validate-${pkg.problemVersionId}",
-            attempt = 1,
-            fencingToken = FencingToken(1),
-            correlationId = "validate",
-            problemVersionId = pkg.problemVersionId,
-            packageDigest = pkg.packageDigest,
-            language = Language.KOTLIN,
-            source = source,
-            signature = pkg.manifest.signature,
-            limits = pkg.manifest.limits,
-            groups = pkg.groups.map { RequestedGroup(it.policy, it.cases) },
-            mode = mode,
-        ),
+    ): ExecutionResult = engine.execute(request(pkg, source, mode = mode))
+
+    /** 검증 실행 요청. 여유 측정은 한도와 케이스만 바꿔 같은 경로로 돈다. */
+    private fun request(
+        pkg: ProblemPackage,
+        source: String,
+        limits: Limits = pkg.manifest.limits,
+        groups: List<RequestedGroup> = pkg.groups.map { RequestedGroup(it.policy, it.cases) },
+        mode: ExecutionMode = ExecutionMode.JUDGE,
+    ) = ExecutionRequest(
+        executionId = "validate-${pkg.problemVersionId}",
+        submissionId = "validate-${pkg.problemVersionId}",
+        attempt = 1,
+        fencingToken = FencingToken(1),
+        correlationId = "validate",
+        problemVersionId = pkg.problemVersionId,
+        packageDigest = pkg.packageDigest,
+        language = Language.KOTLIN,
+        source = source,
+        signature = pkg.manifest.signature,
+        limits = limits,
+        groups = groups,
+        mode = mode,
     )
 
     private fun referenceSolution(problemId: String): String? =
@@ -367,10 +484,26 @@ class ContentValidator(
          *
          * `"0"` 은 이 값을 기록하기 전에 등록된 행을 뜻한다 (V9 migration).
          */
-        const val VALIDATOR_VERSION = "1"
+        const val VALIDATOR_VERSION = "2"
 
         /** 정답 풀이가 제한 시간의 이 비율을 넘게 쓰면 공개를 막는다. */
         private const val MAX_REFERENCE_TIME_RATIO = 0.5
+
+        /**
+         * 시간으로 잡는 오답이 한도를 넘겨야 하는 최소 배수.
+         *
+         * 머신마다 단일 스레드 속도는 몇 배씩 차이 난다. 그 차이보다 작은 여유로 잡은
+         * 오답은 다른 머신에서 통과한다.
+         */
+        private const val MIN_MARGIN = 3.0
+
+        /**
+         * 여유를 잴 때 늘리는 배수. [MIN_MARGIN] 과 같게 둔다.
+         *
+         * 여기서도 못 끝내면 기준을 넘긴 것이므로 더 재지 않는다. 오답 하나가 쓰는
+         * 시간을 한도의 이 배수로 묶는 장치이기도 하다.
+         */
+        private const val MARGIN_PROBE = 3.0
 
         private const val PERFORMANCE_GROUP = "performance"
     }
@@ -395,10 +528,25 @@ data class ValidationReport(
     val validatorVersion: String = ContentValidator.VALIDATOR_VERSION,
 )
 
-data class Check(val stage: String, val passed: Boolean, val detail: String) {
+/**
+ * 검증 단계 하나의 결과.
+ *
+ * [warning] 은 통과이되 사람이 봐야 할 것이다. 공개를 막지는 않는다 — 막으면 이미
+ * 공개된 문제가 한꺼번에 막히고, 그 판단은 검증기가 혼자 내릴 것이 아니다.
+ *
+ * 그래서 [passed] 와 별개의 축이다. 보고서 digest 는 [passed] 만 섞으므로, 경고가
+ * 생기고 사라져도 등록된 버전이 무효가 되지 않는다.
+ */
+data class Check(
+    val stage: String,
+    val passed: Boolean,
+    val detail: String,
+    val warning: Boolean = false,
+) {
     companion object {
         fun pass(stage: String, detail: String) = Check(stage, true, detail)
         fun fail(stage: String, detail: String) = Check(stage, false, detail)
+        fun warn(stage: String, detail: String) = Check(stage, true, detail, warning = true)
     }
 }
 
@@ -408,4 +556,11 @@ data class MutationResult(
     val killed: Boolean,
     val killedBy: List<String>,
     val verdicts: List<String>,
+    /**
+     * 시간으로만 잡힌 오답이 한도를 몇 배로 넘겼는지. 값으로도 잡혔으면 `null` 이다.
+     *
+     * 배로 이기는 오답은 머신을 탄다 — 한가하면 통과하고 바쁘면 잡힌다. 그러면 공개
+     * 여부를 정한 것이 알고리즘이 아니라 그날의 부하다 (§12.1).
+     */
+    val timeMargin: Double? = null,
 )
