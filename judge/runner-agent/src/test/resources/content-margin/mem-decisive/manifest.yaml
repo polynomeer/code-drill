@@ -1,0 +1,33 @@
+# performance-margin 단계의 고정물 (기술 설계서 §6.3, §12.1).
+# 저장소의 문제가 아니다 — content/problems 아래에 두면 공개 대상이 된다.
+
+id: mem-decisive
+version: 1
+title: 자릿수로 넘치는 오답
+statement: statement.md
+
+# 메모리 한도를 작게 잡는다. 오답이 이 한도를 자릿수로 넘느냐 조금 넘느냐가
+# 이 고정물이 시험하는 전부다.
+limits:
+  timeMillis: 4000
+  memoryMb: 64
+  outputBytes: 65536
+
+signature:
+  name: total
+  parameters:
+    - name: n
+      type: INT
+  returns: INT
+
+groups:
+  - id: sample
+    weight: 0
+    visibility: PUBLIC
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: FAIL_FAST
+  - id: hidden
+    weight: 100
+    visibility: HIDDEN
+    aggregation: ALL_OR_NOTHING
+    stopPolicy: CONTINUE
