@@ -293,6 +293,7 @@ class ContainerSandbox(
             }
             if (rows.isEmpty()) return@runCatching 0
 
+            val found = rows.lines().count { it.isNotBlank() }
             val stale = rows.lineSequence().mapNotNull { row ->
                 val (id, startedAt) = row.split('\t').let { it.getOrNull(0) to it.getOrNull(1) }
                 // 라벨을 읽지 못한 컨테이너는 건드리지 않는다. 나이를 모르면 채점 중인지도
@@ -307,11 +308,21 @@ class ContainerSandbox(
                     .start()
                     .waitFor(REMOVE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             }
-            if (stale.isNotEmpty()) {
-                reaperLog.warn(
-                    "이전 Runner 가 두고 간 샌드박스 컨테이너 {}개를 제거했다. " +
+            // 치울 것이 없어도 본 것을 남긴다. 이 누수가 하루를 갔던 이유는 컨테이너가
+            // 조용히 쌓였기 때문이다 — 아무 줄도 찍지 않으면 다음에도 똑같이 모른다.
+            when {
+                stale.isNotEmpty() -> reaperLog.warn(
+                    "이전 Runner 가 두고 간 샌드박스 컨테이너 {}/{}개를 제거했다. " +
                         "Runner 가 비정상 종료했다는 뜻이다",
                     stale.size,
+                    found,
+                )
+
+                else -> reaperLog.info(
+                    "샌드박스 컨테이너 {}개가 남아 있다. 전부 {}분 미만이라 두고 본다 — " +
+                        "기동할 때마다 늘어나면 정리 경로를 의심한다",
+                    found,
+                    maxAgeMillis / 60_000,
                 )
             }
             stale.size
