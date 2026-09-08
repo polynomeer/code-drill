@@ -55,6 +55,16 @@ class IdentityService(
     }
 
     /**
+     * 이메일로 계정 id 를 찾는다.
+     *
+     * 관리자 역할의 **부트스트랩에만** 쓴다 (§11.2). 일반 조회로 열어 두면 이메일 존재
+     * 여부를 확인하는 창구가 되므로(§11.1 계정 열거), 부르는 쪽은 결과를 응답으로
+     * 흘리지 않아야 한다.
+     */
+    fun findIdByEmail(email: String): String? =
+        repository.findCredentials(normalize(email))?.first?.id?.toString()
+
+    /**
      * 로그인.
      *
      * 이메일이 없을 때도 해시 검증을 한 번 돌린다. 없는 계정만 빨리 실패하면 응답

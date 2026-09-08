@@ -10,6 +10,8 @@ import dev.codedrill.controlplane.admin.JudgedSubmissions
 import dev.codedrill.controlplane.admin.PublishService
 import dev.codedrill.controlplane.admin.RejudgeResult
 import dev.codedrill.controlplane.admin.RejudgeService
+import dev.codedrill.controlplane.admin.AdminAccounts
+import dev.codedrill.controlplane.identity.IdentityService
 import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.controlplane.submission.RejudgeContext
 import dev.codedrill.controlplane.submission.SubmissionService
@@ -40,6 +42,15 @@ class ControlPlaneConfig {
      */
     @Bean
     fun publishedProblems(publish: PublishService) = PublishedProblems { publish.publishedProblemIds() }
+
+    /**
+     * 관리자 역할 부트스트랩이 쓰는 계정 조회 (§11.2).
+     *
+     * Admin 모듈은 Identity 를 참조하지 않는다 (§3.1). 첫 역할을 누구에게 줄지 정하는
+     * 데 이메일 → 계정 id 하나가 필요할 뿐이라, 그 한 줄만 포트로 열고 잇는다.
+     */
+    @Bean
+    fun adminAccounts(identity: IdentityService) = AdminAccounts { identity.findIdByEmail(it) }
 
     /**
      * 재채점과 제출 도메인을 잇는 어댑터 두 개 (§3.1 조립 지점).

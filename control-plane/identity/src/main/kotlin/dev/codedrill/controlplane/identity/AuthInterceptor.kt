@@ -99,8 +99,17 @@ class IdentitySecurityConfig(
             // 사용자의 것: 제출·초안·자기 정보. 소유자만 열 수 있어야 한다.
             .addPathPatterns(
                 "/api/v1/submissions/**", "/api/v1/workspaces/**", "/api/v1/auth/**",
+                // 관리자 API 도 같은 방식으로 로그인한다. 인가는 Admin 모듈이 이어서
+                // 하지만, **누구인지 확인하는 일은 한 곳에서만** 일어나야 한다 (§11.2).
+                "/api/v1/admin/**",
             )
             // 로그인과 가입 자체는 토큰 없이 부를 수 있어야 한다.
             .excludePathPatterns("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh")
+            .order(AUTHENTICATION_ORDER)
+    }
+
+    private companion object {
+        /** 인증이 인가보다 먼저다. AdminSecurityConfig 가 그 다음 순서를 쓴다. */
+        const val AUTHENTICATION_ORDER = 0
     }
 }

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank
 import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -28,6 +29,7 @@ class AdminController(
     private val publish: PublishService,
     private val rejudge: RejudgeService,
     private val audit: AuditLog,
+    private val roles: AdminRoles,
 ) {
 
     // --- 콘텐츠 수명주기 ---
@@ -68,6 +70,47 @@ class AdminController(
             is PublishService.PublishOutcome.Rejected ->
                 ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
         }
+
+    /**
+     * 역할 부여 현황 (§11.2).
+     *
+     * 누가 무엇을 할 수 있는지는 감사의 출발점이다. 설정 파일에 적혀 있던 시절에는
+     * 이 질문에 답하려면 운영 환경의 환경변수를 봐야 했다.
+     */
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @GetMapping("/operators")
+    fun operators(): List<RoleGrant> = roles.grants()
+
+    /** 역할을 준다. 부여 자체가 감사 대상이다 (§13.3). */
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @PostMapping("/operators/{userId}/roles")
+    fun grantRole(
+        @PathVariable userId: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @RequestBody request: RoleRequest,
+    ): ResponseEntity<Map<String, Any>> {
+        val role = request.parsed()
+            ?: return ResponseEntity.badRequest().body(mapOf("reason" to "알 수 없는 역할이다: ${request.role}"))
+
+        return ResponseEntity.ok(
+            mapOf("userId" to userId, "role" to role.name, "changed" to roles.grant(userId, role, actor)),
+        )
+    }
+
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @DeleteMapping("/operators/{userId}/roles/{role}")
+    fun revokeRole(
+        @PathVariable userId: String,
+        @PathVariable role: String,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+    ): ResponseEntity<Map<String, Any>> {
+        val parsed = runCatching { AdminRole.valueOf(role.uppercase()) }.getOrNull()
+            ?: return ResponseEntity.badRequest().body(mapOf("reason" to "알 수 없는 역할이다: $role"))
+
+        return ResponseEntity.ok(
+            mapOf("userId" to userId, "role" to parsed.name, "changed" to roles.revoke(userId, parsed, actor)),
+        )
+    }
 
     @RequiresRole(AdminRole.PUBLISHER)
     @PostMapping("/problems/{problemId}/archive")
@@ -185,6 +228,10 @@ data class PublishRequest(
 )
 
 data class ArchiveRequest(@field:NotBlank val reason: String)
+
+data class RoleRequest(@field:NotBlank val role: String) {
+    fun parsed(): AdminRole? = runCatching { AdminRole.valueOf(role.uppercase()) }.getOrNull()
+}
 
 data class RejudgeRequest(
     @field:NotBlank val scope: String,

@@ -30,55 +30,21 @@ enum class AdminRole {
     SECURITY_ADMIN,
 }
 
-/** 인증된 운영자. 감사 로그의 actor 는 이 이름이며, 헤더로 자칭한 값이 아니다 (§13.3). */
-data class Operator(val name: String, val roles: Set<AdminRole>)
-
 /**
- * 운영자 목록 (§11.2, §11.4 API authz 게이트).
+ * 관리자 설정 (§11.2).
  *
- * **비어 있으면 관리자 API 전체가 닫힌다.** 기본 토큰을 심어 두는 쪽이 편하지만, 그
- * 토큰은 반드시 어딘가의 운영 환경에 그대로 남는다. 설정하지 않은 환경에서 관리자
- * API 가 열려 있는 것보다, 설정을 잊었을 때 아무것도 안 되는 편이 낫다.
+ * **비밀이 없다.** 예전에는 여기에 `<이름>:<토큰>:<역할>` 이 통째로 들어 있었고, 그
+ * 토큰은 프로세스 목록에서 읽는 순간 곧바로 관리자였다. 이제 신원은 Identity 모듈의
+ * 계정이 정하고, 이 설정에는 **첫 역할을 누구에게 줄지**만 남는다.
  *
- * 형식은 `<이름>:<토큰>:<역할,역할>` 을 `;` 로 이은 것이다. 로컬 설정 방법은
- * docs/running-locally.md 에 있다.
+ * [bootstrapEmail] 은 비밀이 아니다. 알아도 그 계정의 비밀번호가 없으면 아무것도 못
+ * 한다. 그리고 역할 표가 비어 있을 때 딱 한 번만 쓰인다 ([AdminRoles]).
  *
- * 토큰을 이렇게 문자열로 두는 것은 슬라이스의 한계다. Identity 모듈이 붙으면 워크로드
- * ID 와 짧은 수명 토큰으로 옮긴다 (§11.2).
+ * 비워 두면 부트스트랩이 없다. 이미 역할을 가진 사람이 있는 환경에서는 그게 맞다 —
+ * 첫 역할을 만드는 길은 필요할 때만 열려 있어야 한다.
  */
 @ConfigurationProperties(prefix = "codedrill.admin")
-data class AdminProperties(val operators: String = "") {
-
-    val byToken: Map<String, Operator> = operators
-        .split(';')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .associate { entry ->
-            val parts = entry.split(':')
-            require(parts.size == 3) {
-                "운영자 설정 형식은 <이름>:<토큰>:<역할,역할> 이다: $entry"
-            }
-            val (name, token, roles) = parts
-            require(token.length >= MIN_TOKEN_LENGTH) {
-                "운영자 토큰이 너무 짧다 (${MIN_TOKEN_LENGTH}자 이상): $name"
-            }
-            token to Operator(
-                name = name,
-                roles = roles.split(',')
-                    .map { it.trim().uppercase() }
-                    .filter { it.isNotEmpty() }
-                    .map(AdminRole::valueOf)
-                    .toSet(),
-            )
-        }
-
-    fun resolve(token: String?): Operator? = token?.let { byToken[it] }
-
-    private companion object {
-        /** 짧은 토큰은 추측 가능하다. 사람이 손으로 고른 토큰을 걸러 내는 최소선이다. */
-        const val MIN_TOKEN_LENGTH = 24
-    }
-}
+data class AdminProperties(val bootstrapEmail: String = "")
 
 /**
  * 이 엔드포인트를 부를 수 있는 역할.
