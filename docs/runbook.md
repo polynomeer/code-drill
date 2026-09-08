@@ -156,13 +156,27 @@ curl -H "Authorization: Bearer $JUDGE_OPERATOR_TOKEN" \
 
 ```bash
 curl -X POST -H "Authorization: Bearer $PUBLISHER_TOKEN" -H 'Content-Type: application/json' \
-  -d '{"version": 1, "reportDigest": "<그 버전의 보고서 digest>"}' \
+  -d '{"version": 1, "reportDigest": "<그 버전의 보고서 digest>", "validatorVersion": "<그때의 파이프라인 버전>"}' \
   http://localhost:8080/api/v1/admin/problems/<problemId>/publish
 ```
 
-`reportDigest` 는 그 버전을 등록할 때 쓴 §6.3 보고서의 digest다. 모르면
-`GET /api/v1/admin/problems/{id}` 로 확인한다. **공개는 등록자와 다른 사람이 해야
-한다** (§11.2) — 되돌리는 상황에서도 예외를 두지 않는다.
+`reportDigest` 는 그 버전을 등록할 때 쓴 §6.3 보고서의 digest이고, `validatorVersion` 은 그
+보고서를 만든 파이프라인의 버전이다 (§15.3). 둘 다 등록 시점의 감사 로그에 있다.
+
+```bash
+curl -H "Authorization: Bearer $PUBLISHER_TOKEN" \
+  "http://localhost:8080/api/v1/admin/audit?subject=<problemId>@<version>"
+```
+
+`PROBLEM_VERSION_REGISTERED` 행의 `detail` 에 두 값이 함께 있다. 파이프라인이 바뀌어 다시
+검증한 적이 있으면 `PROBLEM_VERSION_REVALIDATED` 행이 더 최근이고, 그 행의 값을 쓴다.
+`GET /api/v1/admin/problems/{id}` 는 공개 포인터와 버전 수만 돌려주므로 여기서는 쓸 수 없다.
+
+**공개는 등록자와 다른 사람이 해야 한다** (§11.2) — 되돌리는 상황에서도 예외를 두지 않는다.
+
+되돌리려는 보고서가 지금 파이프라인보다 옛 버전이면 공개가 거부된다. 그때는 값을 억지로
+맞추지 말고 `validateContent` 를 다시 돌려 같은 버전으로 등록한 뒤 공개한다 — 옛 기준이
+통과시킨 문제를 지금 기준으로 다시 보지 않고 내보내는 것이 사고의 시작이다.
 
 문제를 아예 감추려면 archive 한다. 이미 채점된 제출이 참조하므로 행은 남는다.
 
