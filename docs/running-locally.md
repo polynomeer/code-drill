@@ -74,28 +74,42 @@ KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=pyt
 `CONTENT_ROOT` 는 문제 패키지 경로다. 기본값은 `content/problems` 이며, 저장소 루트가
 아닌 곳에서 실행하면 절대 경로로 지정해야 한다.
 
-## 3. 관리자 토큰
+## 3. 관리자 계정
 
-**운영자를 설정하지 않으면 관리자 API 는 통째로 닫힌다** (§11.2). 기본 토큰을 심어
-두면 그 토큰이 반드시 어느 운영 환경에 그대로 남기 때문이다. 제어 영역과 스크립트가
-같은 환경변수를 읽으므로, 두 터미널에서 같은 값을 export 한다.
+**관리자도 사람과 같은 방식으로 로그인한다** (§11.2). 관리자 API 에 별도의 공유 토큰은
+없다 — 예전에는 `ADMIN_OPERATORS` 에 적힌 토큰이 곧 신원이었고, 그 값은 서버와 스크립트
+양쪽의 프로세스 목록(`ps eww`)에 평문으로 보였다. 읽는 순간 관리자였다.
+
+역할은 DB 의 부여 기록이 정한다. 그런데 역할을 줄 수 있는 사람이 아무도 없으면 아무도
+역할을 받을 수 없으므로, 그 매듭을 푸는 길이 하나 필요하다.
 
 ```bash
-export ADMIN_OPERATORS="\
-content-editor:$(openssl rand -hex 16):CONTENT_EDITOR;\
-release-manager:$(openssl rand -hex 16):CONTENT_EDITOR,PUBLISHER;\
-release-approver:$(openssl rand -hex 16):PUBLISHER;\
-judge-operator:$(openssl rand -hex 16):JUDGE_OPERATOR,REVIEWER;\
-judge-reviewer:$(openssl rand -hex 16):REVIEWER;\
-security-admin:$(openssl rand -hex 16):SECURITY_ADMIN"
+export ADMIN_BOOTSTRAP_EMAIL=admin@codedrill.test   # 앱 터미널과 스크립트 터미널 모두
 ```
 
-역할은 §11.2 의 다섯 가지다. 스모크는 각 역할을 가진 사람이 **둘씩** 있어야 2인 승인을
-확인할 수 있고, `release-manager` 와 `judge-operator` 처럼 **두 단계를 모두 할 수 있는
-계정**이 하나씩 있어야 한다 — 권한이 과하게 열린 계정에서도 등록자·승인자 분리가
-남아 있는지 보기 위한 것이다.
+**역할 표가 완전히 비어 있을 때만**, 이 이메일의 주인이 관리자 API 를 처음 부르는 순간
+SECURITY_ADMIN 하나를 받는다. 한 번 역할이 생기면 다시 열리지 않는다.
 
-토큰은 24자 이상이어야 하며, 짧으면 기동 시점에 거절된다.
+이 값은 비밀이 아니다. 알아도 그 계정의 비밀번호가 없으면 아무것도 못 한다.
+
+비밀번호는 `scripts/operators.py` 가 만들어 `~/.codedrill/seed-operators.json`(권한 600)
+에 둔다. 환경변수로 받지 않는 이유는 그러면 다시 프로세스 목록에 남기 때문이고, 저장소
+밖에 두는 이유는 실수로 커밋될 자리를 만들지 않기 위해서다.
+
+스크립트가 만드는 운영자 구성은 `SEED_OPERATORS` 에 있다. 각 역할을 가진 사람이 **둘씩**
+있어야 2인 승인을 확인할 수 있고, `release-manager` 와 `judge-operator` 처럼 **두 단계를
+모두 할 수 있는 계정**이 하나씩 있어야 한다 — 권한이 과하게 열린 계정에서도 등록자·승인자
+분리가 남아 있는지 보기 위한 것이다.
+
+역할을 손으로 주고 받으려면 SECURITY_ADMIN 으로 부른다.
+
+```bash
+GET    /api/v1/admin/operators                     # 누가 무엇을 할 수 있나
+POST   /api/v1/admin/operators/{userId}/roles      # {"role": "PUBLISHER"}
+DELETE /api/v1/admin/operators/{userId}/roles/{role}
+```
+
+부여와 회수는 감사 로그에 `ADMIN_ROLE_GRANTED` / `ADMIN_ROLE_REVOKED` 로 남는다 (§13.3).
 
 ## 4. 문제 공개
 
@@ -111,7 +125,7 @@ python3 scripts/publish-content.py
 예산)을 돌려 보고서를 남기고, 뒤 명령이 통과한 버전만 등록·공개한다. 30문제 전체를
 돌리므로 몇 분 걸린다. 문제를 추가하는 방법은 [content/tools/README.md](../content/tools/README.md)
 에 있다. 시딩 스크립트는
-`ADMIN_OPERATORS` 에서 서로 다른 두 운영자를 골라 쓰므로 로컬·CI 전용이다 — 사람이 하는
+시드 운영자 중 서로 다른 두 계정을 골라 쓰므로 로컬·CI 전용이다 — 사람이 하는
 공개는 등록과 승인을 각각 다른 사람이 해야 2인 승인이 의미를 갖는다.
 
 개발 중에 공개 절차를 건너뛰려면 `codedrill.content.require-publish=false` 로 띄운다.
@@ -178,7 +192,7 @@ python3 scripts/smoke.py
 사용자 인증과 객체 소유권, 문자열·격자 값 타입의 3개 언어 왕복, 관리자 API 인증과 역할 분리,
 콘텐츠 공개와 2인 승인,
 재채점 승인·실행·dry-run, 멱등성, SSE, 숨은 테스트 비노출까지 실제 서비스로 확인한다.
-115개 항목이 전부 통과해야 한다.
+117개 항목이 전부 통과해야 한다.
 
 스크립트는 실행할 때마다 계정을 새로 만든다. 고정 계정을 두면 그 비밀번호가 저장소에
 남고, 실행할 때마다 남의 기록이 섞인다.
@@ -214,8 +228,9 @@ python3 scripts/drill.py all      # 장애 주입 훈련 — 컨테이너와 Run
 | 문제 목록이 비어 있다 | 아직 공개하지 않았다. 위 4번 절차를 돌린다 |
 | 문제 목록 전체가 500 | 앱이 새 값 타입을 모른다. 세 앱을 다시 띄운다 (아래) |
 | 공개가 409 로 거부된다 | 사유를 읽는다. 등록자·승인자 동일, 패키지 변경, 파이프라인 변경이 각각 다른 문구다 |
-| 관리자 API 가 전부 503 | `ADMIN_OPERATORS` 를 앱 터미널에서 export 하지 않았다 |
-| 관리자 API 가 401 | 스크립트 터미널의 `ADMIN_OPERATORS` 가 앱의 것과 다르다 |
+| 관리자 API 가 전부 403 | 그 계정에 역할이 없다. 부트스트랩 계정으로 부여한다 |
+| 부트스트랩이 역할을 안 준다 | 이미 누군가 역할을 갖고 있다. 표가 빌 때만 열린다 |
+| 관리자 API 가 401 | 로그인하지 않았거나 세션이 만료됐다 (access 30분) |
 | 관리자 API 가 403 | 그 토큰의 역할로는 못 하는 작업이다. 다른 운영자로 부른다 |
 | 제출·초안이 401 | 로그인이 만료됐다. 웹은 자동 갱신하지만 스크립트는 다시 만든다 |
 | 남의 제출이 404 | 정상이다. 소유자가 아니면 있는 것조차 알려 주지 않는다 (§11.3) |

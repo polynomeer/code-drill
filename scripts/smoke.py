@@ -506,8 +506,15 @@ def main() -> int:
     security = operators.with_roles("SECURITY_ADMIN").headers
 
     # 토큰 없이는 아무것도 못 한다. 이전 슬라이스는 X-Actor 헤더를 자칭하면 통과했다.
-    status, _ = raw_request("GET", "/admin/audit")
+    # 빈 값은 "이 헤더 없이 보내라"는 뜻이다 — 기본값은 스모크 사용자의 토큰이라,
+    # 비우지 않으면 "로그인은 했지만 역할이 없다"(403)를 시험하게 된다.
+    status, _ = raw_request("GET", "/admin/audit", None, {"Authorization": ""})
     results.append(check("토큰 없는 요청 거부", status, 401))
+    # 로그인한 일반 사용자도 관리자 API 는 못 연다. 로그인했다는 사실만으로 열리면
+    # 관리자 API 는 사실상 모두에게 열려 있는 셈이다 (§11.2).
+    status, denied = raw_request("GET", "/admin/audit")
+    results.append(check("역할 없는 계정 거부", status, 403))
+    results.append(check("  사유가 역할을 지목", "역할이 없다" in denied["message"], True))
     status, _ = raw_request(
         "GET", "/admin/audit", None, {"Authorization": "Bearer unknown-token-that-is-long-enough"},
     )
