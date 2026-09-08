@@ -3,6 +3,7 @@ package dev.codedrill.judge.runner.execution.sandbox
 import dev.codedrill.judge.runner.execution.CaseOutcome
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.absolutePathString
 
@@ -21,12 +22,17 @@ import kotlin.io.path.absolutePathString
  * | CPU quota | `--cpus` |
  * | memory.max + swap 비활성 | `--memory` 와 같은 값의 `--memory-swap` |
  * | 언어별 seccomp allowlist | `--security-opt seccomp=<프로파일>` |
+ * | 실행이 끝나면 흔적 제거 | `--rm` 과 [forceRemove] |
  *
  * **메모리는 두 겹이다.** 언어 런타임의 상한(JVM `-Xmx`, Python `RLIMIT_AS`)이 먼저
  * 걸리고, 컨테이너 상한은 그것을 빠져나간 경우의 backstop 이다. 그래서 컨테이너 몫은
  * 사용자 한도보다 [MEMORY_HEADROOM_MB] 만큼 크다. 순서가 반대면 모든 초과가 exit 137
  * 로만 보여 어디서 샌 메모리인지 알 수 없게 된다.
  *
+ * **컨테이너 수명은 두 겹이다.** `--rm` 은 컨테이너가 *스스로 끝났을 때*만 동작하므로,
+ * 무한 루프처럼 끝나지 않는 풀이에는 아무 효과가 없다. 그리고 데드라인에 걸려 죽는 것은
+ * `docker run` **클라이언트 프로세스**일 뿐, 컨테이너는 데몬 아래 그대로 남아 계속 돈다.
+ * 그래서 [run] 은 컨테이너에 이름을 붙이고 끝날 때 [forceRemove] 로 직접 지운다.
  */
 class ContainerSandbox(
     private val image: String,
@@ -99,7 +105,11 @@ class ContainerSandbox(
         onEvent: (String, String) -> Unit,
         shouldContinue: (String, CaseOutcome) -> Boolean,
     ): SandboxRun {
-        val process = ProcessBuilder(buildCommand(spec)).start()
+        // 이름을 미리 정해 둬야 컨테이너를 지울 수 있다. `docker run` 의 출력에서 id 를
+        // 읽는 방법은 쓸 수 없다 — 그 출력은 사용자 코드의 프로토콜 스트림이고, 애초에
+        // 컨테이너가 매달린 채 아무것도 내보내지 않는 경우가 지워야 하는 바로 그 경우다.
+        val containerName = "$CONTAINER_PREFIX${UUID.randomUUID()}"
+        val process = ProcessBuilder(buildCommand(spec, containerName)).start()
 
         return SandboxStream.consume(
             process = process,
@@ -109,7 +119,30 @@ class ContainerSandbox(
             outputByteLimit = spec.outputByteLimit,
             onEvent = onEvent,
             shouldContinue = shouldContinue,
+            onTeardown = { forceRemove(containerName) },
         )
+    }
+
+    /**
+     * 컨테이너를 확실히 없앤다. 실행 경로가 어떻게 끝났든 마지막에 반드시 한 번 돈다.
+     *
+     * 정상 종료한 실행에서는 `--rm` 이 이미 지운 뒤라 "No such container" 로 실패하는데,
+     * 그것이 정상이므로 종료 코드를 보지 않는다. 여기서 확인할 것은 오직 **호출이 걸려
+     * 있지 않은가**뿐이다 — 데몬이 응답하지 않을 때 이 정리가 채점 스레드를 붙잡으면
+     * 컨테이너 하나가 새는 대신 Runner 전체가 멈춘다.
+     */
+    private fun forceRemove(containerName: String) {
+        runCatching {
+            val process = ProcessBuilder(runtimeBinary, "rm", "--force", containerName)
+                .redirectErrorStream(true)
+                .start()
+            if (!process.waitFor(REMOVE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                process.destroyForcibly()
+                log.warn("샌드박스 컨테이너 제거가 시간 안에 끝나지 않았다: {}", containerName)
+            }
+        }.onFailure { error ->
+            log.warn("샌드박스 컨테이너를 제거하지 못했다: {} ({})", containerName, error.message)
+        }
     }
 
     /**
@@ -135,11 +168,12 @@ class ContainerSandbox(
         value.toInt()
     }.getOrDefault(0)
 
-    private fun buildCommand(spec: SandboxSpec): List<String> {
+    private fun buildCommand(spec: SandboxSpec, containerName: String): List<String> {
         val containerMemory = spec.memoryMb + MEMORY_HEADROOM_MB
         val command = mutableListOf(
             runtimeBinary, "run", "--rm",
-            // 실행이 끝나면 흔적을 남기지 않는다.
+            // 스스로 끝난 실행은 여기서 정리된다. 끝나지 않는 실행은 forceRemove 가 맡는다.
+            "--name", containerName,
             "--network", "none",
             "--read-only",
             // 쓰기가 필요한 곳은 여기 하나뿐이고, 실행 권한도 주지 않는다.
@@ -204,6 +238,12 @@ class ContainerSandbox(
         const val DEFAULT_RUNTIME = "docker"
         const val DEFAULT_CPUS = "1"
         const val DEFAULT_PIDS_LIMIT = 64
+
+        /** 컨테이너 이름 접두사. 호스트에서 사람이 봤을 때 출처가 드러나야 한다. */
+        const val CONTAINER_PREFIX = "codedrill-sandbox-"
+
+        const val REMOVE_TIMEOUT_SECONDS = 15L
+
 
         /** nobody:nogroup. 이미지에 관계없이 존재하는 비특권 계정이다. */
         const val UNPRIVILEGED_UID = 65534

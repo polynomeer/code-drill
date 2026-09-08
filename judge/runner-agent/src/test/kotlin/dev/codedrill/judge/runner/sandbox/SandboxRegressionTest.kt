@@ -16,6 +16,7 @@ import dev.codedrill.platform.problempackage.Limits
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
  * | 네트워크 | `외부로 연결하지 못한다` |
  * | 시스템 호출 — allowlist 밖 | `허용 목록에 없는 시스템 호출은 막힌다` |
  * | 샌드박스 탈출 — 네임스페이스·ptrace | `새 사용자 네임스페이스를 만들지 못한다` |
+ * | 자원 고갈 — 컨테이너 누수 | `무한 루프는 컨테이너를 남기지 않는다` |
  *
  * 컨테이너 런타임이 없으면 통째로 건너뛴다. **건너뛴 것을 통과로 읽으면 안 된다** —
  * 이 스위트가 돌지 않은 빌드는 격리를 검증하지 않은 빌드다 (§14.4 Security 게이트).
@@ -312,6 +314,53 @@ class SandboxRegressionTest {
                 "$language: ${result.cases.first()}",
             )
         }
+    }
+
+    /**
+     * 데드라인에 걸린 실행이 컨테이너를 남기지 않는지 (§11.1 자원 고갈).
+     *
+     * 이것이 깨졌을 때 증상은 오판이 아니라 **호스트가 조용히 죽는 것**이다. 판정은
+     * TIME_LIMIT 으로 정확히 나오고 사용자에게는 아무 문제가 없어 보이는데, 무한 루프는
+     * 컨테이너 안에서 계속 돌면서 CPU 한 코어씩을 영구히 가져간다. 실제로 이 누수로
+     * 개발 머신에 컨테이너 64개가 24시간 동안 살아 있었다.
+     *
+     * `--rm` 은 이것을 막지 못한다. 컨테이너가 스스로 끝났을 때만 도는 옵션이고, 여기서
+     * 문제가 되는 실행은 정의상 스스로 끝나지 않는다.
+     */
+    @Test
+    fun `무한 루프는 컨테이너를 남기지 않는다`() {
+        requireContainers()
+
+        val before = sandboxContainerIds()
+
+        val result = engine.execute(
+            request(
+                Language.KOTLIN,
+                GoldenSources.TIME_LIMIT.getValue(Language.KOTLIN),
+                Limits(timeMillis = 2_000, memoryMb = 256, outputBytes = 65_536),
+            ),
+        )
+
+        assertEquals(Verdict.TIME_LIMIT, result.cases.first().verdict)
+
+        // 판정이 맞는 것으로는 부족하다. 누수는 판정이 정확할 때도 일어난다.
+        val leaked = sandboxContainerIds() - before
+        assertTrue(
+            leaked.isEmpty(),
+            "데드라인 뒤에도 샌드박스 컨테이너가 남았다: $leaked",
+        )
+    }
+
+    /** 지금 이 호스트에 남아 있는 샌드박스 컨테이너. */
+    private fun sandboxContainerIds(): Set<String> {
+        val process = ProcessBuilder(
+            "docker", "ps", "--all", "--no-trunc",
+            "--filter", "name=${ContainerSandbox.CONTAINER_PREFIX}",
+            "--format", "{{.ID}}",
+        ).start()
+        val ids = process.inputStream.bufferedReader().readText()
+        process.waitFor(30, TimeUnit.SECONDS)
+        return ids.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
     }
 
     @Test
