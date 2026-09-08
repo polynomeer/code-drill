@@ -6,13 +6,14 @@ import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.RequestedGroup
-import dev.codedrill.judge.protocol.TestCaseResult
 import dev.codedrill.judge.protocol.TraceManifest
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.platform.problempackage.Limits
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
+import dev.codedrill.platform.problempackage.TestCase
+import dev.codedrill.platform.problempackage.TestGroup
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.io.path.exists
@@ -224,7 +225,14 @@ class ContentValidator(
         // 그 판정은 머신 속도와 무관하므로 잴 것이 없다.
         val decisive = result.terminalVerdict != null ||
             killers.any { it.verdict != Verdict.TIME_LIMIT }
-        val timedOut = if (decisive) emptyList() else killers.filter { it.verdict == Verdict.TIME_LIMIT }
+        // 그룹 **전부**를 모은다. 시간으로 잡히는 자리는 성능 그룹만이 아니다 — 값이
+        // 커서 느려지는 오답은 경계 케이스에서도 걸린다. 첫 그룹만 보면 그 그룹의
+        // 빠듯한 여유가 문제 전체의 여유로 잘못 보고된다.
+        val timedOutGroups = if (decisive) {
+            emptyList()
+        } else {
+            killers.filter { it.verdict == Verdict.TIME_LIMIT }.map { it.groupId }.distinct()
+        }
 
         return MutationResult(
             name = mutant.name,
@@ -233,30 +241,35 @@ class ContentValidator(
             // 어느 그룹이 잡았는지. 특정 그룹만 일하고 있으면 테스트 설계가 치우친 것이다.
             killedBy = killers.map { it.groupId }.distinct().sorted(),
             verdicts = killers.map { it.verdict.name }.distinct().sorted(),
-            timeMargin = widestMargin(pkg, mutant, timedOut),
+            timeMargin = widestMargin(pkg, mutant, timedOutGroups),
         )
     }
 
     /**
-     * 시간으로 잡은 케이스들 중 **가장 크게 이긴** 여유.
+     * 그룹 안에서 오답이 **가장 크게 진** 여유.
      *
      * 케이스 하나하나가 넉넉할 필요는 없다. 작은 입력에서 느린 풀이가 아슬아슬하게
      * 통과하거나 아슬아슬하게 걸리는 것은 부분 점수가 있는 그룹의 의도다 (§6.2).
      * 물어야 할 것은 **"어디선가 확실히 잡히는가"**다.
      *
-     * 큰 케이스가 뒤에 오므로 뒤에서부터 재고, 기준을 넘기면 거기서 멈춘다.
+     * 판정 결과가 아니라 **그룹의 케이스 전부**를 훑는다. 한 케이스가 데드라인에 걸리면
+     * 프로세스가 죽어 뒤 케이스는 실행되지 않으므로, 결과만 보면 큰 케이스가 있는지조차
+     * 알 수 없다. 큰 것이 뒤에 오니 뒤에서부터 재고, 기준을 넘기면 멈춘다.
      */
     private fun widestMargin(
         pkg: ProblemPackage,
         mutant: Mutant,
-        timedOut: List<TestCaseResult>,
+        groupIds: List<String>,
     ): Double? {
-        if (timedOut.isEmpty()) return null
+        if (groupIds.isEmpty()) return null
 
         var widest = 0.0
-        for (case in timedOut.reversed()) {
-            widest = maxOf(widest, margin(pkg, mutant, case))
-            if (widest >= MARGIN_PROBE) return widest
+        // 뒤에서부터 본다. 큰 입력이 뒤에 오고, 성능 그룹이 그룹 목록의 끝에 있다.
+        for (group in pkg.groups.filter { it.policy.id in groupIds }.reversed()) {
+            for (case in group.cases.reversed()) {
+                widest = maxOf(widest, margin(pkg, mutant, group, case))
+                if (widest >= MARGIN_PROBE) return widest
+            }
         }
         return widest
     }
@@ -275,9 +288,12 @@ class ContentValidator(
      * 비용은 오답 하나당 한도의 [MARGIN_PROBE] 배로 묶인다. 자릿수로 지는 오답은 그
      * 시간을 다 쓰지만, 그 대가로 "어디서 돌려도 잡힌다"를 얻는다.
      */
-    private fun margin(pkg: ProblemPackage, mutant: Mutant, killed: TestCaseResult): Double {
-        val group = pkg.groups.first { it.policy.id == killed.groupId }
-        val case = group.cases.first { it.id == killed.caseId }
+    private fun margin(
+        pkg: ProblemPackage,
+        mutant: Mutant,
+        group: TestGroup,
+        case: TestCase,
+    ): Double {
         val limitMillis = pkg.manifest.limits.timeMillis * group.policy.limitMultiplier.time
 
         val probe = engine.execute(
@@ -329,9 +345,9 @@ class ContentValidator(
      * 자릿수로 지지 않고 배로 지는 오답은 **머신이 판정을 정한다.** 한가한 머신에서는
      * 통과하고 바쁜 머신에서는 잡히므로, 그 문제의 공개 여부는 그날의 부하에 달린다.
      *
-     * **경고로 둔다.** 공개를 막으면 지금 얇은 문제들이 한꺼번에 막히는데, 그 문제들은
-     * 잘못 채점하고 있는 것이 아니라 오답을 아슬아슬하게 잡고 있을 뿐이다. 어디까지
-     * 감수할지는 콘텐츠를 쥔 사람이 정할 일이지 검증기가 혼자 정할 일이 아니다.
+     * **공개를 막는다.** 처음에는 경고로 두었는데, 그러면 "잡히기는 하니까"로 넘어가고
+     * 실제로 잡지 못하는 문제가 그 상태로 남는다 — `count-inversions` 는 오답이 한도
+     * 안에 끝나고 있었는데도 공개돼 있었다.
      */
     private fun performanceMargin(results: List<MutationResult>): List<Check> {
         val timed = results.filter { it.timeMargin != null }
@@ -350,7 +366,7 @@ class ContentValidator(
                         "${"%.1f".format(worst)}배 이상",
                 )
             } else {
-                Check.warn(
+                Check.fail(
                     "performance-margin",
                     "한도를 겨우 넘는 오답: " +
                         thin.joinToString { "${it.name}(${"%.1f".format(it.timeMargin)}배)" } +
@@ -528,25 +544,10 @@ data class ValidationReport(
     val validatorVersion: String = ContentValidator.VALIDATOR_VERSION,
 )
 
-/**
- * 검증 단계 하나의 결과.
- *
- * [warning] 은 통과이되 사람이 봐야 할 것이다. 공개를 막지는 않는다 — 막으면 이미
- * 공개된 문제가 한꺼번에 막히고, 그 판단은 검증기가 혼자 내릴 것이 아니다.
- *
- * 그래서 [passed] 와 별개의 축이다. 보고서 digest 는 [passed] 만 섞으므로, 경고가
- * 생기고 사라져도 등록된 버전이 무효가 되지 않는다.
- */
-data class Check(
-    val stage: String,
-    val passed: Boolean,
-    val detail: String,
-    val warning: Boolean = false,
-) {
+data class Check(val stage: String, val passed: Boolean, val detail: String) {
     companion object {
         fun pass(stage: String, detail: String) = Check(stage, true, detail)
         fun fail(stage: String, detail: String) = Check(stage, false, detail)
-        fun warn(stage: String, detail: String) = Check(stage, true, detail, warning = true)
     }
 }
 

@@ -9,6 +9,8 @@ import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteExisting
+import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeText
 import kotlin.system.exitProcess
 
@@ -41,18 +43,18 @@ object ValidateContent {
             .enable(SerializationFeature.INDENT_OUTPUT)
 
         reportRoot.createDirectories()
+        // 지난 실행이 남긴 보고서를 지우고 시작한다. 문제의 version 을 올리면 옛 버전의
+        // 보고서가 그대로 남아, 시딩이 **이미 대체된 버전을 다시 공개**한다. 보고서는
+        // 검증의 산출물이지 쌓아 두는 기록이 아니다.
+        reportRoot.listDirectoryEntries("*.json").forEach { it.deleteExisting() }
+
         val reports = validator.validateAll()
 
         for (report in reports) {
             val marker = if (report.passed) "PASS" else "FAIL"
             println("$marker  ${report.problemVersionId}  (report ${report.reportDigest.take(12)})")
             report.checks.forEach { check ->
-                val mark = when {
-                    !check.passed -> "✗"
-                    check.warning -> "⚠"
-                    else -> "·"
-                }
-                println("        $mark ${check.stage}: ${check.detail}")
+                println("        ${if (check.passed) "·" else "✗"} ${check.stage}: ${check.detail}")
             }
             report.mutations.forEach { mutation ->
                 val killed = if (mutation.killed) "잡힘 (${mutation.killedBy.joinToString()})" else "살아남음"
@@ -64,22 +66,8 @@ object ValidateContent {
         }
 
         val failed = reports.count { !it.passed }
-        val warned = reports.filter { report -> report.checks.any { it.warning } }
-
         println()
         println("${reports.size - failed}/${reports.size} 통과")
-
-        // 경고는 공개를 막지 않는다. 그래서 더더욱 마지막에 한 번 더 모아 보여 준다 —
-        // 통과 줄만 보고 닫으면 그대로 묻힌다.
-        if (warned.isNotEmpty()) {
-            println()
-            println("경고 ${warned.size}건 — 공개는 막지 않는다")
-            warned.forEach { report ->
-                report.checks.filter { it.warning }.forEach { check ->
-                    println("  ⚠ ${report.problemVersionId}  ${check.stage}: ${check.detail}")
-                }
-            }
-        }
         if (failed > 0) exitProcess(1)
     }
 }
