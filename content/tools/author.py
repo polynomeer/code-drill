@@ -291,14 +291,15 @@ def catalog() -> list[Problem]:
     import catalog_dp
     import catalog_graph
     import catalog_math
+    import catalog_matrix
     import catalog_search
     import catalog_strings
     import catalog_stack
 
     problems: list[Problem] = []
     for module in (
-        catalog_arrays, catalog_dp, catalog_graph,
-        catalog_math, catalog_search, catalog_stack, catalog_strings,
+        catalog_arrays, catalog_dp, catalog_graph, catalog_math,
+        catalog_matrix, catalog_search, catalog_stack, catalog_strings,
     ):
         problems += module.PROBLEMS
 
