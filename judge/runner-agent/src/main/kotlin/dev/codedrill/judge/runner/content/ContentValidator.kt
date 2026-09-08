@@ -223,15 +223,25 @@ class ContentValidator(
 
         // 시간이 **유일한** 근거일 때만 여유를 잰다. 오답 하나가 값으로도 틀렸다면
         // 그 판정은 머신 속도와 무관하므로 잴 것이 없다.
+        // 자원으로**만** 잡히면 여유를 잰다. 값으로도 틀렸다면 그 판정은 머신과 무관하다.
         val decisive = result.terminalVerdict != null ||
-            killers.any { it.verdict != Verdict.TIME_LIMIT }
-        // 그룹 **전부**를 모은다. 시간으로 잡히는 자리는 성능 그룹만이 아니다 — 값이
-        // 커서 느려지는 오답은 경계 케이스에서도 걸린다. 첫 그룹만 보면 그 그룹의
-        // 빠듯한 여유가 문제 전체의 여유로 잘못 보고된다.
-        val timedOutGroups = if (decisive) {
+            killers.any { it.verdict !in RESOURCE_VERDICTS }
+        // 그룹 **전부**를 모은다. 자원으로 잡히는 자리는 성능 그룹만이 아니다 — 값이
+        // 커서 느려지거나 커지는 오답은 경계 케이스에서도 걸린다. 첫 그룹만 보면 그
+        // 그룹의 빠듯한 여유가 문제 전체의 여유로 잘못 보고된다.
+        fun groupsWith(verdict: Verdict) = if (decisive) {
             emptyList()
         } else {
-            killers.filter { it.verdict == Verdict.TIME_LIMIT }.map { it.groupId }.distinct()
+            killers.filter { it.verdict == verdict }.map { it.groupId }.distinct()
+        }
+
+        val timeMargin = widestMargin(pkg, mutant, groupsWith(Verdict.TIME_LIMIT))
+        // 시간이 이미 넉넉하면 메모리는 재지 않는다. 자원 하나가 확실히 잡으면 그
+        // 오답은 어디서 돌려도 잡히고, 측정 한 번이 한도의 세 배씩 든다.
+        val memoryClearsProbe = if (timeMargin != null && timeMargin >= MIN_MARGIN) {
+            null
+        } else {
+            memoryStillExceeds(pkg, mutant, groupsWith(Verdict.MEMORY_LIMIT))
         }
 
         return MutationResult(
@@ -241,8 +251,45 @@ class ContentValidator(
             // 어느 그룹이 잡았는지. 특정 그룹만 일하고 있으면 테스트 설계가 치우친 것이다.
             killedBy = killers.map { it.groupId }.distinct().sorted(),
             verdicts = killers.map { it.verdict.name }.distinct().sorted(),
-            timeMargin = widestMargin(pkg, mutant, timedOutGroups),
+            timeMargin = timeMargin,
+            memoryClearsProbe = memoryClearsProbe,
         )
+    }
+
+    /**
+     * 메모리를 [MARGIN_PROBE] 배로 늘려도 여전히 넘치는지 (§12.1 재현성).
+     *
+     * **배수를 재지 않고 사실만 본다.** JVM 이 돌려주는 사용량은 케이스가 끝난 시점의
+     * 힙이라 정점이 아니고, 애초에 메모리로 죽은 실행은 결과 줄을 남기지 않아 잴 값
+     * 자체가 없다. 반면 "세 배로 늘려도 넘치는가"는 실행 한 번으로 확실히 답이 나온다.
+     *
+     * 시간도 함께 늘린다. 메모리만 늘리면 늘어난 힙을 쓰느라 느려져 시간에 먼저 걸리고,
+     * 그러면 메모리 여유를 물었는데 시간이 답하게 된다.
+     */
+    private fun memoryStillExceeds(
+        pkg: ProblemPackage,
+        mutant: Mutant,
+        groupIds: List<String>,
+    ): Boolean? {
+        if (groupIds.isEmpty()) return null
+
+        for (group in pkg.groups.filter { it.policy.id in groupIds }.reversed()) {
+            for (case in group.cases.reversed()) {
+                val probe = engine.execute(
+                    request(
+                        pkg = pkg,
+                        source = mutant.source,
+                        limits = pkg.manifest.limits.copy(
+                            timeMillis = (pkg.manifest.limits.timeMillis * MARGIN_PROBE).toLong(),
+                            memoryMb = (pkg.manifest.limits.memoryMb * MARGIN_PROBE).toInt(),
+                        ),
+                        groups = listOf(RequestedGroup(group.policy, listOf(case))),
+                    ),
+                )
+                if (probe.cases.firstOrNull()?.verdict == Verdict.MEMORY_LIMIT) return true
+            }
+        }
+        return false
     }
 
     /**
@@ -350,28 +397,28 @@ class ContentValidator(
      * 안에 끝나고 있었는데도 공개돼 있었다.
      */
     private fun performanceMargin(results: List<MutationResult>): List<Check> {
-        val timed = results.filter { it.timeMargin != null }
-        if (timed.isEmpty()) {
-            return listOf(Check.pass("performance-margin", "시간으로만 잡는 오답이 없다"))
+        val measured = results.filter { it.timeMargin != null || it.memoryClearsProbe != null }
+        if (measured.isEmpty()) {
+            return listOf(Check.pass("performance-margin", "자원으로만 잡는 오답이 없다"))
         }
 
-        val thin = timed.filter { it.timeMargin!! < MIN_MARGIN }
-        val worst = timed.minOf { it.timeMargin!! }
+        // 자원 하나만 확실하면 된다. 시간으로 넉넉히 지면 메모리가 빠듯한지는 상관없다.
+        val thin = measured.filterNot { it.clearsMargin() }
 
         return listOf(
             if (thin.isEmpty()) {
                 Check.pass(
                     "performance-margin",
-                    "시간으로 잡는 오답 ${timed.size}개, 가장 빠듯한 것도 한도의 " +
-                        "${"%.1f".format(worst)}배 이상",
+                    "자원으로 잡는 오답 ${measured.size}개, 전부 한도의 " +
+                        "${MIN_MARGIN.toInt()}배 넘게 넘긴다",
                 )
             } else {
                 Check.fail(
                     "performance-margin",
-                    "한도를 겨우 넘는 오답: " +
-                        thin.joinToString { "${it.name}(${"%.1f".format(it.timeMargin)}배)" } +
-                        ". ${MIN_MARGIN.toInt()}배를 넘지 못하면 빠른 머신에서는 통과한다 — " +
-                        "케이스를 키우거나, 못 키우면 오답을 자릿수로 지는 것으로 바꾼다",
+                    "한도를 겨우 넘는 오답: " + thin.joinToString { it.marginDetail() } +
+                        ". ${MIN_MARGIN.toInt()}배를 넘지 못하면 더 빠르거나 더 넉넉한 " +
+                        "머신에서는 통과한다 — 케이스를 키우거나, 못 키우면 오답을 " +
+                        "자릿수로 지는 것으로 바꾼다",
                 )
             },
         )
@@ -511,7 +558,10 @@ class ContentValidator(
          * 머신마다 단일 스레드 속도는 몇 배씩 차이 난다. 그 차이보다 작은 여유로 잡은
          * 오답은 다른 머신에서 통과한다.
          */
-        private const val MIN_MARGIN = 3.0
+        const val MIN_MARGIN = 3.0
+
+        /** 머신·런타임 설정에 따라 결과가 달라질 수 있는 판정. 이것들만 여유를 잰다. */
+        private val RESOURCE_VERDICTS = setOf(Verdict.TIME_LIMIT, Verdict.MEMORY_LIMIT)
 
         /**
          * 여유를 잴 때 늘리는 배수. [MIN_MARGIN] 과 같게 둔다.
@@ -564,4 +614,22 @@ data class MutationResult(
      * 여부를 정한 것이 알고리즘이 아니라 그날의 부하다 (§12.1).
      */
     val timeMargin: Double? = null,
-)
+    /**
+     * 메모리로 잡힌 오답이 한도를 세 배로 늘려도 여전히 넘치는지.
+     *
+     * 배수가 아니라 사실이다 — 메모리로 죽은 실행은 사용량을 남기지 않고, 남기는
+     * 값도 정점이 아니라 케이스가 끝난 시점의 힙이다. 시간 여유가 이미 충분하면
+     * 재지 않으므로 `null` 이다.
+     */
+    val memoryClearsProbe: Boolean? = null,
+) {
+    /** 자원 중 **하나라도** 확실히 잡으면 그 오답은 어디서 돌려도 잡힌다. */
+    internal fun clearsMargin(): Boolean =
+        (timeMargin != null && timeMargin >= ContentValidator.MIN_MARGIN) || memoryClearsProbe == true
+
+    internal fun marginDetail(): String = when {
+        memoryClearsProbe == false && timeMargin == null -> "$name(메모리를 3배로 주면 통과한다)"
+        memoryClearsProbe == false -> "$name(시간 ${"%.1f".format(timeMargin)}배, 메모리도 3배면 통과)"
+        else -> "$name(${"%.1f".format(timeMargin)}배)"
+    }
+}
