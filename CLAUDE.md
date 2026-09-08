@@ -34,6 +34,7 @@ Claude가 만든 커밋은 마지막 줄에 `Co-Authored-By: Claude Opus 5 <nore
 ./gradlew test                    # 테스트만
 ./gradlew checkModuleBoundaries   # 도메인 모듈이 서로를 참조하는지 검사
 ./gradlew :judge:runner-agent:validateContent   # 콘텐츠 검증 (§6.3)
+python3 scripts/up.py             # 의존성+앱 셋+웹을 한 번에 (포트가 차 있으면 비켜 간다)
 python3 scripts/smoke.py          # E2E 스모크 (앱 세 개가 떠 있어야 한다)
 python3 scripts/loadtest.py       # 부하 시험과 §12.1 SLO 판정
 python3 scripts/drill.py all      # 장애 주입 훈련 (컨테이너와 Runner 를 실제로 죽인다)

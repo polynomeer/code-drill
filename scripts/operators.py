@@ -25,7 +25,7 @@ import sys
 import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8080/api/v1"
+BASE = os.environ.get("CODEDRILL_BASE", "http://localhost:8080").rstrip("/") + "/api/v1"
 BOOTSTRAP_ENV = "ADMIN_BOOTSTRAP_EMAIL"
 STORE = pathlib.Path.home() / ".codedrill" / "seed-operators.json"
 

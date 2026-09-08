@@ -74,6 +74,31 @@ KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=pyt
 `CONTENT_ROOT` 는 문제 패키지 경로다. 기본값은 `content/problems` 이며, 저장소 루트가
 아닌 곳에서 실행하면 절대 경로로 지정해야 한다.
 
+## 한 번에 띄우기
+
+아래 절차를 전부 실행하는 스크립트가 있다. 처음이거나, 무엇이 어디에 떠 있는지
+헷갈릴 때는 이쪽이 빠르다.
+
+```bash
+python3 scripts/up.py            # 의존성 + 앱 셋 + 웹
+python3 scripts/up.py --status   # 지금 무엇이 어디에
+python3 scripts/up.py --down     # 앱을 내린다 (--all 이면 컨테이너까지)
+```
+
+**포트가 차 있으면 비켜 간다.** 개발 머신에는 5432·6379·8080 을 쓰는 스택이 이미 떠
+있는 경우가 흔하다. 고른 포트는 `.codedrill-stack.json` 에 적어 다음 실행에서도 같은
+값을 쓴다 — 매번 달라지면 컨테이너가 다시 만들어지고 DB 가 날아간다. 이미 떠 있는
+우리 컨테이너의 포트는 그대로 물려받는다.
+
+비켜 간 포트는 스크립트가 알아서 넘겨 준다. 손으로 부를 때는 이렇게 맞춘다.
+
+```bash
+export CODEDRILL_BASE=http://localhost:8085   # scripts/up.py --status 가 알려 준다
+python3 scripts/smoke.py
+```
+
+아래는 그 스크립트가 무엇을 하는지, 그리고 손으로 할 때 무엇이 필요한지다.
+
 ## 3. 관리자 계정
 
 **관리자도 사람과 같은 방식으로 로그인한다** (§11.2). 관리자 API 에 별도의 공유 토큰은

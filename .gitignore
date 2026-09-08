@@ -41,3 +41,6 @@ content/reports/
 # Python 캐시. 스크립트를 import 한 흔적이지 산출물이 아니다.
 __pycache__/
 *.pyc
+
+# scripts/up.py 가 고른 포트와 pid. 머신마다 다르다.
+.codedrill-stack.json

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 import urllib.error
@@ -24,7 +25,7 @@ import urllib.request
 
 import operators
 
-BASE = "http://localhost:8080/api/v1/admin"
+BASE = os.environ.get("CODEDRILL_BASE", "http://localhost:8080").rstrip("/") + "/api/v1/admin"
 REPORT_DIR = pathlib.Path("content/reports")
 
 
