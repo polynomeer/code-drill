@@ -527,6 +527,25 @@ def main() -> int:
     status, _ = raw_request("GET", "/admin/audit", None, registrar)
     results.append(check("감사 로그는 보안 역할만", status, 403))
 
+    # 역할을 스스로 늘릴 수 있으면 2인 승인은 사람 수를 세지 못한다 (§11.2).
+    me = security["Authorization"]
+    status, refused = raw_request(
+        "POST", f"/admin/operators/{operators.with_roles('SECURITY_ADMIN').user_id}/roles",
+        {"role": "PUBLISHER"}, security,
+    )
+    results.append(check("자기 자신에게 역할 부여 거부", status, 409))
+    results.append(check("  사유가 자기 부여를 지목", "자기 자신" in refused["reason"], True))
+
+    other = operators.with_roles("CONTENT_EDITOR")
+    status, granted = raw_request(
+        "POST", f"/admin/operators/{other.user_id}/roles", {"role": "REVIEWER"}, security,
+    )
+    results.append(check("남에게는 부여된다", status, 200))
+    status, _ = raw_request(
+        "DELETE", f"/admin/operators/{other.user_id}/roles/REVIEWER", None, security,
+    )
+    results.append(check("회수도 된다", status, 200))
+
     print("\n콘텐츠 공개와 2인 승인 (§3.2, §11.2, §13.3)")
     pid = "smoke-" + uuid.uuid4().hex[:8]
     digest = uuid.uuid4().hex

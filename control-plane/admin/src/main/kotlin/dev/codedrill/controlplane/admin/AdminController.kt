@@ -92,9 +92,7 @@ class AdminController(
         val role = request.parsed()
             ?: return ResponseEntity.badRequest().body(mapOf("reason" to "알 수 없는 역할이다: ${request.role}"))
 
-        return ResponseEntity.ok(
-            mapOf("userId" to userId, "role" to role.name, "changed" to roles.grant(userId, role, actor)),
-        )
+        return respond(userId, role, roles.grant(userId, role, actor))
     }
 
     @RequiresRole(AdminRole.SECURITY_ADMIN)
@@ -107,8 +105,24 @@ class AdminController(
         val parsed = runCatching { AdminRole.valueOf(role.uppercase()) }.getOrNull()
             ?: return ResponseEntity.badRequest().body(mapOf("reason" to "알 수 없는 역할이다: $role"))
 
-        return ResponseEntity.ok(
-            mapOf("userId" to userId, "role" to parsed.name, "changed" to roles.revoke(userId, parsed, actor)),
+        return respond(userId, parsed, roles.revoke(userId, parsed, actor))
+    }
+
+    /** 거절은 409 다. "안 바뀌었다"(200)와 구분되지 않으면 스크립트가 실패를 못 본다. */
+    private fun respond(
+        userId: String,
+        role: AdminRole,
+        outcome: RoleOutcome,
+    ): ResponseEntity<Map<String, Any>> = when (outcome) {
+        is RoleOutcome.Refused ->
+            ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
+
+        else -> ResponseEntity.ok(
+            mapOf(
+                "userId" to userId,
+                "role" to role.name,
+                "changed" to (outcome is RoleOutcome.Changed),
+            ),
         )
     }
 

@@ -86,3 +86,49 @@ class AdminIdentityTest {
         assertEquals("", AdminProperties().bootstrapEmail)
     }
 }
+
+/**
+ * 역할 변경의 안전장치 (기술 설계서 §11.2).
+ *
+ * 판단만 순수 함수로 빼 두었다. 규칙이 DB 질의 사이에 섞여 있으면 시험하려고 DB 를
+ * 띄워야 하고, 그러면 이 두 규칙은 시험되지 않은 채로 남는다.
+ */
+class RoleChangeTest {
+
+    @Test
+    fun `자기 자신에게는 역할을 줄 수 없다`() {
+        // 막지 않으면 SECURITY_ADMIN 한 명이 자기에게 등록 권한과 공개 권한을 붙여
+        // 2인 승인을 혼자 통과한다.
+        val refused = AdminRoles.selfGrant(userId = "user-1", actor = "user-1")
+
+        assertTrue(refused is RoleOutcome.Refused)
+        assertTrue("자기 자신" in refused.reason, refused.reason)
+    }
+
+    @Test
+    fun `남에게 주는 것은 막지 않는다`() {
+        assertEquals(null, AdminRoles.selfGrant(userId = "user-1", actor = "user-2"))
+    }
+
+    @Test
+    fun `마지막 SECURITY_ADMIN 은 회수할 수 없다`() {
+        // 회수하면 역할을 줄 수 있는 사람이 없어지는데, 부트스트랩은 역할 표가
+        // 완전히 비어야 열린다. 다른 역할이 하나라도 남아 있으면 되살릴 길이 없다.
+        val refused = AdminRoles.lastSecurityAdmin(AdminRole.SECURITY_ADMIN, holders = 1)
+
+        assertTrue(refused is RoleOutcome.Refused)
+        assertTrue("마지막" in refused.reason, refused.reason)
+    }
+
+    @Test
+    fun `둘 이상이면 회수할 수 있다`() {
+        assertEquals(null, AdminRoles.lastSecurityAdmin(AdminRole.SECURITY_ADMIN, holders = 2))
+    }
+
+    @Test
+    fun `다른 역할은 마지막이어도 회수할 수 있다`() {
+        // 잠기는 것은 역할을 줄 수 있는 사람이 사라질 때뿐이다. PUBLISHER 가 없어지면
+        // 공개를 못 할 뿐, SECURITY_ADMIN 이 다시 줄 수 있다.
+        assertEquals(null, AdminRoles.lastSecurityAdmin(AdminRole.PUBLISHER, holders = 1))
+    }
+}

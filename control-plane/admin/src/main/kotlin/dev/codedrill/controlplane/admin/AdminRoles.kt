@@ -59,7 +59,9 @@ class AdminRoles(
     }
 
     @Transactional
-    fun grant(userId: String, role: AdminRole, actor: String): Boolean {
+    fun grant(userId: String, role: AdminRole, actor: String): RoleOutcome {
+        selfGrant(userId, actor)?.let { return it }
+
         val changed = jdbc.update(
             """
             INSERT INTO admin_role (user_id, role, granted_by) VALUES (?, ?, ?)
@@ -69,7 +71,7 @@ class AdminRoles(
         )
         // 이미 있는 역할을 다시 주는 것은 아무 일도 아니다. 감사 로그에 남기면 실제로
         // 권한이 바뀐 순간을 찾기 어려워진다.
-        if (changed == 0) return false
+        if (changed == 0) return RoleOutcome.Unchanged
 
         audit.record(
             AuditAction.ADMIN_ROLE_GRANTED,
@@ -77,16 +79,18 @@ class AdminRoles(
             actor = actor,
             detail = mapOf("role" to role.name),
         )
-        return true
+        return RoleOutcome.Changed
     }
 
     @Transactional
-    fun revoke(userId: String, role: AdminRole, actor: String): Boolean {
+    fun revoke(userId: String, role: AdminRole, actor: String): RoleOutcome {
+        lastSecurityAdmin(role, holdersOf(AdminRole.SECURITY_ADMIN))?.let { return it }
+
         val changed = jdbc.update(
             "DELETE FROM admin_role WHERE user_id = ? AND role = ?",
             UUID.fromString(userId), role.name,
         )
-        if (changed == 0) return false
+        if (changed == 0) return RoleOutcome.Unchanged
 
         audit.record(
             AuditAction.ADMIN_ROLE_REVOKED,
@@ -94,7 +98,51 @@ class AdminRoles(
             actor = actor,
             detail = mapOf("role" to role.name),
         )
-        return true
+        return RoleOutcome.Changed
+    }
+
+    private fun holdersOf(role: AdminRole): Int = jdbc.queryForObject(
+        "SELECT count(*) FROM admin_role WHERE role = ?", Int::class.java, role.name,
+    ) ?: 0
+
+    companion object {
+        /**
+         * 자기 자신에게는 역할을 줄 수 없다 (§11.2 2인 승인).
+         *
+         * 막지 않으면 SECURITY_ADMIN 한 명이 자기에게 CONTENT_EDITOR 와 PUBLISHER 를
+         * 붙여 등록과 승인을 혼자 밟는다. 2인 승인이 등록자·승인자 비교로 서 있는데,
+         * 역할을 스스로 늘릴 수 있으면 그 비교는 사람 수를 세지 못한다.
+         *
+         * 담합까지 막지는 못한다 — 두 사람이 서로에게 주면 통과한다. 그건 2인 승인이
+         * 원래 막지 못하는 것이고, 그래서 부여가 감사 로그에 남는다 (§13.3).
+         */
+        internal fun selfGrant(userId: String, actor: String): RoleOutcome? =
+            if (userId == actor) {
+                RoleOutcome.Refused(
+                    "자기 자신에게는 역할을 줄 수 없다. 다른 SECURITY_ADMIN 이 줘야 한다 (§11.2)",
+                )
+            } else {
+                null
+            }
+
+        /**
+         * 마지막 SECURITY_ADMIN 은 회수할 수 없다.
+         *
+         * 회수하면 역할을 줄 수 있는 사람이 없어진다. 그런데 부트스트랩은 역할 표가
+         * **완전히** 비어야 열리므로, 다른 역할이 하나라도 남아 있으면 되살릴 길이
+         * 없다 — DB 를 직접 건드리는 수밖에 없는 상태가 된다.
+         */
+        internal fun lastSecurityAdmin(role: AdminRole, holders: Int): RoleOutcome? =
+            if (role == AdminRole.SECURITY_ADMIN && holders <= 1) {
+                RoleOutcome.Refused(
+                    "마지막 SECURITY_ADMIN 은 회수할 수 없다. 회수하면 역할을 줄 수 있는 " +
+                        "사람이 없어지고, 부트스트랩은 역할 표가 완전히 비어야 열린다",
+                )
+            } else {
+                null
+            }
+
+        private const val BOOTSTRAP_ACTOR = "bootstrap"
     }
 
     /** 부여 현황. 누가 무엇을 할 수 있는지는 SECURITY_ADMIN 이 볼 수 있어야 한다. */
@@ -120,10 +168,16 @@ class AdminRoles(
 
     private fun count(): Int =
         jdbc.queryForObject("SELECT count(*) FROM admin_role", Int::class.java) ?: 0
+}
 
-    private companion object {
-        const val BOOTSTRAP_ACTOR = "bootstrap"
-    }
+/** 역할 변경의 결과. "안 바뀌었다"와 "거절했다"는 부르는 쪽에서 갈라야 한다. */
+sealed interface RoleOutcome {
+    data object Changed : RoleOutcome
+
+    /** 이미 그 상태였다. 오류가 아니다 — 시딩은 여러 번 돌아도 같아야 한다. */
+    data object Unchanged : RoleOutcome
+
+    data class Refused(val reason: String) : RoleOutcome
 }
 
 data class RoleGrant(
