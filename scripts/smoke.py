@@ -582,18 +582,34 @@ def main() -> int:
     results.append(check("  패키지가 다르면 거부", status, 409))
     results.append(check("  사유가 새 버전을 요구", "새 버전이어야" in changed["reason"], True))
 
+    # 패키지 digest 는 manifest 와 tests 만 덮는다. 참조 풀이나 오답을 고치면 패키지는
+    # 그대로인 채 보고서만 달라지므로, 파이프라인이 같아도 다시 받아야 한다 (§6.1, §6.3).
+    status, inputs = raw_request(
+        "POST", f"/admin/problems/{pid}/versions",
+        {"version": 1, "packageDigest": digest, "reportDigest": uuid.uuid4().hex,
+         "validatorVersion": "2"}, registrar,
+    )
+    results.append(check("  검증 입력만 바뀐 재등록", (status, inputs["versionId"]), (200, f"{pid}@1")))
+
     trail = request("GET", f"/admin/audit?subject={pid}@1", None, security)
     actions = [entry["action"] for entry in trail]
+    # 재검증이 두 번이다. 파이프라인이 바뀐 것과 검증 입력만 바뀐 것 — 둘 다 같은 행위로
+    # 남고, 무엇이 옮겨갔는지는 detail 이 말한다.
     results.append(check(
         "감사 로그", sorted(actions),
-        ["PROBLEM_PUBLISHED", "PROBLEM_VERSION_REGISTERED", "PROBLEM_VERSION_REVALIDATED"],
+        ["PROBLEM_PUBLISHED", "PROBLEM_VERSION_REGISTERED",
+         "PROBLEM_VERSION_REVALIDATED", "PROBLEM_VERSION_REVALIDATED"],
     ))
     # detail 은 jsonb 를 문자열로 내려보낸다. 어느 파이프라인에서 어디로 옮겼는지가
     # 남아야 "언제 기준이 바뀌었나"를 로그만으로 되짚을 수 있다 (§13.3).
-    revalidation = next(e for e in trail if e["action"] == "PROBLEM_VERSION_REVALIDATED")
+    moves = [e for e in trail if e["action"] == "PROBLEM_VERSION_REVALIDATED"]
     results.append(check(
-        "  재검증이 파이프라인 이동을 남긴다",
-        "1 -> 2" in revalidation["detail"], True,
+        "  파이프라인 이동이 남는다",
+        any('"validatorVersion": "1 -> 2"' in e["detail"] for e in moves), True,
+    ))
+    results.append(check(
+        "  입력만 바뀐 재검증은 파이프라인을 그대로 적는다",
+        any('"validatorVersion": "2"' in e["detail"] for e in moves), True,
     ))
 
     # 공개된 문제만 목록에 나온다. 디렉터리에 파일을 놓는 것만으로 공개되면 §6.3 검증과

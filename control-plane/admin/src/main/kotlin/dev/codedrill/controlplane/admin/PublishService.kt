@@ -104,13 +104,15 @@ class PublishService(private val jdbc: JdbcTemplate, private val audit: AuditLog
             // 시딩이 여러 번 돌아도 같은 결과여야 한다.
             return RegisterOutcome.Registered(versionId)
         }
-        if (row.validatorVersion == validatorVersion) {
-            return RegisterOutcome.Rejected(
-                "같은 파이프라인($validatorVersion)이 같은 패키지에서 다른 보고서를 냈다. " +
-                    "검증이 결정적이지 않다는 뜻이므로 등록하지 않는다 (§6.3, §12.1)",
-            )
-        }
 
+        // 파이프라인이 그대로인데 보고서가 달라졌으면 검증 입력이 바뀐 것이다. 패키지
+        // digest 는 manifest 와 tests 만 덮으므로(§6.1 — 사용자에게 나가는 것이 그 둘이다),
+        // 참조 풀이와 오답을 고치면 **패키지는 그대로인 채 보고서만 달라진다.**
+        //
+        // 그래서 이 상태를 "검증이 결정적이지 않다"로 읽을 수 없다. 제어 영역이 보는 것은
+        // 표본 하나뿐이라, 재실행마다 흔들리는 것과 입력이 바뀐 것을 가릴 수 없다. 가릴 수
+        // 없는 것을 가린다고 말하면 오답 하나를 고칠 때마다 사용자에게 보이는 버전 번호가
+        // 올라간다.
         jdbc.update(
             "UPDATE problem_version SET report_digest = ?, validator_version = ?, registered_by = ? WHERE id = ?",
             reportDigest, validatorVersion, actor, versionId,
@@ -121,8 +123,12 @@ class PublishService(private val jdbc: JdbcTemplate, private val audit: AuditLog
             actor = actor,
             detail = mapOf(
                 "packageDigest" to packageDigest,
-                "reportDigest" to reportDigest,
-                "validatorVersion" to "${row.validatorVersion} -> $validatorVersion",
+                "reportDigest" to "${row.reportDigest} -> $reportDigest",
+                "validatorVersion" to if (row.validatorVersion == validatorVersion) {
+                    validatorVersion
+                } else {
+                    "${row.validatorVersion} -> $validatorVersion"
+                },
             ),
         )
         return RegisterOutcome.Registered(versionId)
