@@ -46,8 +46,16 @@ class SandboxSelector(
         ContainerSandbox(image, seccompProfile = profiles[language])
     }
 
-    /** 기동 시 한 번 호출해 실제 격리 상태를 로그로 남긴다. */
+    /**
+     * 기동 시 한 번 호출해 실제 격리 상태를 로그로 남긴다.
+     *
+     * 이전 Runner 가 두고 간 샌드박스 컨테이너도 여기서 치운다. 기동 시점은 이 Runner 가
+     * 아직 아무것도 채점하지 않은 유일한 순간이라, 살아 있는 실행을 잘못 죽일 위험이
+     * 가장 낮다.
+     */
     fun report() {
+        if (containers.isNotEmpty()) ContainerSandbox.reapOrphans()
+
         for ((language, sandbox) in containers) {
             if (sandbox.available()) {
                 log.info(

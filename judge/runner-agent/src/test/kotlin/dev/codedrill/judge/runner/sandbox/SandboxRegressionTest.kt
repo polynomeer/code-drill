@@ -16,6 +16,7 @@ import dev.codedrill.platform.problempackage.Limits
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import java.nio.file.Path
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
  * | 시스템 호출 — allowlist 밖 | `허용 목록에 없는 시스템 호출은 막힌다` |
  * | 샌드박스 탈출 — 네임스페이스·ptrace | `새 사용자 네임스페이스를 만들지 못한다` |
  * | 자원 고갈 — 컨테이너 누수 | `무한 루프는 컨테이너를 남기지 않는다` |
+ * | 자원 고갈 — Runner 사망 | `죽은 Runner 가 두고 간 컨테이너를 치운다` |
  *
  * 컨테이너 런타임이 없으면 통째로 건너뛴다. **건너뛴 것을 통과로 읽으면 안 된다** —
  * 이 스위트가 돌지 않은 빌드는 격리를 검증하지 않은 빌드다 (§14.4 Security 게이트).
@@ -351,16 +353,69 @@ class SandboxRegressionTest {
         )
     }
 
+    /**
+     * Runner 가 죽어 teardown 이 돌지 못한 경우 (§11.1 자원 고갈).
+     *
+     * 나이로만 거르므로, 이 판단이 헐거우면 **채점 중인 실행을 죽여** 멀쩡한 제출이
+     * 오판을 받는다. 그래서 오래된 것이 지워지는지와 함께 최근 것이 살아남는지를 본다 —
+     * 뒤쪽이 없으면 리퍼가 무차별로 도는 것을 잡지 못한다.
+     */
+    @Test
+    fun `죽은 Runner 가 두고 간 컨테이너를 치운다`() {
+        requireContainers()
+
+        val image = jvmImage!!
+        val orphan = "${ContainerSandbox.CONTAINER_PREFIX}reap-orphan-${UUID.randomUUID()}"
+        val live = "${ContainerSandbox.CONTAINER_PREFIX}reap-live-${UUID.randomUUID()}"
+
+        try {
+            startDetached(image, orphan, System.currentTimeMillis() - 7_200_000)
+            startDetached(image, live, System.currentTimeMillis())
+
+            ContainerSandbox.reapOrphans()
+
+            val remaining = sandboxContainerNames()
+            assertTrue(orphan !in remaining, "한 시간 넘게 남은 고아를 치우지 못했다")
+            assertTrue(live in remaining, "이제 막 뜬 컨테이너를 죽였다 — 채점 중인 실행이었다면 오판이다")
+        } finally {
+            forceRemove(orphan)
+            forceRemove(live)
+        }
+    }
+
+    /** 리퍼가 보게 될 것과 같은 라벨을 달아 컨테이너를 띄운다. */
+    private fun startDetached(image: String, name: String, startedAt: Long) {
+        val process = ProcessBuilder(
+            "docker", "run", "--detach", "--name", name,
+            "--label", "${ContainerSandbox.OWNER_LABEL}=${ContainerSandbox.OWNER_LABEL_VALUE}",
+            "--label", "${ContainerSandbox.STARTED_AT_LABEL}=$startedAt",
+            "--network", "none", "--entrypoint", "sleep", image, "300",
+        ).redirectErrorStream(true).start()
+        process.inputStream.bufferedReader().readText()
+        process.waitFor(60, TimeUnit.SECONDS)
+    }
+
+    private fun forceRemove(name: String) {
+        ProcessBuilder("docker", "rm", "--force", name)
+            .redirectErrorStream(true)
+            .start()
+            .waitFor(60, TimeUnit.SECONDS)
+    }
+
+    private fun sandboxContainerNames(): Set<String> = dockerPs("{{.Names}}")
+
     /** 지금 이 호스트에 남아 있는 샌드박스 컨테이너. */
-    private fun sandboxContainerIds(): Set<String> {
+    private fun sandboxContainerIds(): Set<String> = dockerPs("{{.ID}}")
+
+    private fun dockerPs(format: String): Set<String> {
         val process = ProcessBuilder(
             "docker", "ps", "--all", "--no-trunc",
             "--filter", "name=${ContainerSandbox.CONTAINER_PREFIX}",
-            "--format", "{{.ID}}",
+            "--format", format,
         ).start()
-        val ids = process.inputStream.bufferedReader().readText()
+        val rows = process.inputStream.bufferedReader().readText()
         process.waitFor(30, TimeUnit.SECONDS)
-        return ids.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        return rows.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
     }
 
     @Test

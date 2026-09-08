@@ -33,6 +33,7 @@ import kotlin.io.path.absolutePathString
  * 무한 루프처럼 끝나지 않는 풀이에는 아무 효과가 없다. 그리고 데드라인에 걸려 죽는 것은
  * `docker run` **클라이언트 프로세스**일 뿐, 컨테이너는 데몬 아래 그대로 남아 계속 돈다.
  * 그래서 [run] 은 컨테이너에 이름을 붙이고 끝날 때 [forceRemove] 로 직접 지운다.
+ * Runner 자체가 죽어 그 정리마저 못 도는 경우는 [reapOrphans] 가 받는다.
  */
 class ContainerSandbox(
     private val image: String,
@@ -174,6 +175,9 @@ class ContainerSandbox(
             runtimeBinary, "run", "--rm",
             // 스스로 끝난 실행은 여기서 정리된다. 끝나지 않는 실행은 forceRemove 가 맡는다.
             "--name", containerName,
+            // 이름을 잃어버려도 라벨로는 찾을 수 있다. reapOrphans 가 이것으로 훑는다.
+            "--label", "$OWNER_LABEL=$OWNER_LABEL_VALUE",
+            "--label", "$STARTED_AT_LABEL=${System.currentTimeMillis()}",
             "--network", "none",
             "--read-only",
             // 쓰기가 필요한 곳은 여기 하나뿐이고, 실행 권한도 주지 않는다.
@@ -242,8 +246,79 @@ class ContainerSandbox(
         /** 컨테이너 이름 접두사. 호스트에서 사람이 봤을 때 출처가 드러나야 한다. */
         const val CONTAINER_PREFIX = "codedrill-sandbox-"
 
+        const val OWNER_LABEL = "dev.codedrill.sandbox"
+        const val OWNER_LABEL_VALUE = "runner-agent"
+        const val STARTED_AT_LABEL = "dev.codedrill.sandbox.started-at"
+
+        /**
+         * 고아 컨테이너로 판정하는 나이.
+         *
+         * 케이스 하나의 제한이 수 초, 한 판이 길어야 수 분이다. 한 시간을 넘겨 살아 있는
+         * 샌드박스는 정의상 아무도 기다리지 않는 것이다. 넉넉히 잡는 이유는 이 판단이
+         * 틀리면 채점 중인 실행을 죽여 멀쩡한 제출이 오판을 받기 때문이다.
+         */
+        const val ORPHAN_MAX_AGE_MILLIS = 3_600_000L
+
         const val REMOVE_TIMEOUT_SECONDS = 15L
 
+        private val reaperLog = LoggerFactory.getLogger(ContainerSandbox::class.java)
+
+        /**
+         * Runner 가 죽으면서 두고 간 샌드박스 컨테이너를 치운다 (기동 시 한 번).
+         *
+         * [forceRemove] 는 채점 스레드가 살아 있을 때만 돈다. Runner 가 SIGKILL 을 받거나
+         * 호스트가 재부팅되면 그 정리는 아예 실행되지 않고, 남은 컨테이너는 CPU 를 계속
+         * 태운다 — 끝나지 않는 풀이라면 무한히. 그래서 정리 경로가 둘이어야 한다.
+         *
+         * 나이로만 거른다. 지금 이 Runner 가 채점 중인 컨테이너를 죽이면 멀쩡한 제출이
+         * 오판을 받으므로, 판단 근거는 "누가 띄웠나"가 아니라 "아무도 기다릴 수 없을 만큼
+         * 오래됐나"여야 한다 ([ORPHAN_MAX_AGE_MILLIS]).
+         *
+         * @return 제거한 컨테이너 수.
+         */
+        fun reapOrphans(
+            runtimeBinary: String = DEFAULT_RUNTIME,
+            maxAgeMillis: Long = ORPHAN_MAX_AGE_MILLIS,
+            now: Long = System.currentTimeMillis(),
+        ): Int = runCatching {
+            val listing = ProcessBuilder(
+                runtimeBinary, "ps", "--all", "--no-trunc",
+                "--filter", "label=$OWNER_LABEL=$OWNER_LABEL_VALUE",
+                "--format", "{{.ID}}\t{{.Label \"$STARTED_AT_LABEL\"}}",
+            ).start()
+            val rows = listing.inputStream.bufferedReader().readText().trim()
+            if (!listing.waitFor(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                listing.destroyForcibly()
+                return@runCatching 0
+            }
+            if (rows.isEmpty()) return@runCatching 0
+
+            val stale = rows.lineSequence().mapNotNull { row ->
+                val (id, startedAt) = row.split('\t').let { it.getOrNull(0) to it.getOrNull(1) }
+                // 라벨을 읽지 못한 컨테이너는 건드리지 않는다. 나이를 모르면 채점 중인지도
+                // 모르고, 확신 없이 죽이는 쪽이 두고 보는 쪽보다 나쁘다.
+                val age = startedAt?.toLongOrNull()?.let { now - it } ?: return@mapNotNull null
+                id?.takeIf { it.isNotBlank() && age > maxAgeMillis }
+            }.toList()
+
+            for (id in stale) {
+                ProcessBuilder(runtimeBinary, "rm", "--force", id)
+                    .redirectErrorStream(true)
+                    .start()
+                    .waitFor(REMOVE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            }
+            if (stale.isNotEmpty()) {
+                reaperLog.warn(
+                    "이전 Runner 가 두고 간 샌드박스 컨테이너 {}개를 제거했다. " +
+                        "Runner 가 비정상 종료했다는 뜻이다",
+                    stale.size,
+                )
+            }
+            stale.size
+        }.getOrElse { error ->
+            reaperLog.warn("고아 컨테이너를 훑지 못했다: {}", error.message)
+            0
+        }
 
         /** nobody:nogroup. 이미지에 관계없이 존재하는 비특권 계정이다. */
         const val UNPRIVILEGED_UID = 65534
