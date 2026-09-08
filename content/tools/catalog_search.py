@@ -259,6 +259,9 @@ def _inversions(nums):
 
 PROBLEMS.append(Problem(
     id="count-inversions",
+    # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
+    # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
+    version=2,
     title="역순 쌍의 개수",
     summary="""
 정수 배열 `nums` 에서 `i < j` 이면서 `nums[i] > nums[j]` 인 쌍의 개수를 반환한다.
@@ -307,7 +310,7 @@ Drill.call("sort")          // 재귀로 내려갔다
             #
             # 내림차순으로 크게 잡을 수는 없다. 역순 쌍이 n^2/2 이라 n 이 65_536 만
             # 넘어도 답이 Int 를 넘어, 제약에 적은 것과 어긋난다.
-            ("03-large-sorted", [list(range(1, 120001))]),
+            ("03-large-sorted", [list(range(1, 300001))]),
         ],
     },
     kotlin="""

@@ -2,7 +2,7 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: longest-increasing-run
-version: 1
+version: 2
 title: 최장 증가 부분 수열의 길이
 statement: statement.md
 

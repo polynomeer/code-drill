@@ -2,7 +2,7 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: max-window-sum
-version: 1
+version: 2
 title: 크기 k 창의 최대 합
 statement: statement.md
 

@@ -161,6 +161,9 @@ def _next_greater(values):
 
 PROBLEMS.append(Problem(
     id="next-greater-distance",
+    # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
+    # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
+    version=2,
     title="다음 더 큰 값까지의 거리",
     summary="""
 정수 배열 `values` 가 주어진다. 각 위치마다 **자기보다 큰 값이 처음 나오는 곳까지의
@@ -183,7 +186,7 @@ Drill.write(index, dist)   // 거리를 적었다
     signature=dict(name="nextGreater", parameters=[("values", "INT_ARRAY")],
                    returns="INT_ARRAY"),
     # 배열을 돌려주므로 기본 64KB 로는 성능 케이스의 정답조차 담지 못한다.
-    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 400000},
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 800000},
     groups=perf_groups(),
     reference=_next_greater,
     cases={
@@ -214,7 +217,7 @@ Drill.write(index, dist)   // 거리를 적었다
             ("02-medium", [randoms(20000, -1000000000, 1000000000, salt=33)]),
             # 내림차순이면 두 겹 풀이가 최악이다. 각 위치가 끝까지 훑고 아무것도
             # 찾지 못한다. 답이 전부 0 이라 출력이 짧아 크게 잡을 수 있다.
-            ("03-worst-case", [list(range(150000, 0, -1))]),
+            ("03-worst-case", [list(range(300000, 0, -1))]),
         ],
     },
     kotlin="""
@@ -310,6 +313,9 @@ def _histogram(heights):
 
 PROBLEMS.append(Problem(
     id="histogram-rectangle",
+    # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
+    # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
+    version=2,
     title="히스토그램에서 가장 큰 직사각형",
     summary="""
 너비가 1 인 막대의 높이 배열 `heights` 가 주어진다. 이 히스토그램 안에 들어가는 가장
@@ -361,7 +367,7 @@ Drill.write(0, area)  // 지금까지의 최대 넓이
             # 오름차순이면 두 겹 풀이가 매 위치에서 끝까지 뻗는다. 높이를 10_000 에서
             # 멈춰 두는 이유는 넓이가 Int 를 넘지 않게 하기 위해서다 — 제약에 적은
             # "정답은 Int 범위를 넘지 않는다"를 테스트 데이터가 먼저 지켜야 한다.
-            ("03-worst-case", [[min(i, 10000) for i in range(1, 100001)]]),
+            ("03-worst-case", [[min(i, 10000) for i in range(1, 200001)]]),
         ],
     },
     kotlin="""

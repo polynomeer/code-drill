@@ -269,6 +269,9 @@ def _lis(nums):
 
 PROBLEMS.append(Problem(
     id="longest-increasing-run",
+    # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
+    # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
+    version=2,
     title="최장 증가 부분 수열의 길이",
     summary="""
 정수 배열 `nums` 에서 **엄격히 증가하는** 부분 수열 중 가장 긴 것의 길이를 반환한다.
@@ -311,7 +314,7 @@ Drill.write(pos, value)    // 길이 pos+1 의 가장 작은 끝값을 갱신했
             ("01-small", [randoms(3000, -1000000, 1000000, salt=72)]),
             ("02-medium", [randoms(40000, -1000000, 1000000, salt=73)]),
             # 오름차순이면 O(n^2) 풀이가 매 위치에서 앞을 전부 훑는다.
-            ("03-worst-case", [list(range(1, 200001))]),
+            ("03-worst-case", [list(range(1, 400001))]),
         ],
     },
     kotlin="""

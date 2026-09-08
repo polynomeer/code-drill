@@ -261,6 +261,9 @@ def _power_mod(base, exponent):
 
 PROBLEMS.append(Problem(
     id="power-mod",
+    # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
+    # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
+    version=2,
     title="거듭제곱의 나머지",
     summary="""
 정수 `base` 와 `exponent` 가 주어진다. `base^exponent` 를 `1_000_000_007` 로 나눈
@@ -282,7 +285,9 @@ Drill.visit(bit, 1)     // 지수의 이 비트가 켜져 있었다
 """,
     signature=dict(name="powerMod", parameters=[("base", "INT"), ("exponent", "INT")],
                    returns="INT"),
-    groups=perf_groups(),
+    # 오답이 지수만큼 곱하는데 지수는 Int 상한에서 멈춘다. 입력을 더 못 키우므로
+    # 성능 그룹의 시계를 조인다 — 분할 제곱은 한도의 1% 도 안 쓴다.
+    groups=perf_groups(time_multiplier=0.5),
     reference=_power_mod,
     cases={
         "sample": [("01", [2, 10]), ("02", [3, 5])],
@@ -306,7 +311,7 @@ Drill.visit(bit, 1)     // 지수의 이 비트가 켜져 있었다
         "performance": [
             ("01-small", [3, 1000000]),
             ("02-medium", [5, 100000000]),
-            ("03-large", [7, 1000000000]),
+            ("03-large", [7, 2000000000]),
         ],
     },
     kotlin="""

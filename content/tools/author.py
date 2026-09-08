@@ -253,8 +253,14 @@ def standard_groups(boundary=40, hidden=60):
     ]
 
 
-def perf_groups(boundary=20, hidden=40, performance=40):
-    """성능 그룹이 있는 문제. SUM 이라 부분 점수가 나온다 (§6.2)."""
+def perf_groups(boundary=20, hidden=40, performance=40, time_multiplier=None):
+    """성능 그룹이 있는 문제. SUM 이라 부분 점수가 나온다 (§6.2).
+
+    [time_multiplier] 는 성능 그룹의 시간 한도만 조인다. **입력을 더 못 키울 때 쓴다** —
+    느린 풀이의 비용이 자료형 상한에 걸려 한도를 배로밖에 못 넘기는 경우다. 정답 풀이는
+    한도의 1% 도 안 쓰므로 조여도 영향이 없고, 조이지 않으면 그 오답은 빠른 머신에서
+    통과한다.
+    """
     return [
         dict(id="sample", weight=0, visibility="PUBLIC",
              aggregation="ALL_OR_NOTHING", stopPolicy="FAIL_FAST"),
@@ -264,7 +270,8 @@ def perf_groups(boundary=20, hidden=40, performance=40):
              aggregation="ALL_OR_NOTHING", stopPolicy="CONTINUE"),
         # 느린 풀이도 작은 입력은 통과한다. 어디서 무너지는지가 점수로 드러난다.
         dict(id="performance", weight=performance, visibility="HIDDEN",
-             aggregation="SUM", stopPolicy="CONTINUE"),
+             aggregation="SUM", stopPolicy="CONTINUE",
+             timeMultiplier=time_multiplier),
     ]
 
 

@@ -273,6 +273,9 @@ def _max_window(nums, k):
 
 PROBLEMS.append(Problem(
     id="max-window-sum",
+    # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
+    # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
+    version=2,
     title="크기 k 창의 최대 합",
     summary="""
 정수 배열 `nums` 와 정수 `k` 가 주어진다. 연속한 `k` 개 원소의 합 중 **최댓값**을
@@ -321,7 +324,7 @@ Drill.write(0, sum)         // 현재 창의 합
         "performance": [
             ("01-small", [randoms(2000, -10000, 10000, salt=1), 100]),
             ("02-medium", [randoms(20000, -10000, 10000, salt=2), 10000]),
-            ("03-large", [randoms(200000, -10000, 10000, salt=3), 100000]),
+            ("03-large", [randoms(400000, -10000, 10000, salt=3), 200000]),
         ],
     },
     kotlin="""
