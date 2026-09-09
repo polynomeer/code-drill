@@ -38,6 +38,7 @@ python3 scripts/up.py             # 의존성+앱 셋+웹을 한 번에 (포트�
 python3 scripts/smoke.py          # E2E 스모크 (앱 세 개가 떠 있어야 한다)
 python3 scripts/loadtest.py       # 부하 시험과 §12.1 SLO 판정
 python3 scripts/drill.py all      # 장애 주입 훈련 (컨테이너와 Runner 를 실제로 죽인다)
+python3 scripts/backup.py verify  # 백업을 임시 DB 에 복원해 본다 (§12.3)
 ```
 
 경보가 울렸을 때의 첫 대응은 → [docs/runbook.md](docs/runbook.md)

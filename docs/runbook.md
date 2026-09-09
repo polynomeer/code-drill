@@ -243,12 +243,27 @@ dry-run 결과가 납득되면 `dryRun` 없이 같은 절차를 한 번 더 돌�
 
 ### restore
 
-DB 복구 목표는 RPO 15분 / RTO 60분이다 (§12.3). 복구 훈련은 스냅샷 복원 후
-[consistency](#consistency) 점검이 깨끗한지로 확인한다 — 복원이 끝났다는 것은
-프로세스가 뜬 것이 아니라 데이터가 맞아떨어진다는 뜻이다.
+DB 복구 목표는 RPO 15분 / RTO 60분이다 (§12.3). **복원이 끝났다는 것은 프로세스가 뜬
+것이 아니라 데이터가 맞아떨어진다는 뜻이다.**
 
-문제 패키지는 불변 버전이라 별도 복제에서 그대로 되살린다. 공개 포인터만 DB 에
-있으므로, 복원 후 `published_version_missing` 점검이 비어 있어야 한다.
+```bash
+python3 scripts/backup.py list                    # 무엇이 있나
+python3 scripts/backup.py verify <파일>           # 이 덤프로 되살릴 수 있나 (운영 무관)
+python3 scripts/up.py --down                      # 앱을 먼저 내린다
+python3 scripts/backup.py restore <파일> --yes    # 덮어쓴다. 되돌릴 수 없다
+python3 scripts/up.py                             # 다시 띄운다
+```
+
+**`verify` 를 먼저 돌린다.** 임시 DB 에 복원해 보고 지우므로 운영에 아무 영향이 없고,
+받아 둔 덤프가 실제로 쓸 만한지는 그렇게밖에 알 수 없다 — 복원해 본 적 없는 백업은
+백업이 아니다.
+
+복원 뒤에는 `GET /api/v1/admin/consistency` 가 깨끗한지 본다 (§12.4). 문제 패키지는
+불변 버전이라 이미지에서 그대로 되살아나고, 공개 포인터만 DB 에 있으므로
+`published_version_missing` 이 비어 있어야 한다.
+
+**브로커는 복원하지 않는다.** 진행 중이던 작업만 들어 있고, 제출은 아웃박스와 함께
+커밋되므로 복원 후 다시 발행된다 (§3.2). 큐까지 되살리면 같은 작업을 두 번 돌린다.
 
 ## 장애 주입 훈련
 

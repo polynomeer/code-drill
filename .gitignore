@@ -44,3 +44,6 @@ __pycache__/
 
 # scripts/up.py 가 고른 포트와 pid. 머신마다 다르다.
 .codedrill-stack.json
+
+# scripts/backup.py 가 받는 덤프. 실데이터라 저장소에 두지 않는다.
+build/backups/
