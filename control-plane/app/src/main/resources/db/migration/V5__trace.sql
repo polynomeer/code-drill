@@ -25,7 +25,7 @@ CREATE TABLE trace_chunk (
     PRIMARY KEY (trace_id, seq)
 );
 
--- 원본 트레이스 보존은 30일이다 (§7.4). TraceRetention 이 주기적으로 지운다.
+-- 원본 트레이스 보존은 30일이다 (§7.4). 정리 작업이 붙기 전까지는 수동 삭제 대상이다.
 
 -- 이전 슬라이스가 submission 에 직접 담던 컬럼은 더 이상 쓰지 않는다.
 ALTER TABLE submission DROP COLUMN IF EXISTS trace;
