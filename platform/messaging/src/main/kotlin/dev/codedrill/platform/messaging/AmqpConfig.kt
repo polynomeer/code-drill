@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import org.springframework.amqp.core.BindingBuilder
 import org.springframework.amqp.core.Declarables
+import org.springframework.amqp.core.DirectExchange
 import org.springframework.amqp.core.FanoutExchange
 import org.springframework.amqp.core.QueueBuilder
 import org.springframework.amqp.rabbit.connection.ConnectionFactory
@@ -30,7 +32,29 @@ class AmqpConfig {
     // Declarables 로 감싸야 RabbitAdmin 이 선언 대상으로 인식한다. List<Queue> 빈은 무시된다.
     @Bean
     fun judgeQueues() = Declarables(
-        JudgeQueues.all.map { QueueBuilder.durable(it).quorum().build() },
+        buildList {
+            val dead = DirectExchange(JudgeQueues.DEAD_EXCHANGE, true, false)
+            add(dead)
+
+            for (name in JudgeQueues.all) {
+                // 배달 횟수는 브로커가 센다. 애플리케이션 재시도로 세면 소비자가 죽었다
+                // 살아날 때마다 0 부터 다시 세고, 그러면 한도가 없는 것과 같다.
+                add(
+                    QueueBuilder.durable(name).quorum()
+                        .deliveryLimit(DELIVERY_LIMIT)
+                        .deadLetterExchange(JudgeQueues.DEAD_EXCHANGE)
+                        .deadLetterRoutingKey(name)
+                        .build(),
+                )
+                // 옆으로 치운 메시지는 남겨 둔다. 다만 영원히는 아니다 — 아무도 보지
+                // 않는 큐가 브로커 디스크를 채우는 것이 그 다음 사고다.
+                val deadQueue = QueueBuilder.durable(JudgeQueues.dead(name)).quorum()
+                    .ttl(DEAD_TTL_MILLIS)
+                    .build()
+                add(deadQueue)
+                add(BindingBuilder.bind(deadQueue).to(dead).with(name))
+            }
+        },
     )
 
     /**
@@ -65,4 +89,18 @@ class AmqpConfig {
     @Bean
     fun rabbitTemplate(factory: ConnectionFactory, converter: MessageConverter) =
         RabbitTemplate(factory).apply { messageConverter = converter }
+
+    private companion object {
+        /**
+         * 한 메시지를 몇 번까지 배달해 볼 것인가.
+         *
+         * 일시적인 실패(브로커 재연결, 순간적인 DB 오류)는 몇 번이면 지나간다. 그보다
+         * 많이 실패하는 것은 대개 메시지 자체가 처리 불가능한 경우이고, 그때는 재시도가
+         * 뒤의 작업을 막는 일밖에 하지 않는다.
+         */
+        const val DELIVERY_LIMIT = 5
+
+        /** 치운 메시지를 들여다볼 수 있는 기간. 7일. */
+        const val DEAD_TTL_MILLIS = 7 * 24 * 60 * 60 * 1000
+    }
 }

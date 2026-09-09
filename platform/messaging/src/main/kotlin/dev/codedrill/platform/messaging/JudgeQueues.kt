@@ -30,6 +30,24 @@ object JudgeQueues {
     val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS)
 
     /**
+     * 처리할 수 없는 메시지가 가는 곳 (§10.2, §12.2).
+     *
+     * 없으면 실패한 메시지가 큐 머리에서 무한히 재시도되고 **뒤의 멀쩡한 작업이 전부
+     * 밀린다.** 실제로 그렇게 채점이 섰다 — `problemVersion` 을 빠뜨린 제출 하나가
+     * 존재하지 않는 버전을 가리켰고, 오케스트레이터가 그것을 영원히 실패시켰다.
+     *
+     * 재시도가 무의미한 실패와 일시적인 실패를 브로커는 가릴 수 없다. 그래서 **횟수로**
+     * 가른다 — 몇 번 해 보고 안 되면 옆으로 치우고 나머지를 흘려보낸다.
+     */
+    const val DEAD_EXCHANGE = "judge.dead"
+
+    /** 옆으로 치운 메시지가 쌓이는 큐. 지우지 않고 남겨 사람이 들여다볼 수 있게 한다. */
+    fun dead(queue: String) = "$queue.dead"
+
+    /** 소비자가 붙는 유일한 dead 큐. 애노테이션에서 쓰므로 상수여야 한다. */
+    const val SUBMISSIONS_DEAD = "$SUBMISSIONS.dead"
+
+    /**
      * 제어 영역 내부 팬아웃: 제출 상태 변화 (§9.1 SSE).
      *
      * 위의 큐들과 성격이 다르다. 저것들은 **일이 하나씩 처리되어야** 하는 작업 큐라
