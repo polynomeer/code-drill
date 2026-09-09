@@ -28,4 +28,29 @@ object JudgeQueues {
     const val HEARTBEATS = "judge.heartbeats"
 
     val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS)
+
+    /**
+     * 제어 영역 내부 팬아웃: 제출 상태 변화 (§9.1 SSE).
+     *
+     * 위의 큐들과 성격이 다르다. 저것들은 **일이 하나씩 처리되어야** 하는 작업 큐라
+     * 소비자 하나가 가져가면 끝이지만, 이것은 **모든 인스턴스가 받아야** 한다.
+     *
+     * SSE 구독은 인스턴스 메모리에 있다. 사용자가 A 에 붙어 있는데 판정 결과를 B 가
+     * 처리하면, 팬아웃이 없을 때 그 사용자는 아무것도 받지 못한다.
+     *
+     * 여기 실리는 것은 이미 DB 에 쓴 사실의 사본이다. 유실돼도 재조회로 수렴한다.
+     */
+    const val SUBMISSION_EVENTS = "codedrill.submission-events"
 }
+
+/**
+ * 인스턴스 사이로 흘려보내는 제출 이벤트 (§9.1).
+ *
+ * 진실의 원천이 아니다 — DB 조회가 정한다. 그래서 필드가 얇고, 놓쳐도 클라이언트가
+ * 재조회로 수렴한다.
+ */
+data class SubmissionEvent(
+    val submissionId: String,
+    val event: String,
+    val payload: Map<String, Any?>,
+)

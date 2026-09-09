@@ -5,6 +5,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import org.springframework.amqp.core.Declarables
+import org.springframework.amqp.core.FanoutExchange
 import org.springframework.amqp.core.QueueBuilder
 import org.springframework.amqp.rabbit.connection.ConnectionFactory
 import org.springframework.amqp.rabbit.core.RabbitTemplate
@@ -32,6 +33,16 @@ class AmqpConfig {
         JudgeQueues.all.map { QueueBuilder.durable(it).quorum().build() },
     )
 
+    /**
+     * 제출 이벤트 팬아웃 (§9.1).
+     *
+     * 큐를 여기서 만들지 않는다. 인스턴스마다 익명·배타·자동 삭제 큐를 붙이므로,
+     * 인스턴스가 사라지면 그 큐도 함께 사라져야 한다 — 이름 있는 큐를 두면 죽은
+     * 인스턴스의 큐에 이벤트가 영원히 쌓인다.
+     */
+    @Bean
+    fun submissionEvents() = FanoutExchange(JudgeQueues.SUBMISSION_EVENTS, true, false)
+
     @Bean
     fun jsonMessageConverter(): MessageConverter =
         Jackson2JsonMessageConverter(
@@ -46,7 +57,8 @@ class AmqpConfig {
             // 역직렬화 대상 패키지를 좁힌다. 브로커 메시지는 신뢰 경계를 넘어오므로,
             // 타입 헤더가 임의의 클래스를 지목하게 두면 안 된다 (§11.1 공급망).
             javaTypeMapper = DefaultJackson2JavaTypeMapper().apply {
-                setTrustedPackages("dev.codedrill.judge.protocol")
+                // 제어 영역 내부 팬아웃 메시지도 여기로 온다 (SubmissionEvent).
+                setTrustedPackages("dev.codedrill.judge.protocol", "dev.codedrill.platform.messaging")
             }
         }
 
