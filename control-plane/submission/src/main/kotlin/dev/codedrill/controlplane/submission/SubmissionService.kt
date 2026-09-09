@@ -25,6 +25,7 @@ class SubmissionService(
     private val repository: SubmissionRepository,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
+    private val quota: SubmissionQuota,
     private val rejudges: RejudgeContext = RejudgeContext.NONE,
 ) {
 
@@ -37,6 +38,16 @@ class SubmissionService(
     @Transactional
     fun create(command: CreateSubmission): Submission {
         val key = IdempotencyKey(command.idempotencyKey)
+
+        // 쿼터를 먼저 본다. 다만 **같은 키로 다시 온 요청은 막지 않는다** — 그것은 새
+        // 제출이 아니라 이미 받은 제출을 다시 묻는 것이고, 네트워크가 흔들려 재시도한
+        // 클라이언트를 쿼터로 막으면 멱등성이 있으나 마나다 (§4.3).
+        quota.exceededBy(command.userId)?.let { reason ->
+            repository.findByIdempotencyKey(command.userId, key.value)?.let { return it }
+            metrics.quotaRejected(command.language.name)
+            throw QuotaExceededException(reason)
+        }
+
         val id = UUID.randomUUID()
         val correlationId = UUID.randomUUID().toString()
 

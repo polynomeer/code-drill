@@ -11,6 +11,8 @@ import dev.codedrill.controlplane.admin.PublishService
 import dev.codedrill.controlplane.admin.RejudgeResult
 import dev.codedrill.controlplane.admin.RejudgeService
 import dev.codedrill.controlplane.admin.AdminAccounts
+import dev.codedrill.controlplane.submission.QuotaLimits
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import dev.codedrill.controlplane.identity.IdentityService
 import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.controlplane.submission.RejudgeContext
@@ -25,6 +27,7 @@ import java.nio.file.Path
 import java.util.UUID
 
 @Configuration
+@EnableConfigurationProperties(QuotaLimits::class)
 @EnableScheduling
 class ControlPlaneConfig {
 

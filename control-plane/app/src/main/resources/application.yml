@@ -26,6 +26,13 @@ codedrill:
     # 비워 두면 부트스트랩이 없다. 역할을 가진 사람이 아무도 없는 환경에서는 관리자
     # API 가 전부 403 이다. 로컬 설정은 docs/running-locally.md 를 따른다.
     bootstrap-email: ${ADMIN_BOOTSTRAP_EMAIL:}
+  quota:
+    # 한 사람이 판정 큐를 혼자 채우지 못하게 한다 (§10.2).
+    #
+    # 기본값은 사람이 손으로 푸는 속도를 기준으로 잡았다. 한 문제를 고쳐 다시 내는 데
+    # 몇 초는 걸리므로 분당 30건이면 사람에게는 닿지 않고 스크립트에는 곧바로 닿는다.
+    in-flight: ${QUOTA_IN_FLIGHT:5}
+    per-minute: ${QUOTA_PER_MINUTE:30}
   content:
     root: ${CONTENT_ROOT:content/problems}
   outbox:

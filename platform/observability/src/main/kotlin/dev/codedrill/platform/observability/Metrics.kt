@@ -41,6 +41,9 @@ object Metrics {
     /** Counter. 태그 `language`. SYSTEM_ERROR 는 사용자 실패와 다른 축이다 (§4.4). */
     const val SYSTEM_ERROR = "codedrill.system.error"
 
+    /** Counter. 태그 `language`. 쿼터로 거절한 제출 (§10.2 남용 방어). */
+    const val QUOTA_REJECTED = "codedrill.submission.quota.rejected"
+
     /** Counter. 태그 `outcome` = accepted | duplicate | already_completed | stale (§4.3). */
     const val RESULT_ACCEPTANCE = "codedrill.result.acceptance"
 

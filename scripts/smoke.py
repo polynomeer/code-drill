@@ -423,6 +423,37 @@ def main() -> int:
     results.append(check("  performance 부분 득점", 0 < perf["score"] < perf["maxScore"], True))
     print(f"        (총점 {slow['score']}, performance {perf['score']}/{perf['maxScore']})")
 
+    print("\n제출 쿼터 (§10.2 남용 방어)")
+    # 한 사람이 판정 큐를 혼자 채우지 못해야 한다. 끝나지 않는 풀이로 동시 진행 수를
+    # 채운 뒤, 그 다음 제출이 거절되는지 본다.
+    quota_user = accounts.create("quota")
+    quota_auth = quota_user.headers
+    forever = "fun twoSum(nums: IntArray, target: Int): IntArray { while (true) {} }"
+    body = {"problemId": "two-sum", "problemVersion": 1, "language": "KOTLIN", "source": forever}
+
+    key = str(uuid.uuid4())
+    status, first = raw_request("POST", "/submissions", body,
+                                {**quota_auth, "Idempotency-Key": key})
+    results.append(check("첫 제출은 통과", status, 202))
+
+    rejected = None
+    for _ in range(12):
+        status, payload = raw_request("POST", "/submissions", body,
+                                      {**quota_auth, "Idempotency-Key": str(uuid.uuid4())})
+        if status == 429:
+            rejected = payload
+            break
+    results.append(check("쿼터가 막는다", rejected is not None, True))
+    if rejected:
+        results.append(check("  오류 코드", rejected["errorCode"], "QUOTA_EXCEEDED"))
+
+    # 멱등 재시도는 새 제출이 아니다. 네트워크가 흔들려 다시 보낸 클라이언트를 쿼터로
+    # 막으면 멱등성이 있으나 마나다 (§4.3).
+    status, retry = raw_request("POST", "/submissions", body,
+                                {**quota_auth, "Idempotency-Key": key})
+    results.append(check("멱등 재시도는 막지 않는다", status, 202))
+    results.append(check("  같은 제출을 돌려준다", retry["id"], first["id"]))
+
     print("\n초안 자동 저장 CAS (§9.2, §9.4)")
     # 초안은 사용자별로 키가 잡혀 있다. 신원은 토큰이 정한다.
     headers = None

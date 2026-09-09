@@ -167,6 +167,18 @@ class SubmissionController(
     private fun ownedBy(principal: Principal, id: UUID): Submission? =
         service.find(id)?.takeIf { it.userId == principal.id }
 
+    /**
+     * 쿼터 초과는 429 다 (§9.4).
+     *
+     * 400 이 아닌 이유는 **요청이 잘못된 것이 아니기 때문**이다. 같은 요청을 조금 뒤에
+     * 보내면 통과한다. 클라이언트가 고칠 것과 기다릴 것을 상태 코드로 가른다.
+     */
+    @ExceptionHandler(QuotaExceededException::class)
+    fun onQuota(e: QuotaExceededException): ResponseEntity<ApiError> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+            ApiError(ErrorCode.QUOTA_EXCEEDED, e.message ?: "쿼터를 넘겼다", traceId()),
+        )
+
     @ExceptionHandler(IllegalArgumentException::class)
     fun onInvalid(e: IllegalArgumentException): ResponseEntity<ApiError> =
         ResponseEntity.badRequest().body(

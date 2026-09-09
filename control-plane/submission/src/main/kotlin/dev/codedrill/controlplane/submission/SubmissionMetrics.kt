@@ -41,6 +41,16 @@ class SubmissionMetrics(private val registry: MeterRegistry) {
      * verdict 분포와 SYSTEM_ERROR 를 나눠 센다. 둘을 한 카운터에 담으면 "플랫폼이
      * 고장났다"와 "사용자가 틀렸다"가 같은 선으로 보인다 (§4.4).
      */
+    /**
+     * 쿼터로 거절한 제출 (§10.2).
+     *
+     * 0 이 아니면 누군가 한도에 닿고 있다는 뜻이다. 사람이 손으로 낼 수 있는 속도가
+     * 아니므로, 꾸준히 오르면 스크립트이거나 한도가 너무 낮은 것이다 — 둘 다 봐야 한다.
+     */
+    fun quotaRejected(language: String) {
+        registry.counter(Metrics.QUOTA_REJECTED, Metrics.Tag.LANGUAGE, language).increment()
+    }
+
     fun completed(language: String, verdict: Verdict, waited: Duration, propagation: Duration) {
         registry.counter(
             Metrics.VERDICT,
