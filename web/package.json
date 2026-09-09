@@ -2,6 +2,7 @@
   "name": "code-drill-web",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.22.0",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vitest run && vite build && node scripts/bundle-budget.mjs",
