@@ -317,6 +317,23 @@ def stop(state: dict, everything: bool) -> None:
     STATE.write_text(json.dumps(state, indent=2) + "\n")
 
 
+def emit_env(state: dict) -> None:
+    """고른 포트를 셸에 넘긴다.
+
+    compose 를 손으로 부를 때 이게 없으면 기본 포트로 뜨려다 실패한다 — 비켜 간 이유가
+    남이 그 포트를 쓰고 있기 때문이므로, 두 번째 시도도 같은 곳에서 막힌다.
+    """
+    ports = state.get("ports") or {}
+    if not ports:
+        print("# 띄운 기록이 없다. python3 scripts/up.py 로 시작한다.")
+        return
+    for name, (_, var) in PORTS.items():
+        if var and name in ports:
+            print(f"export {var}={ports[name]}")
+    print(f"export CODEDRILL_BASE=http://localhost:{ports['control-plane']}")
+    print(f"export ADMIN_BOOTSTRAP_EMAIL={BOOTSTRAP_EMAIL}")
+
+
 def status(state: dict) -> None:
     ports = state.get("ports") or {}
     if not ports:
@@ -353,10 +370,17 @@ def main() -> int:
     parser.add_argument("--status", action="store_true", help="지금 상태")
     parser.add_argument("--no-web", action="store_true", help="웹 개발 서버 없이")
     parser.add_argument("--seed", action="store_true", help="문제 검증·공개까지")
+    parser.add_argument(
+        "--env", action="store_true",
+        help="고른 포트를 export 구문으로 찍는다 (eval \"$(python3 scripts/up.py --env)\")",
+    )
     args = parser.parse_args()
 
     state = json.loads(STATE.read_text()) if STATE.exists() else {}
 
+    if args.env:
+        emit_env(state)
+        return 0
     if args.status:
         status(state)
         return 0
