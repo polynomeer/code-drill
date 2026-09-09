@@ -14,12 +14,54 @@
 docker compose -f deploy/docker-compose.yml --profile observability up -d
 ```
 
-Grafana `http://localhost:3001`, Prometheus `http://localhost:9090`.
+Grafana `http://localhost:3001`, Prometheus `http://localhost:9090`,
+Alertmanager `http://localhost:9093`.
 대시보드 패널 순서가 조사 순서다 — SLO 위반 → 판정 품질 → 큐 → Runner → 일관성.
 
 앱은 호스트에서 돌고 Prometheus 는 컨테이너에서 돈다. 타깃이 전부 down 이면
 `host.docker.internal` 이 풀리지 않는 것이므로, Linux 에서는 compose 의 `extra_hosts`
 가 살아 있는지 본다.
+
+## 경보는 어디로 가나
+
+규칙(`alerts.yml`)은 **무엇이 잘못됐는지**를 정하고, 라우팅
+([`alertmanager.yml`](../deploy/observability/alertmanager.yml))은 **그것이 누구에게 언제
+가는지**를 정한다. 둘 중 하나만 있으면 경보 체계는 없는 것과 같다.
+
+| severity | 어디로 | 다시 알림 | 뜻 |
+|---|---|---|---|
+| `page` | 당번 | 4시간 | 지금 사람이 봐야 한다 |
+| `ticket` | 백로그 | 24시간 | 근무 시간에 처리한다 |
+| `watchdog` | 배달 감시 | 5분 | 아래 참고 |
+| (없음) | unrouted | 24시간 | 라벨을 빠뜨린 규칙 |
+
+같은 문제를 `alertname` 과 `plane` 으로 묶어 한 번만 알린다. 인스턴스별로 묶으면 장애
+한 번에 알림이 인스턴스 수만큼 오고, 사람은 곧 그것을 무시하는 법을 배운다. `page` 가
+떠 있는 동안 같은 대상의 `ticket` 은 억제한다 — 큰 장애에 딸려 오는 작은 신호가 호출
+위에 쌓이면 정작 봐야 할 것이 묻힌다.
+
+**라벨 없는 경보도 어딘가로 간다.** 조용히 버려지면, 라벨을 빠뜨린 새 규칙은 만들어
+놓고도 아무도 모른다.
+
+<a id="alert-routing"></a>
+### alert-routing
+
+**증상**: `Watchdog` 이 오지 않는다.
+
+`Watchdog` 은 항상 켜져 있는 경보다. 문제가 없어서 조용한 것과 **배달 경로가 끊겨서
+조용한 것**은 화면에서 똑같아 보이는데, 이것이 둘을 가른다. 받는 쪽에서 "5분 안에 오지
+않으면 알린다"로 걸어 둔다.
+
+오지 않으면 위에서부터 짚는다.
+
+1. Prometheus 가 Alertmanager 를 찾았나 — `curl -s localhost:9090/api/v1/alertmanagers`
+2. 규칙이 켜져 있나 — `curl -s localhost:9090/api/v1/alerts`
+3. Alertmanager 까지 왔나 — `curl -s localhost:9093/api/v2/alerts`
+4. 배달이 됐나 — `alertmanager_notifications_failed_total`
+
+**수신자가 아직 채워지지 않았다면 4에서 멈춘다.** 기본 설정의 주소는 절대 풀리지 않는
+`.invalid` 다 — 빈 수신자로 두면 배달이 조용히 성공한 것처럼 보이기 때문이다. 실제
+주소로 바꾸는 것이 이 항목을 닫는 일이며, **누가 당번인가는 조직이 정한다.**
 
 ## 경보별 첫 대응
 
