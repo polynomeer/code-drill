@@ -1,0 +1,45 @@
+# 이미지로 뜬 앱 (기술 설계서 §2.3 배포 토폴로지).
+#
+# 의존성 파일과 함께 쓴다. 프로젝트 이름이 같아야 같은 네트워크에 붙는다.
+#
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.apps.yml \
+#     --profile apps up -d
+#
+# 컨테이너끼리는 서비스 이름과 **컨테이너 안 포트**로 붙는다. 호스트 포트를 비켜 가도
+# 여기는 그대로다 — 그게 네트워크를 나누는 이유다.
+#
+# **Runner 는 여기 없다.** 이유는 docs/deploying.md 의 "Runner 를 어디서 돌리나" 에 있다.
+# 한 줄로 줄이면: 사용자 코드를 격리하는 컴포넌트에 호스트 컨테이너 런타임을 통째로
+# 내주면 격리가 뒤집힌다.
+
+name: code-drill
+
+services:
+  control-plane:
+    image: codedrill/control-plane:${CODEDRILL_TAG:-dev}
+    profiles: ["apps"]
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/codedrill
+      REDIS_URL: redis://redis:6379
+      BROKER_URL: amqp://codedrill:codedrill@rabbitmq:5672
+      ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+    ports: ["${CONTROL_PLANE_PORT:-8080}:8080"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      rabbitmq: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo -e 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q 200"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  orchestrator:
+    image: codedrill/orchestrator:${CODEDRILL_TAG:-dev}
+    profiles: ["apps"]
+    environment:
+      BROKER_URL: amqp://codedrill:codedrill@rabbitmq:5672
+    ports: ["${ORCHESTRATOR_PORT:-8081}:8081"]
+    depends_on:
+      rabbitmq: {condition: service_healthy}

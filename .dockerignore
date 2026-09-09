@@ -1,0 +1,11 @@
+# 빌드 컨텍스트에서 뺀다. 이미지에 들어갈 이유가 없고, 바뀔 때마다 캐시를 깨뜨린다.
+.git
+.gradle
+build
+*/build
+*/*/build
+web/node_modules
+web/dist
+content/reports
+.codedrill-stack.json
+**/__pycache__
