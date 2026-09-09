@@ -28,7 +28,11 @@ class JudgeMetrics(private val registry: MeterRegistry = SimpleMeterRegistry()) 
      * 도착한 결과를 어떻게 처리했는지 (§4.3).
      *
      * duplicate 는 정상이고 stale 은 워커 유실의 흔적이며 already_completed 는 조사
-     * 대상이다. 셋을 한 카운터에 태그로 담아야 대시보드에서 비율로 볼 수 있다.
+     * 대상이다. 한 카운터에 태그로 담아야 대시보드에서 비율로 볼 수 있다.
+     *
+     * unleased 는 **정상 경로에서 드물어야 한다.** 재시작이나 인스턴스 증설 직후에는
+     * 자연스럽지만, 꾸준히 나온다면 임대가 제 일을 못 하고 있다는 뜻이고 그러면 만료로
+     * 워커 유실을 잡는 장치도 함께 무너져 있다.
      */
     fun acceptance(outcome: AttemptRegistry.Acceptance) {
         val label = when (outcome) {
@@ -36,6 +40,7 @@ class JudgeMetrics(private val registry: MeterRegistry = SimpleMeterRegistry()) 
             AttemptRegistry.Acceptance.Duplicate -> "duplicate"
             AttemptRegistry.Acceptance.AlreadyCompleted -> "already_completed"
             is AttemptRegistry.Acceptance.Stale -> "stale"
+            AttemptRegistry.Acceptance.Unleased -> "unleased"
         }
         registry.counter(Metrics.RESULT_ACCEPTANCE, Metrics.Tag.OUTCOME, label).increment()
     }

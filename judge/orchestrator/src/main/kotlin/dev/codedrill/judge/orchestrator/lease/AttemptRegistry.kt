@@ -126,8 +126,15 @@ class AttemptRegistry(
             return if (digest == result.resultDigest) Acceptance.Duplicate else Acceptance.AlreadyCompleted
         }
 
-        val lease = active[result.submissionId]
-            ?: return Acceptance.Stale("임대 기록이 없다")
+        // 임대 기록이 없다고 버리지 않는다.
+        //
+        // 기록은 이 프로세스의 메모리에 있다. 오케스트레이터가 재시작했거나, 인스턴스가
+        // 둘이어서 **띄운 쪽과 결과를 받은 쪽이 다르면** 기록이 없다. 버리면 그 제출은
+        // 결과가 멀쩡히 도착했는데도 영영 끝나지 않는다.
+        //
+        // 낡은 결과가 섞여 들어올 위험은 제어 영역이 받는다 — 끝난 제출의 판정은
+        // 승인된 재채점으로만 바뀐다 (SubmissionService.complete).
+        val lease = active[result.submissionId] ?: return Acceptance.Unleased
 
         if (result.fencingToken < lease.token) {
             return Acceptance.Stale(
@@ -169,5 +176,14 @@ class AttemptRegistry(
 
         /** 유효하지 않은 실행에서 온 결과다. 폐기하고 감사 기록만 남긴다. */
         data class Stale(val reason: String) : Acceptance
+
+        /**
+         * 임대 기록이 없는 결과다. 넘기되 그 사실을 남긴다 (§4.3).
+         *
+         * 재시작했거나, 인스턴스가 둘이어서 띄운 쪽과 받은 쪽이 다르면 이렇게 된다.
+         * **정상 경로에서 자주 보이면 안 된다** — 자주 보인다면 임대가 쓸모없어졌다는
+         * 뜻이고, 그러면 만료로 워커 유실을 잡는 장치도 함께 무너져 있다.
+         */
+        data object Unleased : Acceptance
     }
 }

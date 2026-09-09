@@ -162,6 +162,16 @@ class JudgeCoordinator(
         when (acceptance) {
             AttemptRegistry.Acceptance.Accepted -> complete(result, correlationId)
 
+            // 임대 기록이 없어도 결과는 넘긴다. 버리면 그 제출은 결과가 멀쩡히
+            // 도착했는데도 영영 끝나지 않는다 — 재시작이나 인스턴스 증설만으로 생긴다.
+            AttemptRegistry.Acceptance.Unleased -> {
+                log.atWarn()
+                    .addKeyValue(CorrelationIds.SUBMISSION_ID, result.submissionId)
+                    .addKeyValue(CorrelationIds.EXECUTION_ID, result.executionId)
+                    .log("임대 기록이 없는 결과다. 넘긴다 — 재시작했거나 다른 인스턴스가 띄운 실행이다")
+                complete(result, correlationId)
+            }
+
             AttemptRegistry.Acceptance.Duplicate ->
                 log.atInfo()
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, result.submissionId)
