@@ -81,3 +81,29 @@ COPY --from=builder /src/judge/runner-agent/build/install/runner-agent /app/runn
 
 EXPOSE 8082
 ENTRYPOINT ["/app/runner-agent/bin/runner-agent"]
+
+# --- 웹 ----------------------------------------------------------------------
+#
+# 배포 단위 넷째다. 개발에서는 Vite 가 정적 자산도 내주고 /api 프록시도 했지만, 배포에는
+# Vite 가 없다. 그 두 가지를 nginx 가 대신한다 (deploy/web.nginx.conf).
+
+FROM node:22-alpine AS web-builder
+WORKDIR /web
+
+RUN corepack enable
+
+# 잠금 파일과 선언을 먼저 넣어 의존성 설치를 캐시한다. 소스만 바뀐 재빌드에서 건너뛴다.
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY web ./
+# `pnpm build` 는 타입 검사·테스트·번들에 **번들 예산**까지 돈다. 예산을 이미지 빌드에서
+# 돌리는 이유는, 크기가 무너진 채로 이미지가 만들어지면 배포하기 전에는 아무도 모르기
+# 때문이다 (web/scripts/bundle-budget.mjs).
+RUN pnpm build
+
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS web
+COPY --from=web-builder /web/dist /usr/share/nginx/html
+COPY deploy/web.nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 8080

@@ -1,0 +1,56 @@
+# Runner 전용 노드 (기술 설계서 §2.3 신뢰 경계, §5.2 격리).
+#
+# **이 파일은 다른 것과 함께 띄우지 않는다.** 앱 스택과 나눠 둔 것이 실수가 아니다 —
+# Runner 는 사용자 코드에 가장 가까이 있는 컴포넌트이고, 여기서는 호스트의 컨테이너
+# 런타임에 접근한다. 그 둘이 한 호스트에서 겹치면 Runner 를 깨는 데 성공한 사람이
+# 제어 영역과 DB 가 있는 호스트를 얻는다.
+#
+# 그래서 **Runner 말고 아무것도 없는 노드**에서 이것만 띄운다. 노드 자체가 폐기 가능한
+# 격리 단위가 된다. 자세한 이유와 남은 위험은 docs/deploying.md 에 있다.
+#
+#   BROKER_URL=amqp://codedrill:codedrill@<브로커 호스트>:5672 \
+#   CODEDRILL_TAG=<커밋 SHA> \
+#     docker compose -f deploy/docker-compose.runner.yml up -d
+
+name: code-drill-runner
+
+services:
+  runner-agent:
+    image: codedrill/runner-agent:${CODEDRILL_TAG:-dev}
+    environment:
+      # 브로커는 다른 노드에 있다. 기본값을 두지 않는다 — localhost 로 조용히 붙어
+      # 아무 작업도 받지 못한 채 "떠 있는" 것이 가장 알아채기 어려운 실패다.
+      BROKER_URL: ${BROKER_URL:?브로커 주소가 필요하다}
+
+      # 격리 없이는 뜨지 않는다 (§5.2). 런타임을 못 찾으면 프로세스 샌드박스로 내려가는
+      # 개발 편의가 있는데, 공개 환경에서 그것은 사용자 코드를 호스트에서 그냥 돌리는
+      # 것과 같다.
+      REQUIRE_ISOLATION: "true"
+
+      # 아래 마운트와 **같은 경로**여야 한다. 샌드박스 컨테이너를 띄우는 것은 Runner
+      # 지만 그 마운트 경로를 해석하는 것은 호스트 데몬이라, 이름이 다르면 데몬은 빈
+      # 디렉터리를 만들어 붙이고 모든 제출이 SYSTEM_ERROR 가 된다.
+      SANDBOX_WORK_ROOT: /var/lib/codedrill/work
+
+      # 운영에서는 태그가 아니라 digest 로 고정한다 (§5.5). 태그는 같은 이름이 다른
+      # 내용을 가리킬 수 있어, 지난 제출을 그때의 런타임으로 재현하지 못한다.
+      KOTLIN_IMAGE: ${KOTLIN_IMAGE:-eclipse-temurin:21-jre}
+      JAVA_IMAGE: ${JAVA_IMAGE:-eclipse-temurin:21-jre}
+      PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-alpine}
+
+    volumes:
+      # 안과 밖의 이름이 같다. 위 SANDBOX_WORK_ROOT 와 짝이다.
+      - /var/lib/codedrill/work:/var/lib/codedrill/work
+      # 샌드박스 컨테이너를 띄우기 위한 접근. **이 한 줄이 이 파일을 따로 둔 이유다.**
+      # 이 소켓을 가진 프로세스는 호스트에서 무엇이든 할 수 있으므로, 이 노드에는
+      # 잃어도 되는 것만 있어야 한다.
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    ports: ["${RUNNER_PORT:-8082}:8082"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8082/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
