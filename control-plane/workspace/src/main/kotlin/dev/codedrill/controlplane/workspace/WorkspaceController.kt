@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.workspace
 import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
 import dev.codedrill.platform.common.Principal
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import java.time.Instant
 import java.util.UUID
@@ -54,7 +55,7 @@ class WorkspaceController(private val service: WorkspaceService) {
         @PathVariable problemId: String,
         @PathVariable language: String,
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
-        @RequestBody request: SaveDraftRequest,
+        @Valid @RequestBody request: SaveDraftRequest,
     ): ResponseEntity<Any> =
         when (val outcome = service.save(principal.id, problemId, language.uppercase(), request.code, request.version)) {
             is WorkspaceService.SaveOutcome.Saved ->

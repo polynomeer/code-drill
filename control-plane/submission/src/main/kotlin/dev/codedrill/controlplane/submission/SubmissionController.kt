@@ -10,7 +10,9 @@ import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
 import dev.codedrill.platform.common.Page
 import dev.codedrill.platform.common.Principal
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Positive
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -49,7 +51,7 @@ class SubmissionController(
     fun create(
         @RequestHeader("Idempotency-Key") idempotencyKey: String,
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
-        @RequestBody request: CreateSubmissionRequest,
+        @Valid @RequestBody request: CreateSubmissionRequest,
     ): ResponseEntity<SubmissionResponse> {
         // 트랜잭션 경계가 서비스에 있으므로, 여기서 감싸야 커밋까지가 측정에 들어간다
         // (§12.1 API 수신 → submission/outbox commit).
@@ -176,7 +178,14 @@ class SubmissionController(
 
 data class CreateSubmissionRequest(
     @field:NotBlank val problemId: String,
-    val problemVersion: Int,
+    /**
+     * 채점할 문제 버전. **1 이상이어야 한다.**
+     *
+     * 빠뜨리면 Jackson 이 Int 기본값 0 을 채운다. 그대로 받으면 존재하지 않는 버전을
+     * 가리키는 제출이 만들어지고, 큐에 실려 오케스트레이터에서 영원히 실패한다 —
+     * 잘못된 요청 하나가 소비자를 재시도 루프에 가둔다. 여기서 400 으로 끊는다.
+     */
+    @field:Positive val problemVersion: Int,
     val language: Language,
     @field:NotBlank val source: String,
     /** 판정 뒤 학습용 트레이스를 이어서 만들지 (§9.3). */

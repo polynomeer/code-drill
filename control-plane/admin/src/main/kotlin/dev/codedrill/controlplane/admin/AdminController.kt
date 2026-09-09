@@ -1,5 +1,6 @@
 package dev.codedrill.controlplane.admin
 
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import java.util.UUID
 import org.springframework.http.HttpStatus
@@ -40,7 +41,7 @@ class AdminController(
     fun registerVersion(
         @PathVariable problemId: String,
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
-        @RequestBody request: RegisterVersionRequest,
+        @Valid @RequestBody request: RegisterVersionRequest,
     ): ResponseEntity<Map<String, String>> =
         when (val outcome = publish.registerVersion(
             problemId, request.version, request.packageDigest, request.reportDigest,
@@ -59,7 +60,7 @@ class AdminController(
     fun publishVersion(
         @PathVariable problemId: String,
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
-        @RequestBody request: PublishRequest,
+        @Valid @RequestBody request: PublishRequest,
     ): ResponseEntity<Map<String, String>> =
         when (val outcome = publish.publish(
             problemId, request.version, request.reportDigest, request.validatorVersion, actor,
@@ -87,7 +88,7 @@ class AdminController(
     fun grantRole(
         @PathVariable userId: String,
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
-        @RequestBody request: RoleRequest,
+        @Valid @RequestBody request: RoleRequest,
     ): ResponseEntity<Map<String, Any>> {
         val role = request.parsed()
             ?: return ResponseEntity.badRequest().body(mapOf("reason" to "알 수 없는 역할이다: ${request.role}"))
@@ -131,7 +132,7 @@ class AdminController(
     fun archive(
         @PathVariable problemId: String,
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
-        @RequestBody request: ArchiveRequest,
+        @Valid @RequestBody request: ArchiveRequest,
     ): Map<String, String> {
         publish.archive(problemId, actor, request.reason)
         return mapOf("problemId" to problemId, "archived" to "true")
@@ -147,7 +148,7 @@ class AdminController(
     @PostMapping("/rejudges")
     fun requestRejudge(
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
-        @RequestBody request: RejudgeRequest,
+        @Valid @RequestBody request: RejudgeRequest,
     ): RejudgeJob = rejudge.request(request.scope, request.reason, actor, request.dryRun)
 
     @RequiresRole(AdminRole.REVIEWER)
@@ -167,7 +168,7 @@ class AdminController(
     fun rejectRejudge(
         @PathVariable id: UUID,
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
-        @RequestBody request: ArchiveRequest,
+        @Valid @RequestBody request: ArchiveRequest,
     ): ResponseEntity<Any> =
         when (val outcome = rejudge.reject(id, actor, request.reason)) {
             is RejudgeService.ApprovalOutcome.Approved -> ResponseEntity.ok(outcome.job)
