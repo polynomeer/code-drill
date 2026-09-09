@@ -5,8 +5,9 @@ name: images
 # ci.yml 이 앞단(빌드·테스트·콘텐츠 검증)을 맡는다. 여기서는 그 결과가 실제로 이미지로
 # 묶이고, 뜨고, 어디선가 내려받을 수 있는 것이 되는지 본다.
 #
-# **만들기와 올리기를 나눈다.** 먼저 로컬로 만들어 기동을 확인하고, 통과한 것만 올린다.
-# 순서를 바꾸면 뜨지 않는 이미지가 태그를 갖게 되고, 그 태그를 롤백 대상으로 믿게 된다.
+# **만들기와 올리기를 나눈다.** 먼저 로컬로 만들어 기동과 취약점을 확인하고, 통과한 것만
+# 올린다. 순서를 바꾸면 뜨지 않거나 구멍 난 이미지가 태그를 갖게 되고, 그 태그를 롤백
+# 대상으로 믿게 된다. 게이트가 push 뒤에 있으면 그것은 게이트가 아니라 보고서다.
 
 on:
   push:
@@ -83,6 +84,20 @@ jobs:
               ;;
           esac
 
+      # 스캐너 DB 는 크고 자주 바뀐다. 날짜로 키를 두어 하루 한 번만 받는다 —
+      # 캐시가 없으면 스캔보다 내려받기가 오래 걸린다.
+      - name: 스캐너 DB 캐시
+        uses: actions/cache@v4
+        with:
+          path: build/trivy-cache
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+
+      # §11.4 네 게이트 중 마지막. 정책은 scripts/scan-images.py 에 있고 로컬에서도
+      # 같은 명령으로 돈다 — 게이트가 CI 안에만 살면, 막혔을 때 손에 쥔 것이 로그뿐이다.
+      - name: 취약점 게이트
+        run: python3 scripts/scan-images.py ${{ steps.name.outputs.image }}:${{ github.sha }}
+
       - name: 레지스트리 로그인
         if: github.event_name == 'push'
         uses: docker/login-action@v3
@@ -117,3 +132,24 @@ jobs:
           subject-name: ${{ steps.name.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+
+  # 사용자 코드가 실제로 도는 이미지 (§5.5). 우리가 만들지 않았지만 **우리가 고른
+  # 것**이고, 신뢰 경계 바깥에서 가장 노출된 자리다. 우리 이미지만 스캔하고 여기를
+  # 빼면, 정작 공격자가 서 있는 바닥은 아무도 보지 않는 셈이 된다.
+  #
+  # 이 잡은 우리 빌드와 무관하게 깨질 수 있다 — 상류가 새 CVE 를 받으면 코드를 한 줄도
+  # 바꾸지 않은 날에도 빨개진다. 그것이 알고 싶은 사실이다.
+  sandbox-runtimes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 스캐너 DB 캐시
+        uses: actions/cache@v4
+        with:
+          path: build/trivy-cache
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+      - run: |
+          docker pull --quiet eclipse-temurin:21-jre
+          docker pull --quiet python:3.12-alpine
+          python3 scripts/scan-images.py eclipse-temurin:21-jre python:3.12-alpine
