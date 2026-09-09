@@ -25,6 +25,9 @@ done
 | runner-agent | **JDK** + installDist + python3 + docker CLI | ~1.35GB |
 | web | nginx + 정적 번들 | ~82MB |
 
+기반 이미지 판은 §11.4 스캔이 정한다. `nginx-unprivileged` 를 1.27 에서 1.29 로 올린
+것도 1.27 의 openssl 3.3.3 에 고칠 수 있는 CRITICAL 이 있었기 때문이다.
+
 **웹은 정적 자산만이 아니다.** 개발에서는 Vite 가 자산을 내주고 `/api` 를 제어 영역으로
 넘겼는데(§9.1), 배포에는 Vite 가 없다. 그 두 가지를 [nginx 설정](../deploy/web.nginx.conf)
 이 대신한다 — SPA 폴백, 자산 영구 캐시와 `index.html` 무캐시, 그리고 **SSE 버퍼링 끄기**.
