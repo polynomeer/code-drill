@@ -7,15 +7,15 @@
 로컬에서 띄우는 방법은 [running-locally.md](running-locally.md) 에 있다. 이 문서는
 이미지로 만들어 다른 곳에서 돌리는 이야기다.
 
-## 이미지 셋
+## 이미지 넷
 
-[deploy/Dockerfile](../deploy/Dockerfile) 하나에서 세 개를 만든다. 빌더 단계를 공유하므로
-컴파일은 한 번이고, 빌드 방법이 한 곳에만 있어 셋이 어긋나지 않는다.
+[deploy/Dockerfile](../deploy/Dockerfile) 하나에서 네 개를 만든다. 빌더 단계를 공유하므로
+컴파일은 한 번이고, 빌드 방법이 한 곳에만 있어 넷이 어긋나지 않는다.
 
 ```bash
-docker build -f deploy/Dockerfile --target control-plane -t codedrill/control-plane:$TAG .
-docker build -f deploy/Dockerfile --target orchestrator  -t codedrill/orchestrator:$TAG  .
-docker build -f deploy/Dockerfile --target runner-agent  -t codedrill/runner-agent:$TAG  .
+for t in control-plane orchestrator runner-agent web; do
+  docker build -f deploy/Dockerfile --target $t -t codedrill/$t:$TAG .
+done
 ```
 
 | 이미지 | 담는 것 | 크기 |
@@ -23,6 +23,12 @@ docker build -f deploy/Dockerfile --target runner-agent  -t codedrill/runner-age
 | control-plane | JRE + bootJar + **문제 패키지** | ~590MB |
 | orchestrator | JRE + bootJar + 문제 패키지 | ~580MB |
 | runner-agent | **JDK** + installDist + python3 + docker CLI | ~1.35GB |
+| web | nginx + 정적 번들 | ~82MB |
+
+**웹은 정적 자산만이 아니다.** 개발에서는 Vite 가 자산을 내주고 `/api` 를 제어 영역으로
+넘겼는데(§9.1), 배포에는 Vite 가 없다. 그 두 가지를 [nginx 설정](../deploy/web.nginx.conf)
+이 대신한다 — SPA 폴백, 자산 영구 캐시와 `index.html` 무캐시, 그리고 **SSE 버퍼링 끄기**.
+마지막 것을 빠뜨리면 판정이 실시간으로 오지 않고 한참 뒤에 뭉쳐서 도착한다.
 
 **문제 패키지를 이미지에 굽는다.** 목록·상세 API 가 그 디렉터리를 읽으므로(§9.2),
 볼륨으로 빼면 "어느 콘텐츠로 뜬 서비스인가"를 태그로 말할 수 없다. 콘텐츠를 고치면
@@ -49,16 +55,36 @@ Runner 는 사용자 코드를 격리 컨테이너에서 돌린다(§5.2). 그�
 에는 Runner 서비스가 없다.
 
 지금 서 있는 선택지는 하나다. **Runner 를 전용 노드에서 돌린다** — 그 노드에는 Runner
-말고 아무것도 없고, 노드 자체가 폐기 가능한 격리 단위가 된다. 이미지는 그 노드에서
-쓰라고 만든 것이다.
+말고 아무것도 없고, 노드 자체가 폐기 가능한 격리 단위가 된다.
+[deploy/docker-compose.runner.yml](../deploy/docker-compose.runner.yml) 이 그 노드용이며,
+앱 스택과 **같이 띄우지 않는다.**
 
-컨테이너 안에서 돌리려면 두 가지가 더 필요하다. 아직 없다.
+```bash
+BROKER_URL=amqp://codedrill:codedrill@<브로커 호스트>:5672 CODEDRILL_TAG=<SHA> \
+  docker compose -f deploy/docker-compose.runner.yml up -d
+```
 
-- **경로가 맞아야 한다.** Runner 는 작업 디렉터리를 샌드박스 컨테이너에 마운트하는데,
-  형제 컨테이너를 띄우면 그 경로를 호스트 데몬이 해석한다. Runner 안의 경로와 호스트
-  경로가 같아야 한다.
-- **런타임을 소켓 말고 다른 방식으로 줘야 한다.** rootless 런타임이나 노드마다 하나씩
-  두는 격리 데몬이 후보다. 이것은 §11.2 워크로드 신원과 함께 풀어야 한다.
+### 경로가 같아야 한다
+
+Runner 는 샌드박스 컨테이너를 띄우면서 두 가지를 마운트한다. **그 경로를 해석하는 것은
+Runner 가 아니라 호스트 데몬이다.** Runner 안에만 있는 경로를 주면 데몬은 그런 경로가
+없으니 빈 디렉터리를 만들어 붙이고, 사용자 코드는 자기 소스나 런타임이 사라진 채로 돌아
+전부 SYSTEM_ERROR 가 된다. 로그에는 아무 오류도 남지 않는다.
+
+| 무엇 | 맞추는 방법 |
+|---|---|
+| 실행 디렉터리 | 호스트의 한 경로를 **같은 이름으로** 마운트하고 `SANDBOX_WORK_ROOT` 에 준다 |
+| Kotlin 런타임 jar | Runner 가 기동할 때 그 디렉터리 아래 `runtime/` 로 복제한다 (자동) |
+
+둘째를 빠뜨렸다가 실제로 겪었다. 실행 디렉터리만 맞춰 두면 Java·Python 은 통과하고
+**Kotlin 만** SYSTEM_ERROR 가 된다 — 셋 중 Kotlin 만 자기 런타임 jar 를 샌드박스에
+들여보내기 때문이다. 언어 하나만 깨지는 실패라 격리 문제로 보이지 않는다.
+
+### 아직 남은 위험
+
+**런타임을 소켓 말고 다른 방식으로 줘야 한다.** rootless 런타임이나 노드마다 하나씩 두는
+격리 데몬이 후보다. 지금은 소켓을 그대로 내주고 **노드를 격리 단위로 삼아** 위험을
+가둔다. 이것은 §11.2 워크로드 신원과 함께 풀어야 한다.
 
 **격리 없이는 뜨지 못하게 하라.** 이미지는 컨테이너 런타임을 못 찾으면 경고를 남기고
 프로세스 샌드박스로 내려간다 — 개발 편의다. 공개 환경에서는 반드시 막는다.
@@ -111,8 +137,27 @@ codedrill/control-plane:dev            ← 로컬 빌드
 
 경보가 울렸을 때의 첫 대응은 [runbook.md](runbook.md) 에 있다.
 
+## 레지스트리와 출처
+
+[images.yml](../.github/workflows/images.yml) 이 넷을 만들고, **main 에 들어온 것만**
+`ghcr.io/<owner>/<repo>/<이미지>:<SHA>` 로 올린다.
+
+**만들기와 올리기를 나눈다.** 먼저 로컬로 만들어 기동을 확인하고 통과한 것만 올린다.
+순서를 바꾸면 뜨지 않는 이미지가 태그를 갖고, 그 태그를 롤백 대상으로 믿게 된다.
+
+올릴 때 SBOM 과 출처 증명(provenance)이 함께 붙는다. **비밀 키가 없다** — OIDC 로
+서명하므로 보관할 키가 생기지 않는다. 키를 두면 그것이 새로운 장기 비밀이 되고, 관리자
+토큰을 없앤 이유(§11.2)가 다른 자리에서 되살아난다.
+
+```bash
+gh attestation verify oci://ghcr.io/<owner>/<repo>/control-plane:<SHA> --repo <owner>/<repo>
+```
+
+이 검증이 §11.4 이미지 스캔 게이트(B4)가 설 자리다.
+
 ## 아직 없는 것
 
-배포 매니페스트(Kubernetes 든 무엇이든), 레지스트리, 이미지 서명과 SBOM, 스캔 게이트가
-없다. 무엇에 배포할지가 정해져야 쓸 수 있는 것들이라 비워 두었다.
-[production-readiness.md](production-readiness.md) 의 A1 과 B4 가 이 자리를 가리킨다.
+여러 노드에 걸치는 매니페스트(Kubernetes 든 무엇이든)와 스캔 게이트가 없다. 지금 서 있는
+것은 **단일 호스트 compose** 다 — 앱 스택 한 벌과 Runner 노드 하나. 그 이상으로 늘릴 때가
+매니페스트가 필요해지는 때다. [production-readiness.md](production-readiness.md) 의 A1 과
+B4 가 이 자리를 가리킨다.
