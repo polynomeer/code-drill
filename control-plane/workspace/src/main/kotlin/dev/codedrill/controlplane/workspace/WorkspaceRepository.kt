@@ -74,3 +74,16 @@ class WorkspaceRepository(private val jdbc: JdbcTemplate) {
         }
     }
 }
+
+/** 초안의 개인 데이터 (기술 설계서 §11.3). 초안은 통째로 사용자가 쓴 것이라 그냥 지운다. */
+@org.springframework.stereotype.Repository
+class DraftPersonalData(private val jdbc: org.springframework.jdbc.core.JdbcTemplate) {
+
+    fun export(userId: String): List<Map<String, Any?>> = jdbc.queryForList(
+        "SELECT problem_id, language, code, version, updated_at FROM workspace_draft WHERE user_id = ?",
+        userId,
+    )
+
+    fun erase(userId: String): Map<String, Int> =
+        mapOf("drafts" to jdbc.update("DELETE FROM workspace_draft WHERE user_id = ?", userId))
+}

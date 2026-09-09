@@ -248,3 +248,43 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
         }
     }
 }
+
+/**
+ * 개인 데이터 반출·삭제용 질의 (기술 설계서 §11.3).
+ *
+ * 저장소에 두는 이유는 이 SQL 이 표 구조를 알아야 하기 때문이다. **어느 열이 개인
+ * 데이터인지는 표를 가진 쪽만 안다** — 밖에서 지우게 하면 열이 늘어날 때 조용히 빠진다.
+ */
+@org.springframework.stereotype.Repository
+class SubmissionPersonalData(private val jdbc: org.springframework.jdbc.core.JdbcTemplate) {
+
+    fun export(userId: String): List<Map<String, Any?>> = jdbc.queryForList(
+        """
+        SELECT id, problem_id, problem_version, language, source, status, verdict,
+               score, compile_log, created_at
+          FROM submission WHERE user_id = ? ORDER BY created_at
+        """.trimIndent(),
+        userId,
+    )
+
+    /**
+     * 사용자가 쓴 내용을 지우고, 집계에 쓰이는 사실만 남긴다.
+     *
+     * 제출 행 자체는 지우지 않는다. 판정 이력이 이 행을 참조하고(§8.1), 문제별 통계와
+     * 정답률이 여기서 나온다. 지워야 할 것은 **그 사람이 쓴 코드**이지 "이 문제가 몇 번
+     * 풀렸는가"가 아니다.
+     */
+    fun erase(userId: String): Map<String, Int> {
+        val traces = jdbc.update(
+            """
+            DELETE FROM trace WHERE submission_id IN (SELECT id FROM submission WHERE user_id = ?)
+            """.trimIndent(),
+            userId,
+        )
+        val sources = jdbc.update(
+            "UPDATE submission SET source = NULL, compile_log = NULL WHERE user_id = ? AND source IS NOT NULL",
+            userId,
+        )
+        return mapOf("submissionSources" to sources, "traces" to traces)
+    }
+}

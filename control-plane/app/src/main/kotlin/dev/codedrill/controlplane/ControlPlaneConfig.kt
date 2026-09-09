@@ -14,6 +14,9 @@ import dev.codedrill.controlplane.admin.AdminAccounts
 import dev.codedrill.controlplane.submission.QuotaLimits
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import dev.codedrill.controlplane.identity.IdentityService
+import dev.codedrill.controlplane.identity.PersonalData
+import dev.codedrill.controlplane.submission.SubmissionPersonalData
+import dev.codedrill.controlplane.workspace.DraftPersonalData
 import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.controlplane.submission.RejudgeContext
 import dev.codedrill.controlplane.submission.SubmissionService
@@ -54,6 +57,29 @@ class ControlPlaneConfig {
      */
     @Bean
     fun adminAccounts(identity: IdentityService) = AdminAccounts { identity.findIdByEmail(it) }
+
+    /**
+     * 개인 데이터를 가진 모듈을 Identity 에 잇는다 (§11.3, §3.1).
+     *
+     * Identity 는 제출도 초안도 모른다. 그런데 "내 데이터를 지워 달라"에 답해야 하는
+     * 것은 계정만이 아니므로, 각 모듈이 자기 몫을 내놓고 여기서 모은다.
+     *
+     * **모듈이 개인 데이터를 갖게 되면 이 목록에 넣어야 한다.** 넣지 않으면 반출은
+     * 조용히 빠뜨리고 삭제는 조용히 남긴다.
+     */
+    @Bean
+    fun submissionPersonalArea(data: SubmissionPersonalData) = object : PersonalData {
+        override val area = "submissions"
+        override fun export(userId: String) = data.export(userId)
+        override fun erase(userId: String) = data.erase(userId)
+    }
+
+    @Bean
+    fun draftPersonalArea(data: DraftPersonalData) = object : PersonalData {
+        override val area = "drafts"
+        override fun export(userId: String) = data.export(userId)
+        override fun erase(userId: String) = data.erase(userId)
+    }
 
     /**
      * 재채점과 제출 도메인을 잇는 어댑터 두 개 (§3.1 조립 지점).

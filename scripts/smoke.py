@@ -423,6 +423,35 @@ def main() -> int:
     results.append(check("  performance 부분 득점", 0 < perf["score"] < perf["maxScore"], True))
     print(f"        (총점 {slow['score']}, performance {perf['score']}/{perf['maxScore']})")
 
+    print("\n개인 데이터 반출·삭제 (§11.3)")
+    leaver = accounts.create("leaver")
+    leaver_auth = leaver.headers
+    raw_request("POST", "/submissions",
+                {"problemId": "two-sum", "problemVersion": 1, "language": "KOTLIN",
+                 "source": ACCEPTED_SOURCE},
+                {**leaver_auth, "Idempotency-Key": str(uuid.uuid4())})
+
+    dump = request("GET", "/auth/me/export", None, leaver_auth)
+    results.append(check("반출에 계정이 있다", "account" in dump, True))
+    results.append(check("  제출도 함께", len(dump.get("submissions", [])) >= 1, True))
+    results.append(check("  소스가 실린다", bool(dump["submissions"][0].get("source")), True))
+
+    # 되돌릴 수 없는 요청이다. 자리를 비운 사이 남이 만졌을 때 막을 것이 세션 하나뿐이면
+    # 안 된다 (§11.3).
+    status, _ = raw_request("DELETE", "/auth/me", {"password": "definitely-not-the-password"}, leaver_auth)
+    results.append(check("비밀번호 없이는 못 지운다", status, 401))
+
+    status, erased = raw_request("DELETE", "/auth/me", {"password": leaver.password}, leaver_auth)
+    results.append(check("계정 삭제", status, 200))
+    results.append(check("  제출 소스를 지웠다", erased["erased"]["submissions.submissionSources"] >= 1, True))
+    results.append(check("  세션을 끊었다", erased["erased"]["sessions"] >= 1, True))
+
+    status, _ = raw_request("POST", "/auth/login", {"email": leaver.email, "password": leaver.password},
+                            {"Authorization": ""})
+    results.append(check("지운 계정으로 로그인 불가", status, 401))
+    status, _ = raw_request("GET", "/auth/me/export", None, leaver_auth)
+    results.append(check("옛 토큰도 안 통한다", status, 401))
+
     print("\n제출 쿼터 (§10.2 남용 방어)")
     # 한 사람이 판정 큐를 혼자 채우지 못해야 한다. 끝나지 않는 풀이로 동시 진행 수를
     # 채운 뒤, 그 다음 제출이 거절되는지 본다.

@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
@@ -63,6 +64,41 @@ class IdentityController(private val identity: IdentityService) {
                 error(ErrorCode.UNAUTHENTICATED, "쓸 수 없는 refresh token 이다. 다시 로그인해야 한다"),
             )
 
+    /**
+     * 내 데이터를 전부 내려받는다 (§11.3).
+     *
+     * 지우기 전에 받아 갈 수 있어야 한다. 지우고 나면 돌려줄 것이 없다.
+     */
+    @GetMapping("/me/export")
+    fun export(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<Any> =
+        identity.exportAccount(principal.id)
+            ?.let { ResponseEntity.ok(it) }
+            ?: ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+
+    /**
+     * 계정을 지운다 (§11.3).
+     *
+     * 되돌릴 수 없으므로 비밀번호를 다시 받는다. 자리를 비운 사이 남이 만졌을 때 막을
+     * 것이 세션 하나뿐이면 안 된다.
+     */
+    @DeleteMapping("/me")
+    fun deleteAccount(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @Valid @RequestBody request: DeleteAccountRequest,
+    ): ResponseEntity<Any> =
+        when (val outcome = identity.deleteAccount(principal.id, request.password)) {
+            is IdentityService.Deletion.Done -> ResponseEntity.ok(mapOf("erased" to outcome.erased))
+
+            IdentityService.Deletion.WrongPassword ->
+                ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    error(ErrorCode.UNAUTHENTICATED, "비밀번호가 맞지 않는다"),
+                )
+
+            IdentityService.Deletion.NotFound -> ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        }
+
     @PostMapping("/logout")
     fun logout(@RequestHeader("Authorization") authorization: String): ResponseEntity<Void> {
         identity.logout(authorization.removePrefix("Bearer ").trim())
@@ -97,6 +133,8 @@ data class LoginRequest(
 )
 
 data class RefreshRequest(@field:NotBlank val refreshToken: String)
+
+data class DeleteAccountRequest(@field:NotBlank val password: String)
 
 /** 발급 응답. 평문 토큰이 나가는 유일한 곳이다. */
 data class SessionResponse(

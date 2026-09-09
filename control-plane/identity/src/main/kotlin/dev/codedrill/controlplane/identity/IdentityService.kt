@@ -30,6 +30,7 @@ import java.util.UUID
 class IdentityService(
     private val repository: IdentityRepository,
     private val properties: IdentityProperties,
+    private val areas: List<PersonalData> = emptyList(),
     private val clock: Clock = Clock.systemUTC(),
 ) {
 
@@ -52,6 +53,59 @@ class IdentityService(
         ) ?: return Registration.EmailTaken
 
         return Registration.Created(issue(user))
+    }
+
+    /**
+     * 계정을 지운다 (§11.3).
+     *
+     * **비밀번호를 다시 받는다.** 되돌릴 수 없는 요청이고, 자리를 비운 사이 남이 만졌을
+     * 때 막을 것이 세션 하나뿐이면 안 된다.
+     *
+     * 행을 지우지 않고 식별값을 지운다. 제출과 판정 이력이 이 id 를 참조하므로(§8.1),
+     * 행을 지우면 문제별 통계까지 함께 사라진다 — 그건 지워 달라고 요청받은 것이 아니다.
+     * 각 모듈이 자기 몫의 개인 데이터를 지우는 것은 [areas] 가 맡는다.
+     */
+    @Transactional
+    fun deleteAccount(userId: String, password: String): Deletion {
+        val id = UUID.fromString(userId)
+        val user = repository.findById(id) ?: return Deletion.NotFound
+        val credentials = repository.findCredentials(normalize(user.email))
+            ?: return Deletion.NotFound
+        if (!passwords.matches(password, credentials.second)) return Deletion.WrongPassword
+
+        val erased = buildMap {
+            for (area in areas) {
+                putAll(area.erase(userId).mapKeys { (key, _) -> "${area.area}.$key" })
+            }
+            put("sessions", repository.revokeAllFor(id, "account-deleted"))
+            put("account", repository.anonymize(id, tombstone(id)))
+        }
+        log.info("계정을 지웠다: {} — {}", userId, erased)
+        return Deletion.Done(erased)
+    }
+
+    /**
+     * 지운 계정이 남기는 이메일 자리값.
+     *
+     * 비우지 않는 이유는 이메일이 유니크이기 때문이다 — 비워 두면 두 번째 삭제가 충돌하고,
+     * 원래 주소를 남기면 지운 것이 아니다. 실제 주소와 겹칠 수 없는 도메인을 쓴다.
+     */
+    private fun tombstone(id: UUID) = "deleted-$id@deleted.invalid"
+
+    sealed interface Deletion {
+        data class Done(val erased: Map<String, Int>) : Deletion
+        data object WrongPassword : Deletion
+        data object NotFound : Deletion
+    }
+
+    /** 이 사람에 대해 갖고 있는 것 전부 (§11.3 반출). */
+    fun exportAccount(userId: String): Map<String, Any?>? {
+        val user = repository.findById(UUID.fromString(userId)) ?: return null
+        return buildMap {
+            put("account", mapOf("id" to user.id.toString(), "email" to user.email,
+                                 "displayName" to user.displayName))
+            for (area in areas) put(area.area, area.export(userId))
+        }
     }
 
     /**

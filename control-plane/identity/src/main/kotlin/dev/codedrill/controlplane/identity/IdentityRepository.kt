@@ -36,8 +36,14 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         jdbc.query("SELECT * FROM app_user WHERE id = ?", USER, id).firstOrNull()
 
     /** 로그인용. 해시를 함께 돌려주는 유일한 경로다. */
+    /**
+     * 로그인용 자격.
+     *
+     * 지운 계정은 돌려주지 않는다. 무덤값 해시로는 어차피 맞출 수 없지만, 그 판단을
+     * 비밀번호 비교에 맡기면 "왜 안 되는지"가 코드에 남지 않는다 (§11.3).
+     */
     fun findCredentials(email: String): Pair<User, String>? = jdbc.query(
-        "SELECT * FROM app_user WHERE email = ?",
+        "SELECT * FROM app_user WHERE email = ? AND deleted_at IS NULL",
         { rs, _ -> USER.mapRow(rs, 0)!! to rs.getString("password_hash") },
         email,
     ).firstOrNull()
@@ -77,6 +83,23 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
     )
 
     /** 한 사용자의 살아 있는 세션 전부. refresh 재사용이 탐지되면 통째로 끊는다. */
+    /**
+     * 계정에서 사람을 식별하는 값을 지운다 (§11.3).
+     *
+     * 이미 지운 계정은 건드리지 않는다 — 두 번째 요청이 무덤값을 또 덮어쓰면 삭제 시각이
+     * 뒤로 밀린다.
+     */
+    fun anonymize(id: UUID, tombstoneEmail: String): Int = jdbc.update(
+        """
+        UPDATE app_user
+           SET email = ?, display_name = '탈퇴한 사용자',
+               -- BCrypt 형식이 아니라 어떤 비밀번호로도 맞출 수 없다.
+               password_hash = 'deleted', deleted_at = now()
+         WHERE id = ? AND deleted_at IS NULL
+        """.trimIndent(),
+        tombstoneEmail, id,
+    )
+
     fun revokeAllFor(userId: UUID, reason: String): Int = jdbc.update(
         "UPDATE user_session SET revoked_at = now(), revoked_reason = ? WHERE user_id = ? AND revoked_at IS NULL",
         reason, userId,
