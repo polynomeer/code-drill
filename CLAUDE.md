@@ -44,8 +44,8 @@ python3 scripts/backup.py verify  # 백업을 임시 DB 에 복원해 본다 (§
 경보가 울렸을 때의 첫 대응은 → [docs/runbook.md](docs/runbook.md)
 
 ```bash
-cd web && pnpm build   # tsc --noEmit + vitest + vite build
-cd web && pnpm test    # 리플레이 리듀서 불변식
+cd web && pnpm build   # tsc --noEmit + vitest + vite build + 번들 예산
+cd web && pnpm test    # 리플레이 리듀서 불변식, Monaco import 경계
 cd web && pnpm dev     # :8080 으로 /api 프록시
 ```
 
