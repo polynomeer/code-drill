@@ -78,9 +78,22 @@ services:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
     ports: ["${PROMETHEUS_PORT:-9090}:9090"]
+    depends_on: [alertmanager]
     # 앱은 호스트에서 돌고 Prometheus 는 컨테이너에서 돈다. macOS 는 이 이름을 기본
     # 제공하지만 Linux 는 아니라서 명시한다.
     extra_hosts: ["host.docker.internal:host-gateway"]
+
+  # 경보를 실제로 내보내는 곳 (§13.4). 이것이 없으면 규칙은 평가만 되고 아무 데도 가지
+  # 않는다 — 화면을 보고 있는 사람에게만 있는 경보다.
+  #
+  # 수신자는 observability/alertmanager.yml 에서 채운다. 채우지 않으면 여기까지는 오고
+  # 그다음에서 멈춘다. 어디서 멈췄는지는 :9093 의 UI 에 보인다.
+  alertmanager:
+    image: prom/alertmanager:v0.28.0
+    profiles: ["observability"]
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports: ["${ALERTMANAGER_PORT:-9093}:9093"]
 
   grafana:
     image: grafana/grafana:11.5.1

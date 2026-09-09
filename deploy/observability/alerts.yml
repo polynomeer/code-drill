@@ -158,3 +158,20 @@ groups:
         annotations:
           summary: "일관성 점검 {{ $labels.check }} 가 어긋난 행을 찾았다"
           runbook: "docs/runbook.md#consistency"
+
+  # 경보 배달 자체를 감시한다 (§13.4).
+  #
+  # 위의 규칙들은 "문제가 있다"를 말한다. 문제가 없을 때 조용한 것과 **배달 경로가
+  # 끊겨서 조용한 것**은 화면에서 똑같아 보인다. Prometheus 가 죽어도, Alertmanager 가
+  # 죽어도, 수신자 설정이 틀려도 결과는 같은 침묵이다.
+  #
+  # 그래서 항상 켜져 있는 경보를 하나 둔다. 이것이 **도착하지 않으면** 경보 체계가
+  # 멈춘 것이다. 받는 쪽에서 "일정 시간 안에 오지 않으면 알린다"로 걸어 둔다.
+  - name: codedrill-watchdog
+    rules:
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: watchdog }
+        annotations:
+          summary: "경보 배달 경로가 살아 있다 (항상 켜져 있다)"
+          runbook: "docs/runbook.md#alert-routing"

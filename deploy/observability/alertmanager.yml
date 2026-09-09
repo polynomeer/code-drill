@@ -1,0 +1,75 @@
+# 경보 라우팅 (기술 설계서 §13.4).
+#
+# 규칙은 무엇이 잘못됐는지 정하고, 이 파일은 **그것이 누구에게 언제 가는지**를 정한다.
+# 둘 중 하나만 있으면 경보 체계는 없는 것과 같다 — 규칙만 있으면 아무도 모르고, 라우팅만
+# 있으면 보낼 것이 없다. 지금까지는 규칙 13개가 평가만 되고 아무 데도 가지 않았다.
+#
+# **수신자는 채워지지 않은 채로 둔다.** 누가 당번인지, 어느 채널로 받을지는 조직이 정할
+# 일이고, 그것을 코드에 넣어 두면 틀린 채로 굳는다.
+#
+# 대신 절대 풀리지 않는 주소(`.invalid` 는 예약된 TLD 다)를 넣어 두었다. 세 가지를 함께
+# 얻는다 — Alertmanager 는 정상 기동하고, 라우팅은 실제로 동작하며, 배달은 **눈에 띄게**
+# 실패한다. 빈 수신자로 두면 배달이 조용히 성공한 것처럼 보이고, 그것이 가장 나쁘다.
+#
+# 설정되지 않았다는 사실은 `alertmanager_notifications_failed_total` 과 :9093 UI 에
+# 그대로 드러난다. 아래 주소를 실제 것으로 바꾸면 그날부터 동작한다.
+
+route:
+  # 한 문제를 한 번만 알린다. 인스턴스별로 묶으면 장애 한 번에 알림이 인스턴스 수만큼
+  # 오고, 사람은 곧 그것을 무시하는 법을 배운다.
+  group_by: [alertname, plane]
+  group_wait: 30s
+  group_interval: 5m
+  # 기본은 티켓 쪽에 맞춘다 — 라벨이 없는 새 규칙이 실수로 사람을 깨우지 않게.
+  repeat_interval: 24h
+  receiver: unrouted
+
+  routes:
+    # 항상 켜져 있는 경보. 사람에게 보내지 않는다 — 받는 쪽 시스템이 "끊기면 알린다"로
+    # 감시한다 (§13.4). 5분마다 다시 보내 침묵을 빨리 알아채게 한다.
+    - matchers: [severity = "watchdog"]
+      receiver: watchdog
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 5m
+      continue: false
+
+    # 지금 사람이 봐야 하는 것. 응답이 없으면 계속 다시 온다 — 확인하지 않은 호출이
+    # 조용해지는 것이 가장 나쁘다.
+    - matchers: [severity = "page"]
+      receiver: oncall
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+
+    # 근무 시간에 처리할 것. 묶어서 하루 한 번 다시 알린다.
+    - matchers: [severity = "ticket"]
+      receiver: backlog
+      group_wait: 5m
+      repeat_interval: 24h
+
+# page 가 떠 있는 동안 같은 대상의 ticket 은 보내지 않는다. 큰 장애가 나면 작은 신호가
+# 함께 뜨는데, 그것들이 호출 위에 쌓이면 정작 봐야 할 것이 묻힌다.
+inhibit_rules:
+  - source_matchers: [severity = "page"]
+    target_matchers: [severity = "ticket"]
+    equal: [alertname, plane]
+
+receivers:
+  # 어느 경로에도 걸리지 않은 경보. **비워 두지 않는다** — 조용히 버려지면, 라벨을
+  # 빠뜨린 새 규칙은 만들어 놓고도 아무도 모른다.
+  - name: unrouted
+    webhook_configs:
+      - url: http://unrouted.oncall.invalid/   # 라벨 없는 경보를 받을 곳
+
+  - name: oncall
+    webhook_configs:
+      - url: http://page.oncall.invalid/       # 당번 호출
+
+  - name: backlog
+    webhook_configs:
+      - url: http://ticket.oncall.invalid/     # 티켓 생성
+
+  - name: watchdog
+    webhook_configs:
+      - url: http://watchdog.oncall.invalid/   # 끊기면 알리도록 걸어 둔 곳

@@ -11,6 +11,12 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+# 규칙을 평가만 하고 아무 데도 보내지 않으면, 경보는 화면을 보고 있는 사람에게만 있다.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
   - job_name: control-plane
     metrics_path: /actuator/prometheus
