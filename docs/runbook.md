@@ -39,6 +39,29 @@ Grafana `http://localhost:3001`, Prometheus `http://localhost:9090`.
 브로커를 되살리면 아웃박스가 스스로 재발행한다. 손으로 재발행하지 않는다 — 같은
 이벤트를 두 번 밀게 되고, 멱등성이 흡수하더라도 원인 추적이 어려워진다.
 
+### dead-letter
+
+**증상**: `judge.*.dead` 큐에 메시지가 쌓인다. 그 제출들은 SYSTEM_ERROR 로 끝나 있다.
+
+처리할 수 없다고 판단된 메시지다. **큐는 막히지 않는다** — 그것이 dead 큐를 둔 이유다.
+급한 불은 없으니 원인부터 본다.
+
+```bash
+docker exec code-drill-rabbitmq-1 rabbitmqctl list_queues name messages | grep dead
+```
+
+1. 왜 치웠는지는 소비자 로그에 있다 — `처리할 수 없는 메시지다` 또는 배달 한도 초과
+2. 한 문제에 몰려 있으면 **콘텐츠 문제다.** 그 버전이 공개돼 있는지, 패키지가 디스크에
+   있는지 본다
+3. 여러 문제에 흩어져 있으면 **메시지 스키마가 어긋난 것이다.** 배포된 세 이미지가 같은
+   SHA 인지 확인한다 (§15.3)
+
+고친 뒤에는 [rejudge](#rejudge) 로 되돌린다. dead 큐의 메시지를 손으로 다시 넣지
+않는다 — 그 사이 제출은 이미 SYSTEM_ERROR 로 끝났고, 다시 넣으면 같은 제출에 두 개의
+판정 경로가 생긴다.
+
+dead 큐의 메시지는 7일 뒤 사라진다. 그 전에 원인을 봐야 한다.
+
 ### seccomp
 
 **증상**: 특정 언어·풀이만 `Operation not permitted` 로 실패한다.

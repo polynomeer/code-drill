@@ -308,7 +308,17 @@ def stop(state: dict, everything: bool) -> None:
     # 포트를 실제로 놓을 때까지 기다린다. Spring 은 우아하게 내려가느라 잠깐 더 잡고
     # 있는데, 여기서 바로 돌아가면 --status 가 "떠 있음"으로 보이고 다음 --up 이
     # 옆 포트로 비켜 간다.
-    release(state.get("ports") or {})
+    ports = state.get("ports") or {}
+    release(ports)
+
+    # 기록에 없는 프로세스가 앱 포트를 잡고 있으면 말해 준다. 죽이지는 않는다 — 남의
+    # 서비스일 수 있다. 하지만 조용히 두면 다음 실행이 옆 포트로 비켜 가고, 옛 코드가
+    # 도는 고아와 새 앱이 같은 큐를 나눠 먹는다. 실제로 그렇게 한나절을 썼다.
+    stray = [name for name in APPS if name in ports and not free(ports[name])]
+    if stray:
+        print("  기록에 없는 프로세스가 아직 잡고 있다: " + ", ".join(
+            f"{name}:{ports[name]}" for name in stray))
+        print("  lsof -ti :<포트> 로 확인하고 직접 정리한다")
 
     if everything:
         print("플랫폼 의존성 정지")
