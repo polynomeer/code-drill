@@ -565,7 +565,11 @@ def main() -> int:
     registrar = registrar_op.headers
     publisher = operators.with_roles("PUBLISHER", other_than=registrar_op).headers
     editor_only = operators.with_roles("CONTENT_EDITOR", other_than=registrar_op).headers
-    security = operators.with_roles("SECURITY_ADMIN").headers
+    security_op = operators.with_roles("SECURITY_ADMIN")
+    security = security_op.headers
+    # 역할 부여에도 2인 승인이 걸려 있어 SECURITY_ADMIN 이 둘 필요하다 (§11.2).
+    approver_op = operators.with_roles("SECURITY_ADMIN", other_than=security_op)
+    approver = approver_op.headers
 
     # 토큰 없이는 아무것도 못 한다. 이전 슬라이스는 X-Actor 헤더를 자칭하면 통과했다.
     # 빈 값은 "이 헤더 없이 보내라"는 뜻이다 — 기본값은 스모크 사용자의 토큰이라,
@@ -590,23 +594,57 @@ def main() -> int:
     results.append(check("감사 로그는 보안 역할만", status, 403))
 
     # 역할을 스스로 늘릴 수 있으면 2인 승인은 사람 수를 세지 못한다 (§11.2).
-    me = security["Authorization"]
     status, refused = raw_request(
-        "POST", f"/admin/operators/{operators.with_roles('SECURITY_ADMIN').user_id}/roles",
-        {"role": "PUBLISHER"}, security,
+        "POST", f"/admin/operators/{security_op.user_id}/roles",
+        {"role": "PUBLISHER", "reason": "스모크"}, security,
     )
     results.append(check("자기 자신에게 역할 부여 거부", status, 409))
     results.append(check("  사유가 자기 부여를 지목", "자기 자신" in refused["reason"], True))
 
+    # 남에게 주는 것도 혼자서는 못 한다. 계정 등록은 누구에게나 열려 있어, 혼자
+    # 두 번째 계정을 만들어 역할을 붙이면 등록자·승인자 비교는 그 둘을 두 사람으로
+    # 센다 — 그래서 권한이 늘어나는 순간 자체를 두 사람이 밟는다.
     other = operators.with_roles("CONTENT_EDITOR")
-    status, granted = raw_request(
-        "POST", f"/admin/operators/{other.user_id}/roles", {"role": "REVIEWER"}, security,
+    status, requested = raw_request(
+        "POST", f"/admin/operators/{other.user_id}/roles",
+        {"role": "REVIEWER", "reason": "스모크"}, security,
     )
-    results.append(check("남에게는 부여된다", status, 200))
+    results.append(check("역할 부여는 요청으로 접수된다", status, 202))
+    results.append(check("  아직 부여되지 않았다", requested["changed"], False))
+
+    status, _ = raw_request(
+        "POST", f"/admin/role-requests/{requested['requestId']}/approve", None, security,
+    )
+    results.append(check("요청자가 자기 요청 승인 거부", status, 409))
+
+    status, _ = raw_request(
+        "POST", f"/admin/role-requests/{requested['requestId']}/approve", None, approver,
+    )
+    results.append(check("다른 SECURITY_ADMIN 이 승인하면 부여된다", status, 200))
+
+    # 권한을 줄이는 것은 승인을 기다리지 않는다. 사고가 났을 때 가장 급한 조치다.
     status, _ = raw_request(
         "DELETE", f"/admin/operators/{other.user_id}/roles/REVIEWER", None, security,
     )
-    results.append(check("회수도 된다", status, 200))
+    results.append(check("회수는 즉시다", status, 200))
+
+    # 담합: SECURITY_ADMIN 둘이 서로에게 주면 각자 권한이 늘고, 그러면 권한을 키우는
+    # 데 필요한 사람 수가 다시 둘로 돌아간다. 수혜자는 자기 승격에 표를 못 던진다.
+    status, mutual = raw_request(
+        "POST", f"/admin/operators/{approver_op.user_id}/roles",
+        {"role": "PUBLISHER", "reason": "담합 시험"}, security,
+    )
+    results.append(check("서로 주기도 요청까지는 된다", status, 202))
+    status, blocked = raw_request(
+        "POST", f"/admin/role-requests/{mutual['requestId']}/approve", None, approver,
+    )
+    results.append(check("수혜자가 자기 승격 승인 거부", status, 409))
+    results.append(check("  사유가 자기 승격을 지목", "자기 승격" in blocked["reason"], True))
+    status, _ = raw_request(
+        "POST", f"/admin/role-requests/{mutual['requestId']}/reject",
+        {"reason": "스모크 정리"}, security,
+    )
+    results.append(check("반려는 요청자도 할 수 있다", status, 200))
 
     print("\n콘텐츠 공개와 2인 승인 (§3.2, §11.2, §13.3)")
     pid = "smoke-" + uuid.uuid4().hex[:8]

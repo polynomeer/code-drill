@@ -124,25 +124,47 @@ SECURITY_ADMIN 하나를 받는다. 한 번 역할이 생기면 다시 열리지
 스크립트가 만드는 운영자 구성은 `SEED_OPERATORS` 에 있다. 각 역할을 가진 사람이 **둘씩**
 있어야 2인 승인을 확인할 수 있고, `release-manager` 와 `judge-operator` 처럼 **두 단계를
 모두 할 수 있는 계정**이 하나씩 있어야 한다 — 권한이 과하게 열린 계정에서도 등록자·승인자
-분리가 남아 있는지 보기 위한 것이다.
+분리가 남아 있는지 보기 위한 것이다. SECURITY_ADMIN 도 둘이다. 부여 자체가 2인 승인이라
+하나로는 아무에게도 역할을 줄 수 없다.
 
-역할을 손으로 주고 받으려면 SECURITY_ADMIN 으로 부른다.
+### 역할 부여는 두 사람이 밟는다
 
 ```bash
-GET    /api/v1/admin/operators                     # 누가 무엇을 할 수 있나
-POST   /api/v1/admin/operators/{userId}/roles      # {"role": "PUBLISHER"}
-DELETE /api/v1/admin/operators/{userId}/roles/{role}
+GET    /api/v1/admin/operators                        # 누가 무엇을 할 수 있나
+POST   /api/v1/admin/operators/{userId}/roles         # {"role": "PUBLISHER", "reason": "..."}
+GET    /api/v1/admin/role-requests                    # 승인을 기다리는 요청
+POST   /api/v1/admin/role-requests/{id}/approve
+POST   /api/v1/admin/role-requests/{id}/reject        # {"reason": "..."}
+DELETE /api/v1/admin/operators/{userId}/roles/{role}  # 회수는 즉시
 ```
 
-부여와 회수는 감사 로그에 `ADMIN_ROLE_GRANTED` / `ADMIN_ROLE_REVOKED` 로 남는다 (§13.3).
+첫 번째 호출은 **202 를 돌려주고 아무 권한도 늘리지 않는다.** 응답의 `status` 가
+`REQUESTED` 면 승인이 남았다는 뜻이다. 다른 SECURITY_ADMIN 이 승인해야 역할이 붙는다.
 
-두 가지는 거절한다(409).
+승인자는 **요청자와도, 역할을 받는 사람과도** 달라야 한다. 뒤엣것을 빼면 SECURITY_ADMIN
+둘이 서로에게 주면서 각자 권한을 늘릴 수 있고, 그러면 권한을 키우는 데 필요한 사람 수가
+다시 둘로 돌아간다. 그래서 부여 하나에 서로 다른 세 계정이 관여한다.
+
+**회수는 즉시다.** 권한을 줄이는 일까지 승인을 기다리면 사고가 났을 때 가장 급한 조치가
+가장 느려진다.
+
+요청·반려·부여·회수는 감사 로그에 `ADMIN_ROLE_GRANT_REQUESTED` / `ADMIN_ROLE_GRANT_REJECTED`
+/ `ADMIN_ROLE_GRANTED` / `ADMIN_ROLE_REVOKED` 로 남는다 (§13.3). 부여 기록에는 승인자가
+actor 로, 요청자가 `requestedBy` 로 함께 들어간다 — 한쪽만 남기면 누가 시작했는지 또는
+누가 통과시켰는지 중 하나를 잃는다.
+
+거절(409)은 넷이다.
 
 - **자기 자신에게 부여.** 막지 않으면 SECURITY_ADMIN 한 명이 자기에게 등록 권한과 공개
-  권한을 붙여 2인 승인을 혼자 밟는다. 담합까지 막지는 못한다 — 그건 2인 승인이 원래
-  막지 못하는 것이고, 그래서 부여가 감사 로그에 남는다.
+  권한을 붙여 2인 승인을 혼자 밟는다.
+- **요청자가 자기 요청을 승인.**
+- **역할을 받는 사람이 자기 승격을 승인.**
 - **마지막 SECURITY_ADMIN 회수.** 회수하면 역할을 줄 사람이 없어지는데, 부트스트랩은
   역할 표가 **완전히** 비어야 열린다. 다른 역할이 하나라도 남아 있으면 되살릴 길이 없다.
+
+예외는 부트스트랩 구간 하나다. SECURITY_ADMIN 이 **한 명뿐이면** 승인해 줄 사람이 없어
+아무 역할도 만들 수 없으므로, 그 한 명은 `SECURITY_ADMIN` 만 혼자 줄 수 있다. 혼자일 때
+할 수 있는 유일한 일이 동료를 만드는 것이고, 동료가 생기는 순간 이 길은 닫힌다.
 
 ## 4. 문제 공개
 
@@ -225,7 +247,7 @@ python3 scripts/smoke.py
 사용자 인증과 객체 소유권, 개인 데이터 반출·삭제, 문자열·격자 값 타입의 3개 언어 왕복, 관리자 API 인증과 역할 분리,
 콘텐츠 공개와 2인 승인,
 재채점 승인·실행·dry-run, 멱등성, SSE, 숨은 테스트 비노출까지 실제 서비스로 확인한다.
-135개 항목이 전부 통과해야 한다.
+142개 항목이 전부 통과해야 한다.
 
 스크립트는 실행할 때마다 계정을 새로 만든다. 고정 계정을 두면 그 비밀번호가 저장소에
 남고, 실행할 때마다 남의 기록이 섞인다.

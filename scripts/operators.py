@@ -5,8 +5,11 @@
 같은 방식으로 로그인하고, 역할은 DB 의 부여 기록이 정한다.
 
 매듭을 푸는 것은 부트스트랩 하나다. **역할 표가 완전히 비어 있을 때만**, 서버 설정
-`codedrill.admin.bootstrap-email` 의 주인이 SECURITY_ADMIN 을 받는다. 그 다음부터는
-그 계정이 다른 계정에 역할을 준다.
+`codedrill.admin.bootstrap-email` 의 주인이 SECURITY_ADMIN 을 받는다.
+
+그 다음은 혼자 되지 않는다. 역할 부여에도 2인 승인이 걸려 있어(§11.2), 부트스트랩
+계정이 단독으로 줄 수 있는 것은 **두 번째 SECURITY_ADMIN 하나뿐**이다. 나머지 역할은
+부트스트랩이 요청하고 그 두 번째 계정이 승인한다.
 
     export ADMIN_BOOTSTRAP_EMAIL=admin@example.test   # 앱과 같은 값이어야 한다
 
@@ -32,6 +35,9 @@ STORE = pathlib.Path.home() / ".codedrill" / "seed-operators.json"
 # 로컬 시딩이 필요로 하는 구성. 역할마다 둘씩 있어야 2인 승인을 확인할 수 있고,
 # 두 단계를 모두 할 수 있는 계정이 하나씩 있어야 권한이 과한 계정에서도 등록자·승인자
 # 분리가 남아 있는지 볼 수 있다 (§11.2).
+#
+# SECURITY_ADMIN 도 둘이다. 역할 부여 자체가 2인 승인이 되면서, 하나로는 아무에게도
+# 역할을 줄 수 없게 됐기 때문이다.
 SEED_OPERATORS = {
     "content-editor": ["CONTENT_EDITOR"],
     "release-manager": ["CONTENT_EDITOR", "PUBLISHER"],
@@ -39,6 +45,7 @@ SEED_OPERATORS = {
     "judge-operator": ["JUDGE_OPERATOR", "REVIEWER"],
     "judge-reviewer": ["REVIEWER"],
     "security-admin": ["SECURITY_ADMIN"],
+    "security-approver": ["SECURITY_ADMIN"],
 }
 
 
@@ -139,20 +146,56 @@ def _ensure_seeded() -> dict:
         print("그리고 이미 다른 계정에 역할이 부여돼 있지 않은지 본다 (부트스트랩은 표가 빌 때만 열린다).")
         sys.exit(2)
 
-    # 2. 나머지 운영자 계정과 역할.
+    # 2. 나머지 운영자 계정. 역할은 아직 붙이지 않는다 — 승인자가 먼저 있어야 한다.
     sessions = {}
     for name, roles in SEED_OPERATORS.items():
         email = f"{name}@{bootstrap_email.split('@', 1)[1]}"
         user_id, token = _session(email, password_for(name), name)
-        for role in roles:
-            _call(
-                "POST", f"/admin/operators/{user_id}/roles", {"role": role},
-                headers={"Authorization": f"Bearer {root_token}"},
-            )
         sessions[name] = Operator(name, user_id, token, set(roles))
 
     _store_write(store)
+
+    # 3. 승인자를 세운다. SECURITY_ADMIN 이 한 명뿐인 동안에만 단독 부여가 열려 있고,
+    #    그 한 번으로 만들 수 있는 것은 두 번째 SECURITY_ADMIN 뿐이다 (§11.2).
+    approver = sessions["security-admin"]
+    _grant(root_token, approver.user_id, "SECURITY_ADMIN", approver_token=None)
+
+    # 4. 나머지 역할은 부트스트랩이 요청하고 승인자가 승인한다. 요청자·승인자·수혜자가
+    #    모두 달라야 하므로 approver 자신의 역할은 3번에서 이미 끝나 있어야 한다.
+    for operator in sessions.values():
+        for role in operator.roles:
+            _grant(root_token, operator.user_id, role, approver.token)
+
     return sessions
+
+
+def _grant(root_token: str, user_id: str, role: str, approver_token: str | None) -> None:
+    """역할 하나를 붙인다. 이미 있으면 아무 일도 하지 않는다."""
+    status, body = _call(
+        "POST", f"/admin/operators/{user_id}/roles",
+        {"role": role, "reason": "로컬 시딩 (scripts/operators.py)"},
+        headers={"Authorization": f"Bearer {root_token}"},
+    )
+    if status == 200:
+        return  # 이미 갖고 있다.
+    if status != 202:
+        print(f"역할 부여 요청 실패 ({role} → {user_id}): {status} {body}")
+        sys.exit(2)
+
+    if approver_token is None:
+        # 단독 부여가 열려 있어야 했는데 요청으로 접수됐다. SECURITY_ADMIN 이 이미
+        # 둘 이상이라는 뜻이고, 그러면 승인해 줄 사람을 골라야 한다.
+        print(f"단독 부여가 닫혀 있다 ({role} → {user_id}). 요청 {body.get('requestId')} 이 승인을 기다린다.")
+        print("이미 SECURITY_ADMIN 이 둘 이상인 환경이다. 사람이 승인해야 한다 (§11.2).")
+        sys.exit(2)
+
+    status, decided = _call(
+        "POST", f"/admin/role-requests/{body['requestId']}/approve",
+        headers={"Authorization": f"Bearer {approver_token}"},
+    )
+    if status != 200:
+        print(f"역할 부여 승인 실패 ({role} → {user_id}): {status} {decided}")
+        sys.exit(2)
 
 
 _CACHE: dict | None = None

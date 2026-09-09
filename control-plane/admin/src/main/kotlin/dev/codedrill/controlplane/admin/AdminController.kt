@@ -18,11 +18,8 @@ import org.springframework.web.bind.annotation.RestController
 /**
  * 운영 API (기술 설계서 §3.1 Admin, §9.2, §11.2).
  *
- * 행위자는 [AdminAuthInterceptor] 가 토큰에서 확인한 이름이다. 컨트롤러는 자칭한 값을
- * 받지 않으며, 감사 로그의 actor 도 이 이름이다.
- *
- * 아직 사용자 세션과 통합돼 있지 않다. 토큰은 설정에 든 장기 비밀이므로, Identity
- * 모듈이 붙으면 워크로드 ID 와 짧은 수명 토큰으로 옮긴다 (§11.2).
+ * 행위자는 [AdminAuthInterceptor] 가 넣어 둔 계정 id 다. 컨트롤러는 자칭한 값을 받지
+ * 않으며, 감사 로그의 actor 도 이 값이다.
  */
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -82,10 +79,16 @@ class AdminController(
     @GetMapping("/operators")
     fun operators(): List<RoleGrant> = roles.grants()
 
-    /** 역할을 준다. 부여 자체가 감사 대상이다 (§13.3). */
+    /**
+     * 역할 부여를 요청한다. **이것만으로는 권한이 늘지 않는다** (§11.2).
+     *
+     * 응답의 `status` 가 `REQUESTED` 면 다른 SECURITY_ADMIN 의 승인이 남았다는 뜻이다.
+     * 부트스트랩 구간(SECURITY_ADMIN 한 명)에서 동료를 만들 때만 그 자리에서 부여되며,
+     * 그때는 `GRANTED` 가 온다.
+     */
     @RequiresRole(AdminRole.SECURITY_ADMIN)
     @PostMapping("/operators/{userId}/roles")
-    fun grantRole(
+    fun requestRole(
         @PathVariable userId: String,
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @Valid @RequestBody request: RoleRequest,
@@ -93,8 +96,35 @@ class AdminController(
         val role = request.parsed()
             ?: return ResponseEntity.badRequest().body(mapOf("reason" to "알 수 없는 역할이다: ${request.role}"))
 
-        return respond(userId, role, roles.grant(userId, role, actor))
+        return respond(userId, role, roles.requestGrant(userId, role, actor, request.reason))
     }
+
+    /** 승인을 기다리는 역할 부여 요청 (§11.2). */
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @GetMapping("/role-requests")
+    fun roleRequests(): List<GrantRequest> = roles.pendingGrants()
+
+    /**
+     * 요청을 승인한다. 승인이 곧 부여다.
+     *
+     * 승인자는 요청자와도, 역할을 받는 사람과도 달라야 한다 — 둘 중 하나라도 겹치면
+     * 권한을 키우는 데 필요한 사람 수가 둘로 줄어든다 (§11.2).
+     */
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @PostMapping("/role-requests/{requestId}/approve")
+    fun approveRole(
+        @PathVariable requestId: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+    ): ResponseEntity<Map<String, Any>> = respondTo(requestId, roles.approveGrant(requestId, actor))
+
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @PostMapping("/role-requests/{requestId}/reject")
+    fun rejectRole(
+        @PathVariable requestId: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ArchiveRequest,
+    ): ResponseEntity<Map<String, Any>> =
+        respondTo(requestId, roles.rejectGrant(requestId, actor, request.reason))
 
     @RequiresRole(AdminRole.SECURITY_ADMIN)
     @DeleteMapping("/operators/{userId}/roles/{role}")
@@ -109,7 +139,12 @@ class AdminController(
         return respond(userId, parsed, roles.revoke(userId, parsed, actor))
     }
 
-    /** 거절은 409 다. "안 바뀌었다"(200)와 구분되지 않으면 스크립트가 실패를 못 본다. */
+    /**
+     * 거절은 409 다. "안 바뀌었다"(200)와 구분되지 않으면 스크립트가 실패를 못 본다.
+     *
+     * `status` 를 함께 낸다. `changed` 만 보면 **접수됐다**와 **부여됐다**가 둘 다
+     * `false`/`true` 한 칸에 뭉개져, 부르는 쪽이 아직 없는 권한을 있다고 믿는다.
+     */
     private fun respond(
         userId: String,
         role: AdminRole,
@@ -118,10 +153,36 @@ class AdminController(
         is RoleOutcome.Refused ->
             ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
 
+        is RoleOutcome.Requested -> ResponseEntity.accepted().body(
+            mapOf(
+                "userId" to userId,
+                "role" to role.name,
+                "status" to "REQUESTED",
+                "requestId" to outcome.requestId.toString(),
+                "changed" to false,
+            ),
+        )
+
         else -> ResponseEntity.ok(
             mapOf(
                 "userId" to userId,
                 "role" to role.name,
+                "status" to if (outcome is RoleOutcome.Changed) "GRANTED" else "UNCHANGED",
+                "changed" to (outcome is RoleOutcome.Changed),
+            ),
+        )
+    }
+
+    private fun respondTo(
+        requestId: UUID,
+        outcome: RoleOutcome,
+    ): ResponseEntity<Map<String, Any>> = when (outcome) {
+        is RoleOutcome.Refused ->
+            ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
+
+        else -> ResponseEntity.ok(
+            mapOf(
+                "requestId" to requestId.toString(),
                 "changed" to (outcome is RoleOutcome.Changed),
             ),
         )
@@ -244,7 +305,16 @@ data class PublishRequest(
 
 data class ArchiveRequest(@field:NotBlank val reason: String)
 
-data class RoleRequest(@field:NotBlank val role: String) {
+/**
+ * 역할 부여 요청 (§11.2).
+ *
+ * 사유를 필수로 받는다. 승인자가 판단할 근거가 없으면 승인은 형식이 되고, 그러면 2인
+ * 승인은 사람 수만 채운다 — 재채점이 사유를 요구하는 것과 같은 이유다.
+ */
+data class RoleRequest(
+    @field:NotBlank val role: String,
+    @field:NotBlank val reason: String,
+) {
     fun parsed(): AdminRole? = runCatching { AdminRole.valueOf(role.uppercase()) }.getOrNull()
 }
 

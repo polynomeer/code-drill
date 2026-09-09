@@ -126,6 +126,57 @@ class RoleChangeTest {
     }
 
     @Test
+    fun `요청자가 자기 요청을 승인할 수 없다`() {
+        val refused = AdminRoles.approvalConflict(
+            userId = "subject", requestedBy = "admin-a", approver = "admin-a",
+        )
+
+        assertTrue(refused is RoleOutcome.Refused)
+        assertTrue("요청자와 승인자가 같다" in refused.reason, refused.reason)
+    }
+
+    @Test
+    fun `역할을 받는 사람은 자기 승격을 승인할 수 없다`() {
+        // 이것이 담합을 막는 자리다. 허용하면 SECURITY_ADMIN 둘이 서로에게 주면서
+        // 각자 권한을 늘릴 수 있고, 권한을 키우는 데 필요한 사람 수가 다시 둘이 된다.
+        val refused = AdminRoles.approvalConflict(
+            userId = "admin-b", requestedBy = "admin-a", approver = "admin-b",
+        )
+
+        assertTrue(refused is RoleOutcome.Refused)
+        assertTrue("자기 승격" in refused.reason, refused.reason)
+    }
+
+    @Test
+    fun `제3자가 승인하면 통과한다`() {
+        assertEquals(
+            null,
+            AdminRoles.approvalConflict(
+                userId = "subject", requestedBy = "admin-a", approver = "admin-b",
+            ),
+        )
+    }
+
+    @Test
+    fun `SECURITY_ADMIN 이 한 명이면 동료를 혼자 만들 수 있다`() {
+        // 승인해 줄 사람이 없는 구간이다. 이 길이 없으면 부트스트랩 계정 하나로
+        // 굳어 아무 역할도 만들지 못한다.
+        assertTrue(AdminRoles.soloGrant(AdminRole.SECURITY_ADMIN, securityAdmins = 1))
+    }
+
+    @Test
+    fun `혼자여도 다른 역할은 못 준다`() {
+        // 열어 두면 혼자서 부하 계정에 PUBLISHER 를 붙일 수 있고, 등록자·승인자
+        // 비교는 그 둘을 두 사람으로 센다 — 막으려던 것이 그대로 남는다.
+        assertEquals(false, AdminRoles.soloGrant(AdminRole.PUBLISHER, securityAdmins = 1))
+    }
+
+    @Test
+    fun `동료가 생기면 단독 부여가 닫힌다`() {
+        assertEquals(false, AdminRoles.soloGrant(AdminRole.SECURITY_ADMIN, securityAdmins = 2))
+    }
+
+    @Test
     fun `다른 역할은 마지막이어도 회수할 수 있다`() {
         // 잠기는 것은 역할을 줄 수 있는 사람이 사라질 때뿐이다. PUBLISHER 가 없어지면
         // 공개를 못 할 뿐, SECURITY_ADMIN 이 다시 줄 수 있다.
