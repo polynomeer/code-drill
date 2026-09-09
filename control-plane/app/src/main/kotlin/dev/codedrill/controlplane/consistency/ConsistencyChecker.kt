@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
+import dev.codedrill.controlplane.scheduling.SchedulerLock
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
@@ -27,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong
 @Component
 class ConsistencyChecker(
     private val jdbc: JdbcTemplate,
+    private val lock: SchedulerLock,
     registry: MeterRegistry,
 ) {
 
@@ -50,7 +52,20 @@ class ConsistencyChecker(
      * 주기가 길다. 이 쿼리들은 인덱스를 타지 않는 전수 검사에 가까워서, 자주 돌리면
      * 점검이 스스로 DB 포화를 만든다 — 찾으려던 장애를 만들어 내는 셈이다.
      */
+    /**
+     * 주기 실행. 인스턴스가 여럿이어도 한 번만 돈다 (§12.4).
+     *
+     * 관리자 API 는 [sweep] 을 직접 부른다 — 사람이 "지금 상태를 보여 달라"고 한 것은
+     * 어느 인스턴스가 받았든 답해야 하고, 그건 중복이 아니다. 막아야 하는 것은 **같은
+     * 위반을 인스턴스 수만큼 경고하는 것**이다.
+     */
     @Scheduled(fixedDelayString = "\${codedrill.consistency.interval-ms:60000}")
+    fun scheduledSweep() {
+        // 임대는 주기보다 넉넉하게 잡는다. 점검이 아직 돌고 있는데 만료되면 다른
+        // 인스턴스가 함께 돌기 시작한다.
+        lock.runIfHolder(LOCK_NAME, LOCK_TTL) { sweep() }
+    }
+
     fun sweep(): List<CheckResult> {
         val results = CHECKS.map { check ->
             val ids = runCatching { jdbc.queryForList(check.sql, String::class.java, *check.args) }
@@ -93,6 +108,11 @@ class ConsistencyChecker(
 
     private companion object {
         const val SAMPLE_SIZE = 5
+
+        const val LOCK_NAME = "consistency-sweep"
+
+        /** 주기(기본 60초)보다 넉넉하게. 짧으면 아직 돌고 있는 사이에 만료된다. */
+        val LOCK_TTL: java.time.Duration = java.time.Duration.ofMinutes(5)
 
         val CHECKS = listOf(
             // §12.4 "QUEUED 인데 outbox 가 없는 제출"
