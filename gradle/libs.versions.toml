@@ -1,6 +1,8 @@
 [versions]
 kotlin = "2.1.20"
 springBoot = "3.4.4"
+# Boot 3.4.4 가 고정하는 10.1.39 를 덮어쓴다. 그 판에 고칠 수 있는 CRITICAL 이 여섯 있다.
+tomcat = "10.1.59"
 springDependencyManagement = "1.1.7"
 awsSdk = "2.31.16"
 

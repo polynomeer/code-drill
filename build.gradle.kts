@@ -14,6 +14,14 @@ subprojects {
 
     repositories { mavenCentral() }
 
+    // Boot 가 고정한 Tomcat 10.1.39 에 고칠 수 있는 CRITICAL 이 여섯 있다 (§11.4 이미지
+    // 스캔이 잡았다). Boot 판을 통째로 올리는 것보다 이 한 줄이 좁다 — 고쳐야 할 것은
+    // 서블릿 컨테이너 하나이고, 나머지를 함께 움직이면 스캔이 잡은 것과 무관한 실패가
+    // 섞인다. Boot 를 올릴 때는 이 값이 오히려 낮지 않은지 본다.
+    //
+    // BOM 의 프로퍼티를 덮어쓰는 방식이다. 셋(core·el·websocket)이 이 한 값을 함께 쓴다.
+    extra["tomcat.version"] = rootProject.libs.versions.tomcat.get()
+
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {
             mavenBom("org.springframework.boot:spring-boot-dependencies:${rootProject.libs.versions.springBoot.get()}")

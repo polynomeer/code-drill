@@ -103,7 +103,9 @@ COPY web ./
 # 때문이다 (web/scripts/bundle-budget.mjs).
 RUN pnpm build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS web
+# 1.27-alpine 은 openssl 3.3.3 을 담고 있었고 거기 고칠 수 있는 CRITICAL 이 있었다
+# (§11.4 이미지 스캔이 잡았다). 1.29-alpine 은 3.5.x 다.
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS web
 COPY --from=web-builder /web/dist /usr/share/nginx/html
 COPY deploy/web.nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
