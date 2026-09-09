@@ -22,7 +22,14 @@ import kotlin.io.path.writeText
  * 이어지고 이는 사용자 코드 오류로 분류된다.
  */
 class KotlinAdapter(
-    private val compiler: KotlinSourceCompiler = KotlinSourceCompiler(RuntimeClasspath.all),
+    /**
+     * 컴파일과 실행에 함께 붙는 Kotlin 런타임 jar.
+     *
+     * 주입받는 이유는 하나뿐이다 — Runner 가 컨테이너 안에서 돌면 이 경로가 호스트와
+     * 같아야 한다 ([RuntimeClasspath.sharedInto]).
+     */
+    private val runtime: List<Path> = RuntimeClasspath.all,
+    private val compiler: KotlinSourceCompiler = KotlinSourceCompiler(runtime),
 ) : RuntimeAdapter {
 
     override val language = Language.KOTLIN
@@ -56,7 +63,7 @@ class KotlinAdapter(
         "-XX:-UsePerfData",
         "-Dfile.encoding=UTF-8",
         "-cp",
-        (RuntimeClasspath.all.plusElement(outputDir)).joinToString(File.pathSeparator) {
+        (runtime.plusElement(outputDir)).joinToString(File.pathSeparator) {
             it.absolutePathString()
         },
         "MainKt",
@@ -64,7 +71,7 @@ class KotlinAdapter(
         sourceDir.absolutePathString(),
     )
 
-    override fun readOnlyPaths(): List<Path> = RuntimeClasspath.all
+    override fun readOnlyPaths(): List<Path> = runtime
 
     // --- 코드 생성 ---
 

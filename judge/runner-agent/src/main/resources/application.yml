@@ -15,6 +15,9 @@ codedrill:
   sandbox:
     # 공개 환경에서는 반드시 true. 컨테이너 런타임이 없으면 기동을 중단한다 (§5.2).
     require-isolation: ${REQUIRE_ISOLATION:false}
+    # Runner 가 컨테이너 안에서 돌 때, 호스트와 이름이 같은 경로여야 한다.
+    # 비우면 임시 디렉터리를 쓴다 (SandboxProperties.workRoot 에 이유를 적었다).
+    work-root: ${SANDBOX_WORK_ROOT:}
     images:
       # 운영에서는 태그가 아니라 digest 로 고정한다 (§5.5).
       kotlin: ${KOTLIN_IMAGE:eclipse-temurin:21-jre}

@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.judge.runner.execution.RuntimeClasspath
 import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
 import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
@@ -14,7 +15,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.createDirectories
 
 /**
  * Runner 조립.
@@ -27,11 +30,16 @@ import java.util.concurrent.TimeUnit
 class RunnerConfig {
 
     @Bean
-    fun runtimeAdapters(): Map<Language, RuntimeAdapter> = listOf(
-        KotlinAdapter(),
+    fun runtimeAdapters(properties: SandboxProperties): Map<Language, RuntimeAdapter> = listOf(
+        // Kotlin 만 자기 런타임 jar 를 샌드박스에 들여보낸다. Java 와 Python 은
+        // 샌드박스 이미지 안의 런타임을 쓰므로 경로를 맞출 것이 없다.
+        KotlinAdapter(runtime = workRoot(properties)?.let(RuntimeClasspath::sharedInto) ?: RuntimeClasspath.all),
         JavaAdapter(),
         PythonAdapter(),
     ).associateBy { it.language }
+
+    private fun workRoot(properties: SandboxProperties): Path? =
+        properties.workRoot.takeIf { it.isNotBlank() }?.let(Path::of)?.also { it.createDirectories() }
 
     @Bean
     fun sandboxSelector(
@@ -62,7 +70,12 @@ class RunnerConfig {
         adapters: Map<Language, RuntimeAdapter>,
         selector: SandboxSelector,
         registry: MeterRegistry,
-    ) = ExecutionEngine(adapters, selector::forLanguage) { phase, language, outcome, nanos ->
+        properties: SandboxProperties,
+    ) = ExecutionEngine(
+        adapters,
+        selector::forLanguage,
+        workRoot = workRoot(properties),
+    ) { phase, language, outcome, nanos ->
         Timer.builder(if (phase == "compile") Metrics.COMPILE else Metrics.EXECUTE)
             .tag(Metrics.Tag.LANGUAGE, language.name)
             .tag(if (phase == "compile") Metrics.Tag.OUTCOME else Metrics.Tag.MODE, outcome)
@@ -81,6 +94,22 @@ data class SandboxProperties(
      * 격리 없는 프로세스 실행으로 내려간다.
      */
     val requireIsolation: Boolean = false,
+
+    /**
+     * 실행 디렉터리를 만들 자리. 비우면 임시 디렉터리를 쓴다.
+     *
+     * **Runner 가 컨테이너 안에서 돌 때 필요하다.** Runner 는 이 디렉터리를 샌드박스
+     * 컨테이너에 마운트하는데, 형제 컨테이너를 띄우면 그 경로를 해석하는 것은 Runner 가
+     * 아니라 **호스트의 컨테이너 데몬**이다. Runner 안에서만 존재하는 임시 경로를 주면
+     * 데몬은 그런 경로가 없으니 빈 디렉터리를 새로 만들어 마운트하고, 사용자 코드는
+     * 자기 소스가 사라진 채로 돌아 전부 SYSTEM_ERROR 가 된다.
+     *
+     * 그래서 호스트의 한 경로를 **같은 경로로** Runner 에 마운트하고 그 값을 여기 준다.
+     * 안과 밖의 이름이 같아지면 누가 해석하든 같은 곳을 가리킨다
+     * (deploy/docker-compose.runner.yml).
+     */
+    val workRoot: String = "",
+
     val images: Images = Images(),
 ) {
     data class Images(
