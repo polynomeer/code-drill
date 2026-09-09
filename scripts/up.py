@@ -327,9 +327,17 @@ def emit_env(state: dict) -> None:
     if not ports:
         print("# 띄운 기록이 없다. python3 scripts/up.py 로 시작한다.")
         return
+    # compose 용 호스트 포트
     for name, (_, var) in PORTS.items():
         if var and name in ports:
             print(f"export {var}={ports[name]}")
+
+    # 앱이 읽는 주소. 인스턴스를 손으로 하나 더 띄울 때 이게 없으면 기본 포트로 붙으려다
+    # 연결이 거부된다 — 비켜 간 이유가 그 포트에 남이 있기 때문이다.
+    for var, value in env_for(ports).items():
+        if var in ("DB_URL", "REDIS_URL", "BROKER_URL", "CONTENT_ROOT"):
+            print(f"export {var}={value}")
+
     print(f"export CODEDRILL_BASE=http://localhost:{ports['control-plane']}")
     print(f"export ADMIN_BOOTSTRAP_EMAIL={BOOTSTRAP_EMAIL}")
 
