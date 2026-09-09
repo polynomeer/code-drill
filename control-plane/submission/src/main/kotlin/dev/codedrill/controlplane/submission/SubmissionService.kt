@@ -8,6 +8,7 @@ import dev.codedrill.platform.common.Cursor
 import dev.codedrill.platform.common.IdempotencyKey
 import dev.codedrill.platform.common.Page
 import dev.codedrill.platform.messaging.OutboxEvent
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -26,6 +27,8 @@ class SubmissionService(
     private val metrics: SubmissionMetrics,
     private val rejudges: RejudgeContext = RejudgeContext.NONE,
 ) {
+
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /**
      * 제출을 만든다. 같은 `(userId, idempotencyKey)` 로 다시 부르면 새로 만들지 않고
@@ -132,7 +135,16 @@ class SubmissionService(
         val groupsJson = json.writeValueAsString(message.groups)
 
         val pending = rejudges.pendingFor(id)
-        val apply = pending?.dryRun != true
+
+        // **판정은 재채점으로만 바뀐다** (§4.2, §11.2).
+        //
+        // 이미 끝난 제출에 다른 결과가 오는 길은 둘이다. 승인된 재채점이거나, 뒤늦게
+        // 도착한 낡은 실행 결과거나. 앞의 것만 판정을 움직여야 한다 — 뒤의 것까지
+        // 반영하면 아무도 승인하지 않은 판정 변경이 생기고, 그 순간 2인 승인은 우회된다.
+        //
+        // 낡은 결과도 이력에는 남긴다. 무슨 일이 있었는지는 남아야 한다 (§13.3).
+        val late = current.status == SubmissionStatus.COMPLETED && pending == null
+        val apply = pending?.dryRun != true && !late
 
         // 이력의 revision 은 이 판정을 반영한 **뒤** 제출이 갖게 될 값이다. 최초 판정은
         // 제출을 만들 때 이미 revision 1 이므로 올리지 않는다 — 올리면 아무도 재채점하지
@@ -152,6 +164,14 @@ class SubmissionService(
         )
         // 이미 기록된 실행이다. 여기서 멈춰야 중복 전달이 revision 을 올리지 못한다.
         if (recorded == 0) return false
+
+        if (late) {
+            log.warn(
+                "끝난 제출에 뒤늦은 결과가 왔다. 이력에만 남기고 판정은 그대로 둔다: {} ({})",
+                id, message.executionId,
+            )
+            return false
+        }
 
         val updated = when {
             !apply -> 0
