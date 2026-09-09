@@ -245,6 +245,21 @@ def request(method: str, path: str, body: dict | None = None, headers: dict | No
         return json.loads(response.read())
 
 
+_VERSIONS: dict[str, int] = {}
+
+
+def version_of(problem: str) -> int:
+    """지금 공개돼 있는 버전.
+
+    예전에는 1 로 고정돼 있었다. 문제를 v2 로 올리는 순간 제출이 **존재하지 않는 조합**을
+    가리키고, 오케스트레이터가 그 메시지를 거부해 dead-letter 로 보낸다. 제품은 멀쩡한데
+    스모크가 낡은 것인데, 화면에는 "판정이 안 온다"로만 보인다.
+    """
+    if problem not in _VERSIONS:
+        _VERSIONS[problem] = request("GET", f"/problems/{problem}")["version"]
+    return _VERSIONS[problem]
+
+
 def submit(
     source: str,
     key: str | None = None,
@@ -254,7 +269,12 @@ def submit(
     return request(
         "POST",
         "/submissions",
-        {"problemId": problem, "problemVersion": 1, "language": language, "source": source},
+        {
+            "problemId": problem,
+            "problemVersion": version_of(problem),
+            "language": language,
+            "source": source,
+        },
         {"Idempotency-Key": key or str(uuid.uuid4())},
     )
 
@@ -427,7 +447,7 @@ def main() -> int:
     leaver = accounts.create("leaver")
     leaver_auth = leaver.headers
     raw_request("POST", "/submissions",
-                {"problemId": "two-sum", "problemVersion": 1, "language": "KOTLIN",
+                {"problemId": "two-sum", "problemVersion": version_of("two-sum"), "language": "KOTLIN",
                  "source": ACCEPTED_SOURCE},
                 {**leaver_auth, "Idempotency-Key": str(uuid.uuid4())})
 
@@ -458,7 +478,7 @@ def main() -> int:
     quota_user = accounts.create("quota")
     quota_auth = quota_user.headers
     forever = "fun twoSum(nums: IntArray, target: Int): IntArray { while (true) {} }"
-    body = {"problemId": "two-sum", "problemVersion": 1, "language": "KOTLIN", "source": forever}
+    body = {"problemId": "two-sum", "problemVersion": version_of("two-sum"), "language": "KOTLIN", "source": forever}
 
     key = str(uuid.uuid4())
     status, first = raw_request("POST", "/submissions", body,

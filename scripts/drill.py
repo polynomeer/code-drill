@@ -75,12 +75,27 @@ def request(method: str, path: str, body=None, headers=None):
         return json.loads(payload) if payload else None
 
 
+_VERSION: dict[str, int] = {}
+
+
+def version_of(problem: str) -> int:
+    """지금 공개돼 있는 버전.
+
+    1 로 고정해 두면 문제를 v2 로 올리는 순간 존재하지 않는 조합을 가리킨다. 장애 주입
+    훈련에서 그것은 특히 나쁘다 — 주입한 장애 때문에 판정이 안 오는 것인지, 제출이 애초에
+    잘못된 것인지 구분할 수 없다.
+    """
+    if problem not in _VERSION:
+        _VERSION[problem] = request("GET", f"/problems/{problem}")["version"]
+    return _VERSION[problem]
+
+
 def submit(source: str = ACCEPTED_SOURCE, key: str | None = None, trace: bool = False):
     return request(
         "POST", "/submissions",
         {
-            "problemId": "two-sum", "problemVersion": 1, "language": "KOTLIN",
-            "source": source, "requestTrace": trace,
+            "problemId": "two-sum", "problemVersion": version_of("two-sum"),
+            "language": "KOTLIN", "source": source, "requestTrace": trace,
         },
         {"Idempotency-Key": key or uuid.uuid4().hex},
     )

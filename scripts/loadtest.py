@@ -147,6 +147,20 @@ def counter_total(series, metric: str, **match: str) -> float:
     )
 
 
+_VERSIONS: dict[str, int] = {}
+
+
+def version_of(problem: str) -> int:
+    """지금 공개돼 있는 버전.
+
+    1 로 고정해 두면 문제를 v2 로 올리는 순간 존재하지 않는 조합을 가리키고, 그 제출은
+    dead-letter 로 간다 — 화면에는 "판정이 안 온다"로만 보인다.
+    """
+    if problem not in _VERSIONS:
+        _VERSIONS[problem] = request("GET", f"/problems/{problem}")["version"]
+    return _VERSIONS[problem]
+
+
 def run_one(problem: str) -> tuple[float, float, str]:
     """한 건을 제출하고 판정까지 기다린다. (수락 시간, 전체 시간, 판정)."""
     started = time.monotonic()
@@ -154,7 +168,7 @@ def run_one(problem: str) -> tuple[float, float, str]:
         "POST", "/submissions",
         {
             "problemId": problem,
-            "problemVersion": 1,
+            "problemVersion": version_of(problem),
             "language": "KOTLIN",
             "source": SOURCE,
             # 트레이스는 판정 뒤에 실행을 한 번 더 돌린다. 부하 시험의 대상은 판정
