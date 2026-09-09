@@ -1,7 +1,13 @@
 name: CI
 
-# 기술 설계서 §15.1 파이프라인의 앞단(정적 분석·단위 테스트·계약 검사)을 담당한다.
-# Runner 이미지 빌드, SBOM·서명, sandbox/golden 스위트, E2E 는 별도 워크플로로 붙인다.
+# 기술 설계서 §15.1 파이프라인. 정적 분석·단위 테스트·계약 검사에 더해, **격리 회귀와
+# E2E 까지 여기서 돈다.**
+#
+# 골든 판정 행렬은 프로세스 샌드박스로 도므로 backend 잡에 이미 들어 있다. 격리 회귀는
+# 런타임 이미지가 있어야 하고, 없으면 **건너뛴다** — 그래서 따로 잡을 두고 이미지를 받은
+# 뒤 건너뛰기를 실패로 바꿔 돌린다. 붙이기 전까지 13개가 조용히 초록이었다.
+#
+# 이미지 빌드·스캔·서명은 images.yml 이 맡는다.
 
 on:
   push:
@@ -42,3 +48,71 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+
+  # 격리 회귀 (§5.2, §11.4 sandbox regression 게이트).
+  #
+  # 런타임 이미지를 먼저 받는다. 없으면 스위트가 통째로 건너뛰는데, 건너뛴 검사는
+  # 초록으로 보인다. CODEDRILL_REQUIRE_SANDBOX 가 그 건너뛰기를 실패로 바꾼다 —
+  # 격리 검증이 조용히 빠진 파이프라인은 격리를 검증하지 않는 파이프라인이다.
+  sandbox:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: 런타임 이미지 받기
+        run: |
+          docker pull --quiet eclipse-temurin:21-jre
+          docker pull --quiet python:3.12-alpine
+      - name: 격리 회귀
+        env:
+          CODEDRILL_REQUIRE_SANDBOX: 'true'
+        run: ./gradlew :judge:runner-agent:test --tests '*sandbox*'
+
+  # E2E (§14 판정 흐름 전체).
+  #
+  # 단위 테스트가 통과해도 붙는 자리에서 깨지는 것들이 있다 — 큐 인자, 아웃박스 발행,
+  # SSE, 2인 승인, 트레이스 전달. 스모크는 그것을 실제 서비스로 확인한다.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Runner 가 사용자 코드를 이 이미지들 안에서 돌린다. 없으면 격리 없는 프로세스
+      # 실행으로 내려가고, 그러면 E2E 가 확인하는 것이 운영과 달라진다.
+      - name: 런타임 이미지 받기
+        run: |
+          docker pull --quiet eclipse-temurin:21-jre
+          docker pull --quiet python:3.12-alpine
+
+      # --seed 가 §6.3 검증과 §3.2 공개까지 한다. 웹 개발 서버는 띄우지 않는다 —
+      # 스모크는 API 를 직접 부른다.
+      - name: 스택 기동과 콘텐츠 공개
+        run: python3 scripts/up.py --no-web --seed
+
+      - name: 스모크
+        env:
+          ADMIN_BOOTSTRAP_EMAIL: admin@codedrill.test
+        run: python3 scripts/smoke.py
+
+      # 실패했을 때 로그가 없으면 재현이 유일한 진단 수단이 된다. E2E 는 재현이 가장
+      # 비싼 층이라 로그를 남긴다.
+      - name: 로그 남기기
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: build/local-stack/
+          retention-days: 7
+
+      - name: 내리기
+        if: always()
+        run: python3 scripts/up.py --down --all

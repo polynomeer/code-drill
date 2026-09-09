@@ -209,8 +209,11 @@ def wait_port(port: int, name: str, timeout: int = 180) -> None:
 
 # --- 단계 -------------------------------------------------------------------
 
-def check_tools() -> None:
-    missing = [t for t in ("docker", "java", "pnpm") if shutil.which(t) is None]
+def check_tools(with_web: bool) -> None:
+    # pnpm 은 웹 개발 서버에만 쓴다. --no-web 으로 부르는 쪽(CI 의 E2E)에 없다고
+    # 막으면, 쓰지도 않을 도구 때문에 파이프라인이 선다.
+    needed = ("docker", "java", "pnpm") if with_web else ("docker", "java")
+    missing = [t for t in needed if shutil.which(t) is None]
     if missing:
         raise SystemExit(f"필요한 도구가 없다: {', '.join(missing)} (docs/running-locally.md)")
 
@@ -406,7 +409,7 @@ def main() -> int:
         stop(state, everything=args.all)
         return 0
 
-    check_tools()
+    check_tools(with_web=not args.no_web)
     # 지난 실행이 남아 있으면 먼저 정리한다. 두 번 띄우면 포트가 밀리고, 밀린 쪽이
     # 무엇을 보고 있는지 아무도 모르게 된다.
     stop(state, everything=False)

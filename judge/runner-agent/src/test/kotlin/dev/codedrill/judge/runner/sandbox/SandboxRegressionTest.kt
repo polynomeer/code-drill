@@ -86,11 +86,21 @@ class SandboxRegressionTest {
         )
     }
 
+    /**
+     * 런타임 이미지가 없으면 이 스위트는 아무것도 검증하지 못한다.
+     *
+     * 개발 머신에서는 건너뛴다 — 이미지를 받아 두지 않았다고 빌드를 세울 이유가 없다.
+     * **CI 에서는 실패한다.** 건너뛴 검사는 초록으로 보이고, 초록으로 보이는 빈 검사는
+     * 검사가 없는 것보다 나쁘다. 없으면 없는 줄이라도 안다.
+     *
+     * 실행 영역이 `REQUIRE_ISOLATION` 으로 기동을 막는 것과 같은 자리에 있는 스위치다.
+     */
     private fun requireContainers() {
-        assumeTrue(
-            jvmImage != null && pythonImage != null,
-            "런타임 이미지가 로컬에 없어 격리를 검증할 수 없다 (JVM=$jvmImage, Python=$pythonImage)",
-        )
+        val ready = jvmImage != null && pythonImage != null
+        val why = "런타임 이미지가 로컬에 없어 격리를 검증할 수 없다 (JVM=$jvmImage, Python=$pythonImage)"
+
+        if (System.getenv(REQUIRE) == "true") assertTrue(ready, "$REQUIRE=true 인데 $why")
+        assumeTrue(ready, why)
     }
 
     @Test
@@ -453,5 +463,8 @@ class SandboxRegressionTest {
         groups = listOf(RequestedGroup(pkg.groups.first().policy, pkg.groups.first().cases.take(1))),
     )
 
-
+    private companion object {
+        /** CI 에서 건너뛰기를 실패로 바꾸는 스위치. */
+        const val REQUIRE = "CODEDRILL_REQUIRE_SANDBOX"
+    }
 }
