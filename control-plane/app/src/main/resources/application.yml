@@ -33,6 +33,11 @@ codedrill:
     # 몇 초는 걸리므로 분당 30건이면 사람에게는 닿지 않고 스크립트에는 곧바로 닿는다.
     in-flight: ${QUOTA_IN_FLIGHT:5}
     per-minute: ${QUOTA_PER_MINUTE:30}
+  trace:
+    # 원본 트레이스 보존 (§7.4). 리플레이는 방금 낸 제출을 되짚어 보는 기능이라,
+    # 이보다 오래된 트레이스를 여는 일은 거의 없다.
+    retention-days: ${TRACE_RETENTION_DAYS:30}
+    sweep-interval-ms: ${TRACE_SWEEP_INTERVAL_MS:3600000}
   content:
     root: ${CONTENT_ROOT:content/problems}
   outbox:

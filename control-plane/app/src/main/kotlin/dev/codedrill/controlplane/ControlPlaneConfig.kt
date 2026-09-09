@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import dev.codedrill.controlplane.identity.IdentityService
 import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
+import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
 import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.controlplane.submission.RejudgeContext
@@ -30,7 +31,7 @@ import java.nio.file.Path
 import java.util.UUID
 
 @Configuration
-@EnableConfigurationProperties(QuotaLimits::class)
+@EnableConfigurationProperties(QuotaLimits::class, TraceRetentionPolicy::class)
 @EnableScheduling
 class ControlPlaneConfig {
 

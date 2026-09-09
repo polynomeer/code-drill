@@ -44,6 +44,17 @@ object Metrics {
     /** Counter. 태그 `language`. 쿼터로 거절한 제출 (§10.2 남용 방어). */
     const val QUOTA_REJECTED = "codedrill.submission.quota.rejected"
 
+    /** Counter. 보존 기간이 지나 지운 트레이스 (§7.4). */
+    const val TRACE_RETENTION_DELETED = "codedrill.trace.retention.deleted"
+
+    /**
+     * Gauge(days). 가장 오래된 트레이스의 나이.
+     *
+     * 지운 수만 세면 정리가 멈춘 것과 지울 것이 없는 것이 같아 보인다. 이 값이 보존
+     * 기간을 넘어 자라면 정리가 안 돌고 있는 것이다.
+     */
+    const val TRACE_OLDEST_AGE = "codedrill.trace.oldest.age"
+
     /** Counter. 태그 `outcome` = accepted | duplicate | already_completed | stale (§4.3). */
     const val RESULT_ACCEPTANCE = "codedrill.result.acceptance"
 
