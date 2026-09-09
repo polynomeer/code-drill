@@ -1,10 +1,16 @@
 # 다섯 렌더러를 모두 쓰는 문제 (기술 설계서 §1.1 배열·포인터·스택·큐·그래프·재귀).
 #
-# 격자를 1차원 배열로 주고 BFS/DFS 로 연결 요소를 센다. 계측을 붙이면 배열·큐(BFS)·
-# 스택(DFS)·그래프(연결 관계)·재귀(호출)가 한 트레이스에 함께 나타난다.
+# 격자에서 BFS/DFS 로 연결 요소를 센다. 계측을 붙이면 배열·큐(BFS)·스택(DFS)·
+# 그래프(연결 관계)·재귀(호출)가 한 트레이스에 함께 나타난다.
+#
+# v2 에서 격자를 INT_MATRIX 로 바꿨다. v1 은 `평탄화 배열 + 너비` 였는데, 문제가 격자인데
+# 시그니처가 격자가 아니면 **푸는 사람이 먼저 격자를 복원해야 한다** — 문제와 무관한
+# 인덱스 계산이 풀이의 첫 단계가 된다. INT_MATRIX 가 생긴 뒤로 이것만 예외였다.
+#
+# 계측 인덱스는 여전히 행 우선으로 편 자리다. 배열 렌더러가 한 줄을 그리기 때문이다.
 
 id: island-count
-version: 1
+version: 2
 title: 섬의 개수
 statement: statement.md
 
@@ -17,9 +23,7 @@ signature:
   name: countIslands
   parameters:
     - name: grid
-      type: INT_ARRAY
-    - name: width
-      type: INT
+      type: INT_MATRIX
   returns: INT
 
 groups:
