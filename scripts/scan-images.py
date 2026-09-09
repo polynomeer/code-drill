@@ -70,7 +70,13 @@ def scanner_command() -> list[str]:
     ]
 
 
-def scan(image: str) -> dict:
+def scan(image: str) -> dict | None:
+    """스캔 결과. **돌지 못했으면 None 이다.**
+
+    빈 결과와 갈라야 한다. 스캐너가 못 돈 것을 "취약점 0건"으로 읽으면 게이트는 초록으로
+    지나가고, 그때부터 아무것도 검사하지 않으면서 검사한 척한다. 이 실패는 흔하다 —
+    취약점 DB 는 112MB 짜리 원격 아티팩트라 네트워크가 막히면 그대로 못 받는다.
+    """
     CACHE.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         scanner_command() + [
@@ -81,9 +87,16 @@ def scan(image: str) -> dict:
         capture_output=True, text=True,
     )
     if result.returncode != 0:
-        print(f"  스캔 실패: {result.stderr.strip().splitlines()[-1:] or result.stderr}")
-        return {}
-    return json.loads(result.stdout or "{}")
+        tail = (result.stderr or "").strip().splitlines()
+        for line in tail[-3:]:
+            print(f"      {line}")
+        return None
+    try:
+        return json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        # 종료 코드는 0 인데 결과가 JSON 이 아니다. 무엇이 왔는지 모르므로 못 돈 것으로 친다.
+        print("      스캐너가 JSON 이 아닌 것을 내놓았다")
+        return None
 
 
 def findings(report: dict) -> list[dict]:
@@ -157,8 +170,16 @@ def main() -> int:
         saved = None
         print(f"이미지 {len(targets)}개, 스캐너 {SCANNER}\n")
 
+    broken: list[str] = []
     for image in targets:
-        found = findings(saved if saved is not None else scan(image))
+        report = saved if saved is not None else scan(image)
+        if report is None:
+            # 스캐너가 못 돈 것은 통과가 아니다.
+            print(f"못 돎  {image}")
+            broken.append(image)
+            continue
+
+        found = findings(report)
         critical = [f for f in found if f["severity"] == "CRITICAL"]
         fixable = [f for f in critical if f["fix"]]
         blocked = [f for f in fixable if f["id"] not in allowed]
@@ -172,6 +193,15 @@ def main() -> int:
             f"{mark}  {image}\n"
             f"      CRITICAL {len(critical)} (고칠 수 있는 것 {len(fixable)}{note}) · HIGH {high}"
         )
+
+    if broken:
+        print(
+            f"\n스캐너가 이미지 {len(broken)}개에서 돌지 못했다. **통과가 아니다.**\n"
+            "검사하지 못한 것을 통과시키면, 게이트는 초록인데 아무것도 보지 않는 상태가 된다.\n"
+            "취약점 DB 는 112MB 짜리 원격 아티팩트다 — 막힌 망에서는 TRIVY_DB_REPOSITORY 로\n"
+            "다른 미러를 주거나, 받아 둔 캐시를 build/trivy-cache 에 넣는다."
+        )
+        return 2
 
     if not blocking:
         print("\n막을 것이 없다. 올려도 된다.")
