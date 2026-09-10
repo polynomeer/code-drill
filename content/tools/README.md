@@ -20,6 +20,51 @@ python3 content/tools/author.py two-sum    # 하나만
 실패한다 — 서로 다른 두 사람이 같은 문제를 푼 셈이라, 한쪽의 착각이 조용히 정답으로
 굳는 일이 없다.
 
+## 패키지에 무엇이 들어가나
+
+| 파일 | 무엇 | digest 에 드나 |
+|---|---|---|
+| `manifest.yaml` | 제한·시그니처·그룹 정책 | **든다** |
+| `tests/<group>/*.json` | 케이스 | **든다** |
+| `statement.md` | 지문 | 안 든다 |
+| `solutions/reference.kt` | 참조 풀이 | 안 든다 |
+| `mutants/*.kt` | 변이 구현 | 안 든다 |
+| `catalog.yaml` | 난이도·태그·역량·선수 관계 | **안 든다** |
+
+`packageDigest` 는 **판정을 재현하는 근거**다. 이미 등록된 버전과 digest 가 다르면 등록이
+거절되고, 고친 패키지는 새 버전이어야 한다 (§6.1).
+
+그래서 카탈로그는 밖에 있다. 난이도와 태그는 판정을 바꾸지 않는데 digest 에 들면 **오타
+하나를 고치는 데도 문제 버전이 올라가고**, 버전 번호가 "무엇으로 채점됐는가"를 뜻하지
+않게 된다. 경계는 한 문장이다 — **digest 에 드는 것은 판정을 바꾸는 것뿐이다.**
+
+## catalog.yaml
+
+```yaml
+difficulty: MEDIUM        # INTRO EASY MEDIUM HARD EXPERT
+tags:                     # content/tags.yaml 의 어휘만
+  - array
+  - two-pointers
+competencies:             # 이 문제가 증거를 만들어 줄 수 있는 역량
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+prerequisites:            # 먼저 풀어 두면 좋은 문제 (선택)
+  - pair-sum-sorted
+```
+
+**난이도는 느낌이 아니라 무엇이 필요한가로 가른다.** 자료구조 하나를 한 번 순회하면
+`INTRO`, 표준 패턴 하나를 그대로 쓰면 `EASY`, 패턴 둘을 조합하거나 관찰 하나가 필요하면
+`MEDIUM`, 비자명한 관찰이나 증명이 필요하면 `HARD`, 그것을 여럿 엮어야 하면 `EXPERT` 다.
+느낌으로 매기면 저작자마다 기준이 달라지고, 몇 달 뒤에는 같은 사람도 달라진다.
+
+**역량은 "이 문제가 무엇을 가르치나"가 아니라 "이 문제를 푼 기록에서 무엇을 읽어낼 수
+있나"다.** 모든 문제가 구현력의 증거를 만들지만, 복잡도 예측의 증거는 제한이 그것을
+강제하는 문제에서만 나온다. 비워 둘 수 없다 — 비면 그 문제를 아무리 풀어도 숙련도가
+움직이지 않는다.
+
+태그를 늘리려면 `content/tags.yaml` 에 한 줄 더한다. 어휘 밖 값, 없는 선수 문제, 선수
+관계의 순환은 검증 파이프라인의 `catalog` 단계가 막는다.
+
 ## 값 타입
 
 `INT`, `INT_ARRAY`, `STRING`, `STRING_ARRAY`, `INT_MATRIX` 다섯 가지다. 연산자·괄호 같은
