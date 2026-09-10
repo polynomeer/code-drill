@@ -108,6 +108,25 @@ class ProblemPackageLoader(private val root: Path) {
         root.resolve(problemId).resolve("solutions/reference.kt")
             .takeIf { it.isRegularFile() }?.readText()
 
+    /**
+     * 저작자가 쓴 도움 사다리 (FR-802, `hints.yaml`).
+     *
+     * **패키지 digest 밖이다.** catalog.yaml 과 같은 이유다 — 힌트 문장을 고쳤다고 이미
+     * 내려진 판정이 무효가 되면 안 된다. 판정을 정하는 것은 manifest 와 tests 뿐이다.
+     *
+     * 없으면 빈 지도다. 힌트가 없다고 코칭을 못 여는 것보다, 사다리가 짧은 편이 낫다.
+     */
+    fun hints(problemId: String): Map<Competency, List<String>> {
+        val file = root.resolve(problemId).resolve("hints.yaml")
+        if (!file.isRegularFile()) return emptyMap()
+
+        return yaml.readValue<Map<String, List<String>>>(file.readText())
+            .mapNotNull { (name, steps) ->
+                Competency.entries.firstOrNull { it.name == name }?.let { it to steps }
+            }
+            .toMap()
+    }
+
     /** 대표 오답 (§6.1 `mutants/`). 없으면 빈 목록이다. */
     fun mutants(problemId: String): List<MutantSource> {
         val dir = root.resolve(problemId).resolve("mutants")
@@ -118,9 +137,29 @@ class ProblemPackageLoader(private val root: Path) {
             .sortedBy { it.name }
             .map { file ->
                 val source = file.readText()
-                MutantSource(file.name.removeSuffix(".kt"), DefectKind.readFrom(source), source)
+                MutantSource(
+                    name = file.name.removeSuffix(".kt"),
+                    kind = DefectKind.readFrom(source),
+                    source = source,
+                    note = noteOf(source),
+                )
             }
     }
+
+    /**
+     * `// kind:` 아래의 주석 줄들을 이어 한 문장으로 만든다.
+     *
+     * 두 줄에 걸쳐 쓴 설명이 실제로 있어서(`row-wrap--connects-across-edge`) 첫 줄만
+     * 읽으면 문장이 끊긴다. 코드가 시작되면 멈춘다.
+     */
+    private fun noteOf(source: String): String = source.lineSequence()
+        .map { it.trim() }
+        .dropWhile { !it.startsWith("// kind:") }
+        .drop(1)
+        .takeWhile { it.startsWith("//") }
+        .map { it.removePrefix("//").trim() }
+        .filter { it.isNotEmpty() }
+        .joinToString(" ")
 
     private data class RawCase(val args: List<Any>, val expected: Any)
 }

@@ -10,7 +10,19 @@ package dev.codedrill.platform.problempackage
  * [source] 는 사용자에게 절대 나가지 않는다. 오답 코드를 보여 주면 정답의 골격이 그대로
  * 보이기 때문이다. 밖으로 나가는 것은 [kind] 뿐이다.
  */
-data class MutantSource(val name: String, val kind: DefectKind, val source: String)
+data class MutantSource(
+    val name: String,
+    val kind: DefectKind,
+    val source: String,
+    /**
+     * 이 오답이 무엇을 잘못하는지 한 줄로 (`// kind:` 다음 주석 줄).
+     *
+     * 저작자가 자기가 보려고 적어 둔 것이었는데, 코칭이 이것을 쓴다 (FR-802) — 문제마다
+     * "여기서 흔히 무너진다"를 사람이 직접 쓴 문장이 이미 있고, 그것이 곧 힌트다.
+     * 새로 쓰면 같은 사실이 두 곳에 살고, 오답을 고쳤을 때 힌트만 옛말이 된다.
+     */
+    val note: String = "",
+)
 
 /**
  * 결함의 종류 (§6.1).
