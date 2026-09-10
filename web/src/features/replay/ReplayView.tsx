@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { DivergenceCard } from './DivergenceCard'
 import { applyAll } from './reducer'
 import { EventFallback, renderersFor } from './renderers'
 import { kindsIn, useTrace } from './useTrace'
@@ -105,6 +106,10 @@ export function ReplayView({
       <h3>
         실행 리플레이 <span className="muted">{manifest.caseId}</span>
       </h3>
+
+      {/* 분기를 맨 위에 둔다. 리플레이를 여는 이유가 대개 "어디서 틀렸나"이고,
+          그 답이 스크롤 아래 있으면 찾기 전에 재생 버튼을 누른다 (FR-805). */}
+      <DivergenceCard submissionId={submissionId} onSeek={(seq) => setStep(clamp(seq))} />
 
       {error && <p className="warn">{error}</p>}
 

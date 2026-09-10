@@ -246,6 +246,32 @@ export interface RevealedHint {
 }
 
 /**
+ * 최초 분기 진단 (PRD FR-805).
+ *
+ * 참조 코드도 참조 트레이스도 오지 않는다. 오는 것은 갈라진 그 한 이벤트를 사람 말로
+ * 옮긴 한 줄뿐이고, 접근 자체가 다르면 그것마저 오지 않는다.
+ */
+export type DivergenceOutcome =
+  | 'PENDING'
+  | 'SAME'
+  | 'DIVERGED'
+  | 'DIFFERENT_APPROACH'
+  | 'NO_REFERENCE'
+
+export interface Divergence {
+  submissionId: string
+  caseId: string
+  outcome: DivergenceOutcome
+  sharedPrefix: number | null
+  /** 갈라진 지점의 이벤트 seq. 리플레이가 이 자리로 이동한다. */
+  divergedAtSeq: number | null
+  /** 그 이벤트를 부른 내 코드의 줄. */
+  sourceLine: number | null
+  expectedStep: string | null
+  actualStep: string | null
+}
+
+/**
  * 전이 확인 과제 (PRD FR-807).
  *
  * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로

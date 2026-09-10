@@ -970,3 +970,30 @@ table.groups td {
   width: 100%;
   margin: 6px 0;
 }
+
+/* 최초 분기 (FR-805). */
+.divergence {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--bad);
+  background: var(--panel-alt, transparent);
+}
+
+.divergence-steps {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+
+.divergence-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+
+/* 라벨 폭을 맞춰야 두 줄이 세로로 정렬돼 무엇이 다른지 눈에 든다. */
+.divergence-steps li > span:first-child {
+  width: 60px;
+  flex: none;
+}

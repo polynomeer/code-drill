@@ -16,6 +16,7 @@ import type {
   QuestionKind,
   SubmissionLanguage,
   CoachingSession,
+  Divergence,
   MutationCheck,
   TransferTask,
   Trial,
@@ -155,6 +156,18 @@ export async function revealHint(
     body: JSON.stringify({ competency }),
   })
   return json<CoachingSession>(response)
+}
+
+/**
+ * 최초 분기 진단 (PRD FR-805).
+ *
+ * 아직 계산되지 않았으면 204 이고 null 이다. 트레이스와 같은 이유로 오류가 아니다 —
+ * 참조 실행이 아직 안 돌았거나, 이 문제에 참조 풀이가 없을 수 있다.
+ */
+export async function getDivergence(submissionId: string): Promise<Divergence | null> {
+  const response = await authed(`/submissions/${submissionId}/divergence`)
+  if (response.status === 204) return null
+  return json<Divergence>(response)
 }
 
 /**
