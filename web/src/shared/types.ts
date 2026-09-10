@@ -216,3 +216,33 @@ export interface TrialCaseInput {
   args: unknown[]
   expected?: unknown
 }
+
+/** 풀이 전 질문 (PRD FR-803). 백엔드 `PreQuestion` 과 짝을 이룬다. */
+export type QuestionKind = 'ALGORITHM_CHOICE' | 'TIME_COMPLEXITY' | 'SPACE_COMPLEXITY'
+export type Misconception = 'UNDER_ESTIMATED' | 'OVER_ESTIMATED' | 'WRONG_TECHNIQUE'
+
+export const MISCONCEPTION_LABEL: Record<Misconception, string> = {
+  UNDER_ESTIMATED: '실제보다 싸게 봤습니다',
+  OVER_ESTIMATED: '실제보다 비싸게 봤습니다',
+  WRONG_TECHNIQUE: '이 문제가 쓰는 기법이 아닙니다',
+}
+
+export interface PreQuestion {
+  kind: QuestionKind
+  prompt: string
+  choices: string[]
+}
+
+export interface AnsweredQuestion {
+  kind: QuestionKind
+  answer: string
+  correct: boolean
+  misconception: Misconception | null
+  /** 틀렸을 때만 온다. */
+  expected: string | null
+}
+
+export interface PreQuestionSet {
+  questions: PreQuestion[]
+  answered: AnsweredQuestion[]
+}

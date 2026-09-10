@@ -5,10 +5,13 @@ import type {
   Draft,
   DraftConflict,
   Page,
+  AnsweredQuestion,
+  PreQuestionSet,
   Problem,
   ProblemFilter,
   ProblemPage,
   Submission,
+  QuestionKind,
   SubmissionLanguage,
   Trial,
   TrialCaseInput,
@@ -132,6 +135,30 @@ export async function getSubmissionSource(id: string): Promise<string | null> {
   if (response.status === 204) return null
   const body = await json<{ source: string }>(response)
   return body.source
+}
+
+/** 풀이 전 질문과 이미 답한 것 (PRD FR-803). */
+export async function getPreQuestions(problemId: string): Promise<PreQuestionSet> {
+  return json<PreQuestionSet>(await authed(`/prequestions/${problemId}`))
+}
+
+/**
+ * 답한다.
+ *
+ * 채점 결과는 **답한 뒤에** 온다. 미리 알면 예측이 아니라 받아쓰기가 된다.
+ */
+export async function answerPreQuestion(
+  problemId: string,
+  kind: QuestionKind,
+  answer: string,
+  rationale: string | null,
+): Promise<AnsweredQuestion> {
+  const response = await authed(`/prequestions/${problemId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind, answer, rationale }),
+  })
+  return json<AnsweredQuestion>(response)
 }
 
 /** 표시 이름 변경 (기획서 부록 A 계정). */

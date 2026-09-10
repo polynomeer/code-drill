@@ -825,3 +825,19 @@ table.groups td {
   color: var(--muted);
   display: block;
 }
+
+/* --- 풀이 전 질문 (PRD FR-803) --- */
+
+.prequestions .settings-block:first-of-type {
+  border-top: none;
+}
+
+.question-prompt {
+  margin: 0;
+  font-size: 13px;
+}
+
+.rationale {
+  width: 100%;
+  font-size: 12px;
+}

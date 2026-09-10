@@ -9,6 +9,7 @@ import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CodeView } from './features/submissions/CodeView'
 import { VerdictPanel } from './features/submissions/VerdictPanel'
+import { PreQuestionPanel } from './features/workspace/PreQuestionPanel'
 import { TestPanel } from './features/workspace/TestPanel'
 import { Workspace } from './features/workspace/Workspace'
 import { starterFor } from './features/workspace/starters'
@@ -197,6 +198,8 @@ function Drill({ session }: { session: Session }) {
         </div>
 
         <div className="stack">
+          {/* 에디터 위에 둔다. "풀기 전에" 묻는 질문이 코드 아래 있으면 이미 늦다. */}
+          {problem && <PreQuestionPanel problemId={problem.id} />}
           <Workspace
             source={source}
             language={language}
