@@ -188,3 +188,31 @@ export interface ApiError {
   message: string
   traceId: string
 }
+
+/** 시험 실행 (기획서 부록 A 실행 도메인). 백엔드 `TrialRun` 과 짝을 이룬다. */
+export type TrialStatus = 'PENDING' | 'COMPLETED' | 'FAILED'
+
+export interface TrialCaseResult {
+  index: number
+  outcome: Verdict
+  /** 사용자 코드가 실제로 내놓은 값. 실행되지 못했으면 null. */
+  actual: string | null
+  message: string | null
+  wallTimeMillis: number
+  peakMemoryBytes: number
+}
+
+export interface Trial {
+  id: string
+  problemId: string
+  language: SubmissionLanguage
+  status: TrialStatus
+  compileLog: string | null
+  cases: TrialCaseResult[]
+}
+
+/** 사용자가 적는 한 건. `expected` 는 없어도 된다. */
+export interface TrialCaseInput {
+  args: unknown[]
+  expected?: unknown
+}

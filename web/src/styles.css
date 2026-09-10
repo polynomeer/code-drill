@@ -728,3 +728,54 @@ table.groups td {
   border: 1px solid var(--bad);
   color: var(--bad);
 }
+
+/* --- 테스트 패널 (PRD §5.2) --- */
+
+.test-input {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.compile-log {
+  background: var(--bg);
+  border: 1px solid var(--bad);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 11px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.test-results {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.test-results li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 통과 여부를 글자로 먼저 알린다. 색은 거들 뿐이다. */
+.test-mark {
+  width: 12px;
+  font-weight: 700;
+}
+
+.test-actual {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

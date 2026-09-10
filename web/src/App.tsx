@@ -8,6 +8,7 @@ import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { VerdictPanel } from './features/submissions/VerdictPanel'
+import { TestPanel } from './features/workspace/TestPanel'
 import { Workspace } from './features/workspace/Workspace'
 import { starterFor } from './features/workspace/starters'
 import { setParam } from './shared/url'
@@ -215,6 +216,8 @@ function Drill({ session }: { session: Session }) {
             onSubmit={submit}
             submitting={submitting || !problem}
           />
+          {/* 판정 앞에 둔다. 제출하기 전에 돌려 보는 것이 이 패널의 목적이다. */}
+          {problem && <TestPanel problem={problem} language={language} source={source} />}
           {submission && <VerdictPanel submission={submission} />}
           {trace && submissionId && (
             <ReplayView submissionId={submissionId} manifest={trace} input={replayInput} />

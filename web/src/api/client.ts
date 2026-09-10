@@ -10,6 +10,8 @@ import type {
   ProblemPage,
   Submission,
   SubmissionLanguage,
+  Trial,
+  TrialCaseInput,
 } from '../shared/types'
 
 const BASE = '/api/v1'
@@ -88,6 +90,35 @@ export async function login(email: string, password: string): Promise<Session> {
 export async function logout(): Promise<void> {
   await authed('/auth/logout', { method: 'POST' }).catch(() => undefined)
   setSession(null)
+}
+
+/**
+ * 시험 실행을 시작한다 (기획서 부록 A 실행 도메인).
+ *
+ * 제출과 다른 경로다 — 판정이 되지 않고 제출 기록에도 남지 않는다.
+ */
+export async function startTrial(
+  problemId: string,
+  language: SubmissionLanguage,
+  source: string,
+  cases: TrialCaseInput[],
+): Promise<Trial> {
+  const response = await authed('/trials', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId, language, source, cases }),
+  })
+  return json<Trial>(response)
+}
+
+/**
+ * 결과를 가져온다.
+ *
+ * 폴링이다. 제출은 SSE 로 미는데, 시험 실행은 몇 초면 끝나고 화면 하나만 보고 있으므로
+ * 연결을 하나 더 여는 값을 하지 못한다.
+ */
+export async function getTrial(id: string): Promise<Trial> {
+  return json<Trial>(await authed(`/trials/${id}`))
 }
 
 /** 표시 이름 변경 (기획서 부록 A 계정). */
