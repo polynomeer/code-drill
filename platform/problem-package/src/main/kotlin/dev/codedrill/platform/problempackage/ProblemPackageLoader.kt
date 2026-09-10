@@ -47,6 +47,14 @@ class ProblemPackageLoader(private val root: Path) {
 
         val statement = dir.resolve(manifest.statement).readText()
 
+        // 카탈로그는 **digest 를 시작하기 전에** 읽는다. 순서가 우연이 아니라는 것을
+        // 코드로 보여 두어, 나중에 누가 digest.update 를 여기 끼워 넣지 않게 한다.
+        val catalogFile = dir.resolve("catalog.yaml")
+        require(catalogFile.isRegularFile()) {
+            "catalog.yaml 이 없다. 난이도·태그·역량이 없으면 목록에서 찾을 수 없다"
+        }
+        val catalog = yaml.readValue<ProblemCatalog>(catalogFile.readText())
+
         val digest = MessageDigest.getInstance("SHA-256")
         digest.update(manifestText.toByteArray())
 
@@ -85,6 +93,7 @@ class ProblemPackageLoader(private val root: Path) {
             statementMarkdown = statement,
             groups = groups,
             packageDigest = digest.digest().joinToString("") { "%02x".format(it) },
+            catalog = catalog,
         )
     }
 

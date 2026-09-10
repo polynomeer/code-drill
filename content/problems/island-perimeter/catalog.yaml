@@ -1,0 +1,9 @@
+# island-perimeter 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - matrix
+  - counting
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES

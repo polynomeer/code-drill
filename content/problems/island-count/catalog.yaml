@@ -1,0 +1,13 @@
+# island-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - graph
+  - dfs
+  - bfs
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - ALGORITHM_CHOICE
+prerequisites:
+  - connected-components

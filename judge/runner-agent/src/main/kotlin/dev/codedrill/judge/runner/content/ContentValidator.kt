@@ -76,6 +76,7 @@ class ContentValidator(
         val checks = mutableListOf<Check>()
 
         checks += structure(problemId, pkg)
+        checks += catalog(pkg)
         val reference = referenceSolution(problemId)
 
         if (reference == null) {
@@ -143,6 +144,75 @@ class ContentValidator(
                 Check.fail("structure", problems.joinToString("; "))
             },
         )
+    }
+
+    // --- 카탈로그: 문제 하나만 봐서는 알 수 없는 것 ---
+
+    /**
+     * 난이도·태그·역량·선수 관계 검사 (PRD FR-201~203).
+     *
+     * 있는지와 비지 않았는지는 [dev.codedrill.platform.problempackage.ProblemCatalog] 의
+     * `init` 이 로딩 시점에 막는다. 여기서 보는 것은 **저장소 전체를 봐야 알 수 있는 것**
+     * 둘이다.
+     *
+     * - 태그가 어휘에 있는가. `two-pointer` 와 `two-pointers` 가 나뉘면 필터는 오류 없이
+     *   절반만 찾고, 사용자에게는 "그 문제가 없다"로 보인다.
+     * - 선수 관계가 실제 문제를 가리키고 순환이 없는가. 순환이면 학습 경로가 만들어지지
+     *   않는다.
+     */
+    private fun catalog(pkg: ProblemPackage): List<Check> {
+        val problems = mutableListOf<String>()
+
+        val unknown = pkg.catalog.tags.filterNot { it in vocabulary }
+        if (unknown.isNotEmpty()) {
+            problems += "어휘에 없는 태그: ${unknown.joinToString()} (content/tags.yaml)"
+        }
+
+        pkg.catalog.prerequisites.forEach { id ->
+            if (!contentRoot.resolve(id).resolve("manifest.yaml").exists()) {
+                problems += "선수 문제가 없다: $id"
+            }
+        }
+        cycleFrom(pkg.manifest.id, emptySet())?.let { problems += "선수 관계가 순환한다: $it" }
+
+        return listOf(
+            if (problems.isEmpty()) {
+                Check.pass(
+                    "catalog",
+                    "${pkg.catalog.difficulty} · 태그 ${pkg.catalog.tags.size} · " +
+                        "역량 ${pkg.catalog.competencies.size} · 선수 ${pkg.catalog.prerequisites.size}",
+                )
+            } else {
+                Check.fail("catalog", problems.joinToString("; "))
+            },
+        )
+    }
+
+    /** 태그 어휘. 값만 필요하므로 `- value` 줄을 모은다 — 구조를 파싱할 이유가 없다. */
+    private val vocabulary: Set<String> by lazy {
+        val file = contentRoot.parent?.resolve("tags.yaml")
+        if (file == null || !file.exists()) {
+            emptySet()
+        } else {
+            TAG_LINE.findAll(file.readText()).map { it.groupValues[1] }.toSet()
+        }
+    }
+
+    /**
+     * 순환하는 경로를 돌려준다. 없으면 null.
+     *
+     * 카탈로그를 다시 로드하지 않고 파일에서 선수 목록만 뽑는다. 순환이 있으면 로더가
+     * 그것을 따라가다 함께 돌 수 있어서다 — 순환을 찾는 코드가 순환에 걸리면 안 된다.
+     */
+    private fun cycleFrom(id: String, seen: Set<String>): String? {
+        if (id in seen) return (seen.toList() + id).joinToString(" → ")
+        val file = contentRoot.resolve(id).resolve("catalog.yaml")
+        if (!file.exists()) return null
+        val block = PREREQ_BLOCK.find(file.readText())?.groupValues?.get(1) ?: return null
+        return TAG_LINE.findAll(block)
+            .map { it.groupValues[1] }
+            .firstOrNull { next -> cycleFrom(next, seen + id) != null }
+            ?.let { cycleFrom(it, seen + id) }
     }
 
     // --- §6.3 2. 모든 공식 해답을 전체 테스트에 실행 ---
@@ -547,7 +617,13 @@ class ContentValidator(
          *
          * `"0"` 은 이 값을 기록하기 전에 등록된 행을 뜻한다 (V9 migration).
          */
-        const val VALIDATOR_VERSION = "2"
+        const val VALIDATOR_VERSION = "3"
+
+        /** `  - value` 한 줄. 어휘와 선수 목록이 같은 모양이라 하나로 쓴다. */
+        private val TAG_LINE = Regex("""^\s*- (\S+)""", RegexOption.MULTILINE)
+
+        /** `prerequisites:` 아래 붙은 목록 블록. */
+        private val PREREQ_BLOCK = Regex("""prerequisites:\s*\n((?:\s+- \S+\n?)+)""")
 
         /** 정답 풀이가 제한 시간의 이 비율을 넘게 쓰면 공개를 막는다. */
         private const val MAX_REFERENCE_TIME_RATIO = 0.5

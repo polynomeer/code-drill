@@ -1,0 +1,8 @@
+# count-letters 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - string
+  - counting
+competencies:
+  - READING
+  - IMPLEMENTATION

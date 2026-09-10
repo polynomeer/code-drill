@@ -1,0 +1,46 @@
+# 태그 어휘 (기획서 §10.2, PRD FR-201).
+#
+# `catalog.yaml` 의 `tags` 는 여기 있는 값만 쓸 수 있고, 검증 파이프라인이 그것을 막는다.
+# 자유 문자열로 두면 `two-pointer` 와 `two-pointers` 가 나뉘고, 그러면 필터는 오류 없이
+# 절반만 찾는다 — 사용자에게는 "그 문제가 없다"로 보인다.
+#
+# **태그를 늘리는 것은 이 파일 한 줄이다.** 어휘를 코드 enum 으로 두지 않은 이유가 그것이다.
+# 다만 늘리기 전에 기존 태그로 표현되는지 먼저 본다. 태그가 문제 수만큼 많아지면 필터는
+# 아무것도 좁히지 못한다.
+
+# 무엇을 다루는가.
+structures:
+  - array
+  - string
+  - matrix
+  - hash-map
+  - stack
+  - queue
+  - heap
+  - graph
+  - tree
+  - union-find
+  - prefix-sum
+
+# 어떻게 푸는가.
+techniques:
+  - two-pointers
+  - sliding-window
+  - binary-search
+  - sorting
+  - greedy
+  - dynamic-programming
+  - recursion
+  - backtracking
+  - divide-conquer
+  - bfs
+  - dfs
+  - topological-sort
+  - shortest-path
+  - monotonic-stack
+  - simulation
+  - counting
+  - in-place
+  - math
+  - number-theory
+  - bit-manipulation
