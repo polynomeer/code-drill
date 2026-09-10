@@ -7,6 +7,7 @@ import { ProblemList } from './features/problems/ProblemList'
 import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
+import { CodeView } from './features/submissions/CodeView'
 import { VerdictPanel } from './features/submissions/VerdictPanel'
 import { TestPanel } from './features/workspace/TestPanel'
 import { Workspace } from './features/workspace/Workspace'
@@ -47,6 +48,10 @@ function Drill({ session }: { session: Session }) {
 
   // ?submission=<id> 로 특정 제출을 바로 연다. 결과를 공유하거나 다시 열어보는 경로이며,
   // 새로고침해도 방금 본 판정이 사라지지 않는다.
+  // 코드를 펼쳐 본 제출. 판정을 여는 것과 다른 상태다 — 기록을 보다가 코드만 확인하고
+  // 돌아오는 흐름이 흔하다.
+  const [viewingCode, setViewingCode] = useState<string | null>(null)
+
   const [submissionId, setSubmissionId] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get('submission'),
   )
@@ -136,6 +141,7 @@ function Drill({ session }: { session: Session }) {
   }
 
   const replayInput = numberArray(problem?.samples[0]?.args[0])
+  const viewed = history.find((item) => item.id === viewingCode) ?? null
 
   return (
     <div className="app">
@@ -222,15 +228,33 @@ function Drill({ session }: { session: Session }) {
           {trace && submissionId && (
             <ReplayView submissionId={submissionId} manifest={trace} input={replayInput} />
           )}
+          {viewed && (
+            <CodeView
+              submission={viewed}
+              previous={previousOf(history, viewed)}
+              onClose={() => setViewingCode(null)}
+            />
+          )}
           <HistoryPanel
             submissions={history}
             currentId={submissionId}
             onOpen={openSubmission}
+            onView={setViewingCode}
           />
         </div>
       </main>
     </div>
   )
+}
+
+/**
+ * 기록에서 바로 다음(= 시간상 이전) 제출.
+ *
+ * 목록은 최신순이므로 뒤에 있는 것이 이전 제출이다. 첫 제출이면 비교 대상이 없다.
+ */
+function previousOf(history: Submission[], current: Submission): Submission | null {
+  const index = history.findIndex((item) => item.id === current.id)
+  return index >= 0 ? (history[index + 1] ?? null) : null
 }
 
 /** `fun twoSum(nums: IntArray, ...): IntArray` → `twoSum` */

@@ -12,10 +12,13 @@ export function HistoryPanel({
   submissions,
   currentId,
   onOpen,
+  onView,
 }: {
   submissions: Submission[]
   currentId: string | null
   onOpen: (id: string) => void
+  /** 코드를 펼쳐 본다. 여는 것(판정 다시 보기)과 다른 동작이라 버튼도 따로 둔다. */
+  onView: (id: string) => void
 }) {
   if (submissions.length === 0) {
     return (
@@ -39,6 +42,14 @@ export function HistoryPanel({
               <span className="muted">{item.language}</span>
               <span className="muted">{item.score !== null ? `${item.score}점` : '—'}</span>
               <span className="muted mono">{item.id.slice(0, 8)}</span>
+            </button>
+            <button
+              type="button"
+              className="linklike code-link"
+              onClick={() => onView(item.id)}
+              aria-label={`${item.id.slice(0, 8)} 코드 보기`}
+            >
+              코드
             </button>
           </li>
         ))}

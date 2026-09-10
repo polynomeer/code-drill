@@ -121,6 +121,19 @@ export async function getTrial(id: string): Promise<Trial> {
   return json<Trial>(await authed(`/trials/${id}`))
 }
 
+/**
+ * 제출한 코드 (PRD §6.4).
+ *
+ * 목록과 함께 오지 않고 따로 받는다 — 펼쳐 볼 때만 오간다. 계정을 지운 사용자의 소스는
+ * 비어 있어 204 가 오고, 그때는 null 이다 (§11.3).
+ */
+export async function getSubmissionSource(id: string): Promise<string | null> {
+  const response = await authed(`/submissions/${id}/source`)
+  if (response.status === 204) return null
+  const body = await json<{ source: string }>(response)
+  return body.source
+}
+
 /** 표시 이름 변경 (기획서 부록 A 계정). */
 export async function rename(displayName: string): Promise<void> {
   const response = await authed('/auth/me', {

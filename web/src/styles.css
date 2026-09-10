@@ -779,3 +779,49 @@ table.groups td {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* --- 제출 코드와 diff (PRD §6.4) --- */
+
+.history li {
+  display: flex;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+}
+
+.history li button:first-child {
+  border-bottom: none;
+}
+
+.code-link {
+  flex: none;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre;
+}
+
+/* 기호가 먼저 읽히고 색은 거든다. 색맹 사용자도 +/- 로 같은 정보를 얻는다. */
+.diff-added {
+  color: var(--ok);
+  display: block;
+}
+
+.diff-removed {
+  color: var(--bad);
+  display: block;
+}
+
+.diff-gap {
+  color: var(--muted);
+  display: block;
+}
