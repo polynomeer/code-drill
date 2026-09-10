@@ -109,10 +109,16 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
             appendLine("        cls._budget_left -= 1")
             appendLine("        cls._seq += 1")
             appendLine("        cls._out.write(")
-            appendLine("            \"${SandboxProtocol.EVENT}\\t%d\\t%s\\t%s\\t\\t%s\\t%d\\n\"")
-            appendLine("            % (cls._seq, kind, ref, after, importance)")
+            appendLine("            \"${SandboxProtocol.EVENT}\\t%d\\t%s\\t%s\\t\\t%s\\t%d\\t%d\\n\"")
+            appendLine("            % (cls._seq, kind, ref, after, importance, cls._caller_line())")
             appendLine("        )")
             appendLine("        cls._out.flush()")
+            appendLine()
+            // 사용자 코드의 줄 번호 (§7.2 sourceSpan). 계측 실행에서만 돈다.
+            appendLine("    @staticmethod")
+            appendLine("    def _caller_line():")
+            appendLine("        frame = sys._getframe(3)")
+            appendLine("        return frame.f_lineno if frame else 0")
             appendLine()
             appendLine(methods(instrumented = true))
         }

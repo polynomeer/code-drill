@@ -164,7 +164,10 @@ fun ExecutionMode.instrumented(): Boolean = this == ExecutionMode.TRACE
 /**
  * 계측 이벤트 줄을 되돌린다 (§7.2).
  *
- * `EVENT <seq> <eventType> <targetRef> <before> <after> <importance>`
+ * `EVENT <seq> <eventType> <targetRef> <before> <after> <importance> <sourceLine>`
+ *
+ * 마지막 칸은 나중에 붙었다. 없는 줄도 그대로 읽어야 하므로 길이 검사는 7 그대로 두고,
+ * 여덟 번째가 있으면 쓴다 — 옛 형식으로 찍힌 트레이스가 통째로 버려지면 안 된다.
  *
  * `targetKind` 는 싣지 않는다. 이벤트 종류가 이미 종류를 결정하므로, 함께 보내면 둘이
  * 어긋날 수 있는 자리를 만드는 셈이다.
@@ -190,6 +193,8 @@ fun parseTraceEvent(line: String): dev.codedrill.judge.protocol.TraceEvent? {
         before = parts[4].takeIf { it.isNotEmpty() },
         after = parts[5].takeIf { it.isNotEmpty() },
         importance = parts[6].toIntOrNull() ?: type.defaultImportance,
+        // 0 은 "몰랐다"는 뜻이다. 사용자 코드 밖에서 부른 계측이 그렇게 나온다.
+        sourceLine = parts.getOrNull(7)?.toIntOrNull()?.takeIf { it > 0 },
     )
 }
 

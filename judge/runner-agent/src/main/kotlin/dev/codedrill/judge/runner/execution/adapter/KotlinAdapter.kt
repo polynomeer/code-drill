@@ -94,10 +94,17 @@ class KotlinAdapter(
             appendLine("        seq += 1")
             appendLine("        out.println(")
             appendLine("            \"${SandboxProtocol.EVENT}\\t\" + seq + \"\\t\" + type + \"\\t\" + ref +")
-            appendLine("                \"\\t\\t\" + after + \"\\t\" + importance")
+            appendLine("                \"\\t\\t\" + after + \"\\t\" + importance + \"\\t\" + callerLine()")
             appendLine("        )")
             appendLine("        out.flush()")
             appendLine("    }")
+            appendLine()
+            // 사용자 코드의 줄 번호 (§7.2 sourceSpan). 사용자 소스는 Solution.kt 하나로
+            // 그대로 쓰이므로, 그 파일의 프레임을 찾으면 사용자가 보는 줄 번호와 같다.
+            // 계측 실행에서만 도는 코드라 판정 시간에 섞이지 않는다.
+            appendLine("    private fun callerLine(): Int =")
+            appendLine("        Throwable().stackTrace.firstOrNull { it.fileName == \"Solution.kt\" }")
+            appendLine("            ?.lineNumber ?: 0")
             appendLine()
             appendLine(methods(instrumented = true))
             appendLine("}")

@@ -103,6 +103,26 @@ class GoldenJudgeTest {
     }
 
     @Test
+    fun `이벤트는 사용자 코드의 줄 번호를 달고 나온다`() {
+        // FR-805 의 수용 기준이 "선택·근거·결과가 코드·입력·이벤트 시점과 연결된다"다.
+        // 줄 번호가 없으면 화면이 이벤트를 코드에 이을 방법이 아예 없고, 그 실패는
+        // 조용하다 — 트레이스는 멀쩡히 나오고 코드 강조만 안 될 뿐이다.
+        for (language in GoldenSources.languages) {
+            val source = GoldenSources.ACCEPTED.getValue(language)
+            val capture = assertNotNull(
+                engine.execute(request(language, source, mode = ExecutionMode.TRACE)).trace,
+            )
+
+            val lines = capture.events.mapNotNull { it.sourceLine }.distinct()
+            assertTrue(lines.isNotEmpty(), "$language: 줄 번호가 하나도 없다")
+            assertTrue(
+                lines.all { it in 1..source.lines().size },
+                "$language: 줄 번호가 소스 범위를 벗어난다: $lines (소스 ${source.lines().size}줄)",
+            )
+        }
+    }
+
+    @Test
     fun `컴파일 실패는 케이스를 한 건도 만들지 않고 서버 경로를 노출하지 않는다`() {
         for (language in GoldenSources.languages) {
             val result =
