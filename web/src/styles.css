@@ -318,12 +318,97 @@ table.groups td {
   margin-bottom: 8px;
 }
 
+/* --- 문제 탐색 필터 (PRD FR-201) --- */
+
+.problem-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.filters fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.filters legend {
+  /* fieldset 안에서 legend 는 흐름 밖으로 나간다. 줄 맞춤을 위해 되돌린다. */
+  float: left;
+  width: 44px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.chip {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--muted);
+  padding: 2px 9px;
+  font-size: 12px;
+}
+
+.chip.on {
+  /* 켜진 것을 색만으로 알리지 않는다. 테두리와 글자 굵기가 함께 바뀐다. */
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.result-count {
+  margin: 6px 0 2px;
+  font-size: 12px;
+}
+
+.problem-list .problem-title {
+  flex: 1;
+}
+
+.problem-list .problem-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11px;
+  /* 태그가 길어도 제목을 밀지 않는다. */
+  max-width: 55%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 난이도는 글자로 읽힌다. 색은 거들 뿐이라 색맹 사용자도 같은 정보를 얻는다. */
+.level {
+  font-weight: 600;
+}
+
+.level.intro,
+.level.easy {
+  color: var(--ok);
+}
+
+.level.hard,
+.level.expert {
+  color: var(--bad);
+}
+
 .problem-list,
 .history {
   list-style: none;
   padding: 0;
   margin: 0;
-  max-height: 220px;
+  max-height: 260px;
   overflow: auto;
 }
 

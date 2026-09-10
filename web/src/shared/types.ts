@@ -68,11 +68,53 @@ export interface GroupInfo {
   caseCount: number
 }
 
+/** 난이도 (기획서 §10.2). 값과 순서는 백엔드 `Difficulty` 와 짝을 이룬다. */
+export const DIFFICULTIES = ['INTRO', 'EASY', 'MEDIUM', 'HARD', 'EXPERT'] as const
+export type Difficulty = (typeof DIFFICULTIES)[number]
+
+export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  INTRO: '입문',
+  EASY: '쉬움',
+  MEDIUM: '보통',
+  HARD: '어려움',
+  EXPERT: '최상',
+}
+
 export interface ProblemSummary {
   id: string
   version: number
   title: string
+  difficulty: Difficulty
+  tags: string[]
+  competencies: string[]
+  /** 표본이 적으면 null 이다. 없는 값을 0% 로 그리지 않는다 (§0.2 No false precision). */
+  solvedRate: number | null
+  solved: boolean
 }
+
+/**
+ * 문제 목록 응답 (PRD FR-201~203).
+ *
+ * 백엔드 `ProblemPage` 와 짝을 이룬다. `total` 은 **조건에 맞는 전체 개수**이지 이번
+ * 페이지의 개수가 아니다.
+ */
+export interface ProblemPage {
+  items: ProblemSummary[]
+  nextCursor: string | null
+  total: number
+  /** 태그 → 이 조건에서의 문제 수. 결과가 있는 태그만 온다. */
+  tags: Record<string, number>
+}
+
+/** 목록 필터 (PRD FR-201). 비어 있는 항목은 요청에 싣지 않는다. */
+export interface ProblemFilter {
+  query: string
+  difficulty: Difficulty[]
+  tags: string[]
+  status: 'SOLVED' | 'UNSOLVED' | null
+}
+
+export const EMPTY_FILTER: ProblemFilter = { query: '', difficulty: [], tags: [], status: null }
 
 export type SubmissionLanguage = 'KOTLIN' | 'JAVA' | 'PYTHON'
 

@@ -6,7 +6,8 @@ import type {
   DraftConflict,
   Page,
   Problem,
-  ProblemSummary,
+  ProblemFilter,
+  ProblemPage,
   Submission,
   SubmissionLanguage,
 } from '../shared/types'
@@ -89,9 +90,25 @@ export async function logout(): Promise<void> {
   setSession(null)
 }
 
-export function listProblems(query?: string): Promise<Page<ProblemSummary>> {
-  const params = query ? `?query=${encodeURIComponent(query)}` : ''
-  return fetch(`${BASE}/problems${params}`).then(json<Page<ProblemSummary>>)
+/**
+ * 문제 목록 (PRD FR-201~203).
+ *
+ * 로그인하지 않아도 열린다. 다만 토큰이 있으면 실어 보낸다 — 그래야 서버가 "내가 푼
+ * 문제"를 표시해 준다. [authed] 를 쓰지 않는 이유는 그것이 세션이 없을 때 던지기
+ * 때문이다. 여기서는 세션이 없는 것이 오류가 아니라 **평범한 경우**다.
+ */
+export function listProblems(filter: ProblemFilter): Promise<ProblemPage> {
+  const params = new URLSearchParams()
+  if (filter.query.trim()) params.set('query', filter.query.trim())
+  for (const value of filter.difficulty) params.append('difficulty', value)
+  for (const value of filter.tags) params.append('tags', value)
+  if (filter.status) params.set('status', filter.status)
+
+  const session = getSession()
+  const suffix = params.toString() ? `?${params}` : ''
+  return fetch(`${BASE}/problems${suffix}`, {
+    headers: session ? { Authorization: `Bearer ${session.accessToken}` } : {},
+  }).then(json<ProblemPage>)
 }
 
 export function listSubmissions(problemId?: string): Promise<Page<Submission>> {
