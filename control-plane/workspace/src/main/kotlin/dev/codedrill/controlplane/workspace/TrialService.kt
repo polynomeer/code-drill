@@ -12,7 +12,6 @@ import dev.codedrill.platform.problempackage.GroupPolicy
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.problempackage.StopPolicy
 import dev.codedrill.platform.problempackage.TestCase
-import dev.codedrill.platform.problempackage.ValueType
 import dev.codedrill.platform.problempackage.Visibility
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -73,7 +72,7 @@ class TrialService(
         val pkg = packages.load(problemId)
         val parameters = pkg.manifest.signature.parameters
         cases.forEachIndexed { index, case ->
-            typeMismatch(case, parameters.map { it.type })?.let {
+            CaseShape.mismatch(case.args, parameters.map { it.type })?.let {
                 return Outcome.Invalid("${index + 1}번 케이스: $it")
             }
         }
@@ -126,33 +125,6 @@ class TrialService(
 
     fun find(userId: String, id: UUID): TrialRun? =
         repository.find(id)?.takeIf { it.userId == userId }
-
-    /**
-     * 값이 선언한 타입과 맞는지.
-     *
-     * JSON 은 정수와 실수를 구분해 주지 않고 배열의 원소 타입도 말해 주지 않는다. 여기서
-     * 보지 않으면 그 값이 세 언어의 하네스에 그대로 들어가고, 각 언어가 **서로 다른 방식으로**
-     * 깨진다.
-     */
-    private fun typeMismatch(case: TrialCase, types: List<ValueType>): String? {
-        if (case.args.size != types.size) {
-            return "인자 ${types.size}개가 필요한데 ${case.args.size}개다"
-        }
-        types.forEachIndexed { index, type ->
-            if (!matches(case.args[index], type)) {
-                return "${index + 1}번 인자가 $type 이 아니다"
-            }
-        }
-        return null
-    }
-
-    private fun matches(value: Any?, type: ValueType): Boolean = when (type) {
-        ValueType.INT -> value is Number && value.toDouble() % 1.0 == 0.0
-        ValueType.STRING -> value is String
-        ValueType.INT_ARRAY -> value is List<*> && value.all { matches(it, ValueType.INT) }
-        ValueType.STRING_ARRAY -> value is List<*> && value.all { matches(it, ValueType.STRING) }
-        ValueType.INT_MATRIX -> value is List<*> && value.all { matches(it, ValueType.INT_ARRAY) }
-    }
 
     private fun toTestCase(index: Int, case: TrialCase) = TestCase(
         id = "case-${index + 1}",
