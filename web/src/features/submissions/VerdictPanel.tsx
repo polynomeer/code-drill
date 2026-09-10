@@ -1,3 +1,4 @@
+import { CounterexamplePanel } from './CounterexamplePanel'
 import { IN_FLIGHT, VERDICT_LABEL } from '../../shared/types'
 import type { Submission } from '../../shared/types'
 
@@ -75,6 +76,11 @@ export function VerdictPanel({ submission }: { submission: Submission }) {
             ))}
           </ul>
         ))}
+
+      {/* 떨어진 제출에만 나온다. 통과한 제출에는 줄일 반례가 없다 (§6.3). */}
+      {!inFlight && submission.verdict && submission.verdict !== 'ACCEPTED' && (
+        <CounterexamplePanel submissionId={submission.id} />
+      )}
     </section>
   )
 }

@@ -16,6 +16,7 @@ import type {
   QuestionKind,
   SubmissionLanguage,
   CoachingSession,
+  Counterexample,
   Divergence,
   StatePrediction,
   MutationCheck,
@@ -182,6 +183,24 @@ export async function predictNext(
 /** 이미 맞혀 본 자리들. 같은 자리를 다시 묻지 않기 위해서다. */
 export async function getPredictions(submissionId: string): Promise<StatePrediction[]> {
   return json<StatePrediction[]>(await authed(`/submissions/${submissionId}/predictions`))
+}
+
+/**
+ * 최소 반례 축소를 건다 (기술 설계서 §6.3).
+ *
+ * 이 시스템에서 가장 오래 걸리는 작업이다. 사용자가 눌러야 돌고, 같은 제출에 두 번
+ * 눌러도 한 번만 돈다.
+ */
+export async function startCounterexample(submissionId: string): Promise<Counterexample> {
+  const response = await authed(`/submissions/${submissionId}/counterexample`, { method: 'POST' })
+  return json<Counterexample>(response)
+}
+
+/** 축소 결과. 아직 걸지 않았으면 null 이다. */
+export async function getCounterexample(submissionId: string): Promise<Counterexample | null> {
+  const response = await authed(`/submissions/${submissionId}/counterexample`)
+  if (response.status === 204) return null
+  return json<Counterexample>(response)
 }
 
 /**

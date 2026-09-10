@@ -288,6 +288,25 @@ export interface StatePrediction {
 }
 
 /**
+ * 최소 반례 (기술 설계서 §6.3).
+ *
+ * 줄인 입력 하나와 그 입력의 정답만 온다. 숨은 테스트 묶음은 오지 않는다.
+ */
+export type CounterexampleStatus = 'PENDING' | 'FOUND' | 'NOT_REPRODUCED' | 'FAILED'
+
+export interface Counterexample {
+  submissionId: string
+  status: CounterexampleStatus
+  message: string | null
+  args: unknown[] | null
+  actual: string | null
+  expected: string | null
+  originalSize: number | null
+  minimalSize: number | null
+  rounds: number | null
+}
+
+/**
  * 전이 확인 과제 (PRD FR-807).
  *
  * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로
