@@ -687,3 +687,44 @@ table.groups td {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* --- 계정 설정 (기획서 부록 A 계정, §11.3) --- */
+
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.settings-block label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.settings-block input {
+  width: 100%;
+}
+
+.settings-block h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.small {
+  font-size: 11px;
+}
+
+/* 되돌릴 수 없는 구역. 색만으로 알리지 않도록 테두리와 문구가 함께 선다. */
+.settings-block.danger {
+  border-top: 1px solid var(--bad);
+  margin-top: 6px;
+}
+
+.destructive {
+  background: none;
+  border: 1px solid var(--bad);
+  color: var(--bad);
+}

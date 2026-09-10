@@ -90,6 +90,57 @@ export async function logout(): Promise<void> {
   setSession(null)
 }
 
+/** 표시 이름 변경 (기획서 부록 A 계정). */
+export async function rename(displayName: string): Promise<void> {
+  const response = await authed('/auth/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName }),
+  })
+  await json<unknown>(response)
+
+  // 화면 곳곳이 세션의 이름을 읽는다. 서버만 바꾸고 두면 다시 로그인하기 전까지 옛 이름이
+  // 남는다.
+  const session = getSession()
+  if (session) setSession({ ...session, displayName: displayName.trim() })
+}
+
+/**
+ * 비밀번호 변경.
+ *
+ * 서버가 열린 세션을 전부 끊고 새 세션을 준다. 받은 것으로 갈아 끼우지 않으면 **방금
+ * 비밀번호를 바꾼 사람이 곧바로 튕겨 나간다.**
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ revokedSessions: number }> {
+  const response = await authed('/auth/me/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+  const body = await json<{ session: Session; revokedSessions: number }>(response)
+  setSession(body.session)
+  return { revokedSessions: body.revokedSessions }
+}
+
+/** 내 데이터 전부 (§11.3 반출). */
+export async function exportAccount(): Promise<unknown> {
+  return json<unknown>(await authed('/auth/me/export'))
+}
+
+/** 계정 삭제 (§11.3). 되돌릴 수 없어 비밀번호를 다시 받는다. */
+export async function deleteAccount(password: string): Promise<void> {
+  const response = await authed('/auth/me', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  await json<unknown>(response)
+  setSession(null)
+}
+
 /**
  * 문제 목록 (PRD FR-201~203).
  *

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createSubmission, getDraft, getProblem, listSubmissions, logout } from './api/client'
 import { getSession, onSessionChange, type Session } from './api/session'
+import { AccountSettings } from './features/auth/AccountSettings'
 import { SignIn } from './features/auth/SignIn'
 import { ProblemList } from './features/problems/ProblemList'
 import { ReplayView } from './features/replay/ReplayView'
@@ -33,6 +34,7 @@ export function App() {
 }
 
 function Drill({ session }: { session: Session }) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [slug, setSlug] = useState<string | null>(null)
   const [problem, setProblem] = useState<Problem | null>(null)
   const [language, setLanguage] = useState<SubmissionLanguage>('KOTLIN')
@@ -140,7 +142,14 @@ function Drill({ session }: { session: Session }) {
         <strong>CodeDrill</strong>
         <span className="muted">문제를 푸는 것이 아니라, 문제 해결 역량을 훈련합니다</span>
         <span className="who">
-          {session.displayName}
+          <button
+            type="button"
+            className="linklike"
+            onClick={() => setSettingsOpen((open) => !open)}
+            aria-expanded={settingsOpen}
+          >
+            {session.displayName}
+          </button>
           <button type="button" className="linklike" onClick={() => void logout()}>
             로그아웃
           </button>
@@ -151,6 +160,9 @@ function Drill({ session }: { session: Session }) {
 
       <main className="columns">
         <div className="stack">
+          {settingsOpen && (
+            <AccountSettings session={session} onClose={() => setSettingsOpen(false)} />
+          )}
           <ProblemList selected={slug} onSelect={selectProblem} />
           <section className="panel statement">
             <h3>{problem?.title ?? '문제를 고르세요'}</h3>
