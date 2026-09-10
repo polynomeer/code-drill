@@ -68,31 +68,52 @@ class ProblemController(
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
         @RequestAttribute(name = Principal.ATTRIBUTE, required = false) principal: Principal?,
-    ): Page<ProblemSummary> {
+    ): ProblemPage {
         val size = Cursor.limitOf(limit)
         val after = Cursor.decode(cursor)?.firstOrNull()
 
-        // 로그인하지 않았으면 완료 상태를 묻지 않는다. 물어봐야 답이 없고, 그 상태로
-        // status 필터를 걸면 조용히 빈 목록이 된다 — 그래서 아래에서 함께 막는다.
+        // 로그인하지 않았으면 완료 상태를 묻지 않는다. 물어봐야 답이 없다.
         val solved = principal?.let(Principal::id)?.let(progress::solvedBy).orEmpty()
         val accuracy = progress.accuracy()
 
-        val matched = availableProblems()
-            .map { id ->
-                val pkg = packages.load(id)
-                ProblemSummary.of(pkg, accuracy[id], id in solved)
-            }
+        // 태그를 뺀 나머지 조건까지만 좁힌 집합. 태그 후보를 여기서 센다.
+        val base = availableProblems()
+            .map { id -> ProblemSummary.of(packages.load(id), accuracy[id], id in solved) }
             .filter { it.matches(query) }
             .filter { difficulty.isNullOrEmpty() || it.difficulty in difficulty }
-            .filter { tags.isNullOrEmpty() || it.tags.any { tag -> tag in tags } }
             .filter { competency.isNullOrEmpty() || it.competencies.any { c -> c in competency } }
             .filter { matchesStatus(it, status, principal) }
-            .filter { after == null || it.id > after }
 
-        val items = matched.take(size)
-        val nextCursor = if (matched.size > size) Cursor.encode(items.last().id) else null
-        return Page(items, nextCursor)
+        val matched = base.filter { tags.isNullOrEmpty() || it.tags.any { tag -> tag in tags } }
+        val page = matched.filter { after == null || it.id > after }
+        val items = page.take(size)
+
+        return ProblemPage(
+            items = items,
+            nextCursor = if (page.size > size) Cursor.encode(items.last().id) else null,
+            // **페이지 크기가 아니라 조건에 맞는 수다** (FR-202). 이것을 페이지 크기로
+            // 표시하면 20개 넘는 결과가 늘 "20개"로 보이고, 필터를 좁혀도 숫자가 움직이지
+            // 않아 사용자는 필터가 듣지 않는다고 읽는다.
+            total = matched.size,
+            tags = facets(base),
+        )
     }
+
+    /**
+     * 지금 조건에서 **결과가 있는** 태그와 그 수.
+     *
+     * 태그 필터를 적용하기 **전** 집합에서 센다. 적용한 뒤에 세면 태그 하나를 고르는 순간
+     * 다른 태그가 전부 사라져 두 번째 태그를 고를 수 없다 — 같은 종류 안에서 OR 로 묶는
+     * 필터에서는 그게 맞지 않는다.
+     *
+     * 어휘 전체를 내려보내지 않는 이유는, 결과가 0인 버튼이 대부분이면 그것은 필터가
+     * 아니라 목록이 하나 더 생긴 것이기 때문이다.
+     */
+    private fun facets(base: List<ProblemSummary>): Map<String, Int> =
+        base.flatMap { it.tags }
+            .groupingBy { it }
+            .eachCount()
+            .toSortedMap()
 
     /**
      * 완료 상태 필터.
@@ -220,6 +241,23 @@ data class ProblemDetail(
         }
     }
 }
+
+/**
+ * 문제 목록 응답 (PRD FR-201~203).
+ *
+ * 공용 [dev.codedrill.platform.common.Page] 를 쓰지 않는다. 이 화면은 **총 개수와 태그
+ * 후보**가 함께 있어야 쓸모가 있고, 그 둘은 다른 목록에는 뜻이 없다. 공용 타입에 화면
+ * 하나를 위한 칸을 늘리면 그 칸은 다른 모든 목록에서 늘 null 이 된다.
+ */
+data class ProblemPage(
+    val items: List<ProblemSummary>,
+    /** 다음 페이지 커서. null 이면 마지막 페이지다. */
+    val nextCursor: String?,
+    /** 조건에 맞는 전체 개수. 이번 페이지의 개수가 아니다. */
+    val total: Int,
+    /** 태그 → 이 조건에서의 문제 수. */
+    val tags: Map<String, Int>,
+)
 
 data class SampleCase(val id: String, val args: List<Any>, val expected: Any)
 
