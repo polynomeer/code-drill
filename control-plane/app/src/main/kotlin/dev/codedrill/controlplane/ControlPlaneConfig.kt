@@ -18,6 +18,7 @@ import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
 import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
+import dev.codedrill.controlplane.problem.ProblemProgress
 import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.controlplane.submission.RejudgeContext
 import dev.codedrill.controlplane.submission.SubmissionService
@@ -26,6 +27,7 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.EnableScheduling
 import java.nio.file.Path
 import java.util.UUID
@@ -49,6 +51,43 @@ class ControlPlaneConfig {
      */
     @Bean
     fun publishedProblems(publish: PublishService) = PublishedProblems { publish.publishedProblemIds() }
+
+    /**
+     * 문제 목록의 정답률과 완료 상태를 제출 도메인에 묻는다 (§3.1 조립 지점).
+     *
+     * Problem 은 제출 스키마를 모르고, Submission 은 목록이 있다는 것을 모른다. 둘을 아는
+     * 곳은 여기 하나뿐이다.
+     *
+     * **매 요청마다 집계한다.** 제출이 수만 건인 지금은 그것으로 충분하고, 캐시를 먼저
+     * 넣으면 목록이 언제 낡은 값을 보이는지가 또 하나의 문제가 된다. 이 집계가 아파지면
+     * 그때 투영 테이블로 옮긴다 — 그 시점은 `problem_accuracy` 를 만드는 마이그레이션
+     * 하나이며, 이 인터페이스는 그대로다.
+     */
+    @Bean
+    fun problemProgress(jdbc: JdbcTemplate) = object : ProblemProgress {
+
+        override fun accuracy(): Map<String, ProblemProgress.Accuracy> = jdbc.query(
+            """
+            SELECT problem_id,
+                   count(DISTINCT user_id)                                   AS attempted,
+                   count(DISTINCT user_id) FILTER (WHERE verdict = 'ACCEPTED') AS solved
+              FROM submission
+             WHERE status = 'COMPLETED'
+             GROUP BY problem_id
+            """.trimIndent(),
+        ) { rs, _ ->
+            rs.getString("problem_id") to ProblemProgress.Accuracy(
+                attempted = rs.getInt("attempted"),
+                solved = rs.getInt("solved"),
+            )
+        }.toMap()
+
+        override fun solvedBy(userId: String): Set<String> = jdbc.query(
+            "SELECT DISTINCT problem_id FROM submission WHERE user_id = ? AND verdict = 'ACCEPTED'",
+            { rs, _ -> rs.getString("problem_id") },
+            userId,
+        ).toSet()
+    }
 
     /**
      * 관리자 역할 부트스트랩이 쓰는 계정 조회 (§11.2).

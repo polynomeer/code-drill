@@ -1,5 +1,8 @@
 package dev.codedrill.controlplane.problem
 
+import dev.codedrill.platform.common.Principal
+import dev.codedrill.platform.problempackage.Competency
+import dev.codedrill.platform.problempackage.Difficulty
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.common.Cursor
@@ -13,6 +16,7 @@ import kotlin.io.path.name
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -28,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController
 class ProblemController(
     private val packages: ProblemPackageLoader,
     private val published: PublishedProblems,
+    private val progress: ProblemProgress,
     @Value("\${codedrill.content.root}") private val contentRoot: String,
     /**
      * 공개 상태를 강제할지.
@@ -40,30 +45,72 @@ class ProblemController(
 ) {
 
     /**
-     * 문제 목록 (기술 설계서 §9.2 검색·cursor 목록).
+     * 문제 목록 (기술 설계서 §9.2, PRD FR-201~203).
      *
-     * 목록의 진실 원천은 아직 패키지 디렉터리다. 역량 필터는 Problem 모듈이 DB 와 역량
-     * 태그를 갖게 되는 단계에 붙는다. 정렬 키는 id 오름차순으로 고정한다 — 커서가 의미를
-     * 가지려면 같은 요청이 늘 같은 순서를 내야 한다 (§9.1).
+     * 목록의 진실 원천은 패키지 디렉터리다. 난이도·태그·역량은 `catalog.yaml` 에서 오고,
+     * 정답률과 완료 상태는 제출 도메인이 [ProblemProgress] 로 답한다.
+     *
+     * 필터는 **모두 AND 로 겹치고, 같은 종류 안에서는 OR** 다. `difficulty=EASY,MEDIUM`
+     * 은 둘 중 하나, `tags=array&difficulty=EASY` 는 둘 다 — 사람이 필터를 여러 개 켤 때
+     * 기대하는 것이 그것이다.
+     *
+     * 정렬 키는 id 오름차순으로 고정한다. 커서가 의미를 가지려면 같은 요청이 늘 같은
+     * 순서를 내야 한다 (§9.1). **정답률 정렬은 붙이지 않았다** — 정렬 키를 늘리려면 커서에
+     * 그 키를 실어야 하고, 값이 바뀌는 키로 페이지를 넘기면 항목이 건너뛰거나 겹친다.
      */
     @GetMapping
     fun list(
         @RequestParam(required = false) query: String?,
+        @RequestParam(required = false) difficulty: List<Difficulty>?,
+        @RequestParam(required = false) tags: List<String>?,
+        @RequestParam(required = false) competency: List<Competency>?,
+        @RequestParam(required = false) status: Status?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
+        @RequestAttribute(name = Principal.ATTRIBUTE, required = false) principal: Principal?,
     ): Page<ProblemSummary> {
         val size = Cursor.limitOf(limit)
         val after = Cursor.decode(cursor)?.firstOrNull()
 
+        // 로그인하지 않았으면 완료 상태를 묻지 않는다. 물어봐야 답이 없고, 그 상태로
+        // status 필터를 걸면 조용히 빈 목록이 된다 — 그래서 아래에서 함께 막는다.
+        val solved = principal?.let(Principal::id)?.let(progress::solvedBy).orEmpty()
+        val accuracy = progress.accuracy()
+
         val matched = availableProblems()
-            .map { ProblemSummary.of(packages.load(it)) }
+            .map { id ->
+                val pkg = packages.load(id)
+                ProblemSummary.of(pkg, accuracy[id], id in solved)
+            }
             .filter { it.matches(query) }
+            .filter { difficulty.isNullOrEmpty() || it.difficulty in difficulty }
+            .filter { tags.isNullOrEmpty() || it.tags.any { tag -> tag in tags } }
+            .filter { competency.isNullOrEmpty() || it.competencies.any { c -> c in competency } }
+            .filter { matchesStatus(it, status, principal) }
             .filter { after == null || it.id > after }
 
         val items = matched.take(size)
         val nextCursor = if (matched.size > size) Cursor.encode(items.last().id) else null
         return Page(items, nextCursor)
     }
+
+    /**
+     * 완료 상태 필터.
+     *
+     * 로그인하지 않았으면 **거르지 않는다.** 익명 사용자에게 "안 푼 문제만"은 전부를
+     * 뜻하고 "푼 문제만"은 아무것도 아닌데, 후자를 빈 목록으로 돌려주면 사용자는 필터가
+     * 고장 난 것으로 읽는다. 그럴 바에는 필터가 없는 것처럼 구는 편이 덜 거짓말이다.
+     */
+    private fun matchesStatus(summary: ProblemSummary, status: Status?, principal: Principal?): Boolean {
+        if (status == null || principal == null) return true
+        return when (status) {
+            Status.SOLVED -> summary.solved
+            Status.UNSOLVED -> !summary.solved
+        }
+    }
+
+    /** 목록에서 거를 수 있는 완료 상태. */
+    enum class Status { SOLVED, UNSOLVED }
 
     @GetMapping("/{slug}")
     fun detail(@PathVariable slug: String): ResponseEntity<ProblemDetail> {
@@ -89,7 +136,18 @@ class ProblemController(
     }
 }
 
-data class ProblemSummary(val id: String, val version: Int, val title: String) {
+data class ProblemSummary(
+    val id: String,
+    val version: Int,
+    val title: String,
+    val difficulty: Difficulty,
+    val tags: List<String>,
+    val competencies: List<Competency>,
+    /** 표본이 적으면 null. 이유는 [ProblemProgress.Accuracy.rate] 에 있다. */
+    val solvedRate: Double?,
+    /** 부르는 사람이 한 번이라도 맞혔는지. 로그인하지 않았으면 항상 false 다. */
+    val solved: Boolean,
+) {
 
     /** 제목과 id 에서 부분 일치를 본다. 대소문자는 구분하지 않는다. */
     fun matches(query: String?): Boolean {
@@ -99,10 +157,19 @@ data class ProblemSummary(val id: String, val version: Int, val title: String) {
     }
 
     companion object {
-        fun of(pkg: ProblemPackage) = ProblemSummary(
+        fun of(
+            pkg: ProblemPackage,
+            accuracy: ProblemProgress.Accuracy?,
+            solved: Boolean,
+        ) = ProblemSummary(
             id = pkg.manifest.id,
             version = pkg.manifest.version,
             title = pkg.manifest.title,
+            difficulty = pkg.catalog.difficulty,
+            tags = pkg.catalog.tags,
+            competencies = pkg.catalog.competencies,
+            solvedRate = accuracy?.rate,
+            solved = solved,
         )
     }
 }

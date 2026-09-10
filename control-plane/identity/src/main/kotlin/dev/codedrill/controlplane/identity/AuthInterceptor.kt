@@ -27,10 +27,23 @@ import java.util.UUID
  *
  * 문제 목록·상세는 로그인 없이 열린다. 무엇을 풀 수 있는지 둘러보는 것은 공개 정보이며,
  * 여기에 로그인을 요구하면 얻는 것 없이 진입만 막는다.
+ *
+ * 다만 로그인한 사람에게는 목록에 **푼 문제**가 표시돼야 한다 (FR-203). 그래서 [required]
+ * 를 끈 채로 같은 인터셉터를 한 번 더 건다 — 토큰이 있으면 주체를 넣고, 없으면 그냥
+ * 통과시킨다. 토큰을 푸는 코드를 따로 만들지 않는 이유는 위와 같다: **누구인지 확인하는
+ * 일은 한 곳에서만** 일어나야 한다.
  */
 class AuthInterceptor(
     private val identity: IdentityService,
     private val json: ObjectMapper,
+    /**
+     * 토큰이 없거나 못 쓰면 막을지.
+     *
+     * `false` 면 익명으로 통과시킨다. **잘못된 토큰도 통과시킨다** — 공개 경로에서
+     * 만료된 토큰 때문에 목록이 안 보이면, 사용자는 자기가 무엇을 잘못했는지 알 수 없다.
+     * 그 경로는 로그인 여부와 무관하게 답할 수 있어야 한다.
+     */
+    private val required: Boolean = true,
 ) : HandlerInterceptor {
 
     override fun preHandle(
@@ -39,9 +52,12 @@ class AuthInterceptor(
         handler: Any,
     ): Boolean {
         val token = bearerOf(request)
-            ?: return reject(response, ErrorCode.UNAUTHENTICATED, "로그인이 필요하다")
+            ?: return !required || reject(response, ErrorCode.UNAUTHENTICATED, "로그인이 필요하다")
 
-        return when (val resolution = identity.resolve(token)) {
+        val resolution = identity.resolve(token)
+        if (resolution !is IdentityService.Resolution.Active && !required) return true
+
+        return when (resolution) {
             is IdentityService.Resolution.Active -> {
                 request.setAttribute(Principal.ATTRIBUTE, resolution.user)
                 true
@@ -105,6 +121,11 @@ class IdentitySecurityConfig(
             )
             // 로그인과 가입 자체는 토큰 없이 부를 수 있어야 한다.
             .excludePathPatterns("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh")
+            .order(AUTHENTICATION_ORDER)
+
+        // 공개 경로지만 로그인했다면 알아본다. 목록에 "푼 문제"를 표시하기 위해서다.
+        registry.addInterceptor(AuthInterceptor(identity, json, required = false))
+            .addPathPatterns("/api/v1/problems/**", "/api/v1/problems")
             .order(AUTHENTICATION_ORDER)
     }
 
