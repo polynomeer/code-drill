@@ -153,6 +153,12 @@ object SandboxProtocol {
 }
 
 /** 계측 SDK 가 모드에 따라 다른 구현으로 컴파일된다는 사실만 공유한다 (§7.1). */
+/**
+ * 계측을 붙이는가.
+ *
+ * TRACE 만 붙인다. TRIAL 은 사용자가 자기 입력으로 돌려 보는 실행이라 보려는 것이 출력이지
+ * 상태가 아니고, 계측을 붙이면 그만큼 느려지기만 한다.
+ */
 fun ExecutionMode.instrumented(): Boolean = this == ExecutionMode.TRACE
 
 /**

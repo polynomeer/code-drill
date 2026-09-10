@@ -45,5 +45,13 @@ data class TestCase(
     val id: String,
     val groupId: String,
     val args: List<Any>,
-    val expected: Any,
+    /**
+     * 기대 출력. **문제 패키지에서는 항상 있다.**
+     *
+     * null 이 되는 경우는 하나뿐이다 — 사용자가 기대를 적지 않고 돌려 보는 시험 실행
+     * (TrialService). 그때는 비교할 것이 없으므로 실행이 통과/실패를 만들지 않는다.
+     * 자리값을 대신 넣지 않는 이유는, 어떤 값을 넣어도 그것이 반환 타입 검사를 통과해야
+     * 하고 통과하는 순간 **실제 출력과 우연히 같아질 수 있기** 때문이다.
+     */
+    val expected: Any?,
 )

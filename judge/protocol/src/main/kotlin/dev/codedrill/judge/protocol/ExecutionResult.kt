@@ -42,6 +42,16 @@ data class TestCaseResult(
     val measurements: Measurements,
     /** 사용자에게 보여줄 짧은 사유. 숨은 그룹에서는 입력을 담지 않는다 (§8.3). */
     val message: String? = null,
+    /**
+     * 사용자 코드가 실제로 내놓은 값.
+     *
+     * **[ExecutionMode.TRIAL] 에서만 채운다.** 판정 실행에서 채우면 숨은 케이스에 대한
+     * 출력이 그대로 나가고, 판정과 함께 보면 숨은 입력을 되짚을 수 있다 (§8.3).
+     *
+     * 시험 실행의 입력은 사용자가 방금 적은 것이라 숨길 것이 없다. 오히려 이 값이 없으면
+     * 시험 실행은 "통과/실패"만 말하는 채점기가 되어, 무엇이 나왔는지 볼 수 없다.
+     */
+    val actual: String? = null,
 )
 
 /**

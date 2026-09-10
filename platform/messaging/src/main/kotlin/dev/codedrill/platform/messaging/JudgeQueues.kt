@@ -27,7 +27,25 @@ object JudgeQueues {
      */
     const val HEARTBEATS = "judge.heartbeats"
 
-    val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS)
+    /**
+     * 사용자가 자기 입력으로 돌려 보는 실행 (기획서 부록 A 실행 도메인).
+     *
+     * **판정 큐와 나눈다.** 같은 큐에 넣으면 시험 실행이 쌓였을 때 그 뒤의 채점이 통째로
+     * 밀린다 — 사용자에게는 "제출했는데 채점이 시작되지 않는다"로 보인다. 큐를 나누면
+     * 브로커가 둘을 번갈아 주므로, 시험 실행이 아무리 몰려도 채점이 굶지 않는다.
+     *
+     * Runner 는 두 큐를 **한 리스너로** 받는다. 슬롯을 나누면 시험 실행과 채점이 같은
+     * 머신에서 동시에 돌아 측정이 서로 오염된다 (§5.2 CPU/wall 동시 측정).
+     *
+     * 오케스트레이터를 거치지 않는다. 임대와 fencing 은 판정이 두 번 기록되는 것을 막으려고
+     * 있는 것이고, 여기에는 기록될 판정이 없다.
+     */
+    const val TRIALS = "judge.trials"
+
+    /** 시험 실행의 결과. 제어 영역이 받아 저장한다. */
+    const val TRIAL_RESULTS = "judge.trial-results"
+
+    val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS, TRIALS, TRIAL_RESULTS)
 
     /**
      * 처리할 수 없는 메시지가 가는 곳 (§10.2, §12.2).

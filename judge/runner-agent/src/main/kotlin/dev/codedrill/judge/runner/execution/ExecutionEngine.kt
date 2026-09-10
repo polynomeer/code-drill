@@ -108,6 +108,11 @@ class ExecutionEngine(
                 .filter { it.policy.exposesInput }
                 .take(1)
                 .map { it.copy(cases = it.cases.take(1)) }
+
+            // 시험 실행의 그룹은 사용자가 방금 적은 케이스뿐이다. 문제의 숨은 그룹은
+            // 애초에 실려 오지 않으므로 여기서 거를 것이 없다 — 거를 것이 없다는 사실을
+            // 이 분기로 적어 둔다.
+            ExecutionMode.TRIAL -> request.groups
         }
 
         val events = mutableListOf<TraceEvent>()
@@ -124,6 +129,7 @@ class ExecutionEngine(
             }
             results += toCaseResults(
                 run, group, request.limits.outputBytes, request.signature.returns,
+                includeActual = request.mode == ExecutionMode.TRIAL,
             )
         }
         onPhase("execute", request.language, request.mode.name.lowercase(), System.nanoTime() - executeStart)
@@ -191,6 +197,8 @@ class ExecutionEngine(
          * 문제가 무엇을 돌려주기로 했는지는 manifest 에 이미 적혀 있다.
          */
         returns: ValueType,
+        /** 실제 출력을 실을지. 시험 실행에서만 참이다 — 이유는 TestCaseResult.actual 에 있다. */
+        includeActual: Boolean,
     ): List<TestCaseResult> {
         val byId = group.cases.associateBy { it.qualifiedId() }
         return run.outcomes.mapNotNull { (caseId, outcome) ->
@@ -203,6 +211,8 @@ class ExecutionEngine(
                 verdict = verdictOf(outcome, case, outputLimit, returns),
                 measurements = measurementsOf(outcome),
                 message = messageOf(outcome, group.policy.exposesInput),
+                // 시험 실행에서만 실제 출력을 싣는다. 이유는 TestCaseResult.actual 에 있다.
+                actual = (outcome as? CaseOutcome.Completed)?.output?.takeIf { includeActual },
             )
         }
     }
@@ -213,13 +223,19 @@ class ExecutionEngine(
         case: TestCase,
         outputLimit: Long,
         returns: ValueType,
-    ): Verdict =
-        when (outcome) {
+    ): Verdict {
+        // 지역 변수로 받는다. 다른 모듈의 public 프로퍼티는 스마트 캐스트가 되지 않는다.
+        val expected = case.expected
+        return when (outcome) {
             is CaseOutcome.Completed -> when {
                 // 출력 한도 초과는 정답 여부보다 먼저 판정한다. 한도를 넘긴 실행은 결과를
                 // 신뢰할 수 없다.
                 outcome.userOutputBytes > outputLimit -> Verdict.OUTPUT_LIMIT
-                outcome.output == SandboxProtocol.encode(returns, case.expected) ->
+                // 기대가 없으면 비교하지 않는다. 실행 자체는 성공했으므로 실패로 적지
+                // 않는다 — 사용자가 기대를 적지 않은 것과 답이 틀린 것은 다르다.
+                // 문제 패키지의 케이스는 항상 기대를 갖는다 (TestCase.expected).
+                expected == null -> Verdict.ACCEPTED
+                outcome.output == SandboxProtocol.encode(returns, expected) ->
                     Verdict.ACCEPTED
                 else -> Verdict.WRONG_ANSWER
             }
@@ -237,6 +253,7 @@ class ExecutionEngine(
             is CaseOutcome.Broken -> Verdict.SYSTEM_ERROR
             CaseOutcome.NotRun -> Verdict.SYSTEM_ERROR
         }
+    }
 
     private fun measurementsOf(outcome: CaseOutcome): Measurements = when (outcome) {
         is CaseOutcome.Completed -> Measurements(

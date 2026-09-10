@@ -1,6 +1,7 @@
 package dev.codedrill.judge.runner.messaging
 
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
+import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.platform.messaging.JudgeQueues
@@ -40,8 +41,18 @@ class ExecutionListener(
         Thread(runnable, "execution-heartbeat").apply { isDaemon = true }
     }
 
-    @RabbitListener(queues = [JudgeQueues.EXECUTIONS])
+    /**
+     * 판정과 시험 실행을 **한 리스너로** 받는다.
+     *
+     * 큐는 나뉘어 있다 — 시험 실행이 몰려도 채점이 그 뒤에 줄 서지 않게 하려는 것이다.
+     * 그런데 리스너까지 나누면 둘이 같은 머신에서 동시에 돌고, 그러면 서로의 CPU 와
+     * wall time 을 오염시킨다 (§5.2). 한 리스너에 두 큐를 걸면 브로커가 둘을 번갈아
+     * 주면서도 한 번에 하나만 돈다.
+     */
+    @RabbitListener(queues = [JudgeQueues.EXECUTIONS, JudgeQueues.TRIALS])
     fun onExecution(request: ExecutionRequest) {
+        if (request.mode == ExecutionMode.TRIAL) return runTrial(request)
+
         log.atInfo()
             .addKeyValue(CorrelationIds.SUBMISSION_ID, request.submissionId)
             .addKeyValue(CorrelationIds.EXECUTION_ID, request.executionId)
@@ -68,6 +79,24 @@ class ExecutionListener(
         } finally {
             ticking.cancel(false)
         }
+    }
+
+    /**
+     * 시험 실행 (기획서 부록 A 실행 도메인).
+     *
+     * 심장 박동을 보내지 않는다. 박동은 오케스트레이터가 임대 만료로 워커 유실을 잡기
+     * 위한 것인데, 시험 실행에는 임대가 없다 — 잃어버리면 사용자가 다시 누른다.
+     *
+     * 엔진은 같은 것을 쓴다. **사용자가 자기 입력으로 본 결과와 채점이 본 결과가 다르면
+     * 시험 실행은 쓸모가 없으므로**, 실행 경로를 따로 두지 않는다.
+     */
+    private fun runTrial(request: ExecutionRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.executionId)
+            .log("시험 실행을 시작한다")
+
+        val result = engine.execute(request)
+        rabbit.convertAndSend(JudgeQueues.TRIAL_RESULTS, result)
     }
 
     /**
