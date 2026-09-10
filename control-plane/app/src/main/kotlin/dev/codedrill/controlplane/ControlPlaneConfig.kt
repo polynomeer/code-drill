@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.MutationRequest
+import dev.codedrill.judge.protocol.ShrinkRequest
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.controlplane.outbox.OutboxRoute
@@ -40,6 +41,7 @@ import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.workspace.MutationLimits
 import dev.codedrill.controlplane.workspace.MutationRepository
+import dev.codedrill.controlplane.submission.trace.CounterexampleService
 import dev.codedrill.controlplane.submission.trace.DivergenceService
 import dev.codedrill.controlplane.submission.trace.PredictionRepository
 import dev.codedrill.controlplane.workspace.MutationService
@@ -407,6 +409,11 @@ class ControlPlaneConfig {
             // 판정 큐와 다른 큐로 간다 — 이유는 JudgeQueues.TRIALS 에 있다.
             TrialService.TRIAL_EVENT -> OutboxRoute(JudgeQueues.TRIALS) {
                 mapper.readValue<ExecutionRequest>(it)
+            }
+            // 반례 축소도 오케스트레이터를 거치지 않는다. 판정이 아니라 판정 뒤의
+            // 진단이며, 잃어버리면 사용자가 다시 누른다 (§6.3).
+            CounterexampleService.SHRINK_EVENT -> OutboxRoute(JudgeQueues.SHRINKS) {
+                mapper.readValue<ShrinkRequest>(it)
             }
             // 참조 트레이스도 오케스트레이터를 거치지 않는다. 판정이 아니므로 임대도
             // fencing 도 없고, 잃어버리면 다음 제출이 다시 건다 (FR-805).

@@ -3,6 +3,8 @@ package dev.codedrill.controlplane.submission
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.controlplane.submission.trace.Divergence
+import dev.codedrill.controlplane.submission.trace.Counterexample
+import dev.codedrill.controlplane.submission.trace.CounterexampleService
 import dev.codedrill.controlplane.submission.trace.DivergenceService
 import dev.codedrill.controlplane.submission.trace.PredictionService
 import dev.codedrill.controlplane.submission.trace.StatePrediction
@@ -49,6 +51,7 @@ class SubmissionController(
     private val traces: TraceRepository,
     private val divergence: DivergenceService,
     private val predictions: PredictionService,
+    private val counterexamples: CounterexampleService,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
 ) {
@@ -209,6 +212,47 @@ class SubmissionController(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
     ): ResponseEntity<List<StatePrediction>> =
         ResponseEntity.ok(predictions.answered(principal.id, id))
+
+    /**
+     * 최소 반례 축소를 건다 (§6.3).
+     *
+     * 사용자가 눌러야 돈다. 판정마다 자동으로 돌리면 채점 한 번에 이 시스템에서 가장 비싼
+     * 작업이 하나씩 붙고, 그중 대부분은 아무도 열어 보지 않는다.
+     */
+    @PostMapping("/{id}/counterexample")
+    fun shrink(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<Any> = when (val outcome = counterexamples.start(principal.id, id)) {
+        is CounterexampleService.Outcome.Started ->
+            ResponseEntity.accepted().body(outcome.counterexample)
+
+        is CounterexampleService.Outcome.Unavailable ->
+            ResponseEntity.status(HttpStatus.CONFLICT).body(
+                ApiError(ErrorCode.CONTENT_UNAVAILABLE, outcome.reason, UUID.randomUUID().toString()),
+            )
+
+        is CounterexampleService.Outcome.Throttled ->
+            ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+                ApiError(
+                    ErrorCode.QUOTA_EXCEEDED,
+                    "한 시간에 ${outcome.allowed}번까지 줄일 수 있다 (${outcome.used}번 썼다)",
+                    UUID.randomUUID().toString(),
+                ),
+            )
+
+        CounterexampleService.Outcome.NotFound -> ResponseEntity.notFound().build()
+    }
+
+    /** 축소 결과. 아직 없으면 204 다 — 가장 오래 걸리는 작업이라 기다림이 길다. */
+    @GetMapping("/{id}/counterexample")
+    fun counterexample(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<Counterexample> {
+        val found = counterexamples.find(principal.id, id) ?: return ResponseEntity.noContent().build()
+        return ResponseEntity.ok(found)
+    }
 
     /**
      * 판정 이력 (§4.2 INV-02).
