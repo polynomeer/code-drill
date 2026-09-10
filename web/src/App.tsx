@@ -9,6 +9,7 @@ import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { VerdictPanel } from './features/submissions/VerdictPanel'
 import { Workspace } from './features/workspace/Workspace'
 import { starterFor } from './features/workspace/starters'
+import { setParam } from './shared/url'
 import { useAutoSave } from './features/workspace/useAutoSave'
 import type { Problem, Submission, SubmissionLanguage } from './shared/types'
 
@@ -120,14 +121,15 @@ function Drill({ session }: { session: Session }) {
 
   const openSubmission = (id: string) => {
     setSubmissionId(id)
-    window.history.replaceState(null, '', `?submission=${id}`)
+    setParam('submission', id)
   }
 
   const selectProblem = (next: string) => {
     setSlug(next)
     setTouched(false)
     setSubmissionId(null)
-    window.history.replaceState(null, '', window.location.pathname)
+    // 필터는 지우지 않는다. 문제를 바꿨다고 사용자가 걸어 둔 조건까지 풀 이유가 없다.
+    setParam('submission', null)
   }
 
   const replayInput = numberArray(problem?.samples[0]?.args[0])
