@@ -25,7 +25,10 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @RequestMapping("/api/v1/coaching")
-class CoachingController(private val service: CoachingService) {
+class CoachingController(
+    private val service: CoachingService,
+    private val transfers: TransferService,
+) {
 
     /** 세션을 연다. 이미 열려 있으면 그것을 돌려준다 — 두 번 눌러도 하나다. */
     @PostMapping("/sessions")
@@ -84,6 +87,63 @@ class CoachingController(private val service: CoachingService) {
         }
     }
 
+    /**
+     * 전이 확인 과제를 받는다 (FR-807).
+     *
+     * 도움을 하나도 받지 않았으면 과제가 없다. 스스로 푼 것은 이미 그 자체로 증거이고,
+     * 그 위에 과제를 얹으면 안 받아도 될 숙제가 된다.
+     */
+    @PostMapping("/sessions/{id}/transfer")
+    fun assign(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: UUID,
+    ): ResponseEntity<Any> = when (val outcome = transfers.assign(principal.id, id)) {
+        is TransferService.Outcome.Assigned -> ResponseEntity.ok(TransferView.of(outcome.task))
+
+        TransferService.Outcome.NothingToTransfer ->
+            ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error(ErrorCode.CONTENT_UNAVAILABLE, "도움을 받지 않았으니 확인할 전이가 없다"))
+
+        TransferService.Outcome.NoTarget ->
+            ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error(ErrorCode.CONTENT_UNAVAILABLE, "같은 역량을 요구하는 안 푼 문제가 없다"))
+
+        else -> ResponseEntity.notFound().build()
+    }
+
+    @GetMapping("/sessions/{id}/transfer")
+    fun transfer(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: UUID,
+    ): ResponseEntity<TransferView> {
+        val task = transfers.ofSession(principal.id, id) ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(TransferView.of(task))
+    }
+
+    /** 설명 과제를 낸다. 이것을 내야 뒤따르는 판정이 전이 확인이 된다. */
+    @PostMapping("/transfers/{id}/explain")
+    fun explain(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: UUID,
+        @Valid @RequestBody request: ExplainRequest,
+    ): ResponseEntity<Any> = when (val outcome = transfers.explain(principal.id, id, request.text)) {
+        is TransferService.Outcome.Assigned -> ResponseEntity.ok(TransferView.of(outcome.task))
+
+        is TransferService.Outcome.TooShort ->
+            ResponseEntity.badRequest().body(
+                error(
+                    ErrorCode.INVALID_SIGNATURE,
+                    "${outcome.required}자 이상 적어 주세요. 자기 말로 정리하는 것이 이 과제입니다",
+                ),
+            )
+
+        TransferService.Outcome.AlreadyExplained ->
+            ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error(ErrorCode.CONTENT_UNAVAILABLE, "이미 설명을 냈다"))
+
+        else -> ResponseEntity.notFound().build()
+    }
+
     @PostMapping("/sessions/{id}/close")
     fun close(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
@@ -130,3 +190,29 @@ data class SessionResponse(
 data class FocusView(val competency: String, val remaining: Int)
 
 data class RevealedView(val competency: String, val level: Int, val text: String)
+
+data class ExplainRequest(@field:NotBlank val text: String)
+
+/**
+ * 전이 확인 과제 (FR-807).
+ *
+ * 변형 문제의 아이디만 준다. 왜 이 문제인지를 함께 적으면 그것이 곧 접근을 알려 주는
+ * 힌트가 된다 — "같은 역량을 요구한다"는 말은 "같은 생각으로 풀린다"는 뜻이다.
+ */
+data class TransferView(
+    val id: String,
+    val sourceProblemId: String,
+    val targetProblemId: String,
+    val explanation: String?,
+    val status: TransferStatus,
+) {
+    companion object {
+        fun of(task: TransferTask) = TransferView(
+            id = task.id.toString(),
+            sourceProblemId = task.sourceProblemId,
+            targetProblemId = task.targetProblemId,
+            explanation = task.explanation,
+            status = task.status,
+        )
+    }
+}

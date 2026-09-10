@@ -19,10 +19,15 @@ import dev.codedrill.controlplane.identity.IdentityService
 import dev.codedrill.controlplane.competency.CompetencyService
 import dev.codedrill.controlplane.competency.MasteryLevel
 import dev.codedrill.controlplane.competency.EvidenceRepository
+import dev.codedrill.controlplane.coaching.CoachableProblems
 import dev.codedrill.controlplane.coaching.CoachingRepository
 import dev.codedrill.controlplane.coaching.CoachingService
 import dev.codedrill.controlplane.coaching.Diagnosis
 import dev.codedrill.controlplane.coaching.HintLadder
+import dev.codedrill.controlplane.coaching.SolvedProblems
+import dev.codedrill.controlplane.coaching.TransferRepository
+import dev.codedrill.controlplane.coaching.TransferService
+import dev.codedrill.controlplane.coaching.TransferSignals
 import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.LearningSignals as SubmissionLearningSignals
 import dev.codedrill.controlplane.workspace.LearningSignals as WorkspaceLearningSignals
@@ -209,7 +214,11 @@ class ControlPlaneConfig {
      * 아무 일도 하지 않는 NONE 이다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
      */
     @Bean
-    fun submissionLearningSignals(service: CompetencyService, coaching: CoachingService) =
+    fun submissionLearningSignals(
+        service: CompetencyService,
+        coaching: CoachingService,
+        transfers: TransferService,
+    ) =
         SubmissionLearningSignals { userId, problemId, submissionId, accepted ->
             // 이 문제에서 받은 도움을 여기서 조회해 넘긴다 (FR-806). 제출 모듈은 코칭을
             // 모르고 Competency 는 세션을 모르며, 둘을 아는 곳은 여기 하나뿐이다.
@@ -217,6 +226,9 @@ class ControlPlaneConfig {
                 userId, problemId, submissionId.toString(), accepted,
                 helpLevel = runCatching { coaching.helpLevel(userId, problemId) }.getOrDefault(0),
             )
+            // 이 판정이 누군가의 전이 확인 과제를 닫을 수 있다 (FR-807). 실패해도
+            // 판정을 막지 않는다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
+            runCatching { transfers.judged(userId, problemId, accepted) }
         }
 
     /**
@@ -242,6 +254,37 @@ class ControlPlaneConfig {
 
     @Bean
     fun coachingHintLadder(packages: ProblemPackageLoader) = HintLadder(packages)
+
+    /**
+     * 변형 문제로 낼 수 있는 문제 (§3.1 조립 지점, FR-807).
+     *
+     * 공개된 것만 낸다. 콘텐츠 디렉터리를 훑으면 아직 공개되지 않은 문제가 과제로 나가고,
+     * 사용자는 열 수 없는 문제를 풀라는 말을 듣는다.
+     */
+    @Bean
+    fun coachableProblems(publish: PublishService) = CoachableProblems { publish.publishedProblemIds() }
+
+    /** 이미 푼 문제는 변형 과제가 되지 않는다. 옮겨졌는지는 안 풀어 본 문제에서만 드러난다. */
+    @Bean
+    fun coachingSolvedProblems(progress: ProblemProgress) = SolvedProblems { progress.solvedBy(it) }
+
+    /** 확인된 전이를 가장 무거운 증거로 남긴다 (FR-807). */
+    @Bean
+    fun coachingTransferSignals(service: CompetencyService) =
+        TransferSignals { userId, problemId, taskId, competencies ->
+            service.transferred(userId, problemId, taskId, competencies)
+        }
+
+    /** 전이 확인도 사용자의 기록이다 (§11.3). 세션을 지우면 과제도 함께 사라진다. */
+    @Bean
+    fun transferPersonalArea(repository: TransferRepository) = object : PersonalData {
+        override val area = "transfers"
+        override fun export(userId: String) = mapOf("tasks" to repository.export(userId))
+
+        // 지우기는 coaching 이 맡는다 — transfer_task 는 세션을 ON DELETE CASCADE 로
+        // 따라간다. 여기서 또 지우면 이미 없는 것을 지우고 0 을 보고한다.
+        override fun erase(userId: String) = mapOf("tasks" to 0)
+    }
 
     /** 무엇을 도움받았는지도 사용자의 기록이다 (§11.3). */
     @Bean

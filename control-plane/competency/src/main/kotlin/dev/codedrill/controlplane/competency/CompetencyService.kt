@@ -169,6 +169,34 @@ class CompetencyService(
         )
     }
 
+    /**
+     * 코칭 후 힌트 없이 변형 문제를 통과했다 (FR-807).
+     *
+     * > 힌트·AI 없이 완료한 결과를 가장 높은 가중치의 증거로 반영합니다.
+     *
+     * **1.0 보다 무겁다.** 다른 증거와 같은 무게로 세면 "가장 높은 가중치"라는 말이
+     * 아무 뜻도 갖지 못한다. 숙련도는 가중 성공률이라 1 을 넘는 무게가 그대로 통한다.
+     *
+     * [Competency.TRANSFER] 에도 한 줄 남긴다. 옮길 줄 아는 것 자체가 역량이고
+     * (§4.2 확장군), 그것을 재는 사건은 이것뿐이다.
+     */
+    fun transferred(
+        userId: String,
+        problemId: String,
+        taskId: String,
+        competencies: List<Competency>,
+    ) {
+        val targets = (competencies + Competency.TRANSFER).distinct()
+        record(
+            userId, targets, EvidenceSource.TRANSFER,
+            success = true,
+            problemId = problemId,
+            reference = taskId,
+            detail = "코칭 뒤 힌트 없이 변형 문제를 통과했다",
+            weight = TRANSFER_WEIGHT,
+        )
+    }
+
     /** 역량 지도 (FR-806). 증거가 없는 역량도 함께 낸다 — 미측정을 말할 수 있어야 한다. */
     fun mapOf(userId: String): List<Mastery> = MasteryProjection.of(repository.of(userId))
 
@@ -223,6 +251,15 @@ class CompetencyService(
          * 저작자 판단이며, 바꾸면 지난 증거를 그대로 두고 다시 계산하면 된다.
          */
         const val KILL_TARGET = 0.75
+
+        /**
+         * 전이 증거의 무게 (FR-807 "가장 높은 가중치").
+         *
+         * 이것 하나가 도움 없이 푼 제출 한 번 반이다. 그만큼 드물고 그만큼 많은 것을
+         * 말해 주기 때문이다 — 코칭받은 문제를 다시 푸는 것은 기억일 수 있지만, 힌트
+         * 없이 다른 문제를 푸는 것은 기억으로는 되지 않는다.
+         */
+        const val TRANSFER_WEIGHT = 1.5
     }
 }
 
