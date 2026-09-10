@@ -103,6 +103,14 @@ class SubmissionService(
     fun find(id: UUID): Submission? = repository.findById(id)
 
     /**
+     * 제출한 코드. 지운 계정의 것은 null 이다 (§11.3).
+     *
+     * 소유 확인은 부르는 쪽이 한다 — 이 서비스는 제출을 id 로만 다루고, 누구의 것인지는
+     * 컨트롤러가 이미 확인했다.
+     */
+    fun sourceOf(id: UUID): String? = repository.findSource(id)
+
+    /**
      * 제출 기록 한 페이지 (§9.1).
      *
      * 커서가 가리키는 항목 **다음**부터 [limit] 개를 읽는다. 커서는 권한을 담지 않으므로

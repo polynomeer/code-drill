@@ -80,6 +80,29 @@ class SubmissionController(
         return ResponseEntity.ok(SubmissionResponse.of(submission, json))
     }
 
+    /**
+     * 제출한 코드 (PRD §6.4).
+     *
+     * 목록과 상세에는 싣지 않고 **따로 받아 간다.** 기록 한 화면에 스무 건의 소스를 함께
+     * 실으면 대부분 읽히지 않을 코드가 오가고, 소스는 그중 가장 민감한 값이다 (§11.1).
+     * 사용자가 실제로 펼쳐 볼 때만 나간다.
+     *
+     * 소유자만 받을 수 있다. 남의 것은 없는 것처럼 답한다 — 404 와 403 을 가르면 그 자체로
+     * "그 id 는 있다"를 알려 주는 셈이다.
+     *
+     * 계정을 지운 사용자의 소스는 비어 있다 (§11.3). 그때는 204 다 — 없는 것과 지운 것을
+     * 화면에서 갈라 말할 수 있어야 한다.
+     */
+    @GetMapping("/{id}/source")
+    fun source(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<Map<String, String>> {
+        ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
+        val source = service.sourceOf(id) ?: return ResponseEntity.noContent().build()
+        return ResponseEntity.ok(mapOf("source" to source))
+    }
+
     /** 제출 기록 (§9.1). 정렬 키가 고정된 cursor 페이지네이션이다. */
     @GetMapping
     fun history(
