@@ -8,3 +8,6 @@ competencies:
   - CORRECTNESS
 prerequisites:
   - climb-stairs
+complexity:
+  time: LINEAR
+  space: CONSTANT

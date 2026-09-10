@@ -6,3 +6,6 @@ tags:
 competencies:
   - IMPLEMENTATION
   - EDGE_CASES
+complexity:
+  time: LINEAR
+  space: CONSTANT

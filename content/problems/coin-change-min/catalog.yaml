@@ -8,3 +8,7 @@ competencies:
   - COMPLEXITY
 prerequisites:
   - climb-stairs
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "O(동전 수 × 금액) 시간, O(금액) 공간"

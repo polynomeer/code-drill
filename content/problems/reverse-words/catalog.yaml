@@ -7,3 +7,6 @@ competencies:
   - READING
   - IMPLEMENTATION
   - EDGE_CASES
+complexity:
+  time: LINEAR
+  space: LINEAR

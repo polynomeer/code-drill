@@ -7,3 +7,6 @@ competencies:
   - MODELING
   - IMPLEMENTATION
   - COMPLEXITY
+complexity:
+  time: LINEAR
+  space: LINEAR

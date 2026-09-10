@@ -8,3 +8,7 @@ competencies:
   - ALGORITHM_CHOICE
   - COMPLEXITY
   - OPTIMIZATION
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(n log k) 시간, O(k) 공간 — 크기 k 힙"

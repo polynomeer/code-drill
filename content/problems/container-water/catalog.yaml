@@ -10,3 +10,6 @@ competencies:
   - OPTIMIZATION
 prerequisites:
   - pair-sum-sorted
+complexity:
+  time: LINEAR
+  space: CONSTANT

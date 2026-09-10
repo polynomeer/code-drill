@@ -8,3 +8,7 @@ competencies:
   - EDGE_CASES
 prerequisites:
   - spiral-order
+complexity:
+  time: QUADRATIC
+  space: QUADRATIC
+  note: "O(n²) 시간·공간 — 출력 자체가 n²"

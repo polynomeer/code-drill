@@ -6,3 +6,6 @@ tags:
   - array
 competencies:
   - IMPLEMENTATION
+complexity:
+  time: LINEAR
+  space: CONSTANT

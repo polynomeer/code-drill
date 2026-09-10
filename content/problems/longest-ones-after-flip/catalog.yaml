@@ -9,3 +9,6 @@ competencies:
   - EDGE_CASES
 prerequisites:
   - max-window-sum
+complexity:
+  time: LINEAR
+  space: CONSTANT

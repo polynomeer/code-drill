@@ -7,3 +7,6 @@ competencies:
   - IMPLEMENTATION
   - EDGE_CASES
   - COMPLEXITY
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT

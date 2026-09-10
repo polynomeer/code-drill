@@ -6,3 +6,7 @@ tags:
 competencies:
   - READING
   - IMPLEMENTATION
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(n) 시간, O(1) 공간 — 알파벳 26칸"

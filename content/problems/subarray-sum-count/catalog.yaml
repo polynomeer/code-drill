@@ -10,3 +10,6 @@ competencies:
   - COMPLEXITY
 prerequisites:
   - two-sum
+complexity:
+  time: LINEAR
+  space: LINEAR

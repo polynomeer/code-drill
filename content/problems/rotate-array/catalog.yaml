@@ -9,3 +9,6 @@ competencies:
   - EDGE_CASES
 prerequisites:
   - move-zeros
+complexity:
+  time: LINEAR
+  space: CONSTANT

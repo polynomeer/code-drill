@@ -8,3 +8,6 @@ competencies:
   - ALGORITHM_CHOICE
   - CORRECTNESS
   - COMPLEXITY
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR

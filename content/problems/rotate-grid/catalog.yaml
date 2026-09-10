@@ -9,3 +9,7 @@ competencies:
   - EDGE_CASES
 prerequisites:
   - island-perimeter
+complexity:
+  time: QUADRATIC
+  space: CONSTANT
+  note: "O(n²) 시간, O(1) 공간 — 제자리 회전"

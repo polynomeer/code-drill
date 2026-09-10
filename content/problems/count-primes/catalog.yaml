@@ -8,3 +8,7 @@ competencies:
   - ALGORITHM_CHOICE
   - COMPLEXITY
   - OPTIMIZATION
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(n log log n) 시간, O(n) 공간 — 에라토스테네스"

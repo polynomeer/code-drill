@@ -7,3 +7,7 @@ competencies:
   - MODELING
   - IMPLEMENTATION
   - EDGE_CASES
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(행×열) 시간, O(1) 공간"

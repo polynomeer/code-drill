@@ -10,3 +10,6 @@ competencies:
   - COMPLEXITY
 prerequisites:
   - bracket-balance
+complexity:
+  time: LINEAR
+  space: LINEAR

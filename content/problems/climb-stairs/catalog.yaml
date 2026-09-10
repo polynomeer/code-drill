@@ -5,3 +5,7 @@ tags:
 competencies:
   - MODELING
   - IMPLEMENTATION
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(n) 시간, O(1) 공간 — 직전 둘만 들고 간다"

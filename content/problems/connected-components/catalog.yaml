@@ -6,3 +6,7 @@ tags:
 competencies:
   - MODELING
   - IMPLEMENTATION
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(정점+간선) 시간·공간"

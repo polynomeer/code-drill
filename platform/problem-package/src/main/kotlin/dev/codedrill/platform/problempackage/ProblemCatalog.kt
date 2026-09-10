@@ -47,6 +47,15 @@ data class ProblemCatalog(
      * 막는다.
      */
     val prerequisites: List<String> = emptyList(),
+
+    /**
+     * 의도한 풀이의 시간·공간 복잡도 (PRD FR-803 복잡도 예측).
+     *
+     * 사전 질문이 이것을 정답으로 쓴다. 등급으로 두는 이유는 **틀린 방향을 알기 위해서**다 —
+     * 사용자가 실제보다 싸게 봤는지 비싸게 봤는지가 다른 오개념이고, 문자열로 두면 그 둘을
+     * 가릴 수 없다.
+     */
+    val complexity: ComplexityNote,
 ) {
     init {
         require(tags.isNotEmpty()) { "태그가 최소 하나는 있어야 한다 — 없으면 목록에서 찾을 수 없다" }
@@ -57,6 +66,37 @@ data class ProblemCatalog(
         require(competencies.distinct().size == competencies.size) { "역량이 중복된다" }
         require(prerequisites.distinct().size == prerequisites.size) { "선수 문제가 중복된다" }
     }
+}
+
+/**
+ * 복잡도 (PRD FR-803).
+ *
+ * [time] 과 [space] 는 채점에 쓰는 **등급**이고, [note] 는 사람에게 보여줄 실제 식이다.
+ * 둘을 나눈 이유는 두 변수를 쓰는 문제 때문이다 — 편집 거리는 `O(n·m)`, 배낭은 `O(n·W)`
+ * 인데 등급으로는 둘 다 제곱이다. 등급만 두면 화면이 거짓을 말하고, 식만 두면 "더 싸게
+ * 봤나 더 비싸게 봤나"를 가릴 수 없다.
+ */
+data class ComplexityNote(
+    val time: Complexity,
+    val space: Complexity,
+    /** 실제 식. 비우면 등급의 이름을 그대로 쓴다. */
+    val note: String = "",
+)
+
+/**
+ * 복잡도 등급.
+ *
+ * 순서가 뜻을 갖는다 — 앞이 싸고 뒤가 비싸다. 사용자의 답이 정답보다 앞이면 **비용을
+ * 덜 센 것**이고 뒤면 **더 센 것**이며, 그 둘은 고쳐야 할 곳이 다르다.
+ */
+enum class Complexity(val label: String) {
+    CONSTANT("O(1)"),
+    LOGARITHMIC("O(log n)"),
+    LINEAR("O(n)"),
+    LINEARITHMIC("O(n log n)"),
+    QUADRATIC("O(n²)"),
+    CUBIC("O(n³)"),
+    EXPONENTIAL("O(2^n)"),
 }
 
 /**

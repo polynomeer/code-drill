@@ -10,3 +10,6 @@ competencies:
   - OPTIMIZATION
 prerequisites:
   - next-greater-distance
+complexity:
+  time: LINEAR
+  space: LINEAR

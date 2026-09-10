@@ -8,3 +8,7 @@ competencies:
   - COMPLEXITY
 prerequisites:
   - coin-change-min
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "O(n·m) 시간, O(min(n,m)) 공간"

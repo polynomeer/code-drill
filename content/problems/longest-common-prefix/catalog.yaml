@@ -5,3 +5,7 @@ tags:
 competencies:
   - IMPLEMENTATION
   - EDGE_CASES
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(전체 글자 수) 시간, O(1) 공간"

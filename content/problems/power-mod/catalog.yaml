@@ -8,3 +8,7 @@ competencies:
   - ALGORITHM_CHOICE
   - COMPLEXITY
   - EDGE_CASES
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT
+  note: "O(log e) 시간, O(1) 공간"

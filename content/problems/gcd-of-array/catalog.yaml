@@ -7,3 +7,7 @@ tags:
 competencies:
   - IMPLEMENTATION
   - EDGE_CASES
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(n log max) 시간, O(1) 공간"

@@ -11,3 +11,7 @@ competencies:
   - ALGORITHM_CHOICE
 prerequisites:
   - connected-components
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(행×열) 시간·공간"

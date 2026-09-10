@@ -10,3 +10,6 @@ competencies:
   - OPTIMIZATION
 prerequisites:
   - binary-search-insert
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR

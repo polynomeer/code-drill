@@ -7,3 +7,6 @@ competencies:
   - MODELING
   - CORRECTNESS
   - OPTIMIZATION
+complexity:
+  time: LINEAR
+  space: CONSTANT
