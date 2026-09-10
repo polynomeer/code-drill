@@ -231,7 +231,7 @@ function Drill({ session }: { session: Session }) {
           {problem && <TestPanel problem={problem} language={language} source={source} />}
           {/* 에디터와 테스트 **아래**에 둔다. 위에 두면 막히기 전에 눈에 들어오고,
               그러면 관문이 아니라던 말과 어긋난다 (FR-802). */}
-          {problem && <CoachingPanel problemId={problem.id} />}
+          {problem && <CoachingPanel problemId={problem.id} onOpenProblem={selectProblem} />}
           {submission && <VerdictPanel submission={submission} />}
           {trace && submissionId && (
             <ReplayView submissionId={submissionId} manifest={trace} input={replayInput} />

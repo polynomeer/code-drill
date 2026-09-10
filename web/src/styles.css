@@ -958,3 +958,15 @@ table.groups td {
   padding-left: 8px;
   border-left: 2px solid var(--border);
 }
+
+/* 전이 확인 (FR-807). 코칭 패널 안에 얹히므로 구분선 하나로 가른다. */
+.transfer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.transfer textarea {
+  width: 100%;
+  margin: 6px 0;
+}

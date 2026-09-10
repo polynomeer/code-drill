@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { openCoaching, revealHint } from '../../api/client'
 import { COMPETENCY_LABEL } from '../../shared/types'
+import { TransferTaskPanel } from './TransferTaskPanel'
 import type { CoachingSession } from '../../shared/types'
 
 /**
@@ -17,7 +18,13 @@ import type { CoachingSession } from '../../shared/types'
  * 쌓이는 증거를 얼마나 가볍게 하는지도 함께 적는다. 조용히 깎으면 사용자는 자기 지도가
  * 왜 안 오르는지 알 수 없다.
  */
-export function CoachingPanel({ problemId }: { problemId: string }) {
+export function CoachingPanel({
+  problemId,
+  onOpenProblem,
+}: {
+  problemId: string
+  onOpenProblem: (problemId: string) => void
+}) {
   const [session, setSession] = useState<CoachingSession | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -120,6 +127,12 @@ export function CoachingPanel({ problemId }: { problemId: string }) {
             )
           })}
         </ul>
+      )}
+
+      {/* 도움을 받은 뒤에만 나온다. 스스로 푼 사람에게 과제를 얹으면 안 받아도 될
+          숙제가 된다 (FR-807). */}
+      {session.helpLevel > 0 && (
+        <TransferTaskPanel sessionId={session.id} onOpenProblem={onOpenProblem} />
       )}
 
       {error && <p className="warn small">{error}</p>}

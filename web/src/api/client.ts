@@ -17,6 +17,7 @@ import type {
   SubmissionLanguage,
   CoachingSession,
   MutationCheck,
+  TransferTask,
   Trial,
   TrialCaseInput,
 } from '../shared/types'
@@ -154,6 +155,27 @@ export async function revealHint(
     body: JSON.stringify({ competency }),
   })
   return json<CoachingSession>(response)
+}
+
+/**
+ * 전이 확인 과제를 받는다 (PRD FR-807).
+ *
+ * 도움을 하나도 받지 않았으면 409 다 — 스스로 푼 것은 이미 그 자체로 증거이고, 그 위에
+ * 과제를 얹으면 안 받아도 될 숙제가 된다.
+ */
+export async function assignTransfer(sessionId: string): Promise<TransferTask> {
+  const response = await authed(`/coaching/sessions/${sessionId}/transfer`, { method: 'POST' })
+  return json<TransferTask>(response)
+}
+
+/** 설명 과제를 낸다. 이것을 내야 뒤따르는 판정이 전이 확인이 된다. */
+export async function explainTransfer(taskId: string, text: string): Promise<TransferTask> {
+  const response = await authed(`/coaching/transfers/${taskId}/explain`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  return json<TransferTask>(response)
 }
 
 /**

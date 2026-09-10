@@ -246,6 +246,22 @@ export interface RevealedHint {
 }
 
 /**
+ * 전이 확인 과제 (PRD FR-807).
+ *
+ * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로
+ * 풀린다"는 힌트가 되기 때문이다.
+ */
+export type TransferStatus = 'ASSIGNED' | 'EXPLAINED' | 'VERIFIED' | 'UNVERIFIED'
+
+export interface TransferTask {
+  id: string
+  sourceProblemId: string
+  targetProblemId: string
+  explanation: string | null
+  status: TransferStatus
+}
+
+/**
  * 변이 평가 (PRD FR-804).
  *
  * 백엔드 `MutationResponse` 와 짝을 이룬다. **오답의 이름도 소스도 오지 않는다** —
