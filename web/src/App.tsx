@@ -7,6 +7,7 @@ import { ProblemList } from './features/problems/ProblemList'
 import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
+import { CompetencyMapPanel } from './features/competency/CompetencyMapPanel'
 import { CodeView } from './features/submissions/CodeView'
 import { VerdictPanel } from './features/submissions/VerdictPanel'
 import { PreQuestionPanel } from './features/workspace/PreQuestionPanel'
@@ -238,6 +239,8 @@ function Drill({ session }: { session: Session }) {
               onClose={() => setViewingCode(null)}
             />
           )}
+          {/* 기록 아래에 둔다. "무엇을 풀었나" 다음에 "그래서 무엇이 늘었나"가 온다. */}
+          <CompetencyMapPanel onOpenSubmission={openSubmission} />
           <HistoryPanel
             submissions={history}
             currentId={submissionId}

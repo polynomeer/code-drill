@@ -841,3 +841,62 @@ table.groups td {
   width: 100%;
   font-size: 12px;
 }
+
+/* --- 역량 지도 (PRD §3.4, FR-806) --- */
+
+.competency-group h4 {
+  margin: 10px 0 2px;
+}
+
+.competency-list,
+.evidence-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.competency-list > li > button {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 5px 2px;
+}
+
+.competency-name {
+  flex: 1;
+}
+
+/* 아직 재지 않은 역량. 감추지 않되 앞의 것들보다 물러나 있다. */
+.competency-list > li.unmeasured button {
+  opacity: 0.45;
+}
+
+.level.unmeasured {
+  color: var(--muted);
+}
+
+.level.developing {
+  color: var(--bad);
+}
+
+.level.strong {
+  color: var(--ok);
+}
+
+.evidence-list {
+  padding: 4px 0 6px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.evidence-list li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 2px 0;
+}

@@ -6,6 +6,8 @@ import type {
   DraftConflict,
   Page,
   AnsweredQuestion,
+  CompetencyMap,
+  EvidenceView,
   PreQuestionSet,
   Problem,
   ProblemFilter,
@@ -159,6 +161,16 @@ export async function answerPreQuestion(
     body: JSON.stringify({ kind, answer, rationale }),
   })
   return json<AnsweredQuestion>(response)
+}
+
+/** 역량 지도 (PRD FR-801, FR-806). */
+export async function getCompetencyMap(): Promise<CompetencyMap> {
+  return json<CompetencyMap>(await authed('/me/competencies'))
+}
+
+/** 한 역량의 근거. 목록에서 여기로 내려온다. */
+export async function getEvidence(competency: string): Promise<EvidenceView[]> {
+  return json<EvidenceView[]>(await authed(`/me/competencies/${competency}`))
 }
 
 /** 표시 이름 변경 (기획서 부록 A 계정). */

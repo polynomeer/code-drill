@@ -246,3 +246,81 @@ export interface PreQuestionSet {
   questions: PreQuestion[]
   answered: AnsweredQuestion[]
 }
+
+/** 역량 지도 (PRD §3.4, FR-801·FR-806). 백엔드 `MasteryView` 와 짝을 이룬다. */
+export type MasteryLevel = 'UNMEASURED' | 'DEVELOPING' | 'PROFICIENT' | 'STRONG'
+export type Confidence = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
+export type EvidenceSource = 'SUBMISSION' | 'PREQUESTION' | 'TRIAL'
+
+export const LEVEL_LABEL: Record<MasteryLevel, string> = {
+  UNMEASURED: '아직 재지 않음',
+  DEVELOPING: '기르는 중',
+  PROFICIENT: '해낸다',
+  STRONG: '단단하다',
+}
+
+export const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  NONE: '근거 없음',
+  LOW: '근거 적음',
+  MEDIUM: '근거 보통',
+  HIGH: '근거 충분',
+}
+
+export const GROUP_LABEL: Record<string, string> = {
+  UNDERSTANDING: '이해',
+  DESIGN: '설계',
+  EXECUTION: '실행',
+  VERIFICATION: '검증',
+  EXTENSION: '확장',
+}
+
+export const COMPETENCY_LABEL: Record<string, string> = {
+  READING: '문제 독해',
+  CONSTRAINTS: '조건 추출',
+  MODELING: '모델링',
+  ALGORITHM_CHOICE: '알고리즘 선택',
+  CORRECTNESS: '논리·정확성',
+  IMPLEMENTATION: '구현력',
+  COMPLEXITY: '복잡도 예측',
+  OPTIMIZATION: '최적화',
+  TEST_DESIGN: '테스트 설계',
+  EDGE_CASES: '엣지케이스',
+  COUNTEREXAMPLE: '반례',
+  DEBUGGING: '디버깅',
+  EXPLANATION: '설명',
+  TRANSFER: '전이',
+  METACOGNITION: '메타인지',
+  AI_COLLABORATION: 'AI 협업',
+}
+
+export const SOURCE_LABEL: Record<EvidenceSource, string> = {
+  SUBMISSION: '제출',
+  PREQUESTION: '풀기 전 질문',
+  TRIAL: '내가 만든 테스트',
+}
+
+export interface MasteryView {
+  competency: string
+  group: string
+  level: MasteryLevel
+  confidence: Confidence
+  evidenceCount: number
+  successCount: number
+}
+
+export interface CompetencyMap {
+  /** 증거가 하나라도 있는가. false 면 진단 미완료다 (FR-801). */
+  diagnosed: boolean
+  competencies: MasteryView[]
+}
+
+export interface EvidenceView {
+  source: EvidenceSource
+  success: boolean
+  /** 도움 수준. 1.0 이면 도움 없이 얻은 증거다. */
+  weight: number
+  problemId: string
+  reference: string | null
+  detail: string | null
+  occurredAt: string
+}
