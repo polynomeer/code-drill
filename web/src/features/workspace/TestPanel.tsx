@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getTrial, startTrial } from '../../api/client'
+import { MutationCheckPanel } from './MutationCheckPanel'
 import { VERDICT_LABEL } from '../../shared/types'
 import type { Problem, SubmissionLanguage, Trial } from '../../shared/types'
 
@@ -133,6 +134,14 @@ export function TestPanel({
           })}
         </ul>
       )}
+
+      {/* 같은 케이스를 두 방향으로 쓴다 — 위에서는 케이스로 코드를 재고, 아래에서는
+          오답으로 케이스를 잰다 (FR-804). 패널을 나누지 않은 이유는 사용자가 재려는
+          것이 방금 적은 바로 그 케이스이기 때문이다. */}
+      <MutationCheckPanel
+        problemId={problem.id}
+        cases={'cases' in inputs ? inputs.cases : null}
+      />
     </section>
   )
 }

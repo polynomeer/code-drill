@@ -15,6 +15,7 @@ import type {
   Submission,
   QuestionKind,
   SubmissionLanguage,
+  MutationCheck,
   Trial,
   TrialCaseInput,
 } from '../shared/types'
@@ -124,6 +125,34 @@ export async function startTrial(
  */
 export async function getTrial(id: string): Promise<Trial> {
   return json<Trial>(await authed(`/trials/${id}`))
+}
+
+/**
+ * 내 테스트를 대표 오답에 겨눈다 (PRD FR-804).
+ *
+ * 기대 출력을 적은 케이스만 보낸다. 입력만 넣고 돌려 본 것은 시험이 아니라 실행이고,
+ * 그것으로는 아무 결함도 잡을 수 없다.
+ */
+export async function startMutationCheck(
+  problemId: string,
+  cases: TrialCaseInput[],
+): Promise<MutationCheck> {
+  const response = await authed('/mutations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId, cases }),
+  })
+  return json<MutationCheck>(response)
+}
+
+/**
+ * 결과를 가져온다.
+ *
+ * 시험 실행보다 오래 걸린다 — 정답 한 번에 오답 N 번을 돌리므로 몇 초가 아니라
+ * 십수 초다.
+ */
+export async function getMutationCheck(id: string): Promise<MutationCheck> {
+  return json<MutationCheck>(await authed(`/mutations/${id}`))
 }
 
 /**

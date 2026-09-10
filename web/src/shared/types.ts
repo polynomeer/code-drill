@@ -217,6 +217,44 @@ export interface TrialCaseInput {
   expected?: unknown
 }
 
+/**
+ * 변이 평가 (PRD FR-804).
+ *
+ * 백엔드 `MutationResponse` 와 짝을 이룬다. **오답의 이름도 소스도 오지 않는다** —
+ * 오는 것은 결함군과 그것을 잡은 내 케이스 번호까지다.
+ */
+export type MutationStatus = 'PENDING' | 'COMPLETED' | 'NO_CASES' | 'FAILED'
+
+export type DefectKind =
+  | 'OFF_BY_ONE'
+  | 'MISSING_EDGE_CASE'
+  | 'WRONG_BRANCH'
+  | 'WRONG_ALGORITHM'
+  | 'PERFORMANCE'
+  | 'UNSPECIFIED'
+
+export interface MutationCheck {
+  id: string
+  problemId: string
+  status: MutationStatus
+  message: string | null
+  /** 기대 출력이 실제 정답과 다른 케이스 번호 (1부터). 정답 값은 오지 않는다. */
+  mistakenCases: number[]
+  /** 손으로 잡을 수 있는 결함군만 센 비율. 잴 것이 없으면 null 이다. */
+  score: number | null
+  kinds: KindSummary[]
+}
+
+export interface KindSummary {
+  kind: DefectKind
+  label: string
+  killed: number
+  total: number
+  /** 점수에 들어가는지. 성능 결함은 손으로 적는 케이스로 잡을 수 없어 빠진다. */
+  scored: boolean
+  killedBy: number[]
+}
+
 /** 풀이 전 질문 (PRD FR-803). 백엔드 `PreQuestion` 과 짝을 이룬다. */
 export type QuestionKind = 'ALGORITHM_CHOICE' | 'TIME_COMPLEXITY' | 'SPACE_COMPLEXITY'
 export type Misconception = 'UNDER_ESTIMATED' | 'OVER_ESTIMATED' | 'WRONG_TECHNIQUE'

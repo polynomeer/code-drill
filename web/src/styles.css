@@ -900,3 +900,36 @@ table.groups td {
   align-items: baseline;
   padding: 2px 0;
 }
+
+/* 테스트 점검 (FR-804). 테스트 패널 안에 얹히므로 패널 테두리를 다시 그리지 않고
+   구분선 하나로 가른다 — 재는 대상이 위에 적은 바로 그 케이스이기 때문이다. */
+.mutation-check {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.mutation-check h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.mutation-kinds {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.mutation-kinds li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* 점수에서 뺀 결함군. 감추지 않고 흐리게 둔다 — 감추면 사용자는 그런 결함이 있다는
+   것 자체를 모르고, 화면은 실제보다 촘촘해 보인다. */
+.mutation-kinds li.unmeasured {
+  opacity: 0.55;
+}
