@@ -1,6 +1,7 @@
 package dev.codedrill.controlplane.competency
 
 import dev.codedrill.platform.problempackage.Competency
+import dev.codedrill.platform.problempackage.DefectKind
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
@@ -79,6 +80,66 @@ class CompetencyService(
             },
         )
 
+    /**
+     * 사용자의 테스트를 대표 오답에 겨눈 결과 (FR-804).
+     *
+     * **역량마다 한 줄씩만 남긴다.** 결함군마다 남기고 싶었는데, 경계 어긋남과 빠진 경계
+     * 입력이 둘 다 [Competency.EDGE_CASES] 로 가는 바람에 한 평가가 같은 (사용자, 역량,
+     * 출처, 참조) 로 두 번 들어갔고, V19 의 유일 색인이 **말없이 하나를 버렸다.** 남은
+     * 것이 어느 쪽인지도 정해져 있지 않았다.
+     *
+     * 그 색인은 지우면 안 되는 것이다 — 아웃박스가 at-least-once 라, 없으면 재전달 하나가
+     * 증거 두 개가 되어 숙련도가 실제보다 단단해 보인다. 그래서 색인을 고치는 대신
+     * **역량으로 먼저 접는다.** 한 평가는 한 역량에 한 사건이고, 그것이 사실이다.
+     *
+     * 손으로 잡을 수 없는 결함군([DefectKind.reachableByHandWrittenCase])은 세지 않는다.
+     * 성능 오답은 한도를 넘길 만큼 큰 입력이 있어야 잡히고, 그런 입력은 테스트 패널에
+     * 손으로 적을 수 있는 것이 아니다 — 못 잡았다고 역량을 깎으면 사용자가 고칠 수 없는
+     * 것으로 벌하는 셈이다.
+     */
+    fun mutationChecked(
+        userId: String,
+        problemId: String,
+        evaluationId: String,
+        killedByKind: Map<DefectKind, Pair<Int, Int>>,
+    ) {
+        val scored = killedByKind.filterKeys { it.reachableByHandWrittenCase }
+        if (scored.isEmpty()) return
+
+        // Map 이라 같은 역량이 두 번 나올 수 없다. 위의 사고를 주석이 아니라 타입이 막는다.
+        val byCompetency: Map<Competency, Pair<Int, Int>> = scored.entries
+            .mapNotNull { (kind, counts) -> kind.competency()?.let { it to counts } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, rows) -> rows.sumOf { it.first } to rows.sumOf { it.second } }
+
+        for ((competency, counts) in byCompetency) {
+            val (killed, total) = counts
+            record(
+                userId, listOf(competency), EvidenceSource.MUTATION,
+                // **전부 잡아야 성공이다.** 한 역량에 묶인 오답들은 같은 종류의 실수를 다른
+                // 자리에서 낸 것이라, 하나만 잡고 나머지를 놓쳤다면 그 종류를 아는 것이
+                // 아니라 그 자리를 우연히 짚은 것이다.
+                success = killed == total,
+                problemId = problemId,
+                reference = evaluationId,
+                detail = "관련 오답 ${total}개 중 ${killed}개를 잡았다",
+            )
+        }
+
+        // 전체는 따로 한 줄 남긴다. 역량별 증거만 남기면 "무엇을 시험해야 하는지 아는가"를
+        // 통째로 재는 줄이 없어진다. 위 대응에서 TEST_DESIGN 으로 가는 결함군이 없으므로
+        // 이 줄은 방금 넣은 것들과 부딪히지 않는다.
+        val killed = scored.values.sumOf { it.first }
+        val total = scored.values.sumOf { it.second }
+        record(
+            userId, listOf(Competency.TEST_DESIGN), EvidenceSource.MUTATION,
+            success = killed.toDouble() / total >= KILL_TARGET,
+            problemId = problemId,
+            reference = evaluationId,
+            detail = "오답 ${total}개 중 ${killed}개를 잡는 테스트를 적었다",
+        )
+    }
+
     /** 역량 지도 (FR-806). 증거가 없는 역량도 함께 낸다 — 미측정을 말할 수 있어야 한다. */
     fun mapOf(userId: String): List<Mastery> = MasteryProjection.of(repository.of(userId))
 
@@ -120,4 +181,42 @@ class CompetencyService(
             )
         }
     }
+
+    private companion object {
+        /**
+         * 테스트 설계를 "할 줄 안다"고 볼 경계.
+         *
+         * 100% 로 두지 않는다. 저작 게이트는 저작자의 테스트에 100% 를 요구하지만(§6.3),
+         * 저쪽은 오답 목록을 보고 쓴 테스트이고 이쪽은 문제만 보고 쓴 테스트다. 같은
+         * 잣대를 대면 사실상 아무도 넘지 못하고, 넘지 못하는 경계는 아무것도 가르지 않는다.
+         *
+         * 저작자 판단이며, 바꾸면 지난 증거를 그대로 두고 다시 계산하면 된다.
+         */
+        const val KILL_TARGET = 0.75
+    }
+}
+
+/**
+ * 결함군 → 역량 (기획서 §4.2).
+ *
+ * 대응을 여기 두는 이유는 [MasteryProjection] 과 같다 — **무엇이 무엇의 증거인가는
+ * 역량 쪽의 판단이다.** 결함을 만든 쪽(콘텐츠)은 그 오답이 어떤 실수인지만 알면 된다.
+ *
+ * 재지 않는 결함군은 `null` 이다. 아무 역량으로나 떨어뜨리지 않는 이유는 그 역량이
+ * [Competency.TEST_DESIGN] 일 수밖에 없는데, 거기에는 이미 전체 결과 한 줄이 들어가고
+ * 둘은 같은 참조를 갖는다 — V19 의 유일 색인이 그중 하나를 말없이 버린다.
+ */
+private fun DefectKind.competency(): Competency? = when (this) {
+    // 둘 다 "경계에서 무너지는 자리"를 짚었는지를 묻는다. 하나 어긋난 인덱스와 빈 입력은
+    // 겉모습이 다를 뿐 같은 자리를 못 본 것이다.
+    DefectKind.OFF_BY_ONE -> Competency.EDGE_CASES
+    DefectKind.MISSING_EDGE_CASE -> Competency.EDGE_CASES
+
+    // 반례다. 대부분의 입력에서 맞고 일부에서만 틀리는 구현을 넘어뜨리려면, 그 "일부"를
+    // 짚어 내는 입력을 만들어야 한다.
+    DefectKind.WRONG_BRANCH -> Competency.COUNTEREXAMPLE
+    DefectKind.WRONG_ALGORITHM -> Competency.COUNTEREXAMPLE
+
+    DefectKind.PERFORMANCE -> null
+    DefectKind.UNSPECIFIED -> null
 }

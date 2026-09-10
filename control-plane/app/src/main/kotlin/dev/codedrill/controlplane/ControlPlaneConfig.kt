@@ -3,6 +3,7 @@ package dev.codedrill.controlplane
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.MutationRequest
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.controlplane.outbox.OutboxRoute
@@ -21,11 +22,15 @@ import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.LearningSignals as SubmissionLearningSignals
 import dev.codedrill.controlplane.workspace.LearningSignals as WorkspaceLearningSignals
 import dev.codedrill.platform.problempackage.Competency
+import dev.codedrill.platform.problempackage.DefectKind
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
 import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
 import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
+import dev.codedrill.controlplane.workspace.MutationLimits
+import dev.codedrill.controlplane.workspace.MutationRepository
+import dev.codedrill.controlplane.workspace.MutationService
 import dev.codedrill.controlplane.workspace.TrialLimits
 import dev.codedrill.controlplane.workspace.TrialRepository
 import dev.codedrill.controlplane.workspace.TrialService
@@ -44,7 +49,12 @@ import java.nio.file.Path
 import java.util.UUID
 
 @Configuration
-@EnableConfigurationProperties(QuotaLimits::class, TraceRetentionPolicy::class, TrialLimits::class)
+@EnableConfigurationProperties(
+    QuotaLimits::class,
+    TraceRetentionPolicy::class,
+    TrialLimits::class,
+    MutationLimits::class,
+)
 @EnableScheduling
 class ControlPlaneConfig {
 
@@ -177,6 +187,13 @@ class ControlPlaneConfig {
         override fun erase(userId: String) = mapOf("runs" to repository.erase(userId))
     }
 
+    @Bean
+    fun mutationPersonalArea(repository: MutationRepository) = object : PersonalData {
+        override val area = "mutations"
+        override fun export(userId: String) = mapOf("evaluations" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("evaluations" to repository.erase(userId))
+    }
+
     /**
      * 판정과 작업 공간의 사건을 역량 증거로 잇는다 (§3.1 조립 지점, FR-801).
      *
@@ -205,6 +222,13 @@ class ControlPlaneConfig {
 
         override fun tested(userId: String, problemId: String, trialId: String, judgedCases: Int) =
             service.tested(userId, problemId, trialId, judgedCases)
+
+        override fun mutationChecked(
+            userId: String,
+            problemId: String,
+            evaluationId: String,
+            killedByKind: Map<DefectKind, Pair<Int, Int>>,
+        ) = service.mutationChecked(userId, problemId, evaluationId, killedByKind)
     }
 
     /** 역량 증거도 사용자의 기록이다 (§11.3). */
@@ -274,6 +298,11 @@ class ControlPlaneConfig {
             // 판정 큐와 다른 큐로 간다 — 이유는 JudgeQueues.TRIALS 에 있다.
             TrialService.TRIAL_EVENT -> OutboxRoute(JudgeQueues.TRIALS) {
                 mapper.readValue<ExecutionRequest>(it)
+            }
+            // 변이 평가도 오케스트레이터를 거치지 않는다. 정답 한 번 + 오답 N 번이 한
+            // 봉투에 들어 있어, 짝지을 것도 잃어버렸는지 셀 것도 없다.
+            MutationService.MUTATION_EVENT -> OutboxRoute(JudgeQueues.MUTATIONS) {
+                mapper.readValue<MutationRequest>(it)
             }
             else -> null
         }

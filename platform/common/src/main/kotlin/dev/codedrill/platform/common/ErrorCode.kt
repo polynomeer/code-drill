@@ -22,6 +22,14 @@ enum class ErrorCode(val category: Category, val retry: Retry) {
     DRAFT_VERSION_CONFLICT(Category.CONFLICT, Retry.AFTER_REFRESH),
     PROBLEM_VERSION_STALE(Category.CONFLICT, Retry.AFTER_REFRESH),
 
+    /**
+     * 요청은 멀쩡한데 그 기능에 필요한 콘텐츠가 이 문제에 없다.
+     *
+     * VALIDATION 이 아니다. 사용자가 입력을 고쳐도 달라지지 않고, 고칠 사람은 저작자다 —
+     * 그래서 [Retry.AFTER_FIX] 의 "fix" 는 여기서만 사용자의 것이 아니다.
+     */
+    CONTENT_UNAVAILABLE(Category.CONFLICT, Retry.AFTER_FIX),
+
     COMPILE_ERROR(Category.JUDGE, Retry.AFTER_FIX),
     TIME_LIMIT(Category.JUDGE, Retry.AFTER_FIX),
 

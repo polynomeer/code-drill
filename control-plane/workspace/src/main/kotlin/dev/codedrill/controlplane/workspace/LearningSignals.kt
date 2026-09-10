@@ -1,6 +1,7 @@
 package dev.codedrill.controlplane.workspace
 
 import dev.codedrill.platform.problempackage.Competency
+import dev.codedrill.platform.problempackage.DefectKind
 
 /**
  * 작업 공간에서 일어난 일이 학습 기록에 남는 창구 (기술 설계서 §3.1 조립 지점).
@@ -31,6 +32,23 @@ interface LearningSignals {
      */
     fun tested(userId: String, problemId: String, trialId: String, judgedCases: Int)
 
+    /**
+     * 변이 평가가 끝났다 (FR-804).
+     *
+     * **사실만 넘긴다.** 어느 결함군이 어느 역량의 증거인지, 몇 개를 잡아야 성공인지는
+     * Competency 가 정한다 — 여기서 정하면 같은 판단이 두 모듈에 흩어진다.
+     *
+     * [killedByKind] 는 결함군별 (잡은 수, 전체 수)다. 합계만 넘기면 "경계 입력을 전부
+     * 놓쳤다"와 "성능만 못 잡았다"가 같은 숫자가 되는데, 그 둘에게 필요한 다음 행동은
+     * 다르다.
+     */
+    fun mutationChecked(
+        userId: String,
+        problemId: String,
+        evaluationId: String,
+        killedByKind: Map<DefectKind, Pair<Int, Int>>,
+    )
+
     companion object {
         val NONE = object : LearningSignals {
             override fun answered(
@@ -43,6 +61,13 @@ interface LearningSignals {
             ) = Unit
 
             override fun tested(userId: String, problemId: String, trialId: String, judgedCases: Int) = Unit
+
+            override fun mutationChecked(
+                userId: String,
+                problemId: String,
+                evaluationId: String,
+                killedByKind: Map<DefectKind, Pair<Int, Int>>,
+            ) = Unit
         }
     }
 }
