@@ -35,13 +35,42 @@ class CompetencyService(
      * 재채점으로 바뀐 판정은 넣지 않는다. 그때 달라진 것은 사용자의 능력이 아니라 문제
      * 데이터이고, 그것을 증거로 세면 남이 테스트를 고쳤다고 내 숙련도가 움직인다.
      */
-    fun judged(userId: String, problemId: String, submissionId: String, accepted: Boolean) {
+    fun judged(
+        userId: String,
+        problemId: String,
+        submissionId: String,
+        accepted: Boolean,
+        helpLevel: Int = 0,
+    ) {
         val competencies = competenciesOf(problemId) ?: return
         record(
             userId, competencies, EvidenceSource.SUBMISSION, accepted, problemId,
             reference = submissionId,
             detail = if (accepted) "제출이 통과했다" else "제출이 통과하지 못했다",
+            weight = weightFor(helpLevel),
         )
+    }
+
+    /**
+     * 도움 단계 → 증거 무게 (PRD §3.4, FR-806).
+     *
+     * > 표본 부족·힌트 사용·AI 도움을 신뢰도와 증거 가중치에 반영합니다.
+     *
+     * **0 으로 내리지 않는다.** 힌트를 보고 푼 것도 못 푼 것보다는 아는 것이며, 0 으로
+     * 두면 도움을 받은 순간 그 문제는 아무리 잘 풀어도 없던 일이 된다 — 그러면 사용자는
+     * 막혀도 힌트를 누르지 않고, 코칭 기능이 있으나 마나가 된다.
+     *
+     * 깊은 단계일수록 가파르게 떨어진다. 방향만 잡아 준 1단계와 방법을 말해 준 3단계는
+     * 남은 몫이 전혀 다르다.
+     *
+     * 경계값은 저작자 판단이며, 바꾸면 지난 증거를 그대로 두고 다시 계산하면 된다 —
+     * 그러라고 무게를 증거에 박아 저장한다.
+     */
+    private fun weightFor(helpLevel: Int): Double = when {
+        helpLevel <= 0 -> 1.0
+        helpLevel == 1 -> 0.7
+        helpLevel == 2 -> 0.45
+        else -> 0.3
     }
 
     /**
@@ -161,6 +190,7 @@ class CompetencyService(
         problemId: String,
         reference: String?,
         detail: String?,
+        weight: Double = 1.0,
     ) {
         val now = Instant.now()
         for (competency in competencies) {
@@ -171,8 +201,8 @@ class CompetencyService(
                     competency = competency,
                     source = source,
                     success = success,
-                    // 도움 기능이 아직 없어 전부 1.0 이다. 붙으면 여기가 낮아진다 (§3.4).
-                    weight = 1.0,
+                    // 코칭에서 힌트를 본 제출은 여기가 낮아진다 (§3.4, [weightFor]).
+                    weight = weight,
                     problemId = problemId,
                     reference = reference,
                     detail = detail,

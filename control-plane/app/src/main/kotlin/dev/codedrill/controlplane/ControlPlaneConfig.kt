@@ -17,7 +17,12 @@ import dev.codedrill.controlplane.submission.QuotaLimits
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import dev.codedrill.controlplane.identity.IdentityService
 import dev.codedrill.controlplane.competency.CompetencyService
+import dev.codedrill.controlplane.competency.MasteryLevel
 import dev.codedrill.controlplane.competency.EvidenceRepository
+import dev.codedrill.controlplane.coaching.CoachingRepository
+import dev.codedrill.controlplane.coaching.CoachingService
+import dev.codedrill.controlplane.coaching.Diagnosis
+import dev.codedrill.controlplane.coaching.HintLadder
 import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.LearningSignals as SubmissionLearningSignals
 import dev.codedrill.controlplane.workspace.LearningSignals as WorkspaceLearningSignals
@@ -204,10 +209,47 @@ class ControlPlaneConfig {
      * 아무 일도 하지 않는 NONE 이다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
      */
     @Bean
-    fun submissionLearningSignals(service: CompetencyService) =
+    fun submissionLearningSignals(service: CompetencyService, coaching: CoachingService) =
         SubmissionLearningSignals { userId, problemId, submissionId, accepted ->
-            service.judged(userId, problemId, submissionId.toString(), accepted)
+            // 이 문제에서 받은 도움을 여기서 조회해 넘긴다 (FR-806). 제출 모듈은 코칭을
+            // 모르고 Competency 는 세션을 모르며, 둘을 아는 곳은 여기 하나뿐이다.
+            service.judged(
+                userId, problemId, submissionId.toString(), accepted,
+                helpLevel = runCatching { coaching.helpLevel(userId, problemId) }.getOrDefault(0),
+            )
         }
+
+    /**
+     * 코칭이 "무엇이 약한가"를 묻는 창구 (§3.1 조립 지점, FR-802).
+     *
+     * 약한 순서는 **등급 먼저, 증거 수 나중**이다. 아직 재지 않은 역량은 못하는 것이
+     * 아니라 모르는 것이므로 DEVELOPING 뒤에 서고, STRONG 은 아예 빠진다 — 잘하는 것에
+     * 힌트를 붙이면 그것은 개입이 아니라 방해다.
+     */
+    @Bean
+    fun coachingDiagnosis(service: CompetencyService) = Diagnosis { userId, among, limit ->
+        if (among.isEmpty()) {
+            emptyList()
+        } else {
+            val map = service.mapOf(userId).associateBy { it.competency }
+            among.mapNotNull { map[it] }
+                .filter { it.level != MasteryLevel.STRONG }
+                .sortedWith(compareBy({ NEEDS_HELP.indexOf(it.level) }, { it.evidenceCount }))
+                .take(limit)
+                .map { it.competency }
+        }
+    }
+
+    @Bean
+    fun coachingHintLadder(packages: ProblemPackageLoader) = HintLadder(packages)
+
+    /** 무엇을 도움받았는지도 사용자의 기록이다 (§11.3). */
+    @Bean
+    fun coachingPersonalArea(repository: CoachingRepository) = object : PersonalData {
+        override val area = "coaching"
+        override fun export(userId: String) = mapOf("sessions" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("sessions" to repository.erase(userId))
+    }
 
     @Bean
     fun workspaceLearningSignals(service: CompetencyService) = object : WorkspaceLearningSignals {
@@ -308,3 +350,16 @@ class ControlPlaneConfig {
         }
     }
 }
+
+/**
+ * 도움이 급한 순서 (FR-802 "약한 역량").
+ *
+ * DEVELOPING 이 먼저다. 아직 재지 않은 역량은 **못하는 것이 아니라 모르는 것**이라,
+ * 확인된 약점보다 뒤에 선다. STRONG 은 목록에 없다 — 여기 있으면 잘하는 것에 힌트가
+ * 붙는다.
+ */
+private val NEEDS_HELP = listOf(
+    MasteryLevel.DEVELOPING,
+    MasteryLevel.UNMEASURED,
+    MasteryLevel.PROFICIENT,
+)
