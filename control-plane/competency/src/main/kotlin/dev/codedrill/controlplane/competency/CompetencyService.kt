@@ -197,6 +197,25 @@ class CompetencyService(
         )
     }
 
+    /**
+     * 리플레이 중 다음 상태 예측 (FR-805).
+     *
+     * [Competency.DEBUGGING] 의 증거다 — 여기서 재는 것은 답이 맞았는가가 아니라
+     * **자기 코드가 다음에 무엇을 할지 아는가**이고, 그것을 모르면 어디서부터 어긋났는지도
+     * 짚을 수 없다 (§4.2 검증군).
+     *
+     * 무게가 낮은 이유는 [EvidenceSource.PREDICTION] 에 적었다.
+     */
+    fun predicted(userId: String, problemId: String, predictionId: String, correct: Boolean) =
+        record(
+            userId, listOf(Competency.DEBUGGING), EvidenceSource.PREDICTION,
+            success = correct,
+            problemId = problemId,
+            reference = predictionId,
+            detail = if (correct) "다음 이벤트를 맞혔다" else "다음 이벤트를 맞히지 못했다",
+            weight = PREDICTION_WEIGHT,
+        )
+
     /** 역량 지도 (FR-806). 증거가 없는 역량도 함께 낸다 — 미측정을 말할 수 있어야 한다. */
     fun mapOf(userId: String): List<Mastery> = MasteryProjection.of(repository.of(userId))
 
@@ -260,6 +279,15 @@ class CompetencyService(
          * 없이 다른 문제를 푸는 것은 기억으로는 되지 않는다.
          */
         const val TRANSFER_WEIGHT = 1.5
+
+        /**
+         * 예측 증거의 무게.
+         *
+         * 낮다. 트레이스가 이미 클라이언트에 있어 답을 보고 누를 수 있기 때문이며,
+         * 그 구멍은 막을 수 없다 — 자기 실행의 기록을 자기에게 숨길 수는 없다. 그래도
+         * 0 으로 두지는 않는다: 스스로 속이지 않은 사람의 기록까지 버릴 이유는 없다.
+         */
+        const val PREDICTION_WEIGHT = 0.5
     }
 }
 

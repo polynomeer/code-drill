@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.controlplane.submission.trace.Divergence
 import dev.codedrill.controlplane.submission.trace.DivergenceService
+import dev.codedrill.controlplane.submission.trace.PredictionService
+import dev.codedrill.controlplane.submission.trace.StatePrediction
 import dev.codedrill.controlplane.submission.trace.TraceRepository
 import dev.codedrill.judge.protocol.TraceChunk
 import dev.codedrill.judge.protocol.TraceManifest
@@ -46,6 +48,7 @@ class SubmissionController(
     private val events: SubmissionEventStream,
     private val traces: TraceRepository,
     private val divergence: DivergenceService,
+    private val predictions: PredictionService,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
 ) {
@@ -169,6 +172,45 @@ class SubmissionController(
     }
 
     /**
+     * 다음 상태 예측 (PRD FR-805).
+     *
+     * 채점은 서버가 한다. 클라이언트가 맞고 틀림을 정하면 그것은 채점이 아니라 자기
+     * 신고이고, 증거로 쓸 수 없다.
+     *
+     * 자리를 **이벤트의 seq 로** 받는다. 화면의 위치는 클라이언트가 몇 개를 불러왔는지에
+     * 달려 있어, 그것으로 채점하면 사용자가 본 자리와 채점한 자리가 어긋날 수 있다.
+     */
+    @PostMapping("/{id}/predictions")
+    fun predict(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @Valid @RequestBody request: PredictionRequest,
+    ): ResponseEntity<Any> = when (
+        val outcome = predictions.predict(principal.id, id, request.seq, request.predicted, request.rationale)
+    ) {
+        is PredictionService.Outcome.Graded -> ResponseEntity.ok(outcome.prediction)
+
+        // 이미 맞혀 본 자리다. 두 번째는 예측이 아니라 받아쓰기다.
+        PredictionService.Outcome.AlreadyAnswered ->
+            ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiError(ErrorCode.CONTENT_UNAVAILABLE, "이미 맞혀 본 자리다", UUID.randomUUID().toString()))
+
+        PredictionService.Outcome.NoSuchStep ->
+            ResponseEntity.badRequest()
+                .body(ApiError(ErrorCode.INVALID_SIGNATURE, "그런 이벤트가 없다", UUID.randomUUID().toString()))
+
+        PredictionService.Outcome.NotFound -> ResponseEntity.notFound().build()
+    }
+
+    /** 이 제출에서 이미 맞혀 본 자리들. 화면이 같은 자리를 다시 묻지 않게 한다. */
+    @GetMapping("/{id}/predictions")
+    fun predictions(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<List<StatePrediction>> =
+        ResponseEntity.ok(predictions.answered(principal.id, id))
+
+    /**
      * 판정 이력 (§4.2 INV-02).
      *
      * 재채점으로 점수가 바뀐 사용자가 "왜 바뀌었나"에 답을 얻는 곳이다. 최초 판정부터
@@ -231,6 +273,18 @@ class SubmissionController(
 
     private fun traceId(): String = UUID.randomUUID().toString()
 }
+
+/**
+ * 예측 한 건 (FR-805).
+ *
+ * [rationale] 은 선택이다. 필수로 하면 예측 자체를 건너뛰고, 그러면 아무 기록도 남지
+ * 않는다 — 풀이 전 질문이 같은 이유로 같은 모양을 쓴다 (FR-803).
+ */
+data class PredictionRequest(
+    @field:Positive val seq: Int,
+    @field:NotBlank val predicted: String,
+    val rationale: String? = null,
+)
 
 data class CreateSubmissionRequest(
     @field:NotBlank val problemId: String,

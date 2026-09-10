@@ -41,6 +41,7 @@ import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.workspace.MutationLimits
 import dev.codedrill.controlplane.workspace.MutationRepository
 import dev.codedrill.controlplane.submission.trace.DivergenceService
+import dev.codedrill.controlplane.submission.trace.PredictionRepository
 import dev.codedrill.controlplane.workspace.MutationService
 import dev.codedrill.controlplane.workspace.TrialLimits
 import dev.codedrill.controlplane.workspace.TrialRepository
@@ -198,6 +199,14 @@ class ControlPlaneConfig {
         override fun erase(userId: String) = mapOf("runs" to repository.erase(userId))
     }
 
+    /** 예측의 근거도 사용자가 쓴 것이다 (§11.3). */
+    @Bean
+    fun predictionPersonalArea(repository: PredictionRepository) = object : PersonalData {
+        override val area = "predictions"
+        override fun export(userId: String) = mapOf("predictions" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("rationales" to repository.erase(userId))
+    }
+
     @Bean
     fun mutationPersonalArea(repository: MutationRepository) = object : PersonalData {
         override val area = "mutations"
@@ -220,16 +229,30 @@ class ControlPlaneConfig {
         coaching: CoachingService,
         transfers: TransferService,
     ) =
-        SubmissionLearningSignals { userId, problemId, submissionId, accepted ->
-            // 이 문제에서 받은 도움을 여기서 조회해 넘긴다 (FR-806). 제출 모듈은 코칭을
-            // 모르고 Competency 는 세션을 모르며, 둘을 아는 곳은 여기 하나뿐이다.
-            service.judged(
-                userId, problemId, submissionId.toString(), accepted,
-                helpLevel = runCatching { coaching.helpLevel(userId, problemId) }.getOrDefault(0),
-            )
-            // 이 판정이 누군가의 전이 확인 과제를 닫을 수 있다 (FR-807). 실패해도
-            // 판정을 막지 않는다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
-            runCatching { transfers.judged(userId, problemId, accepted) }
+        object : SubmissionLearningSignals {
+            override fun judged(
+                userId: String,
+                problemId: String,
+                submissionId: java.util.UUID,
+                accepted: Boolean,
+            ) {
+                // 이 문제에서 받은 도움을 여기서 조회해 넘긴다 (FR-806). 제출 모듈은
+                // 코칭을 모르고 Competency 는 세션을 모르며, 둘을 아는 곳은 여기뿐이다.
+                service.judged(
+                    userId, problemId, submissionId.toString(), accepted,
+                    helpLevel = runCatching { coaching.helpLevel(userId, problemId) }.getOrDefault(0),
+                )
+                // 이 판정이 누군가의 전이 확인 과제를 닫을 수 있다 (FR-807). 실패해도
+                // 판정을 막지 않는다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
+                runCatching { transfers.judged(userId, problemId, accepted) }
+            }
+
+            override fun predicted(
+                userId: String,
+                problemId: String,
+                predictionId: String,
+                correct: Boolean,
+            ) = service.predicted(userId, problemId, predictionId, correct)
         }
 
     /**
