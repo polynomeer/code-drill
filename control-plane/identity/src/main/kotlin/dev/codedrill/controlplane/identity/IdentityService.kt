@@ -56,6 +56,56 @@ class IdentityService(
     }
 
     /**
+     * 표시 이름을 바꾼다 (기획서 부록 A 계정 도메인).
+     *
+     * 이메일은 바꾸지 않는다. 이메일은 로그인 식별자이자 유일 제약이라, 바꾸는 것은
+     * 소유 확인(새 주소로 보낸 링크)이 함께 있어야 하는 별개의 흐름이다. 그것 없이
+     * 바꾸게 하면 남의 주소를 자기 계정에 붙일 수 있다.
+     */
+    @Transactional
+    fun rename(userId: String, displayName: String): Boolean {
+        require(displayName.isNotBlank()) { "표시 이름은 비울 수 없다" }
+        return repository.updateDisplayName(UUID.fromString(userId), displayName.trim()) > 0
+    }
+
+    /**
+     * 비밀번호를 바꾼다.
+     *
+     * 지금 비밀번호를 다시 받는다. 자리를 비운 사이 남이 만졌을 때, 막을 것이 열려 있는
+     * 세션 하나뿐이면 안 된다 — 계정 삭제와 같은 이유다.
+     *
+     * **바꾸면 열린 세션을 전부 끊고 새로 하나 내준다.** 비밀번호를 바꾸는 이유의 태반이
+     * "누가 내 계정을 보고 있는 것 같다"이고, 그때 바꾸기만 하고 열린 세션을 그대로 두면
+     * 바꾼 의미가 없다.
+     *
+     * 지금 쓰던 세션도 함께 끊는다. 남겨 두려면 "이 세션만 빼고"를 어딘가에서 판단해야
+     * 하는데, 그 판단이 틀리면 **끊었어야 할 세션이 살아남는다.** 대신 새 세션을 돌려주어
+     * 사용자가 다시 로그인하지 않게 한다.
+     */
+    @Transactional
+    fun changePassword(userId: String, current: String, next: String): PasswordChange {
+        require(next.length >= MIN_PASSWORD_LENGTH) {
+            "비밀번호는 ${MIN_PASSWORD_LENGTH}자 이상이어야 한다"
+        }
+        val id = UUID.fromString(userId)
+        val user = repository.findById(id) ?: return PasswordChange.NotFound
+        val credentials = repository.findCredentials(normalize(user.email))
+            ?: return PasswordChange.NotFound
+        if (!passwords.matches(current, credentials.second)) return PasswordChange.WrongPassword
+
+        repository.updatePassword(id, passwords.encode(next))
+        val revoked = repository.revokeAllFor(id, "password-changed")
+        return PasswordChange.Done(issue(user), revoked)
+    }
+
+    sealed interface PasswordChange {
+        /** [revoked] 는 끊긴 세션 수. 사용자에게 "다른 기기에서 로그아웃됐다"를 말해 준다. */
+        data class Done(val session: IssuedSession, val revoked: Int) : PasswordChange
+        data object WrongPassword : PasswordChange
+        data object NotFound : PasswordChange
+    }
+
+    /**
      * 계정을 지운다 (§11.3).
      *
      * **비밀번호를 다시 받는다.** 되돌릴 수 없는 요청이고, 자리를 비운 사이 남이 만졌을

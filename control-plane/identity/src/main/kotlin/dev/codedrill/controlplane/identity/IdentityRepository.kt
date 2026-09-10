@@ -89,6 +89,16 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
      * 이미 지운 계정은 건드리지 않는다 — 두 번째 요청이 무덤값을 또 덮어쓰면 삭제 시각이
      * 뒤로 밀린다.
      */
+    fun updateDisplayName(id: UUID, displayName: String): Int = jdbc.update(
+        "UPDATE app_user SET display_name = ? WHERE id = ? AND deleted_at IS NULL",
+        displayName, id,
+    )
+
+    fun updatePassword(id: UUID, passwordHash: String): Int = jdbc.update(
+        "UPDATE app_user SET password_hash = ? WHERE id = ? AND deleted_at IS NULL",
+        passwordHash, id,
+    )
+
     fun anonymize(id: UUID, tombstoneEmail: String): Int = jdbc.update(
         """
         UPDATE app_user

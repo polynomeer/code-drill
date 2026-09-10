@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
@@ -111,6 +112,54 @@ class IdentityController(private val identity: IdentityService) {
         "displayName" to principal.displayName,
     )
 
+    /**
+     * 표시 이름 변경 (기획서 부록 A 계정 도메인).
+     *
+     * 이메일은 여기서 바꾸지 않는다 — 이유는 [IdentityService.rename] 에 있다.
+     */
+    @PatchMapping("/me")
+    fun rename(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @Valid @RequestBody request: RenameRequest,
+    ): ResponseEntity<Any> =
+        if (identity.rename(principal.id, request.displayName)) {
+            ResponseEntity.ok(mapOf("id" to principal.id, "displayName" to request.displayName.trim()))
+        } else {
+            ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error(ErrorCode.UNAUTHENTICATED, "계정을 찾지 못했다"))
+        }
+
+    /**
+     * 비밀번호 변경.
+     *
+     * 성공하면 **새 세션을 돌려준다.** 열린 세션을 전부 끊기 때문이며, 클라이언트는 받은
+     * 세션으로 갈아 끼우면 된다.
+     */
+    @PostMapping("/me/password")
+    fun changePassword(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @Valid @RequestBody request: ChangePasswordRequest,
+    ): ResponseEntity<Any> =
+        when (val outcome = identity.changePassword(principal.id, request.currentPassword, request.newPassword)) {
+            is IdentityService.PasswordChange.Done ->
+                ResponseEntity.ok(
+                    mapOf(
+                        "session" to SessionResponse.of(outcome.session),
+                        // 몇 개가 끊겼는지 말해 준다. "다른 기기에서도 로그아웃됐다"를
+                        // 사용자가 알아야 그 뒤에 일어나는 일이 놀랍지 않다.
+                        "revokedSessions" to outcome.revoked,
+                    ),
+                )
+
+            IdentityService.PasswordChange.WrongPassword ->
+                ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(error(ErrorCode.UNAUTHENTICATED, "지금 비밀번호가 다르다"))
+
+            IdentityService.PasswordChange.NotFound ->
+                ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(error(ErrorCode.UNAUTHENTICATED, "계정을 찾지 못했다"))
+        }
+
     @ExceptionHandler(IllegalArgumentException::class)
     fun onInvalid(e: IllegalArgumentException): ResponseEntity<ApiError> =
         ResponseEntity.badRequest().body(
@@ -135,6 +184,13 @@ data class LoginRequest(
 data class RefreshRequest(@field:NotBlank val refreshToken: String)
 
 data class DeleteAccountRequest(@field:NotBlank val password: String)
+
+data class RenameRequest(@field:NotBlank val displayName: String)
+
+data class ChangePasswordRequest(
+    @field:NotBlank val currentPassword: String,
+    @field:NotBlank val newPassword: String,
+)
 
 /** 발급 응답. 평문 토큰이 나가는 유일한 곳이다. */
 data class SessionResponse(
