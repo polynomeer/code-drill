@@ -9,7 +9,9 @@ import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.TraceManifest
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.platform.problempackage.DefectKind
 import dev.codedrill.platform.problempackage.Limits
+import dev.codedrill.platform.problempackage.MutantSource
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.problempackage.TestCase
@@ -77,7 +79,7 @@ class ContentValidator(
 
         checks += structure(problemId, pkg)
         checks += catalog(pkg)
-        val reference = referenceSolution(problemId)
+        val reference = loader.referenceSolution(problemId)
 
         if (reference == null) {
             checks += Check.fail("official-solution", "solutions/reference.kt 가 없다 (§6.1)")
@@ -92,7 +94,7 @@ class ContentValidator(
 
         checks += determinism(pkg, reference, judged)
 
-        val mutants = mutants(problemId).map { mutant -> evaluate(pkg, mutant) }
+        val mutants = loader.mutants(problemId).map { mutant -> evaluate(pkg, mutant) }
         checks += mutationKillRate(mutants)
         checks += performanceMargin(mutants)
 
@@ -287,7 +289,7 @@ class ContentValidator(
 
     // --- §6.3 3. mutant kill rate ---
 
-    private fun evaluate(pkg: ProblemPackage, mutant: Mutant): MutationResult {
+    private fun evaluate(pkg: ProblemPackage, mutant: MutantSource): MutationResult {
         val result = run(pkg, mutant.source)
         val killers = result.cases.filter { it.verdict != Verdict.ACCEPTED }
 
@@ -338,7 +340,7 @@ class ContentValidator(
      */
     private fun memoryStillExceeds(
         pkg: ProblemPackage,
-        mutant: Mutant,
+        mutant: MutantSource,
         groupIds: List<String>,
     ): Boolean? {
         if (groupIds.isEmpty()) return null
@@ -375,7 +377,7 @@ class ContentValidator(
      */
     private fun widestMargin(
         pkg: ProblemPackage,
-        mutant: Mutant,
+        mutant: MutantSource,
         groupIds: List<String>,
     ): Double? {
         if (groupIds.isEmpty()) return null
@@ -407,7 +409,7 @@ class ContentValidator(
      */
     private fun margin(
         pkg: ProblemPackage,
-        mutant: Mutant,
+        mutant: MutantSource,
         group: TestGroup,
         case: TestCase,
     ): Double {
@@ -548,26 +550,6 @@ class ContentValidator(
         mode = mode,
     )
 
-    private fun referenceSolution(problemId: String): String? =
-        contentRoot.resolve(problemId).resolve("solutions/reference.kt")
-            .takeIf { it.exists() }?.readText()
-
-    /** `// kind: <KIND>` 첫 줄로 결함 종류를 읽는다. 별도 색인을 두면 파일과 어긋난다. */
-    private fun mutants(problemId: String): List<Mutant> {
-        val dir = contentRoot.resolve(problemId).resolve("mutants")
-        if (!dir.exists()) return emptyList()
-
-        return dir.listDirectoryEntries("*.kt")
-            .filter { it.isRegularFile() }
-            .sortedBy { it.name }
-            .map { file ->
-                val source = file.readText()
-                val kind = Regex("""//\s*kind:\s*(\w+)""").find(source)?.groupValues?.get(1)
-                    ?: "UNSPECIFIED"
-                Mutant(file.name.removeSuffix(".kt"), kind, source)
-            }
-    }
-
     // --- §6.3 7. 검증 산출물 digest ---
 
     private fun report(
@@ -599,8 +581,6 @@ class ContentValidator(
     }
 
     private fun percent(ratio: Double) = "%.0f%%".format(ratio * 100)
-
-    private data class Mutant(val name: String, val kind: String, val source: String)
 
     companion object {
         /**
@@ -679,7 +659,7 @@ data class Check(val stage: String, val passed: Boolean, val detail: String) {
 
 data class MutationResult(
     val name: String,
-    val kind: String,
+    val kind: DefectKind,
     val killed: Boolean,
     val killedBy: List<String>,
     val verdicts: List<String>,

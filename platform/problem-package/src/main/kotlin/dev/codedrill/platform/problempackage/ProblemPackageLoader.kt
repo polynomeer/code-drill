@@ -97,5 +97,30 @@ class ProblemPackageLoader(private val root: Path) {
         )
     }
 
+    /**
+     * 저작자의 정답 (§6.1 `solutions/`).
+     *
+     * **패키지에 담지 않고 따로 읽는다.** [ProblemPackage] 는 화면과 채점이 함께 쓰는
+     * 물건이고, 정답 소스가 거기 실려 있으면 어느 응답 하나가 실수로 그것을 내보내는
+     * 날이 온다. 정답이 필요한 쪽(검증·변이 평가)만 이 함수를 부른다.
+     */
+    fun referenceSolution(problemId: String): String? =
+        root.resolve(problemId).resolve("solutions/reference.kt")
+            .takeIf { it.isRegularFile() }?.readText()
+
+    /** 대표 오답 (§6.1 `mutants/`). 없으면 빈 목록이다. */
+    fun mutants(problemId: String): List<MutantSource> {
+        val dir = root.resolve(problemId).resolve("mutants")
+        if (!dir.isDirectory()) return emptyList()
+
+        return dir.listDirectoryEntries("*.kt")
+            .filter { it.isRegularFile() }
+            .sortedBy { it.name }
+            .map { file ->
+                val source = file.readText()
+                MutantSource(file.name.removeSuffix(".kt"), DefectKind.readFrom(source), source)
+            }
+    }
+
     private data class RawCase(val args: List<Any>, val expected: Any)
 }
