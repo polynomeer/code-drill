@@ -14,7 +14,10 @@ import java.util.UUID
  * 않고, 역량 증거도 만들지 않는다.
  */
 @Component
-class TrialResultListener(private val repository: TrialRepository) {
+class TrialResultListener(
+    private val repository: TrialRepository,
+    private val learning: LearningSignals = LearningSignals.NONE,
+) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -45,6 +48,19 @@ class TrialResultListener(private val repository: TrialRepository) {
         if (updated == 0) {
             // 아웃박스는 at-least-once 다. 같은 결과가 두 번 오는 것은 정상이며 오류가 아니다.
             log.debug("이미 끝난 시험 실행이다: {}", id)
+            return
         }
+
+        // 여기서 재는 것은 코드가 맞았는지가 아니라 **무엇을 시험해야 하는지 아는가**다
+        // (§8.2 테스트 설계). 기대 출력을 적은 케이스만 센다.
+        val trial = repository.find(id) ?: return
+        runCatching {
+            learning.tested(
+                userId = trial.userId,
+                problemId = trial.problemId,
+                trialId = id.toString(),
+                judgedCases = trial.cases.count { it.expected != null },
+            )
+        }.onFailure { log.warn("학습 기록에 남기지 못했다: {} ({})", id, it.message) }
     }
 }

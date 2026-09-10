@@ -86,6 +86,7 @@ class PreQuestionService(
     private val repository: PreQuestionRepository,
     private val packages: ProblemPackageLoader,
     private val questions: PreQuestions,
+    private val learning: LearningSignals = LearningSignals.NONE,
 ) {
 
     fun of(userId: String, problemId: String): PreQuestionSet? {
@@ -120,6 +121,22 @@ class PreQuestionService(
             answeredAt = Instant.now(),
         )
         repository.insert(response)
+
+        // 예측이 맞았는지가 곧 증거다 (§8.2 — 알고리즘 선택·복잡도 예측). 실패해도 삼킨다:
+        // 학습 기록이 질문에 답하는 일을 막아서는 안 된다.
+        runCatching {
+            learning.answered(
+                userId = userId,
+                problemId = problemId,
+                competency = kind.competency(),
+                correct = correct,
+                reference = response.id.toString(),
+                detail = buildString {
+                    append(answer)
+                    if (!correct) append(" — ").append(misconception?.name ?: "틀림")
+                },
+            )
+        }
         return view(pkg, response)
     }
 

@@ -15,7 +15,12 @@ import dev.codedrill.controlplane.admin.AdminAccounts
 import dev.codedrill.controlplane.submission.QuotaLimits
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import dev.codedrill.controlplane.identity.IdentityService
+import dev.codedrill.controlplane.competency.CompetencyService
+import dev.codedrill.controlplane.competency.EvidenceRepository
 import dev.codedrill.controlplane.identity.PersonalData
+import dev.codedrill.controlplane.submission.LearningSignals as SubmissionLearningSignals
+import dev.codedrill.controlplane.workspace.LearningSignals as WorkspaceLearningSignals
+import dev.codedrill.platform.problempackage.Competency
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
 import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
@@ -170,6 +175,44 @@ class ControlPlaneConfig {
         override val area = "trials"
         override fun export(userId: String) = mapOf("runs" to repository.export(userId))
         override fun erase(userId: String) = mapOf("runs" to repository.erase(userId))
+    }
+
+    /**
+     * 판정과 작업 공간의 사건을 역량 증거로 잇는다 (§3.1 조립 지점, FR-801).
+     *
+     * 세 모듈이 서로를 모른 채로 남는다. 제출은 역량을 모르고, Competency 는 제출 스키마를
+     * 모르며, 둘을 아는 곳은 여기 하나뿐이다.
+     *
+     * **어느 쪽도 이 연결 때문에 멈추지 않는다.** 부르는 쪽이 예외를 삼키고, 기본 구현은
+     * 아무 일도 하지 않는 NONE 이다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
+     */
+    @Bean
+    fun submissionLearningSignals(service: CompetencyService) =
+        SubmissionLearningSignals { userId, problemId, submissionId, accepted ->
+            service.judged(userId, problemId, submissionId.toString(), accepted)
+        }
+
+    @Bean
+    fun workspaceLearningSignals(service: CompetencyService) = object : WorkspaceLearningSignals {
+        override fun answered(
+            userId: String,
+            problemId: String,
+            competency: Competency,
+            correct: Boolean,
+            reference: String,
+            detail: String?,
+        ) = service.answered(userId, problemId, competency, correct, reference, detail)
+
+        override fun tested(userId: String, problemId: String, trialId: String, judgedCases: Int) =
+            service.tested(userId, problemId, trialId, judgedCases)
+    }
+
+    /** 역량 증거도 사용자의 기록이다 (§11.3). */
+    @Bean
+    fun competencyPersonalArea(repository: EvidenceRepository) = object : PersonalData {
+        override val area = "competency"
+        override fun export(userId: String) = mapOf("evidence" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("evidence" to repository.erase(userId))
     }
 
     /**

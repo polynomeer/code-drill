@@ -2,6 +2,7 @@ package dev.codedrill.controlplane.submission
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.JudgeCompleted
+import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.common.Cursor
@@ -27,6 +28,7 @@ class SubmissionService(
     private val metrics: SubmissionMetrics,
     private val quota: SubmissionQuota,
     private val rejudges: RejudgeContext = RejudgeContext.NONE,
+    private val learning: LearningSignals = LearningSignals.NONE,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -214,6 +216,23 @@ class SubmissionService(
                     score = message.score,
                 ),
             )
+        }
+
+        // 학습 기록은 **사용자가 직접 받은 판정만** 센다 (§4.2, §3.4).
+        //
+        // 재채점으로 바뀐 판정은 넣지 않는다. 그때 달라진 것은 사용자의 능력이 아니라 문제
+        // 데이터이고, 그것을 증거로 세면 남이 테스트를 고쳤다는 이유로 내 숙련도가 움직인다.
+        //
+        // 실패해도 삼킨다. 학습 기록이 판정을 막아서는 안 된다 (§12.2 장애 격리).
+        if (pending == null && apply) {
+            runCatching {
+                learning.judged(
+                    userId = current.userId,
+                    problemId = current.problemId,
+                    submissionId = id,
+                    accepted = message.verdict == Verdict.ACCEPTED,
+                )
+            }.onFailure { log.warn("학습 기록에 남기지 못했다: {} ({})", id, it.message) }
         }
 
         // dry-run 은 현재 판정을 바꾸지 않았으므로 SSE 로 알릴 것도 없다.
