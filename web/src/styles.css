@@ -933,3 +933,28 @@ table.groups td {
 .mutation-kinds li.unmeasured {
   opacity: 0.55;
 }
+
+/* 코칭 (FR-802). */
+.coaching-focus {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.coaching-focus > li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.coaching-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+/* 힌트는 들여쓴다. 어느 역량에 붙은 것인지 눈으로 바로 갈려야 한다. */
+.hint {
+  margin: 6px 0 0 12px;
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}

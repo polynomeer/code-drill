@@ -15,6 +15,7 @@ import type {
   Submission,
   QuestionKind,
   SubmissionLanguage,
+  CoachingSession,
   MutationCheck,
   Trial,
   TrialCaseInput,
@@ -125,6 +126,34 @@ export async function startTrial(
  */
 export async function getTrial(id: string): Promise<Trial> {
   return json<Trial>(await authed(`/trials/${id}`))
+}
+
+/**
+ * 코칭 세션을 연다 (PRD FR-802).
+ *
+ * 이미 열려 있으면 그것을 돌려준다 — 문제를 다시 열 때마다 새 세션이 생기면 "이 문제에서
+ * 몇 단계까지 봤나"가 세션마다 흩어진다.
+ */
+export async function openCoaching(problemId: string): Promise<CoachingSession> {
+  const response = await authed('/coaching/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId }),
+  })
+  return json<CoachingSession>(response)
+}
+
+/** 다음 단계를 펼친다. 본문은 이 응답에만 실려 온다. */
+export async function revealHint(
+  sessionId: string,
+  competency: string,
+): Promise<CoachingSession> {
+  const response = await authed(`/coaching/sessions/${sessionId}/reveal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ competency }),
+  })
+  return json<CoachingSession>(response)
 }
 
 /**

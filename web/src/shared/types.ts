@@ -218,6 +218,34 @@ export interface TrialCaseInput {
 }
 
 /**
+ * 코칭 세션 (PRD FR-802).
+ *
+ * 사다리 본문은 **펼친 것만** 온다. 남은 단계는 개수만 안다 — 통째로 받아 놓고 화면에서
+ * 가리면 개발자 도구를 열 줄 아는 사람에게는 도움이 아니라 정답이다.
+ */
+export interface CoachingSession {
+  id: string
+  problemId: string
+  /** 비어 있을 수 있다. 약한 역량이 없으면 도울 것도 없다. */
+  focus: CoachingFocus[]
+  revealed: RevealedHint[]
+  /** 가장 깊이 본 단계. 0 이면 도움 없이 풀고 있다는 뜻이다. */
+  helpLevel: number
+  closed: boolean
+}
+
+export interface CoachingFocus {
+  competency: string
+  remaining: number
+}
+
+export interface RevealedHint {
+  competency: string
+  level: number
+  text: string
+}
+
+/**
  * 변이 평가 (PRD FR-804).
  *
  * 백엔드 `MutationResponse` 와 짝을 이룬다. **오답의 이름도 소스도 오지 않는다** —
