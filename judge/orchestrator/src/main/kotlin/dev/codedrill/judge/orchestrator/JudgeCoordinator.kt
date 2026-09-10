@@ -193,8 +193,8 @@ class JudgeCoordinator(
 
     private fun complete(result: ExecutionResult, correlationId: String) {
         inFlight.remove(result.submissionId)
-        dispatchTrace(result.submissionId)
         val pkg = packageOf(result)
+        dispatchTrace(result)
         val aggregated = VerdictAggregator.aggregate(pkg.groups.map { it.policy }, result)
 
         gateway.publishCompleted(
@@ -295,13 +295,36 @@ class JudgeCoordinator(
      *
      * 저우선순위 큐로 분리하는 것이 다음 단계다. 지금은 같은 큐를 쓰되, 계측 오버헤드가
      * 판정 실행에 섞이지 않는다는 본질은 모드 분리로 지켜진다.
+     *
+     * **떨어진 케이스를 고른다.** 예전에는 언제나 첫 공개 케이스를 되짚었는데, 사용자가
+     * 리플레이를 여는 이유는 대개 "어디서 틀렸나"이고 그 답은 통과한 케이스에 없다.
+     * 떨어진 공개 케이스가 없으면 첫 공개 케이스로 돌아간다 — 정답을 받은 사람이
+     * "내가 의도한 대로 돌았나"를 보려는 경우가 그쪽이다 (PRD §2.2).
+     *
+     * 숨은 케이스는 고르지 않는다. 그 상태 변화를 보여주면 테스트가 그대로 샌다 (§8.3).
      */
-    private fun dispatchTrace(submissionId: String) {
-        val original = pendingTrace.remove(submissionId) ?: return
+    private fun dispatchTrace(result: ExecutionResult) {
+        val original = pendingTrace.remove(result.submissionId) ?: return
+        val public = original.groups.filter { it.policy.exposesInput }
+        if (public.isEmpty()) return
+
+        val failedIds = result.cases
+            .filter { it.verdict != Verdict.ACCEPTED }
+            .map { it.groupId to it.caseId }
+            .toSet()
+
+        val chosen = public.firstNotNullOfOrNull { group ->
+            group.cases.firstOrNull { (group.policy.id to it.id) in failedIds }
+                ?.let { group.policy to it }
+        } ?: public.first().let { group ->
+            group.cases.firstOrNull()?.let { group.policy to it }
+        } ?: return
+
         gateway.requestExecution(
             original.copy(
                 executionId = UUID.randomUUID().toString(),
                 mode = ExecutionMode.TRACE,
+                groups = listOf(RequestedGroup(chosen.first, listOf(chosen.second))),
             ),
         )
     }
