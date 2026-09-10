@@ -33,6 +33,30 @@ class HintCoverageTest {
     }
 
     @Test
+    fun `어느 힌트도 코드를 주지 않는다`() {
+        // 주석으로만 적어 둔 규칙은 다음 사람이 문제를 추가할 때 지켜지지 않는다.
+        // 코드를 주는 순간 그것은 도움이 아니라 정답이고, 그 뒤의 증거는 아무것도 재지 못한다.
+        val code = Regex("""\bfun\s+\w+\s*\(|\bfor\s*\(|\bwhile\s*\(|\breturn\b|[{};]""")
+        val offenders = root.listDirectoryEntries().filter { it.isDirectory() }
+            .flatMap { dir -> loader.hints(dir.name).values.flatten().map { dir.name to it } }
+            .filter { (_, text) -> code.containsMatchIn(text) }
+            .map { (id, text) -> "$id: $text" }
+
+        assertTrue(offenders.isEmpty(), "코드가 섞인 힌트: $offenders")
+    }
+
+    @Test
+    fun `평문이다 — 화면이 마크다운을 그리지 않는다`() {
+        // 별표를 그대로 보여 준 적이 있다. 강조하려고 쓴 것이 화면에서는 잡음이 된다.
+        val marked = root.listDirectoryEntries().filter { it.isDirectory() }
+            .flatMap { dir -> loader.hints(dir.name).values.flatten().map { dir.name to it } }
+            .filter { (_, text) -> text.contains("**") || text.contains("`") }
+            .map { (id, text) -> "$id: $text" }
+
+        assertTrue(marked.isEmpty(), "마크다운이 섞인 힌트: $marked")
+    }
+
+    @Test
     fun `저작한 사다리는 카탈로그가 선언한 역량에만 붙는다`() {
         val stray = root.listDirectoryEntries().filter { it.isDirectory() }.mapNotNull { dir ->
             val declared = loader.load(dir.name).catalog.competencies.toSet()
