@@ -40,6 +40,7 @@ import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.workspace.MutationLimits
 import dev.codedrill.controlplane.workspace.MutationRepository
+import dev.codedrill.controlplane.submission.trace.DivergenceService
 import dev.codedrill.controlplane.workspace.MutationService
 import dev.codedrill.controlplane.workspace.TrialLimits
 import dev.codedrill.controlplane.workspace.TrialRepository
@@ -382,6 +383,11 @@ class ControlPlaneConfig {
             // 시험 실행은 오케스트레이터를 거치지 않으므로 payload 가 곧 실행 요청이다.
             // 판정 큐와 다른 큐로 간다 — 이유는 JudgeQueues.TRIALS 에 있다.
             TrialService.TRIAL_EVENT -> OutboxRoute(JudgeQueues.TRIALS) {
+                mapper.readValue<ExecutionRequest>(it)
+            }
+            // 참조 트레이스도 오케스트레이터를 거치지 않는다. 판정이 아니므로 임대도
+            // fencing 도 없고, 잃어버리면 다음 제출이 다시 건다 (FR-805).
+            DivergenceService.REFERENCE_TRACE_EVENT -> OutboxRoute(JudgeQueues.REFERENCE_TRACES) {
                 mapper.readValue<ExecutionRequest>(it)
             }
             // 변이 평가도 오케스트레이터를 거치지 않는다. 정답 한 번 + 오답 N 번이 한

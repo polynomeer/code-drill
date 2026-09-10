@@ -58,9 +58,24 @@ object JudgeQueues {
     /** 변이 평가 결과. */
     const val MUTATION_RESULTS = "judge.mutation-results"
 
+    /**
+     * 참조 풀이를 계측해 돌리는 실행 (PRD FR-805, 최초 분기 진단).
+     *
+     * 판정 큐와 나눈다. 이것은 사용자를 기다리게 하지 않는 뒷일이라, 채점 앞에 서면
+     * 안 된다. 반대로 결과가 늦어도 사용자는 판정과 리플레이를 온전히 본다.
+     *
+     * **문제 버전과 케이스마다 한 번만 돈다.** 참조 트레이스는 그 둘의 함수이고, 제어
+     * 영역이 결과를 저장해 두었다가 다음부터는 그것을 쓴다.
+     */
+    const val REFERENCE_TRACES = "judge.reference-traces"
+
+    /** 참조 트레이스의 결과. */
+    const val REFERENCE_TRACE_RESULTS = "judge.reference-trace-results"
+
     val all = listOf(
         SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS,
         TRIALS, TRIAL_RESULTS, MUTATIONS, MUTATION_RESULTS,
+        REFERENCE_TRACES, REFERENCE_TRACE_RESULTS,
     )
 
     /**

@@ -2,6 +2,8 @@ package dev.codedrill.controlplane.submission
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.Language
+import dev.codedrill.controlplane.submission.trace.Divergence
+import dev.codedrill.controlplane.submission.trace.DivergenceService
 import dev.codedrill.controlplane.submission.trace.TraceRepository
 import dev.codedrill.judge.protocol.TraceChunk
 import dev.codedrill.judge.protocol.TraceManifest
@@ -43,6 +45,7 @@ class SubmissionController(
     private val service: SubmissionService,
     private val events: SubmissionEventStream,
     private val traces: TraceRepository,
+    private val divergence: DivergenceService,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
 ) {
@@ -145,6 +148,24 @@ class SubmissionController(
         ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
         val chunk = traces.findChunk(id, index) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(chunk)
+    }
+
+    /**
+     * 최초 분기 진단 (PRD FR-805).
+     *
+     * 아직 계산되지 않았으면 204 다. 트레이스와 같은 이유로 오류가 아니다 — 참조 실행이
+     * 아직 안 돌았거나, 이 문제에 참조 풀이가 없을 수 있다.
+     *
+     * **참조 코드도 참조 트레이스도 여기서 나가지 않는다.** 나가는 것은 갈라진 그 한
+     * 이벤트를 사람 말로 옮긴 한 줄뿐이다 (§8.3).
+     */
+    @GetMapping("/{id}/divergence")
+    fun divergenceOf(
+        @PathVariable id: UUID,
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+    ): ResponseEntity<Divergence> {
+        val found = divergence.find(principal.id, id) ?: return ResponseEntity.noContent().build()
+        return ResponseEntity.ok(found)
     }
 
     /**

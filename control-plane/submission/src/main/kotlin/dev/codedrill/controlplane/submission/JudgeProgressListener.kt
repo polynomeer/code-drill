@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.submission
 import com.fasterxml.jackson.databind.ObjectMapper
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
+import dev.codedrill.controlplane.submission.trace.DivergenceService
 import dev.codedrill.controlplane.submission.trace.TraceRepository
 import dev.codedrill.judge.protocol.TraceReady
 import dev.codedrill.platform.messaging.JudgeQueues
@@ -28,6 +29,7 @@ class JudgeProgressListener(
     private val events: SubmissionEventStream,
     private val repository: SubmissionRepository,
     private val traces: TraceRepository,
+    private val divergence: DivergenceService,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
 ) {
@@ -90,6 +92,12 @@ class JudgeProgressListener(
         traces.save(message.manifest, message.chunks)
         // SSE 로는 목차만 알린다. 청크는 클라이언트가 필요한 위치만 내려받는다 (§7.5).
         events.publish(message.submissionId, "trace", message.manifest)
+
+        // 분기 진단은 트레이스 위에 얹힌다 (FR-805). 실패해도 리플레이는 그대로 열린다 —
+        // 트레이스가 판정을 막지 않는 것과 같은 이유다 (§12.2).
+        runCatching { divergence.traced(message) }
+            .onFailure { log.warn("분기를 짚지 못했다: {} ({})", message.submissionId, it.message) }
+
         events.close(message.submissionId)
     }
 }

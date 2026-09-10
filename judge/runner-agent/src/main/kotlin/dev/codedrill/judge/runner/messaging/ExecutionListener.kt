@@ -103,6 +103,22 @@ class ExecutionListener(
     }
 
     /**
+     * 참조 풀이 계측 실행 (FR-805).
+     *
+     * 시험 실행과 같은 모양이다 — 심장 박동도 임대도 없고, 잃어버리면 제어 영역이 다시
+     * 요청한다. 다른 것은 여기 실린 소스가 **저작자의 정답**이라는 것뿐이며, Runner 는
+     * 그 사실을 알 필요가 없다.
+     */
+    @RabbitListener(queues = [JudgeQueues.REFERENCE_TRACES])
+    fun onReferenceTrace(request: ExecutionRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.executionId)
+            .log("참조 트레이스를 시작한다")
+
+        rabbit.convertAndSend(JudgeQueues.REFERENCE_TRACE_RESULTS, engine.execute(request))
+    }
+
+    /**
      * 변이 평가 (PRD FR-804).
      *
      * **큐는 따로, 리스너는 같이.** 한 건이 정답 한 번 + 오답 N 번을 돌려 다른 어떤
