@@ -2,6 +2,7 @@ package dev.codedrill.controlplane
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.controlplane.outbox.OutboxRoute
@@ -18,6 +19,9 @@ import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
 import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
+import dev.codedrill.controlplane.workspace.TrialLimits
+import dev.codedrill.controlplane.workspace.TrialRepository
+import dev.codedrill.controlplane.workspace.TrialService
 import dev.codedrill.controlplane.problem.ProblemProgress
 import dev.codedrill.controlplane.problem.PublishedProblems
 import dev.codedrill.controlplane.submission.RejudgeContext
@@ -33,7 +37,7 @@ import java.nio.file.Path
 import java.util.UUID
 
 @Configuration
-@EnableConfigurationProperties(QuotaLimits::class, TraceRetentionPolicy::class)
+@EnableConfigurationProperties(QuotaLimits::class, TraceRetentionPolicy::class, TrialLimits::class)
 @EnableScheduling
 class ControlPlaneConfig {
 
@@ -122,6 +126,19 @@ class ControlPlaneConfig {
     }
 
     /**
+     * 시험 실행도 사용자가 적은 것이다 — 소스와 입력이 그대로 들어 있다.
+     *
+     * 새 표를 만들면서 이 목록에 넣는 것을 잊으면, 반출은 조용히 빠뜨리고 삭제는 조용히
+     * 남긴다. 둘 다 오류를 내지 않는다.
+     */
+    @Bean
+    fun trialPersonalArea(repository: TrialRepository) = object : PersonalData {
+        override val area = "trials"
+        override fun export(userId: String) = mapOf("runs" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("runs" to repository.erase(userId))
+    }
+
+    /**
      * 재채점과 제출 도메인을 잇는 어댑터 두 개 (§3.1 조립 지점).
      *
      * 두 모듈은 서로를 모른다. Admin 은 "무엇을 다시 돌릴지"를 정하고, 제출 도메인은
@@ -175,6 +192,11 @@ class ControlPlaneConfig {
         override fun routeFor(type: String): OutboxRoute? = when (type) {
             "SubmissionQueued" -> OutboxRoute(JudgeQueues.SUBMISSIONS) {
                 mapper.readValue<SubmissionQueued>(it)
+            }
+            // 시험 실행은 오케스트레이터를 거치지 않으므로 payload 가 곧 실행 요청이다.
+            // 판정 큐와 다른 큐로 간다 — 이유는 JudgeQueues.TRIALS 에 있다.
+            TrialService.TRIAL_EVENT -> OutboxRoute(JudgeQueues.TRIALS) {
+                mapper.readValue<ExecutionRequest>(it)
             }
             else -> null
         }

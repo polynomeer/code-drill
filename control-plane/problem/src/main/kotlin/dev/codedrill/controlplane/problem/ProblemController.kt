@@ -259,6 +259,7 @@ data class ProblemPage(
     val tags: Map<String, Int>,
 )
 
-data class SampleCase(val id: String, val args: List<Any>, val expected: Any)
+/** 공개 예제. 문제 패키지의 케이스는 항상 기대 출력을 갖는다 (TestCase.expected). */
+data class SampleCase(val id: String, val args: List<Any>, val expected: Any?)
 
 data class GroupInfo(val id: String, val weight: Int, val aggregation: String, val caseCount: Int)
