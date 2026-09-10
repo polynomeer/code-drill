@@ -19,6 +19,8 @@ import dev.codedrill.controlplane.identity.PersonalData
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
 import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
+import dev.codedrill.controlplane.workspace.PreQuestionRepository
+import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.workspace.TrialLimits
 import dev.codedrill.controlplane.workspace.TrialRepository
 import dev.codedrill.controlplane.workspace.TrialService
@@ -131,6 +133,38 @@ class ControlPlaneConfig {
      * 새 표를 만들면서 이 목록에 넣는 것을 잊으면, 반출은 조용히 빠뜨리고 삭제는 조용히
      * 남긴다. 둘 다 오류를 내지 않는다.
      */
+    /**
+     * 풀이 전 질문이 고를 수 있는 기법 (FR-803).
+     *
+     * `content/tags.yaml` 에서 **containers 를 뺀 나머지**다. 목록을 코드에 또 적으면
+     * 태그를 하나 늘렸을 때 선택지에는 없는 정답이 생기고, 사용자는 무엇을 골라도 틀리는
+     * 질문을 받는다.
+     *
+     * containers(배열·문자열·격자)를 빼는 이유는 그것이 답이 되지 못하기 때문이다 —
+     * 배열 문제를 "배열로 푼다"고 답하는 것은 아무 말도 아니다.
+     */
+    @Bean
+    fun preQuestions(@Value("\${codedrill.content.root}") root: String): PreQuestions {
+        val file = Path.of(root).parent?.resolve("tags.yaml")
+        val text = file?.takeIf { it.toFile().isFile }?.toFile()?.readText().orEmpty()
+
+        fun section(name: String): List<String> =
+            Regex("$name:\\s*\\n((?:\\s+- \\S+\\n?)+)").find(text)
+                ?.groupValues?.get(1)
+                ?.let { block -> Regex("- (\\S+)").findAll(block).map { it.groupValues[1] }.toList() }
+                .orEmpty()
+
+        return PreQuestions(section("structures") + section("techniques"))
+    }
+
+    /** 풀이 전 응답의 근거도 사용자가 적은 것이다 (§11.3, FR-803). */
+    @Bean
+    fun preQuestionPersonalArea(repository: PreQuestionRepository) = object : PersonalData {
+        override val area = "prequestions"
+        override fun export(userId: String) = mapOf("answers" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("rationales" to repository.erase(userId))
+    }
+
     @Bean
     fun trialPersonalArea(repository: TrialRepository) = object : PersonalData {
         override val area = "trials"
