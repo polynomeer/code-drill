@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DivergenceCard } from './DivergenceCard'
+import { PredictNext } from './PredictNext'
 import { applyAll } from './reducer'
 import { EventFallback, renderersFor } from './renderers'
 import { kindsIn, useTrace } from './useTrace'
@@ -54,6 +55,12 @@ export function ReplayView({
   const kinds = useMemo(() => kindsIn(events, manifest), [events, manifest])
   const renderers = useMemo(() => renderersFor(kinds), [kinds])
   const current = step > 0 ? events[step - 1] : null
+  // 보기는 **이 트레이스에 실제로 나오는 종류**에서만 뽑는다. 없는 종류를 섞으면
+  // 소거법으로 답이 드러나고, 그러면 예측이 아니라 퀴즈 풀이가 된다.
+  const choiceTypes = useMemo(
+    () => [...new Set(manifest.summary.concat(events).map((event) => event.eventType))].sort(),
+    [events, manifest.summary],
+  )
 
   if (manifest.status === 'EMPTY') {
     return (
@@ -146,6 +153,15 @@ export function ReplayView({
           {step} / {total}
         </span>
       </div>
+
+      {/* 재생 위치 바로 아래에 둔다. 다음을 누르기 전에 눈에 들어와야 예측이지,
+          지나간 뒤에 물으면 회상이다 (FR-805). */}
+      <PredictNext
+        submissionId={submissionId}
+        next={events[step] ?? null}
+        choices={choiceTypes}
+        labelOf={(type) => TYPE_LABEL[type] ?? type}
+      />
 
       <p className="event-line">
         {current

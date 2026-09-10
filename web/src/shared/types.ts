@@ -272,6 +272,22 @@ export interface Divergence {
 }
 
 /**
+ * 리플레이 중 다음 상태 예측 (PRD FR-805).
+ *
+ * 채점은 서버가 한다. 화면이 맞고 틀림을 정하면 그것은 채점이 아니라 자기 신고다.
+ */
+export interface StatePrediction {
+  id: string
+  submissionId: string
+  /** 맞히려 한 이벤트의 seq. */
+  step: number
+  predicted: string
+  actual: string
+  correct: boolean
+  rationale: string | null
+}
+
+/**
  * 전이 확인 과제 (PRD FR-807).
  *
  * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로

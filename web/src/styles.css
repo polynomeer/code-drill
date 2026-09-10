@@ -997,3 +997,14 @@ table.groups td {
   width: 60px;
   flex: none;
 }
+
+/* 다음 상태 예측 (FR-805). */
+.predict {
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--border);
+}
+
+.predict p {
+  margin: 0 0 6px;
+}

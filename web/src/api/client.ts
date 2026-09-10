@@ -17,6 +17,7 @@ import type {
   SubmissionLanguage,
   CoachingSession,
   Divergence,
+  StatePrediction,
   MutationCheck,
   TransferTask,
   Trial,
@@ -156,6 +157,31 @@ export async function revealHint(
     body: JSON.stringify({ competency }),
   })
   return json<CoachingSession>(response)
+}
+
+/**
+ * 다음 이벤트를 맞혀 본다 (PRD FR-805).
+ *
+ * 자리는 화면의 위치가 아니라 **이벤트의 seq** 로 보낸다. 위치는 몇 개를 불러왔는지에
+ * 달려 있어 서버와 어긋날 수 있다.
+ */
+export async function predictNext(
+  submissionId: string,
+  seq: number,
+  predicted: string,
+  rationale: string | null,
+): Promise<StatePrediction> {
+  const response = await authed(`/submissions/${submissionId}/predictions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seq, predicted, rationale }),
+  })
+  return json<StatePrediction>(response)
+}
+
+/** 이미 맞혀 본 자리들. 같은 자리를 다시 묻지 않기 위해서다. */
+export async function getPredictions(submissionId: string): Promise<StatePrediction[]> {
+  return json<StatePrediction[]>(await authed(`/submissions/${submissionId}/predictions`))
 }
 
 /**
