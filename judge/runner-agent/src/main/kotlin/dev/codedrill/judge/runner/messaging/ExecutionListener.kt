@@ -3,7 +3,9 @@ package dev.codedrill.judge.runner.messaging
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.MutationRequest
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.judge.runner.execution.MutationEvaluator
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.platform.observability.CorrelationIds
 import org.slf4j.LoggerFactory
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeUnit
 @Component
 class ExecutionListener(
     private val engine: ExecutionEngine,
+    private val mutations: MutationEvaluator,
     private val rabbit: RabbitTemplate,
 ) {
 
@@ -97,6 +100,24 @@ class ExecutionListener(
 
         val result = engine.execute(request)
         rabbit.convertAndSend(JudgeQueues.TRIAL_RESULTS, result)
+    }
+
+    /**
+     * 변이 평가 (PRD FR-804).
+     *
+     * **큐는 따로, 리스너는 같이.** 한 건이 정답 한 번 + 오답 N 번을 돌려 다른 어떤
+     * 작업보다 오래 걸리므로 큐를 나눠 뒤를 막지 않게 하고, 리스너를 나누지 않아
+     * 채점과 동시에 돌지 않게 한다 (§5.2).
+     *
+     * 심장 박동도 임대도 없다. 잃어버리면 사용자가 다시 누른다 — 시험 실행과 같다.
+     */
+    @RabbitListener(queues = [JudgeQueues.MUTATIONS])
+    fun onMutation(request: MutationRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.evaluationId)
+            .log("변이 평가를 시작한다: 오답 {}개, 케이스 {}건", request.mutants.size, request.cases.size)
+
+        rabbit.convertAndSend(JudgeQueues.MUTATION_RESULTS, mutations.evaluate(request))
     }
 
     /**

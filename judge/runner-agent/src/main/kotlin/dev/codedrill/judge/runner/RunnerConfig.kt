@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.judge.runner.execution.MutationEvaluator
 import dev.codedrill.judge.runner.execution.RuntimeClasspath
 import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
 import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
@@ -83,6 +84,15 @@ class RunnerConfig {
             .register(registry)
             .record(nanos, TimeUnit.NANOSECONDS)
     }
+
+    /**
+     * 변이 평가 (FR-804).
+     *
+     * 판정과 **같은 엔진**을 받는다. 다른 것을 주면 저작 검증에서 잡히던 오답이 사용자
+     * 화면에서는 안 잡히는 일이 생긴다.
+     */
+    @Bean
+    fun mutationEvaluator(engine: ExecutionEngine) = MutationEvaluator(engine)
 }
 
 @ConfigurationProperties(prefix = "codedrill.sandbox")

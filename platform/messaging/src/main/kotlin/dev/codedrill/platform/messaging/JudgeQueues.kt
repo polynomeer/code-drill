@@ -45,7 +45,23 @@ object JudgeQueues {
     /** 시험 실행의 결과. 제어 영역이 받아 저장한다. */
     const val TRIAL_RESULTS = "judge.trial-results"
 
-    val all = listOf(SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS, TRIALS, TRIAL_RESULTS)
+    /**
+     * 사용자 테스트를 대표 오답에 겨눠 보는 평가 (PRD FR-804).
+     *
+     * 판정·시험과 또 나눈다. 한 건이 **정답 한 번 + 오답 N 번**을 돌리므로 다른 어떤
+     * 작업보다 오래 걸리고, 같은 큐에 두면 그 뒤의 짧은 작업이 통째로 그만큼 밀린다.
+     *
+     * 받는 리스너는 판정과 같은 하나다 — 동시에 돌면 측정이 오염된다 (§5.2).
+     */
+    const val MUTATIONS = "judge.mutations"
+
+    /** 변이 평가 결과. */
+    const val MUTATION_RESULTS = "judge.mutation-results"
+
+    val all = listOf(
+        SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS,
+        TRIALS, TRIAL_RESULTS, MUTATIONS, MUTATION_RESULTS,
+    )
 
     /**
      * 처리할 수 없는 메시지가 가는 곳 (§10.2, §12.2).
