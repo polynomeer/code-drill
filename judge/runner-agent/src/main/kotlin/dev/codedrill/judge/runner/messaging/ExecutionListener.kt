@@ -4,8 +4,10 @@ import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.MutationRequest
+import dev.codedrill.judge.protocol.ShrinkRequest
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.MutationEvaluator
+import dev.codedrill.judge.runner.execution.Shrinker
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.platform.observability.CorrelationIds
 import org.slf4j.LoggerFactory
@@ -28,6 +30,7 @@ import java.util.concurrent.TimeUnit
 class ExecutionListener(
     private val engine: ExecutionEngine,
     private val mutations: MutationEvaluator,
+    private val shrinker: Shrinker,
     private val rabbit: RabbitTemplate,
 ) {
 
@@ -134,6 +137,22 @@ class ExecutionListener(
             .log("변이 평가를 시작한다: 오답 {}개, 케이스 {}건", request.mutants.size, request.cases.size)
 
         rabbit.convertAndSend(JudgeQueues.MUTATION_RESULTS, mutations.evaluate(request))
+    }
+
+    /**
+     * 최소 반례 축소 (§6.3).
+     *
+     * 이 시스템에서 가장 오래 걸리는 작업이다 — 라운드마다 컴파일 두 번에 후보 수십 개를
+     * 돌린다. 그래서 큐를 따로 두고, 그래도 리스너는 같이 쓴다: 채점과 동시에 돌면 둘 다
+     * 느려지고 측정까지 오염된다 (§5.2).
+     */
+    @RabbitListener(queues = [JudgeQueues.SHRINKS])
+    fun onShrink(request: ShrinkRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.shrinkId)
+            .log("반례 축소를 시작한다")
+
+        rabbit.convertAndSend(JudgeQueues.SHRINK_RESULTS, shrinker.shrink(request))
     }
 
     /**

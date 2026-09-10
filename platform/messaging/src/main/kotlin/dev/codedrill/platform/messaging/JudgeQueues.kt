@@ -72,10 +72,21 @@ object JudgeQueues {
     /** 참조 트레이스의 결과. */
     const val REFERENCE_TRACE_RESULTS = "judge.reference-trace-results"
 
+    /**
+     * 최소 반례 축소 (§6.3).
+     *
+     * 한 건이 라운드마다 컴파일 두 번에 후보 수십 개를 돌린다 — 이 시스템에서 가장 비싼
+     * 작업이다. 다른 어떤 큐와도 섞지 않는다.
+     */
+    const val SHRINKS = "judge.shrinks"
+
+    /** 축소 결과. */
+    const val SHRINK_RESULTS = "judge.shrink-results"
+
     val all = listOf(
         SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS,
         TRIALS, TRIAL_RESULTS, MUTATIONS, MUTATION_RESULTS,
-        REFERENCE_TRACES, REFERENCE_TRACE_RESULTS,
+        REFERENCE_TRACES, REFERENCE_TRACE_RESULTS, SHRINKS, SHRINK_RESULTS,
     )
 
     /**
