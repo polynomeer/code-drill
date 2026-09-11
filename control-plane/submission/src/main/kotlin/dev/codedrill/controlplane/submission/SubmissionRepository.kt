@@ -54,6 +54,16 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
         jdbc.query("SELECT source FROM submission WHERE id = ?", { rs, _ -> rs.getString(1) }, id)
             .firstOrNull()
 
+    /** 이 문제에서 가장 최근에 맞힌 제출. 실험실이 "내 풀이"로 세우는 것이다. */
+    fun latestAccepted(userId: String, problemId: String): Submission? = jdbc.query(
+        """
+        SELECT * FROM submission
+         WHERE user_id = ? AND problem_id = ? AND verdict = 'ACCEPTED'
+         ORDER BY created_at DESC LIMIT 1
+        """.trimIndent(),
+        MAPPER, userId, problemId,
+    ).firstOrNull()
+
     fun findByIdempotencyKey(userId: String, key: String): Submission? =
         jdbc.query(
             "SELECT * FROM submission WHERE user_id = ? AND idempotency_key = ?",

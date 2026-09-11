@@ -115,7 +115,7 @@ class IdentitySecurityConfig(
             // 사용자의 것: 제출·초안·자기 정보. 소유자만 열 수 있어야 한다.
             .addPathPatterns(
                 "/api/v1/submissions/**", "/api/v1/workspaces/**", "/api/v1/trials/**",
-                "/api/v1/prequestions/**", "/api/v1/mutations/**", "/api/v1/coaching/**",
+                "/api/v1/prequestions/**", "/api/v1/mutations/**", "/api/v1/coaching/**", "/api/v1/labs/**",
                 "/api/v1/me/**", "/api/v1/auth/**",
                 // 관리자 API 도 같은 방식으로 로그인한다. 인가는 Admin 모듈이 이어서
                 // 하지만, **누구인지 확인하는 일은 한 곳에서만** 일어나야 한다 (§11.2).

@@ -3,6 +3,7 @@ package dev.codedrill.controlplane
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.LabRequest
 import dev.codedrill.judge.protocol.MutationRequest
 import dev.codedrill.judge.protocol.ShrinkRequest
 import dev.codedrill.judge.protocol.SubmissionQueued
@@ -45,6 +46,8 @@ import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.workspace.MutationLimits
 import dev.codedrill.controlplane.workspace.MutationRepository
+import dev.codedrill.controlplane.submission.lab.LabRepository
+import dev.codedrill.controlplane.submission.lab.LabService
 import dev.codedrill.controlplane.submission.trace.CounterexampleService
 import dev.codedrill.controlplane.submission.trace.DivergenceService
 import dev.codedrill.controlplane.submission.trace.PredictionRepository
@@ -205,6 +208,14 @@ class ControlPlaneConfig {
         override fun erase(userId: String) = mapOf("runs" to repository.erase(userId))
     }
 
+    /** 해설 열람과 실험 입력도 사용자의 것이다 (§11.3). */
+    @Bean
+    fun labPersonalArea(repository: LabRepository) = object : PersonalData {
+        override val area = "labs"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = repository.erase(userId)
+    }
+
     /** 예측의 근거도 사용자가 쓴 것이다 (§11.3). */
     @Bean
     fun predictionPersonalArea(repository: PredictionRepository) = object : PersonalData {
@@ -234,6 +245,7 @@ class ControlPlaneConfig {
         service: CompetencyService,
         coaching: CoachingService,
         transfers: TransferService,
+        lab: LabService,
     ) =
         object : SubmissionLearningSignals {
             override fun judged(
@@ -244,10 +256,12 @@ class ControlPlaneConfig {
             ) {
                 // 이 문제에서 받은 도움을 여기서 조회해 넘긴다 (FR-806). 제출 모듈은
                 // 코칭을 모르고 Competency 는 세션을 모르며, 둘을 아는 곳은 여기뿐이다.
-                service.judged(
-                    userId, problemId, submissionId.toString(), accepted,
-                    helpLevel = runCatching { coaching.helpLevel(userId, problemId) }.getOrDefault(0),
+                // 정답 전에 해설을 열었으면 방법을 본 것이다 — 힌트 3단계와 같다 (FR-214).
+                val helpLevel = maxOf(
+                    runCatching { coaching.helpLevel(userId, problemId) }.getOrDefault(0),
+                    if (runCatching { lab.unlockedEarly(userId, problemId) }.getOrDefault(false)) EDITORIAL_HELP else 0,
                 )
+                service.judged(userId, problemId, submissionId.toString(), accepted, helpLevel = helpLevel)
                 // 이 판정이 누군가의 전이 확인 과제를 닫을 수 있다 (FR-807). 실패해도
                 // 판정을 막지 않는다 — 학습 기록은 판정보다 뒤에 있는 관심사다.
                 runCatching { transfers.judged(userId, problemId, accepted) }
@@ -466,6 +480,8 @@ class ControlPlaneConfig {
             TrialService.TRIAL_EVENT -> OutboxRoute(JudgeQueues.TRIALS) {
                 mapper.readValue<ExecutionRequest>(it)
             }
+            // 실험실도 판정이 아니다 (§6.4~6.6).
+            LabService.LAB_EVENT -> OutboxRoute(JudgeQueues.LABS) { mapper.readValue<LabRequest>(it) }
             // 반례 축소도 오케스트레이터를 거치지 않는다. 판정이 아니라 판정 뒤의
             // 진단이며, 잃어버리면 사용자가 다시 누른다 (§6.3).
             CounterexampleService.SHRINK_EVENT -> OutboxRoute(JudgeQueues.SHRINKS) {
@@ -498,3 +514,11 @@ private val NEEDS_HELP = listOf(
     MasteryLevel.UNMEASURED,
     MasteryLevel.PROFICIENT,
 )
+
+/**
+ * 정답 전에 해설을 연 것의 도움 단계 (FR-214).
+ *
+ * 힌트 사다리의 마지막 칸과 같다 — 방법을 본 것이다. 코칭의 3단계가 "방법"이므로 같은
+ * 값을 준다. 더 낮추면 힌트를 세 번 누른 사람보다 해설을 통째로 본 사람이 유리해진다.
+ */
+private const val EDITORIAL_HELP = 3
