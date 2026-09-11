@@ -1,11 +1,13 @@
 package dev.codedrill.judge.runner.messaging
 
+import dev.codedrill.judge.protocol.ArenaRequest
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.LabRequest
 import dev.codedrill.judge.protocol.MutationRequest
 import dev.codedrill.judge.protocol.ShrinkRequest
+import dev.codedrill.judge.runner.execution.ArenaRunner
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.LabRunner
 import dev.codedrill.judge.runner.execution.MutationEvaluator
@@ -34,6 +36,7 @@ class ExecutionListener(
     private val mutations: MutationEvaluator,
     private val shrinker: Shrinker,
     private val lab: LabRunner,
+    private val arena: ArenaRunner,
     private val rabbit: RabbitTemplate,
 ) {
 
@@ -168,6 +171,16 @@ class ExecutionListener(
             .log("실험실 실행을 시작한다: 풀이 {}개", request.approaches.size)
 
         rabbit.convertAndSend(JudgeQueues.LAB_RESULTS, lab.run(request))
+    }
+
+    /** 반례 아레나 (§8.3). 큐는 따로, 리스너는 같이. */
+    @RabbitListener(queues = [JudgeQueues.ARENA])
+    fun onArena(request: ArenaRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.attemptId)
+            .log("아레나 시도를 돌린다: 오답 {}개", request.mutants.size)
+
+        rabbit.convertAndSend(JudgeQueues.ARENA_RESULTS, arena.run(request))
     }
 
     /**

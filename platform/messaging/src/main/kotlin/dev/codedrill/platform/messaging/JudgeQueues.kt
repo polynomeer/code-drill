@@ -89,11 +89,17 @@ object JudgeQueues {
     /** 실험실 결과. */
     const val LAB_RESULTS = "judge.lab-results"
 
+    /** 반례 아레나 (§8.3). 참조 한 번 + 오답 N 번 + 깨뜨린 만큼의 축소. */
+    const val ARENA = "judge.arena"
+
+    /** 아레나 결과. */
+    const val ARENA_RESULTS = "judge.arena-results"
+
     val all = listOf(
         SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS,
         TRIALS, TRIAL_RESULTS, MUTATIONS, MUTATION_RESULTS,
         REFERENCE_TRACES, REFERENCE_TRACE_RESULTS, SHRINKS, SHRINK_RESULTS,
-        LABS, LAB_RESULTS,
+        LABS, LAB_RESULTS, ARENA, ARENA_RESULTS,
     )
 
     /**

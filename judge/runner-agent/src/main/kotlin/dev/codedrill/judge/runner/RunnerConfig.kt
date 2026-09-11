@@ -1,6 +1,7 @@
 package dev.codedrill.judge.runner
 
 import dev.codedrill.judge.protocol.Language
+import dev.codedrill.judge.runner.execution.ArenaRunner
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.LabRunner
 import dev.codedrill.judge.runner.execution.MutationEvaluator
@@ -103,6 +104,10 @@ class RunnerConfig {
     /** 실험실 (§6.4~6.6). 판정과 같은 엔진을 쓴다. */
     @Bean
     fun labRunner(engine: ExecutionEngine) = LabRunner(engine)
+
+    /** 반례 아레나 (§8.3). 같은 엔진, 같은 축소기. */
+    @Bean
+    fun arenaRunner(engine: ExecutionEngine) = ArenaRunner(engine)
 }
 
 @ConfigurationProperties(prefix = "codedrill.sandbox")
