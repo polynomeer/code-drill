@@ -307,6 +307,72 @@ export interface Counterexample {
 }
 
 /**
+ * 학습 루프 (PRD FR-808, FR-205).
+ */
+export type Reason =
+  | 'RECENT_FAILURE'
+  | 'TRANSFER'
+  | 'HINT_DEPENDENT'
+  | 'REVIEW_DUE'
+  | 'WEAK_COMPETENCY'
+  | 'NEXT_ON_PATH'
+
+export const REASON_LABEL: Record<Reason, string> = {
+  RECENT_FAILURE: '최근에 틀린 문제',
+  TRANSFER: '전이 확인',
+  HINT_DEPENDENT: '힌트 없이 다시',
+  REVIEW_DUE: '복습 시점',
+  WEAK_COMPETENCY: '약점 보완',
+  NEXT_ON_PATH: '다음 단계',
+}
+
+export interface PrescribedProblem {
+  problemId: string
+  reason: Reason
+  detail: string
+  competency: string | null
+  nextMeasurement: string
+}
+
+export interface Streak {
+  days: number
+  activeToday: boolean
+  atRisk: boolean
+}
+
+export interface Prescription {
+  date: string
+  items: PrescribedProblem[]
+  streak: Streak
+}
+
+export interface WeeklyReport {
+  from: string
+  to: string
+  activity: { attempts: number; accepted: number; problemsSolved: number; activeDays: number }
+  weakest: string[]
+  recurrences: { problemId: string; solvedAt: string; failedAt: string }[]
+  growth: { competency: string; from: MasteryLevel; to: MasteryLevel }[]
+  actions: PrescribedProblem[]
+  nextMeasurement: string
+}
+
+export interface Stats {
+  problemsAttempted: number
+  problemsSolved: number
+  submissions: number
+  accepted: number
+  verdicts: Record<string, number>
+  byTag: Record<string, { attempted: number; solved: number }>
+}
+
+export interface Collection {
+  id: string
+  name: string
+  problems: string[]
+}
+
+/**
  * 전이 확인 과제 (PRD FR-807).
  *
  * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로
@@ -393,7 +459,13 @@ export interface PreQuestionSet {
 /** 역량 지도 (PRD §3.4, FR-801·FR-806). 백엔드 `MasteryView` 와 짝을 이룬다. */
 export type MasteryLevel = 'UNMEASURED' | 'DEVELOPING' | 'PROFICIENT' | 'STRONG'
 export type Confidence = 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH'
-export type EvidenceSource = 'SUBMISSION' | 'PREQUESTION' | 'TRIAL'
+export type EvidenceSource =
+  | 'SUBMISSION'
+  | 'PREQUESTION'
+  | 'TRIAL'
+  | 'MUTATION'
+  | 'TRANSFER'
+  | 'PREDICTION'
 
 export const LEVEL_LABEL: Record<MasteryLevel, string> = {
   UNMEASURED: '아직 재지 않음',
@@ -440,6 +512,9 @@ export const SOURCE_LABEL: Record<EvidenceSource, string> = {
   SUBMISSION: '제출',
   PREQUESTION: '풀기 전 질문',
   TRIAL: '내가 만든 테스트',
+  MUTATION: '테스트 점검',
+  TRANSFER: '전이 확인',
+  PREDICTION: '상태 예측',
 }
 
 export interface MasteryView {

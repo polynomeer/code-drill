@@ -8,6 +8,9 @@ import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CoachingPanel } from './features/coaching/CoachingPanel'
+import { CollectionsPanel } from './features/learning/CollectionsPanel'
+import { TodayPanel } from './features/learning/TodayPanel'
+import { WeeklyReportPanel } from './features/learning/WeeklyReportPanel'
 import { CompetencyMapPanel } from './features/competency/CompetencyMapPanel'
 import { CodeView } from './features/submissions/CodeView'
 import { VerdictPanel } from './features/submissions/VerdictPanel'
@@ -173,6 +176,9 @@ function Drill({ session }: { session: Session }) {
           {settingsOpen && (
             <AccountSettings session={session} onClose={() => setSettingsOpen(false)} />
           )}
+          {/* 목록보다 위다. "무엇을 풀지 모를 때 현재 수준과 약점을 기준으로 고른다"가
+              PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
+          <TodayPanel onOpenProblem={selectProblem} refreshKey={history.length} />
           <ProblemList selected={slug} onSelect={selectProblem} />
           <section className="panel statement">
             <h3>{problem?.title ?? '문제를 고르세요'}</h3>
@@ -245,6 +251,8 @@ function Drill({ session }: { session: Session }) {
           )}
           {/* 기록 아래에 둔다. "무엇을 풀었나" 다음에 "그래서 무엇이 늘었나"가 온다. */}
           <CompetencyMapPanel onOpenSubmission={openSubmission} />
+          <WeeklyReportPanel onOpenProblem={selectProblem} />
+          <CollectionsPanel currentProblemId={slug} onOpenProblem={selectProblem} />
           <HistoryPanel
             submissions={history}
             currentId={submissionId}

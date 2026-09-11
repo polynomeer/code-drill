@@ -16,6 +16,10 @@ import type {
   QuestionKind,
   SubmissionLanguage,
   CoachingSession,
+  Collection,
+  Prescription,
+  Stats,
+  WeeklyReport,
   Counterexample,
   Divergence,
   StatePrediction,
@@ -201,6 +205,46 @@ export async function getCounterexample(submissionId: string): Promise<Counterex
   const response = await authed(`/submissions/${submissionId}/counterexample`)
   if (response.status === 204) return null
   return json<Counterexample>(response)
+}
+
+/** 오늘의 처방 (PRD FR-808). */
+export async function getPrescription(): Promise<Prescription> {
+  return json<Prescription>(await authed('/me/prescription'))
+}
+
+/** 오늘의 처방에서 밀어낸다. 바뀐 처방이 돌아온다. */
+export async function skipPrescribed(problemId: string): Promise<Prescription> {
+  return json<Prescription>(await authed(`/me/prescription/${problemId}/skip`, { method: 'POST' }))
+}
+
+export async function getWeeklyReport(): Promise<WeeklyReport> {
+  return json<WeeklyReport>(await authed('/me/report/weekly'))
+}
+
+export async function getStats(): Promise<Stats> {
+  return json<Stats>(await authed('/me/stats'))
+}
+
+/** 문제집 (FR-205). */
+export async function getCollections(): Promise<Collection[]> {
+  return json<Collection[]>(await authed('/me/collections'))
+}
+
+export async function createCollection(name: string): Promise<Collection> {
+  const response = await authed('/me/collections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  return json<Collection>(response)
+}
+
+export async function addToCollection(collectionId: string, problemId: string): Promise<void> {
+  await authed(`/me/collections/${collectionId}/problems/${problemId}`, { method: 'POST' })
+}
+
+export async function removeFromCollection(collectionId: string, problemId: string): Promise<void> {
+  await authed(`/me/collections/${collectionId}/problems/${problemId}`, { method: 'DELETE' })
 }
 
 /**
