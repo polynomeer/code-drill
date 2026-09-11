@@ -4,6 +4,7 @@ fun countInversions(nums: IntArray): Int {
     var count = 0
     for (i in nums.indices) {
         for (j in i + 1 until nums.size) {
+            Drill.compare(i, j)
             if (nums[i] > nums[j]) count += 1
         }
     }

@@ -5,6 +5,7 @@ fun maxSubarray(nums: IntArray): Int {
     for (i in nums.indices) {
         var sum = 0
         for (j in i until nums.size) {
+            Drill.visit(j, nums[j])
             sum += nums[j]
             if (sum > best) best = sum
         }

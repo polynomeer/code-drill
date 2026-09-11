@@ -6,6 +6,7 @@ fun countPrimes(n: Int): Int {
         var prime = true
         var d = 2
         while (d < value) {
+            Drill.compare(value, d)
             if (value % d == 0) { prime = false; break }
             d += 1
         }

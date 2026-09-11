@@ -5,6 +5,7 @@ fun kthLargest(nums: IntArray, k: Int): Int {
     for (round in 0 until k) {
         var best = round
         for (i in round + 1 until values.size) {
+            Drill.compare(i, best)
             if (values[i] > values[best]) best = i
         }
         val swap = values[round]

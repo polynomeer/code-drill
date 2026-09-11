@@ -11,6 +11,7 @@ fun gcdOfArray(nums: IntArray): Int {
             continue
         }
         while (a != b) {
+            Drill.compare(a, b)
             if (a > b) a -= b else b -= a
         }
         result = a

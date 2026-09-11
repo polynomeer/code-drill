@@ -4,6 +4,7 @@ fun nextGreater(values: IntArray): IntArray {
     val out = IntArray(values.size)
     for (index in values.indices) {
         for (next in index + 1 until values.size) {
+            Drill.compare(index, next)
             if (values[next] > values[index]) {
                 out[index] = next - index
                 break

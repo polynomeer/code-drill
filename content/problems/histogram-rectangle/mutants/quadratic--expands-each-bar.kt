@@ -6,8 +6,8 @@ fun largestRectangle(heights: IntArray): Int {
         var height = heights[index]
         var left = index
         var right = index
-        while (left > 0 && heights[left - 1] >= height) left -= 1
-        while (right < heights.size - 1 && heights[right + 1] >= height) right += 1
+        while (left > 0 && heights[left - 1] >= height) { Drill.compare(index, left - 1); left -= 1 }
+        while (right < heights.size - 1 && heights[right + 1] >= height) { Drill.compare(index, right + 1); right += 1 }
         val area = height * (right - left + 1)
         if (area > best) best = area
     }

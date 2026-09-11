@@ -5,6 +5,7 @@ fun longestOnes(bits: IntArray, k: Int): Int {
     for (start in bits.indices) {
         var zeros = 0
         for (end in start until bits.size) {
+            Drill.visit(end, bits[end])
             if (bits[end] == 0) zeros += 1
             if (zeros > k) break
             val length = end - start + 1

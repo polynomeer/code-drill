@@ -5,6 +5,7 @@ fun countSubarrays(nums: IntArray, k: Int): Int {
     for (start in nums.indices) {
         var total = 0
         for (end in start until nums.size) {
+            Drill.visit(end, nums[end])
             total += nums[end]
             if (total == k) count += 1
         }

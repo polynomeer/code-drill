@@ -4,7 +4,7 @@ fun maxWindowSum(nums: IntArray, k: Int): Int {
     var best = Int.MIN_VALUE
     for (start in 0..nums.size - k) {
         var total = 0
-        for (i in start until start + k) total += nums[i]
+        for (i in start until start + k) { Drill.visit(i, nums[i]); total += nums[i] }
         if (total > best) best = total
     }
     return best

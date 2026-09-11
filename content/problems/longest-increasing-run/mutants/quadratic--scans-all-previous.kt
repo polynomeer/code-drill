@@ -5,6 +5,7 @@ fun longestIncreasing(nums: IntArray): Int {
     var answer = 1
     for (i in nums.indices) {
         for (j in 0 until i) {
+            Drill.compare(j, i)
             if (nums[j] < nums[i] && best[j] + 1 > best[i]) best[i] = best[j] + 1
         }
         if (best[i] > answer) answer = best[i]

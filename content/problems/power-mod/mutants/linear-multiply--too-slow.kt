@@ -3,6 +3,9 @@
 fun powerMod(base: Int, exponent: Int): Int {
     val mod = 1_000_000_007L
     var result = 1L
-    for (step in 0 until exponent) result = result * base % mod
+    for (step in 0 until exponent) {
+        Drill.write(step, (result % 1_000_000).toInt())
+        result = result * base % mod
+    }
     return result.toInt()
 }
