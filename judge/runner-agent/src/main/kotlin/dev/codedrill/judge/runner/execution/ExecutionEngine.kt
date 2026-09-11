@@ -13,6 +13,7 @@ import dev.codedrill.judge.protocol.TraceEvent
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
 import dev.codedrill.judge.runner.execution.adapter.SandboxProtocol
+import dev.codedrill.judge.runner.execution.adapter.instrumented
 import dev.codedrill.judge.runner.execution.adapter.parseTraceEvent
 import dev.codedrill.judge.runner.execution.sandbox.Sandbox
 import dev.codedrill.judge.runner.execution.sandbox.SandboxRun
@@ -113,6 +114,9 @@ class ExecutionEngine(
             // 애초에 실려 오지 않으므로 여기서 거를 것이 없다 — 거를 것이 없다는 사실을
             // 이 분기로 적어 둔다.
             ExecutionMode.TRIAL -> request.groups
+
+            // 실험실도 사용자가 적은 입력뿐이다. 계측은 하되 케이스를 고르지 않는다.
+            ExecutionMode.LAB -> request.groups
         }
 
         val events = mutableListOf<TraceEvent>()
@@ -129,12 +133,12 @@ class ExecutionEngine(
             }
             results += toCaseResults(
                 run, group, request.limits.outputBytes, request.signature.returns,
-                includeActual = request.mode == ExecutionMode.TRIAL,
+                includeActual = request.mode == ExecutionMode.TRIAL || request.mode == ExecutionMode.LAB,
             )
         }
         onPhase("execute", request.language, request.mode.name.lowercase(), System.nanoTime() - executeStart)
 
-        if (request.mode == ExecutionMode.TRACE) return traceResult(request, results, events)
+        if (request.mode.instrumented()) return traceResult(request, results, events)
 
         return ExecutionResult(
             executionId = request.executionId,
@@ -300,7 +304,7 @@ class ExecutionEngine(
             compileLog = null,
             cases = results,
             resultDigest = digestOf(results),
-            mode = ExecutionMode.TRACE,
+            mode = request.mode,
             trace = TraceCapture(
                 caseId = results.firstOrNull()?.let { it.groupId + "/" + it.caseId } ?: "",
                 events = events,

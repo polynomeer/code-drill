@@ -83,10 +83,17 @@ object JudgeQueues {
     /** 축소 결과. */
     const val SHRINK_RESULTS = "judge.shrink-results"
 
+    /** 실험실 실행 (§6.4~6.6). 한 건이 풀이 수만큼 계측 실행이다. */
+    const val LABS = "judge.labs"
+
+    /** 실험실 결과. */
+    const val LAB_RESULTS = "judge.lab-results"
+
     val all = listOf(
         SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS,
         TRIALS, TRIAL_RESULTS, MUTATIONS, MUTATION_RESULTS,
         REFERENCE_TRACES, REFERENCE_TRACE_RESULTS, SHRINKS, SHRINK_RESULTS,
+        LABS, LAB_RESULTS,
     )
 
     /**

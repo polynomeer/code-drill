@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.judge.runner.execution.LabRunner
 import dev.codedrill.judge.runner.execution.MutationEvaluator
 import dev.codedrill.judge.runner.execution.Shrinker
 import dev.codedrill.judge.runner.execution.RuntimeClasspath
@@ -98,6 +99,10 @@ class RunnerConfig {
     /** 최소 반례 축소 (§6.3). 판정과 같은 엔진을 쓴다. */
     @Bean
     fun shrinker(engine: ExecutionEngine) = Shrinker(engine)
+
+    /** 실험실 (§6.4~6.6). 판정과 같은 엔진을 쓴다. */
+    @Bean
+    fun labRunner(engine: ExecutionEngine) = LabRunner(engine)
 }
 
 @ConfigurationProperties(prefix = "codedrill.sandbox")

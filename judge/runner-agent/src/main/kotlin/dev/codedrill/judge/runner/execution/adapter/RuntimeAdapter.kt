@@ -159,7 +159,7 @@ object SandboxProtocol {
  * TRACE 만 붙인다. TRIAL 은 사용자가 자기 입력으로 돌려 보는 실행이라 보려는 것이 출력이지
  * 상태가 아니고, 계측을 붙이면 그만큼 느려지기만 한다.
  */
-fun ExecutionMode.instrumented(): Boolean = this == ExecutionMode.TRACE
+fun ExecutionMode.instrumented(): Boolean = this == ExecutionMode.TRACE || this == ExecutionMode.LAB
 
 /**
  * 계측 이벤트 줄을 되돌린다 (§7.2).

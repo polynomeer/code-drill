@@ -3,9 +3,11 @@ package dev.codedrill.judge.runner.messaging
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.LabRequest
 import dev.codedrill.judge.protocol.MutationRequest
 import dev.codedrill.judge.protocol.ShrinkRequest
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.judge.runner.execution.LabRunner
 import dev.codedrill.judge.runner.execution.MutationEvaluator
 import dev.codedrill.judge.runner.execution.Shrinker
 import dev.codedrill.platform.messaging.JudgeQueues
@@ -31,6 +33,7 @@ class ExecutionListener(
     private val engine: ExecutionEngine,
     private val mutations: MutationEvaluator,
     private val shrinker: Shrinker,
+    private val lab: LabRunner,
     private val rabbit: RabbitTemplate,
 ) {
 
@@ -153,6 +156,18 @@ class ExecutionListener(
             .log("반례 축소를 시작한다")
 
         rabbit.convertAndSend(JudgeQueues.SHRINK_RESULTS, shrinker.shrink(request))
+    }
+
+    /**
+     * 실험실 (§6.4~6.6). 풀이 수만큼 계측 실행이다. 큐는 따로, 리스너는 같이.
+     */
+    @RabbitListener(queues = [JudgeQueues.LABS])
+    fun onLab(request: LabRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.labId)
+            .log("실험실 실행을 시작한다: 풀이 {}개", request.approaches.size)
+
+        rabbit.convertAndSend(JudgeQueues.LAB_RESULTS, lab.run(request))
     }
 
     /**

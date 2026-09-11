@@ -127,6 +127,30 @@ class ProblemPackageLoader(private val root: Path) {
             .toMap()
     }
 
+    /**
+     * 해설 (§6.1 `editorial/`, 여기서는 `editorial.md` 한 파일).
+     *
+     * 패키지 밖이다 — 해설 문장을 고쳤다고 판정이 무효가 되면 안 된다. 없으면 null 이고,
+     * 그때 화면은 "해설이 아직 없다"를 말한다.
+     */
+    fun editorial(problemId: String): String? =
+        root.resolve(problemId).resolve("editorial.md").takeIf { it.isRegularFile() }?.readText()
+
+    /**
+     * 참조 말고 다른 풀이들 (§6.1 `solutions/` 의 나머지). 이름은 파일명이다.
+     *
+     * 실험실이 나란히 놓을 후보다. 참조 풀이는 [referenceSolution] 으로 따로 읽는다 —
+     * 그것만은 채점 검증의 기준이라 다른 풀이와 섞이면 안 된다.
+     */
+    fun alternativeSolutions(problemId: String): List<Pair<String, String>> {
+        val dir = root.resolve(problemId).resolve("solutions")
+        if (!dir.isDirectory()) return emptyList()
+        return dir.listDirectoryEntries("*.kt")
+            .filter { it.isRegularFile() && it.name != "reference.kt" }
+            .sortedBy { it.name }
+            .map { it.name.removeSuffix(".kt") to it.readText() }
+    }
+
     /** 대표 오답 (§6.1 `mutants/`). 없으면 빈 목록이다. */
     fun mutants(problemId: String): List<MutantSource> {
         val dir = root.resolve(problemId).resolve("mutants")
