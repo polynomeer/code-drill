@@ -30,6 +30,10 @@ import dev.codedrill.controlplane.coaching.TransferRepository
 import dev.codedrill.controlplane.coaching.TransferService
 import dev.codedrill.controlplane.coaching.TransferSignals
 import dev.codedrill.controlplane.identity.PersonalData
+import dev.codedrill.controlplane.learning.Attempt
+import dev.codedrill.controlplane.learning.LearningRepository
+import dev.codedrill.controlplane.learning.LearningSources
+import dev.codedrill.controlplane.learning.Standing
 import dev.codedrill.controlplane.submission.LearningSignals as SubmissionLearningSignals
 import dev.codedrill.controlplane.workspace.LearningSignals as WorkspaceLearningSignals
 import dev.codedrill.platform.problempackage.Competency
@@ -256,6 +260,58 @@ class ControlPlaneConfig {
                 correct: Boolean,
             ) = service.predicted(userId, problemId, predictionId, correct)
         }
+
+    /**
+     * 처방이 기대는 사실들 (§3.1 조립 지점, FR-808).
+     *
+     * 기획서 §8.1 이 추천에 넣으라고 한 넷 — 최근 오답 원인·힌트 의존도·복습 간격·전이
+     * 성과 — 가 각각 제출·코칭·제출·코칭 도메인의 사실이고, Learning 은 그 어느 것도 직접
+     * 읽지 않는다. 넷을 아는 곳은 여기 하나뿐이다.
+     */
+    @Bean
+    fun learningSources(
+        jdbc: JdbcTemplate,
+        progress: ProblemProgress,
+        coaching: CoachingService,
+        transfers: TransferRepository,
+        competency: CompetencyService,
+        publish: PublishService,
+    ) = object : LearningSources {
+        override fun attempts(userId: String, since: java.time.Instant): List<Attempt> = jdbc.query(
+            """
+            SELECT problem_id, verdict, created_at FROM submission
+             WHERE user_id = ? AND status = 'COMPLETED' AND verdict IS NOT NULL AND created_at >= ?
+             ORDER BY created_at
+            """.trimIndent(),
+            { rs, _ ->
+                Attempt(
+                    problemId = rs.getString("problem_id"),
+                    accepted = rs.getString("verdict") == "ACCEPTED",
+                    verdict = rs.getString("verdict"),
+                    at = rs.getTimestamp("created_at").toInstant(),
+                )
+            },
+            userId, java.sql.Timestamp.from(since),
+        )
+
+        override fun solved(userId: String) = progress.solvedBy(userId)
+        override fun helpLevel(userId: String, problemId: String) = coaching.helpLevel(userId, problemId)
+        override fun pendingTransfer(userId: String) = transfers.pendingTarget(userId)
+
+        // 등급 이름으로 옮긴다. Learning 이 Competency 의 타입을 알면 안 된다 (§3.1).
+        override fun standing(userId: String, asOf: java.time.Instant): Map<Competency, Standing> =
+            competency.mapOf(userId, asOf).associate { it.competency to Standing.valueOf(it.level.name) }
+
+        override fun published() = publish.publishedProblemIds()
+    }
+
+    /** 문제집과 처방 조정도 사용자의 것이다 (§11.3). */
+    @Bean
+    fun learningPersonalArea(repository: LearningRepository) = object : PersonalData {
+        override val area = "learning"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = repository.erase(userId)
+    }
 
     /**
      * 코칭이 "무엇이 약한가"를 묻는 창구 (§3.1 조립 지점, FR-802).

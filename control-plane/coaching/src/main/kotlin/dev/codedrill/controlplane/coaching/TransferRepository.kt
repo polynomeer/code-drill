@@ -57,6 +57,17 @@ class TransferRepository(private val jdbc: JdbcTemplate) {
         MAPPER, userId, targetProblemId,
     ).firstOrNull()
 
+    /** 이 사용자에게 걸려 있는 과제 중 가장 오래된 것의 변형 문제. 처방이 이것을 앞에 둔다. */
+    fun pendingTarget(userId: String): String? = jdbc.query(
+        """
+        SELECT target_problem_id FROM transfer_task
+         WHERE user_id = ? AND completed_at IS NULL AND status = ?
+         ORDER BY created_at LIMIT 1
+        """.trimIndent(),
+        { rs, _ -> rs.getString("target_problem_id") },
+        userId, TransferStatus.EXPLAINED.name,
+    ).firstOrNull()
+
     /** 이미 이 문제를 변형 과제로 받은 적이 있는지. 같은 문제를 두 번 주지 않는다. */
     fun assignedTargets(userId: String): Set<String> = jdbc.query(
         "SELECT DISTINCT target_problem_id FROM transfer_task WHERE user_id = ?",
