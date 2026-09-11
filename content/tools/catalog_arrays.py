@@ -387,7 +387,7 @@ fun maxWindowSum(nums: IntArray, k: Int): Int {
     var best = Int.MIN_VALUE
     for (start in 0..nums.size - k) {
         var total = 0
-        for (i in start until start + k) total += nums[i]
+        for (i in start until start + k) { Drill.visit(i, nums[i]); total += nums[i] }
         if (total > best) best = total
     }
     return best
@@ -770,6 +770,7 @@ fun countSubarrays(nums: IntArray, k: Int): Int {
     for (start in nums.indices) {
         var total = 0
         for (end in start until nums.size) {
+            Drill.visit(end, nums[end])
             total += nums[end]
             if (total == k) count += 1
         }
@@ -926,6 +927,7 @@ fun longestOnes(bits: IntArray, k: Int): Int {
     for (start in bits.indices) {
         var zeros = 0
         for (end in start until bits.size) {
+            Drill.visit(end, bits[end])
             if (bits[end] == 0) zeros += 1
             if (zeros > k) break
             val length = end - start + 1

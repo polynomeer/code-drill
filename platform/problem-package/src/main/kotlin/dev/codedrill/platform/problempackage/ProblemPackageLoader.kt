@@ -120,7 +120,9 @@ class ProblemPackageLoader(private val root: Path) {
         val file = root.resolve(problemId).resolve("hints.yaml")
         if (!file.isRegularFile()) return emptyMap()
 
-        return yaml.readValue<Map<String, List<String>>>(file.readText())
+        // 주석만 있는 파일은 null 로 읽힌다. 비어 있는 것은 오류가 아니다.
+        val parsed: Map<String, List<String>>? = yaml.readValue(file.readText())
+        return parsed.orEmpty()
             .mapNotNull { (name, steps) ->
                 Competency.entries.firstOrNull { it.name == name }?.let { it to steps }
             }

@@ -222,6 +222,7 @@ fun kthLargest(nums: IntArray, k: Int): Int {
     for (round in 0 until k) {
         var best = round
         for (i in round + 1 until values.size) {
+            Drill.compare(i, best)
             if (values[i] > values[best]) best = i
         }
         val swap = values[round]
@@ -389,6 +390,7 @@ fun countInversions(nums: IntArray): Int {
     var count = 0
     for (i in nums.indices) {
         for (j in i + 1 until nums.size) {
+            Drill.compare(i, j)
             if (nums[i] > nums[j]) count += 1
         }
     }

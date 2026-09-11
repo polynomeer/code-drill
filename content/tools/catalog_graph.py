@@ -387,7 +387,10 @@ fun countComponents(n: Int, edges: IntArray): Int {
     val parent = IntArray(n) { it }
     fun find(start: Int): Int {
         var node = start
-        while (parent[node] != node) node = parent[node]
+        while (parent[node] != node) {
+            Drill.edge(node.toString(), parent[node].toString())
+            node = parent[node]
+        }
         return node
     }
     var count = n

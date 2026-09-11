@@ -142,6 +142,7 @@ fun countPrimes(n: Int): Int {
         var prime = true
         var d = 2
         while (d < value) {
+            Drill.compare(value, d)
             if (value % d == 0) { prime = false; break }
             d += 1
         }
@@ -381,7 +382,10 @@ fun powerMod(base: Int, exponent: Int): Int {
 fun powerMod(base: Int, exponent: Int): Int {
     val mod = 1_000_000_007L
     var result = 1L
-    for (step in 0 until exponent) result = result * base % mod
+    for (step in 0 until exponent) {
+        Drill.write(step, (result % 1_000_000).toInt())
+        result = result * base % mod
+    }
     return result.toInt()
 }
 """),
@@ -530,6 +534,7 @@ fun gcdOfArray(nums: IntArray): Int {
             continue
         }
         while (a != b) {
+            Drill.compare(a, b)
             if (a > b) a -= b else b -= a
         }
         result = a

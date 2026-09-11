@@ -206,9 +206,23 @@ def check_expected(problem, group, name, expected):
 def write_cases(problem, directory):
     # 케이스를 고치면 패키지 digest 가 달라진다. 공개된 버전은 불변이므로(§6.1) 그때는
     # version 을 올려야 하고, 올리지 않으면 등록이 "새 버전이어야 한다"로 거부된다.
+    #
+    # 정의에 없는 파일은 지운다. 정의가 진실의 원천이다 — 케이스 하나를 정의에서 뺐는데
+    # 파일이 남아 있으면 그 케이스는 계속 채점에 들고, 지운 사람은 그것을 모른다.
+    tests_dir = directory / "tests"
+    if tests_dir.exists():
+        for stale_group in tests_dir.iterdir():
+            if stale_group.name not in problem.cases:
+                for f in stale_group.iterdir():
+                    f.unlink()
+                stale_group.rmdir()
     for group, cases in problem.cases.items():
-        group_dir = directory / "tests" / group
+        group_dir = tests_dir / group
         group_dir.mkdir(parents=True, exist_ok=True)
+        wanted = {f"{name}.json" for name, _ in cases}
+        for stale in group_dir.glob("*.json"):
+            if stale.name not in wanted:
+                stale.unlink()
         for name, args in cases:
             expected = problem.reference(*[list(a) if isinstance(a, list) else a for a in args])
             check_expected(problem, group, name, expected)
@@ -222,14 +236,56 @@ def write_sources(problem, directory):
 
     mutant_dir = directory / "mutants"
     mutant_dir.mkdir(parents=True, exist_ok=True)
+    # 정의에서 뺀 오답은 파일도 지운다. 남겨 두면 검증이 그 오답을 계속 돌리고, 동치
+    # 변이를 걷어냈는데도 "살아남았다"고 나온다 — 실제로 그랬다.
+    wanted = {f"{name}.kt" for name, _, _, _ in problem.mutants}
+    for stale in mutant_dir.glob("*.kt"):
+        if stale.name not in wanted:
+            stale.unlink()
     for name, kind, why, source in problem.mutants:
         (mutant_dir / f"{name}.kt").write_text(
             f"// kind: {kind}\n// {why}\n{source.strip()}\n"
         )
 
 
+# 저작 도구가 만들지 않는 산출물. 사람이 쓰는 것이라 생성하지 않되, **없으면 자리를 잡아
+# 준다** — 빈 자리가 보여야 채운다. 자리표시자는 검증 파이프라인이 막는다: 카탈로그는
+# 로더가, 해설은 길이 검사가, 힌트는 코칭 테스트가.
+HAND_WRITTEN = {
+    "catalog.yaml": """# TODO: 난이도·태그·역량·선수 관계·복잡도 (content/tools/README.md 의 catalog.yaml 절)
+difficulty: TODO
+tags: []
+competencies: []
+prerequisites: []
+complexity:
+  time: TODO
+  space: TODO
+""",
+    "hints.yaml": """# TODO: 산문이 필요한 역량(모델링·구현력·문제 독해)의 도움 사다리. 코드를 주지 않는다.
+""",
+    "editorial.md": """# 해설
+
+TODO: 관찰 → 접근 → 복잡도 → 발전 과정 → 흔히 무너지는 곳
+""",
+}
+
+
+def scaffold(directory):
+    """손으로 쓰는 산출물의 자리를 잡는다. 이미 있으면 건드리지 않는다."""
+    created = []
+    for name, template in HAND_WRITTEN.items():
+        target = directory / name
+        if not target.exists():
+            target.write_text(template, encoding="utf-8")
+            created.append(name)
+    return created
+
+
 def emit(problem):
     directory = CONTENT / problem.id
+    # 자리는 **새 문제에만** 잡는다. 있는 문제를 다시 뽑을 때 빈 자리를 채우면, 산문 없이
+    # 만들어진 사다리로 충분한 문제에도 TODO 파일이 생긴다.
+    fresh = not directory.exists()
     directory.mkdir(parents=True, exist_ok=True)
     write_manifest(problem, directory)
     write_statement(problem, directory)
@@ -237,6 +293,39 @@ def emit(problem):
     write_sources(problem, directory)
     total = sum(len(v) for v in problem.cases.values())
     print(f"{problem.id:<28} 케이스 {total:>3}개, 오답 {len(problem.mutants)}개")
+    for name in (scaffold(directory) if fresh else []):
+        print(f"  {name}: 자리를 잡았다. 채우기 전에는 검증을 통과하지 못한다")
+
+
+ARTIFACTS = [
+    "manifest.yaml", "statement.md", "tests", "solutions/reference.kt", "mutants",
+    "catalog.yaml", "hints.yaml", "editorial.md",
+]
+
+
+def status() -> int:
+    """문제 × 산출물 표. 규모를 늘릴 때 무엇이 비었는지가 한눈에 보여야 한다."""
+    problems = catalog()
+    defined = {p.id for p in problems}
+    ids = sorted(defined | {d.name for d in CONTENT.iterdir() if d.is_dir()})
+    heads = ["manifest", "statemnt", "tests", "referenc", "mutants", "catalog", "hints", "editorl"]
+    print(f"{'문제':26} " + " ".join(f"{h:>8}" for h in heads) + "  정의")
+    empty = 0
+    for pid in ids:
+        directory = CONTENT / pid
+        marks = []
+        for artifact in ARTIFACTS:
+            path = directory / artifact
+            ok = path.exists()
+            if ok and path.is_file() and "TODO" in path.read_text(encoding="utf-8"):
+                ok = False
+            if ok and path.is_dir() and not any(path.iterdir()):
+                ok = False
+            marks.append("       ✓" if ok else "       —")
+            empty += 0 if ok else 1
+        print(f"{pid:26} " + " ".join(marks) + ("   ✓" if pid in defined else "   — (catalog_*.py 에 없음)"))
+    print(f"\n{len(ids)}문제, 빈 칸 {empty}개")
+    return 0
 
 
 # --- 그룹 정책 조합 -----------------------------------------------------------
@@ -303,13 +392,14 @@ def catalog() -> list[Problem]:
     import catalog_graph
     import catalog_math
     import catalog_matrix
+    import catalog_greedy
     import catalog_search
     import catalog_strings
     import catalog_stack
 
     problems: list[Problem] = []
     for module in (
-        catalog_arrays, catalog_dp, catalog_graph, catalog_math,
+        catalog_arrays, catalog_dp, catalog_graph, catalog_greedy, catalog_math,
         catalog_matrix, catalog_search, catalog_stack, catalog_strings,
     ):
         problems += module.PROBLEMS
@@ -321,6 +411,8 @@ def catalog() -> list[Problem]:
 
 
 def main() -> int:
+    if sys.argv[1:] == ["--status"]:
+        return status()
     wanted = sys.argv[1:]
     problems = catalog()
     chosen = [p for p in problems if not wanted or p.id in wanted]

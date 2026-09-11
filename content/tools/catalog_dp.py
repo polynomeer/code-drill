@@ -110,9 +110,12 @@ fun climbStairs(n: Int): Int {
          "메모이제이션 없는 재귀라 같은 부분 문제를 지수적으로 다시 푼다.",
          """
 fun climbStairs(n: Int): Int {
-    fun ways(step: Int): Long = when {
+    fun ways(step: Int): Long {
+        Drill.call("ways($step)")
+        return when {
         step <= 1 -> 1L
         else -> (ways(step - 1) + ways(step - 2)) % 1_000_000_007L
+        }
     }
     return ways(n).toInt()
 }
@@ -387,6 +390,7 @@ fun longestIncreasing(nums: IntArray): Int {
     var answer = 1
     for (i in nums.indices) {
         for (j in 0 until i) {
+            Drill.compare(j, i)
             if (nums[j] < nums[i] && best[j] + 1 > best[i]) best[i] = best[j] + 1
         }
         if (best[i] > answer) answer = best[i]
