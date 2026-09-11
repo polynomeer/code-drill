@@ -22,6 +22,8 @@ import type {
   WeeklyReport,
   Counterexample,
   Divergence,
+  Editorial,
+  LabRun,
   StatePrediction,
   MutationCheck,
   TransferTask,
@@ -245,6 +247,30 @@ export async function addToCollection(collectionId: string, problemId: string): 
 
 export async function removeFromCollection(collectionId: string, problemId: string): Promise<void> {
   await authed(`/me/collections/${collectionId}/problems/${problemId}`, { method: 'DELETE' })
+}
+
+/** 해설 (FR-214). 잠겨 있으면 본문이 null 이다. */
+export async function getEditorial(problemId: string): Promise<Editorial> {
+  return json<Editorial>(await authed(`/labs/${problemId}/editorial`))
+}
+
+/** 정답 전에 연다. 되돌릴 수 없고, 그 뒤 제출의 증거가 가벼워진다. */
+export async function unlockEditorial(problemId: string): Promise<Editorial> {
+  return json<Editorial>(await authed(`/labs/${problemId}/editorial/unlock`, { method: 'POST' }))
+}
+
+/** 한 입력에 여러 풀이를 돌린다 (§6.4~6.6). */
+export async function startLab(problemId: string, args: unknown[], labels: string[]): Promise<LabRun> {
+  const response = await authed(`/labs/${problemId}/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ args, labels }),
+  })
+  return json<LabRun>(response)
+}
+
+export async function getLab(id: string): Promise<LabRun> {
+  return json<LabRun>(await authed(`/labs/runs/${id}`))
 }
 
 /**

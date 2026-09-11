@@ -373,6 +373,39 @@ export interface Collection {
 }
 
 /**
+ * 해설과 실험실 (기획서 §6.4~6.6, PRD FR-214).
+ */
+export interface Editorial {
+  problemId: string
+  available: boolean
+  locked: boolean
+  solved: boolean
+  body: string | null
+  approaches: string[]
+}
+
+export type LabStatus = 'PENDING' | 'COMPLETED'
+
+export interface LabRun {
+  id: string
+  problemId: string
+  args: unknown[]
+  labels: string[]
+  status: LabStatus
+  results: ApproachResult[]
+}
+
+export interface ApproachResult {
+  label: string
+  verdict: Verdict
+  actual: string | null
+  measurements: { cpuTimeMillis: number; wallTimeMillis: number; peakMemoryBytes: number; outputBytes: number }
+  eventCounts: Record<string, number>
+  events: import('../features/replay/traceTypes').TraceEvent[]
+  truncated: boolean
+}
+
+/**
  * 전이 확인 과제 (PRD FR-807).
  *
  * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로

@@ -8,6 +8,7 @@ import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CoachingPanel } from './features/coaching/CoachingPanel'
+import { EditorialPanel } from './features/lab/EditorialPanel'
 import { CollectionsPanel } from './features/learning/CollectionsPanel'
 import { TodayPanel } from './features/learning/TodayPanel'
 import { WeeklyReportPanel } from './features/learning/WeeklyReportPanel'
@@ -203,6 +204,14 @@ function Drill({ session }: { session: Session }) {
               </>
             )}
           </section>
+          {/* 지문 아래, 목록 아래. 정답 뒤의 경험이라 풀기 전에 눈에 들어올 자리가 아니다 (FR-214). */}
+          {problem && (
+            <EditorialPanel
+              problemId={problem.id}
+              problemSignature={problem.signature}
+              sampleArgs={problem.samples[0]?.args ?? null}
+            />
+          )}
         </div>
 
         <div className="stack">
