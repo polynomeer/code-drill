@@ -135,54 +135,54 @@ enum class Difficulty {
  * 나온다. 지금은 그 활동이 없어 어느 문제도 달지 않지만, 온톨로지에서 빼 두면 4단계에서
  * 다시 넣을 때 역량군 번호가 밀린다.
  */
-enum class Competency(val group: CompetencyGroup) {
+enum class Competency(val group: CompetencyGroup, val label: String) {
     /** 지문에서 무엇을 묻는지 읽어내기. */
-    READING(CompetencyGroup.UNDERSTANDING),
+    READING(CompetencyGroup.UNDERSTANDING, "문제 독해"),
 
     /** 제약과 조건을 빠짐없이 뽑아내기. */
-    CONSTRAINTS(CompetencyGroup.UNDERSTANDING),
+    CONSTRAINTS(CompetencyGroup.UNDERSTANDING, "조건 추출"),
 
     /** 문제를 다룰 수 있는 구조로 옮기기. */
-    MODELING(CompetencyGroup.DESIGN),
+    MODELING(CompetencyGroup.DESIGN, "모델링"),
 
     /** 제약에 맞는 접근 고르기. */
-    ALGORITHM_CHOICE(CompetencyGroup.DESIGN),
+    ALGORITHM_CHOICE(CompetencyGroup.DESIGN, "알고리즘 선택"),
 
     /** 왜 맞는지 말할 수 있기 — 불변식과 증명. */
-    CORRECTNESS(CompetencyGroup.DESIGN),
+    CORRECTNESS(CompetencyGroup.DESIGN, "논리·정확성"),
 
     /** 정한 접근을 코드로 옮기기. */
-    IMPLEMENTATION(CompetencyGroup.EXECUTION),
+    IMPLEMENTATION(CompetencyGroup.EXECUTION, "구현력"),
 
     /** 시간·공간 비용을 미리 맞히기. */
-    COMPLEXITY(CompetencyGroup.EXECUTION),
+    COMPLEXITY(CompetencyGroup.EXECUTION, "복잡도 예측"),
 
     /** 맞는 풀이를 더 빠르거나 가볍게 만들기. */
-    OPTIMIZATION(CompetencyGroup.EXECUTION),
+    OPTIMIZATION(CompetencyGroup.EXECUTION, "최적화"),
 
     /** 무엇을 시험해야 하는지 정하기. */
-    TEST_DESIGN(CompetencyGroup.VERIFICATION),
+    TEST_DESIGN(CompetencyGroup.VERIFICATION, "테스트 설계"),
 
     /** 경계에서 무너지는 자리 찾기. */
-    EDGE_CASES(CompetencyGroup.VERIFICATION),
+    EDGE_CASES(CompetencyGroup.VERIFICATION, "엣지케이스"),
 
     /** 틀렸다는 것을 보이는 입력 만들기. */
-    COUNTEREXAMPLE(CompetencyGroup.VERIFICATION),
+    COUNTEREXAMPLE(CompetencyGroup.VERIFICATION, "반례"),
 
     /** 어디서부터 어긋났는지 짚기. */
-    DEBUGGING(CompetencyGroup.VERIFICATION),
+    DEBUGGING(CompetencyGroup.VERIFICATION, "디버깅"),
 
     /** 자기 풀이를 남에게 설명하기. */
-    EXPLANATION(CompetencyGroup.EXTENSION),
+    EXPLANATION(CompetencyGroup.EXTENSION, "설명"),
 
     /** 배운 것을 다른 문제로 옮기기. */
-    TRANSFER(CompetencyGroup.EXTENSION),
+    TRANSFER(CompetencyGroup.EXTENSION, "전이"),
 
     /** 자기가 무엇을 모르는지 알기. */
-    METACOGNITION(CompetencyGroup.EXTENSION),
+    METACOGNITION(CompetencyGroup.EXTENSION, "메타인지"),
 
     /** AI 결과를 검증하고 책임지기. */
-    AI_COLLABORATION(CompetencyGroup.EXTENSION),
+    AI_COLLABORATION(CompetencyGroup.EXTENSION, "AI 협업"),
 }
 
 /** 역량군 (기획서 §4.2). 화면에서 묶어 보여주는 단위다. */

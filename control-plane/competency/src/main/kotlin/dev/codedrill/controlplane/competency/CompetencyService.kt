@@ -216,8 +216,14 @@ class CompetencyService(
             weight = PREDICTION_WEIGHT,
         )
 
-    /** 역량 지도 (FR-806). 증거가 없는 역량도 함께 낸다 — 미측정을 말할 수 있어야 한다. */
-    fun mapOf(userId: String): List<Mastery> = MasteryProjection.of(repository.of(userId))
+    /**
+     * 역량 지도 (FR-806). 증거가 없는 역량도 함께 낸다 — 미측정을 말할 수 있어야 한다.
+     *
+     * [asOf] 를 주면 그 시점까지의 증거로 그린다. 숙련도를 저장하지 않고 계산하기 때문에
+     * 되는 일이고, 주간 리포트가 "지난주보다"를 말하는 방법이다.
+     */
+    fun mapOf(userId: String, asOf: Instant = Instant.now()): List<Mastery> =
+        MasteryProjection.of(repository.of(userId), asOf)
 
     /** 한 역량의 근거. 화면이 여기서 문제와 제출로 내려간다. */
     fun evidenceOf(userId: String, competency: Competency, limit: Int = 20): List<Evidence> =

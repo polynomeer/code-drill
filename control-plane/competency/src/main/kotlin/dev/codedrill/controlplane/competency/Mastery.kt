@@ -1,7 +1,9 @@
 package dev.codedrill.controlplane.competency
 
 import dev.codedrill.platform.problempackage.Competency
+import dev.codedrill.platform.common.LearningRhythm
 import dev.codedrill.platform.problempackage.CompetencyGroup
+import java.time.Instant
 
 /**
  * 역량 하나의 현재 상태 (PRD §3.4, FR-806).
@@ -59,8 +61,11 @@ object MasteryProjection {
      * 화면은 "측정하지 않았다"를 말할 수 없고, 사용자는 자기가 무엇을 아직 보이지 않았는지
      * 모른다 (FR-801 — 진단 미완료를 명시한다).
      */
-    fun of(evidence: List<Evidence>): List<Mastery> {
-        val byCompetency = evidence.groupBy { it.competency }
+    fun of(evidence: List<Evidence>, now: Instant = Instant.now()): List<Mastery> {
+        // "지금" 이후의 증거는 없는 것으로 본다. 그래야 과거 시점의 지도를 같은 함수로
+        // 그릴 수 있다 — 주간 리포트가 "지난주보다"를 말하는 방법이다.
+        val byCompetency = evidence.filter { it.occurredAt <= now }.groupBy { it.competency }
+        val recentSince = now.minus(LearningRhythm.RECENCY_WINDOW)
 
         return Competency.entries.map { competency ->
             val rows = byCompetency[competency].orEmpty()
@@ -71,7 +76,10 @@ object MasteryProjection {
                 competency = competency,
                 group = competency.group,
                 level = levelOf(weight, achieved),
-                confidence = confidenceOf(rows.size),
+                confidence = confidenceOf(
+                    recent = rows.count { it.occurredAt >= recentSince },
+                    total = rows.size,
+                ),
                 evidenceCount = rows.size,
                 successCount = rows.count { it.success },
             )
@@ -92,16 +100,22 @@ object MasteryProjection {
     }
 
     /**
-     * 표본 수로만 정한다.
+     * 최근 표본 수로 정한다.
      *
-     * 최근성도 신뢰도에 넣고 싶어지지만 넣지 않는다 — "언제부터 오래된 것인가"를 정할 근거가
-     * 아직 없고, 근거 없는 규칙은 숫자를 그럴듯하게 만들 뿐이다. 복습 간격이 6단계에서
-     * 실제로 정해지면 그때 붙인다.
+     * 3단계에서는 표본 수만 봤다 — "언제부터 오래된 것인가"를 정할 근거가 없어서였다. 6단계에서
+     * 복습 간격이 정해졌고, 그 네 배([LearningRhythm.RECENCY_WINDOW])보다 오래된 증거는
+     * 신뢰도에 세지 않는다. 한 달 전에 열 번 맞힌 것으로 오늘 "근거 충분"이라 말하면 그
+     * 사이에 잊었는지 아무도 모른다.
+     *
+     * **등급은 그대로 둔다.** 오래된 증거도 그 사람이 한 번은 해냈다는 사실이고, 그것을
+     * 지우면 지도가 매달 백지가 된다. 낡는 것은 등급이 아니라 그 등급을 믿을 근거다.
+     * 증거는 있는데 전부 오래됐으면 NONE 이 아니라 LOW 다 — "재지 않았다"와 "오래됐다"는
+     * 다른 사실이다.
      */
-    private fun confidenceOf(count: Int): Confidence = when {
-        count == 0 -> Confidence.NONE
-        count < LOW_BELOW -> Confidence.LOW
-        count < HIGH_AT -> Confidence.MEDIUM
+    private fun confidenceOf(recent: Int, total: Int): Confidence = when {
+        total == 0 -> Confidence.NONE
+        recent < LOW_BELOW -> Confidence.LOW
+        recent < HIGH_AT -> Confidence.MEDIUM
         else -> Confidence.HIGH
     }
 

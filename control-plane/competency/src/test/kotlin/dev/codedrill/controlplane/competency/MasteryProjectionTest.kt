@@ -14,7 +14,12 @@ import kotlin.test.assertEquals
  */
 class MasteryProjectionTest {
 
-    private fun evidence(competency: Competency, success: Boolean, weight: Double = 1.0) = Evidence(
+    private fun evidence(
+        competency: Competency,
+        success: Boolean,
+        weight: Double = 1.0,
+        at: Instant = Instant.now(),
+    ) = Evidence(
         id = UUID.randomUUID(),
         userId = "u",
         competency = competency,
@@ -24,7 +29,7 @@ class MasteryProjectionTest {
         problemId = "two-sum",
         reference = UUID.randomUUID().toString(),
         detail = null,
-        occurredAt = Instant.now(),
+        occurredAt = at,
     )
 
     private fun of(vararg rows: Evidence) = MasteryProjection.of(rows.toList())
@@ -118,5 +123,37 @@ class MasteryProjectionTest {
 
         assertEquals(2, one.evidenceCount)
         assertEquals(1, one.successCount)
+    }
+
+    @Test
+    fun `오래된 증거는 등급에는 남되 신뢰도에는 세지 않는다`() {
+        // 40일 전 열 번 맞혔다. 한 달 넘게 아무것도 안 했다.
+        val old = Instant.now().minus(java.time.Duration.ofDays(40))
+        val rows = (1..10).map { evidence(Competency.MODELING, success = true, at = old) }
+
+        val mastery = MasteryProjection.of(rows).first { it.competency == Competency.MODELING }
+
+        // 한 번은 해냈다는 사실은 남는다.
+        assertEquals(MasteryLevel.STRONG, mastery.level)
+        // 그러나 그것을 오늘 믿을 근거는 낡았다. 재지 않은 것(NONE)과는 다르다.
+        assertEquals(Confidence.LOW, mastery.confidence)
+    }
+
+    @Test
+    fun `과거 시점으로 그리면 그 뒤의 증거는 없는 것이다`() {
+        val now = Instant.now()
+        val rows = listOf(
+            evidence(Competency.MODELING, success = false, at = now.minus(java.time.Duration.ofDays(10))),
+            evidence(Competency.MODELING, success = true, at = now.minus(java.time.Duration.ofDays(1))),
+            evidence(Competency.MODELING, success = true, at = now.minus(java.time.Duration.ofDays(1))),
+        )
+
+        val then = MasteryProjection.of(rows, now.minus(java.time.Duration.ofDays(7)))
+            .first { it.competency == Competency.MODELING }
+        val today = MasteryProjection.of(rows, now).first { it.competency == Competency.MODELING }
+
+        // 일주일 전에는 실패 하나뿐이었고, 오늘은 셋 중 둘을 해냈다. 주간 리포트의 "성장"이다.
+        assertEquals(MasteryLevel.DEVELOPING, then.level)
+        assertEquals(MasteryLevel.PROFICIENT, today.level)
     }
 }
