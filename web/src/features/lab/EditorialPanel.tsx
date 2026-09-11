@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getEditorial, unlockEditorial } from '../../api/client'
 import type { Editorial } from '../../shared/types'
+import { ArenaPanel } from '../arena/ArenaPanel'
 import { LabPanel } from './LabPanel'
 
 /**
@@ -75,6 +76,10 @@ export function EditorialPanel({ problemId, problemSignature, sampleArgs }: {
         canUseMine={editorial.solved}
         sampleArgs={sampleArgs}
       />
+
+      {/* 실험실 아래에 아레나. 둘 다 맞힌 뒤의 놀이이고, 실험실이 "왜 맞나"라면 아레나는
+          "왜 틀리나"다 (§8.3). */}
+      {editorial.solved && <ArenaPanel problemId={problemId} problemSignature={problemSignature} />}
     </section>
   )
 }

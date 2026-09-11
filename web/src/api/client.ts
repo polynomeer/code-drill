@@ -15,6 +15,8 @@ import type {
   Submission,
   QuestionKind,
   SubmissionLanguage,
+  ArenaAttempt,
+  ArenaBoard,
   CoachingSession,
   Collection,
   Prescription,
@@ -271,6 +273,24 @@ export async function startLab(problemId: string, args: unknown[], labels: strin
 
 export async function getLab(id: string): Promise<LabRun> {
   return json<LabRun>(await authed(`/labs/runs/${id}`))
+}
+
+/** 반례 아레나 (§8.3). */
+export async function getArena(problemId: string): Promise<ArenaBoard> {
+  return json<ArenaBoard>(await authed(`/arena/${problemId}`))
+}
+
+export async function attemptArena(problemId: string, args: unknown[]): Promise<ArenaAttempt> {
+  const response = await authed(`/arena/${problemId}/attempts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ args }),
+  })
+  return json<ArenaAttempt>(response)
+}
+
+export async function getArenaAttempt(id: string): Promise<ArenaAttempt> {
+  return json<ArenaAttempt>(await authed(`/arena/attempts/${id}`))
 }
 
 /**

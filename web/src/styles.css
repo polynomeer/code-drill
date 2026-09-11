@@ -1077,3 +1077,15 @@ table.groups td {
   margin: 0 0 4px;
   font-size: 0.85rem;
 }
+
+/* 반례 아레나 (§8.3). */
+.arena-gym {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.arena-target {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}

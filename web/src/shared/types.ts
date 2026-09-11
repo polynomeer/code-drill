@@ -406,6 +406,53 @@ export interface ApproachResult {
 }
 
 /**
+ * 반례 아레나 (기획서 §8.3).
+ *
+ * 오답의 소스가 온다 — 이 문제를 맞힌 사람에게만 나가는 응답이다.
+ */
+export interface ArenaBoard {
+  problemId: string
+  locked: boolean
+  targets: ArenaTarget[]
+  records: ArenaRecord[]
+}
+
+export interface ArenaTarget {
+  name: string
+  kind: DefectKind
+  kindLabel: string
+  note: string
+  source: string
+}
+
+export interface ArenaRecord {
+  mutantName: string
+  breakers: number
+  smallestSize: number | null
+  smallestIsMine: boolean
+  firstIsMine: boolean
+  myBest: number | null
+}
+
+export type ArenaStatus = 'PENDING' | 'COMPLETED' | 'INVALID_INPUT' | 'FAILED'
+
+export interface ArenaAttempt {
+  id: string
+  problemId: string
+  args: unknown[]
+  status: ArenaStatus
+  message: string | null
+  results: {
+    name: string
+    kind: DefectKind
+    broken: boolean
+    actual: string | null
+    minimalArgs: unknown[] | null
+    minimalSize: number | null
+  }[]
+}
+
+/**
  * 전이 확인 과제 (PRD FR-807).
  *
  * 왜 이 문제가 골라졌는지는 오지 않는다 — "같은 역량을 요구한다"는 말이 곧 "같은 생각으로
