@@ -47,3 +47,14 @@ tasks.register<JavaExec>("validateContent") {
 
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") { enabled = false }
 tasks.named<Jar>("jar") { enabled = true }
+
+/**
+ * 콘텐츠도 테스트의 입력이다.
+ *
+ * `ContentValidationTest` 는 `content/` 를 읽는데, Gradle 은 그것을 모른다. 선언하지 않으면
+ * 해설 하나를 지워도 테스트가 캐시에서 "통과"를 꺼내 온다 — 실제로 그랬다. 콘텐츠를
+ * 고친 사람이 돌리는 테스트가 콘텐츠를 보지 않으면 그 테스트는 없는 것과 같다.
+ */
+tasks.named<Test>("test") {
+    inputs.dir(rootProject.file("content")).withPathSensitivity(PathSensitivity.RELATIVE)
+}
