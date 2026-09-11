@@ -79,6 +79,7 @@ class ContentValidator(
 
         checks += structure(problemId, pkg)
         checks += catalog(pkg)
+        checks += editorial(problemId)
         val reference = loader.referenceSolution(problemId)
 
         if (reference == null) {
@@ -162,6 +163,23 @@ class ContentValidator(
      * - 선수 관계가 실제 문제를 가리키고 순환이 없는가. 순환이면 학습 경로가 만들어지지
      *   않는다.
      */
+    /**
+     * 해설이 있는가 (§6.1 `editorial/`, PRD 출시 판단 기준 "30문제 전부 해설 검수 완료").
+     *
+     * 공개를 막는다. 해설 없이 공개된 문제는 맞힌 뒤에 아무것도 주지 못하고, 원본이 "정답
+     * 이후 경험이 약해 사용자는 비슷한 문제를 반복 소비한다"고 적은 바로 그 자리가 된다.
+     */
+    private fun editorial(problemId: String): List<Check> {
+        val text = loader.editorial(problemId)
+        return listOf(
+            when {
+                text == null -> Check.fail("editorial", "editorial.md 가 없다 (§6.1)")
+                text.trim().length < MIN_EDITORIAL -> Check.fail("editorial", "editorial.md 가 너무 짧다 (${text.trim().length}자)")
+                else -> Check.pass("editorial", "${text.trim().length}자")
+            },
+        )
+    }
+
     private fun catalog(pkg: ProblemPackage): List<Check> {
         val problems = mutableListOf<String>()
 
@@ -597,7 +615,10 @@ class ContentValidator(
          *
          * `"0"` 은 이 값을 기록하기 전에 등록된 행을 뜻한다 (V9 migration).
          */
-        const val VALIDATOR_VERSION = "3"
+        const val VALIDATOR_VERSION = "4"
+
+        /** 해설의 최소 길이. 한 줄짜리 해설은 해설이 아니다. */
+        private const val MIN_EDITORIAL = 200
 
         /** `  - value` 한 줄. 어휘와 선수 목록이 같은 모양이라 하나로 쓴다. */
         private val TAG_LINE = Regex("""^\s*- (\S+)""", RegexOption.MULTILINE)
