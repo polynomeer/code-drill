@@ -49,6 +49,21 @@ interface LearningSignals {
         killedByKind: Map<DefectKind, Pair<Int, Int>>,
     )
 
+    /**
+     * 아레나에서 오답을 깨뜨려 봤다 (§8.3).
+     *
+     * [broken] 이 0 이어도 부른다 — 못 깨뜨린 것도 반례 역량의 증거다. 전제 밖 입력은
+     * 부르지 않는다: 그것은 시도가 아니다.
+     */
+    fun brokeMutants(
+        userId: String,
+        problemId: String,
+        attemptId: String,
+        broken: Int,
+        total: Int,
+        kinds: List<DefectKind>,
+    )
+
     companion object {
         val NONE = object : LearningSignals {
             override fun answered(
@@ -67,6 +82,15 @@ interface LearningSignals {
                 problemId: String,
                 evaluationId: String,
                 killedByKind: Map<DefectKind, Pair<Int, Int>>,
+            ) = Unit
+
+            override fun brokeMutants(
+                userId: String,
+                problemId: String,
+                attemptId: String,
+                broken: Int,
+                total: Int,
+                kinds: List<DefectKind>,
             ) = Unit
         }
     }

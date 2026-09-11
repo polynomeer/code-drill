@@ -3,6 +3,7 @@ package dev.codedrill.controlplane
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.codedrill.judge.protocol.ExecutionRequest
+import dev.codedrill.judge.protocol.ArenaRequest
 import dev.codedrill.judge.protocol.LabRequest
 import dev.codedrill.judge.protocol.MutationRequest
 import dev.codedrill.judge.protocol.ShrinkRequest
@@ -40,10 +41,14 @@ import dev.codedrill.controlplane.workspace.LearningSignals as WorkspaceLearning
 import dev.codedrill.platform.problempackage.Competency
 import dev.codedrill.platform.problempackage.DefectKind
 import dev.codedrill.controlplane.submission.SubmissionPersonalData
+import dev.codedrill.controlplane.submission.SubmissionRepository
 import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
 import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
+import dev.codedrill.controlplane.workspace.ArenaGate
+import dev.codedrill.controlplane.workspace.ArenaRepository
+import dev.codedrill.controlplane.workspace.ArenaService
 import dev.codedrill.controlplane.workspace.MutationLimits
 import dev.codedrill.controlplane.workspace.MutationRepository
 import dev.codedrill.controlplane.submission.lab.LabRepository
@@ -410,6 +415,28 @@ class ControlPlaneConfig {
             evaluationId: String,
             killedByKind: Map<DefectKind, Pair<Int, Int>>,
         ) = service.mutationChecked(userId, problemId, evaluationId, killedByKind)
+
+        override fun brokeMutants(
+            userId: String,
+            problemId: String,
+            attemptId: String,
+            broken: Int,
+            total: Int,
+            kinds: List<DefectKind>,
+        ) = service.brokeMutants(userId, problemId, attemptId, broken, total)
+    }
+
+    /** 아레나의 잠금 — 이 문제를 맞혔나 (§3.1 조립 지점, §8.3). */
+    @Bean
+    fun arenaGate(submissions: SubmissionRepository) =
+        ArenaGate { userId, problemId -> submissions.latestAccepted(userId, problemId) != null }
+
+    /** 아레나 시도도 사용자의 것이다 (§11.3). */
+    @Bean
+    fun arenaPersonalArea(repository: ArenaRepository) = object : PersonalData {
+        override val area = "arena"
+        override fun export(userId: String) = mapOf("attempts" to repository.export(userId))
+        override fun erase(userId: String) = mapOf("attempts" to repository.erase(userId))
     }
 
     /** 역량 증거도 사용자의 기록이다 (§11.3). */
@@ -480,6 +507,8 @@ class ControlPlaneConfig {
             TrialService.TRIAL_EVENT -> OutboxRoute(JudgeQueues.TRIALS) {
                 mapper.readValue<ExecutionRequest>(it)
             }
+            // 아레나도 판정이 아니다 (§8.3).
+            ArenaService.ARENA_EVENT -> OutboxRoute(JudgeQueues.ARENA) { mapper.readValue<ArenaRequest>(it) }
             // 실험실도 판정이 아니다 (§6.4~6.6).
             LabService.LAB_EVENT -> OutboxRoute(JudgeQueues.LABS) { mapper.readValue<LabRequest>(it) }
             // 반례 축소도 오케스트레이터를 거치지 않는다. 판정이 아니라 판정 뒤의

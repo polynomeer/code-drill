@@ -217,6 +217,21 @@ class CompetencyService(
         )
 
     /**
+     * 아레나에서 오답을 깨뜨려 봤다 (§8.3, §8.2 "깨뜨린 제출과 반례 품질").
+     *
+     * [Competency.COUNTEREXAMPLE] 의 증거다. 하나라도 깨뜨리면 성공이다 — 반례는 하나면
+     * 충분하고, 한 입력이 여럿을 깨뜨린 것은 더 좋은 반례이지 더 많은 성공이 아니다.
+     */
+    fun brokeMutants(userId: String, problemId: String, attemptId: String, broken: Int, total: Int) =
+        record(
+            userId, listOf(Competency.COUNTEREXAMPLE), EvidenceSource.ARENA,
+            success = broken > 0,
+            problemId = problemId,
+            reference = attemptId,
+            detail = if (broken > 0) "오답 ${total}개 중 ${broken}개를 깨뜨리는 입력을 적었다" else "오답 ${total}개 중 하나도 깨뜨리지 못했다",
+        )
+
+    /**
      * 역량 지도 (FR-806). 증거가 없는 역량도 함께 낸다 — 미측정을 말할 수 있어야 한다.
      *
      * [asOf] 를 주면 그 시점까지의 증거로 그린다. 숙련도를 저장하지 않고 계산하기 때문에
