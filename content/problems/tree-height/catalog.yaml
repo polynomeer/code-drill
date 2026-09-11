@@ -1,0 +1,13 @@
+difficulty: EASY
+tags:
+  - tree
+  - recursion
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - connected-components
+complexity:
+  time: LINEAR
+  space: LINEAR

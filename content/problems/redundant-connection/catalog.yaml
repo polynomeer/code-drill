@@ -1,0 +1,13 @@
+difficulty: MEDIUM
+tags:
+  - graph
+  - union-find
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+prerequisites:
+  - connected-components
+complexity:
+  time: LINEAR
+  space: LINEAR

@@ -1,0 +1,13 @@
+difficulty: MEDIUM
+tags:
+  - string
+  - two-pointers
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - is-palindrome
+complexity:
+  time: QUADRATIC
+  space: CONSTANT

@@ -1,0 +1,12 @@
+difficulty: INTRO
+tags:
+  - array
+  - prefix-sum
+competencies:
+  - IMPLEMENTATION
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: LINEAR

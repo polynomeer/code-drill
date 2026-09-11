@@ -120,9 +120,12 @@ class ProblemPackageLoader(private val root: Path) {
         val file = root.resolve(problemId).resolve("hints.yaml")
         if (!file.isRegularFile()) return emptyMap()
 
-        // 주석만 있는 파일은 null 로 읽힌다. 비어 있는 것은 오류가 아니다.
-        val parsed: Map<String, List<String>>? = yaml.readValue(file.readText())
-        return parsed.orEmpty()
+        // 주석만 있는 파일은 내용이 없다고 파서가 던진다. 비어 있는 것은 오류가 아니다 —
+        // 산문 없이 만들어진 사다리로 충분한 문제가 그렇다.
+        val tree = yaml.readTree(file.readText())
+        if (tree == null || tree.isMissingNode || tree.isNull) return emptyMap()
+        val parsed: Map<String, List<String>> = yaml.convertValue(tree, object : com.fasterxml.jackson.core.type.TypeReference<Map<String, List<String>>>() {})
+        return parsed
             .mapNotNull { (name, steps) ->
                 Competency.entries.firstOrNull { it.name == name }?.let { it to steps }
             }

@@ -1,0 +1,15 @@
+difficulty: EASY
+tags:
+  - string
+  - stack
+  - greedy
+  - counting
+competencies:
+  - READING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - bracket-balance
+complexity:
+  time: LINEAR
+  space: CONSTANT

@@ -1,0 +1,14 @@
+difficulty: MEDIUM
+tags:
+  - recursion
+  - backtracking
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - IMPLEMENTATION
+prerequisites:
+  - subset-sum-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "O(n!) 시간, O(n) 공간"

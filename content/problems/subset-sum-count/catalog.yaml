@@ -1,0 +1,15 @@
+difficulty: EASY
+tags:
+  - array
+  - recursion
+  - backtracking
+competencies:
+  - CONSTRAINTS
+  - CORRECTNESS
+  - IMPLEMENTATION
+prerequisites:
+  - climb-stairs
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "O(2^n) 시간, O(n) 재귀 깊이"

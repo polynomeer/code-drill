@@ -393,14 +393,16 @@ def catalog() -> list[Problem]:
     import catalog_math
     import catalog_matrix
     import catalog_greedy
+    import catalog_recursion
     import catalog_search
     import catalog_strings
     import catalog_stack
+    import catalog_tree
 
     problems: list[Problem] = []
     for module in (
         catalog_arrays, catalog_dp, catalog_graph, catalog_greedy, catalog_math,
-        catalog_matrix, catalog_search, catalog_stack, catalog_strings,
+        catalog_matrix, catalog_recursion, catalog_search, catalog_stack, catalog_strings, catalog_tree,
     ):
         problems += module.PROBLEMS
 

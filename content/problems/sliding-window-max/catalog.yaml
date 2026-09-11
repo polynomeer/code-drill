@@ -1,0 +1,16 @@
+difficulty: HARD
+tags:
+  - array
+  - queue
+  - monotonic-stack
+  - sliding-window
+competencies:
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - max-window-sum
+  - next-greater-distance
+complexity:
+  time: LINEAR
+  space: LINEAR

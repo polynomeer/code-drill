@@ -1,0 +1,15 @@
+difficulty: HARD
+tags:
+  - array
+  - binary-search
+  - greedy
+competencies:
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - binary-search-insert
+complexity:
+  time: LINEARITHMIC
+  space: CONSTANT
+  note: "O(n log S) 시간 (S 는 무게의 합)"

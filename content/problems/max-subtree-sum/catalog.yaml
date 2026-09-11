@@ -1,0 +1,14 @@
+difficulty: MEDIUM
+tags:
+  - tree
+  - dfs
+  - dynamic-programming
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - tree-height
+complexity:
+  time: LINEAR
+  space: LINEAR

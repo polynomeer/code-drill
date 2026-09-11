@@ -1,0 +1,16 @@
+difficulty: EASY
+tags:
+  - array
+  - hash-map
+  - heap
+  - sorting
+  - counting
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - ALGORITHM_CHOICE
+prerequisites:
+  - count-letters
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR

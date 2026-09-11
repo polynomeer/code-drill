@@ -1,0 +1,13 @@
+difficulty: MEDIUM
+tags:
+  - array
+  - sorting
+  - greedy
+competencies:
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites: []
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR

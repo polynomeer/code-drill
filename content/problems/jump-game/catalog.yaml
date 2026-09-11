@@ -1,0 +1,12 @@
+difficulty: EASY
+tags:
+  - array
+  - greedy
+competencies:
+  - CORRECTNESS
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: CONSTANT

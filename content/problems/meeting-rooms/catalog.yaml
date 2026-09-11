@@ -1,0 +1,15 @@
+difficulty: MEDIUM
+tags:
+  - array
+  - heap
+  - sorting
+  - greedy
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+prerequisites:
+  - merge-intervals-count
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
