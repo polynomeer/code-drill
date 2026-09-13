@@ -87,7 +87,7 @@ Runner 가 아니라 호스트 데몬이다.** Runner 안에만 있는 경로를
 
 **런타임을 소켓 말고 다른 방식으로 줘야 한다.** rootless 런타임이나 노드마다 하나씩 두는
 격리 데몬이 후보다. 지금은 소켓을 그대로 내주고 **노드를 격리 단위로 삼아** 위험을
-가둔다. 이것은 §11.2 워크로드 신원과 함께 풀어야 한다.
+가둔다. 노드를 잃었을 때 잃는 것이 무엇인지는 아래 "브로커는 인증서로만 받는다"가 정한다.
 
 **격리 없이는 뜨지 못하게 하라.** 이미지는 컨테이너 런타임을 못 찾으면 경고를 남기고
 프로세스 샌드박스로 내려간다 — 개발 편의다. 공개 환경에서는 반드시 막는다.
@@ -96,6 +96,75 @@ Runner 가 아니라 호스트 데몬이다.** Runner 안에만 있는 경로를
 docker run -e REQUIRE_ISOLATION=true codedrill/runner-agent:$TAG
 # → 컨테이너 런타임을 찾지 못했다: KOTLIN. ... 기동을 중단한다
 ```
+
+## 브로커는 인증서로만 받는다
+
+앱 셋과 Runner 노드를 잇는 것은 브로커 하나다. 그래서 브로커에 닿을 수 있다는 것이 곧
+판정 결과를 밀어 넣을 수 있다는 뜻이면 안 된다 (§11.2 워크로드 신원).
+
+**배포용 브로커에는 비밀번호가 없다.** 평문 5672 는 열리지 않고, 5671 로 TLS 를 맺으면서
+클라이언트 인증서를 내야 하며, 그 인증서의 CN 이 사용자 이름이 된다. 사용자는 셋뿐이다.
+
+| 신원 | 쓸 수 있는 곳 | 읽을 수 있는 큐 |
+|---|---|---|
+| `control-plane` | `judge.from.control-plane`, SSE 팬아웃 | 진행·결과 큐 7개, `judge.submissions.dead` |
+| `orchestrator` | `judge.from.orchestrator` | `judge.submissions`, `judge.results`, `judge.heartbeats` |
+| `runner` | `judge.from.runner` | 실행 요청 큐 7개 |
+
+큐 이름으로 바로 보내지 않고 **자기 exchange 로 보내는** 이유가 이 표다. 기본 exchange 로
+보내면 브로커는 어느 큐로 가는지 보지 않고 exchange 하나에 대한 쓰기 권한만 본다 —
+실제로 확인했다. 신원마다 exchange 를 하나씩 두고 큐를 거기 묶으면, 쓰기 권한이 곧 "이
+신원이 보낼 수 있는 큐의 집합"이 된다. **Runner 노드를 통째로 잃어도** 얻는 것은
+`judge.from.runner` 하나다. 제출 큐를 읽거나 판정 진행을 꾸며 낼 수 없고, 큐를 지울 수도
+없다 — 아무 신원에도 선언 권한이 없다.
+
+표는 코드에 있다 (`JudgeTopology`). 브로커 정의 파일
+[deploy/broker/definitions.json](../deploy/broker/definitions.json) 은 거기서 만들며 손으로
+고치지 않는다. 큐를 더하면:
+
+```bash
+./gradlew :platform:messaging:writeBrokerDefinitions
+```
+
+테스트가 저장소의 파일과 대조하므로, 이것을 빼먹으면 빌드가 실패한다.
+
+### 인증서
+
+```bash
+python3 scripts/certs.py --broker-host <Runner 노드가 부르는 브로커 이름>
+```
+
+`deploy/certs/` 에 CA 하나, 브로커 서버 인증서, 신원 디렉터리 셋이 생긴다. **신원 디렉터리
+하나가 그 노드가 들고 가는 전부다** — `cert.pem`·`key.pem`·`ca.pem`. Runner 노드에는
+`runner/` 만 준다. 앱 스택은 compose 가 자기 것을 마운트한다.
+
+브로커 이름을 SAN 에 넣는 이유는 앱이 호스트 이름을 검증하기 때문이다. CA 가 같다고 다
+브로커는 아니다 — 같은 CA 로 서명된 Runner 인증서로 브로커 행세를 할 수 없어야 한다.
+
+인증서는 1년이고, 만료 전에 바꾸는 것은 지금은 사람의 일이다. 디렉터리를 지우고 다시
+만든 뒤 컨테이너를 다시 띄운다.
+
+### 운영자 계정
+
+정의 파일에는 운영자 계정이 없고, 정의를 읽는 노드는 이미지의 기본 사용자도 만들지
+않는다. 관리 UI(15672)가 필요하면 한 번 만든다 — 브로커 데이터는 볼륨에 남으므로 한
+번이면 된다.
+
+```bash
+docker compose -f deploy/docker-compose.yml exec -e PW=<비밀번호> rabbitmq sh -c \
+  'rabbitmqctl add_user ops "$PW" && rabbitmqctl set_user_tags ops administrator \
+   && rabbitmqctl set_permissions ops ".*" ".*" ".*"'
+```
+
+이 계정은 AMQP 로는 못 들어온다. 로그인 방식이 EXTERNAL 뿐이라 비밀번호는 관리 UI 에서만
+통한다. 그래서 이 계정이 새어도 판정 결과를 밀어 넣지는 못한다.
+
+### 개발용 브로커는 다르다
+
+`docker-compose.yml` 만 띄우는 개발 브로커는 5672 에 비밀번호로 받고 앱이 토폴로지를
+직접 선언한다 (`scripts/up.py`). 신원과 exchange 는 거기서도 같다 — 다른 것은 브로커가
+**누구를 받아들이느냐**뿐이다. 그래서 개발에서 지나간 코드가 배포에서 권한 거부를 받는
+일은 exchange 를 잘못 짚었을 때뿐이고, 그것은 배포 스택에서 스모크가 잡는다.
 
 ## 태그 규칙
 
@@ -122,7 +191,8 @@ codedrill/control-plane:dev            ← 로컬 빌드
 
 1. 소비자를 모두 내린다 (큐가 비어 있어야 한다 — 남은 메시지는 사라진다)
 2. 큐를 지운다: `rabbitmqctl delete_queue judge.submissions` …
-3. 새 이미지를 띄운다 — 앱이 새 인자로 다시 선언한다
+3. 정의 파일을 다시 만들고(`writeBrokerDefinitions`) 브로커를 다시 띄운다 — 배포에서
+   큐를 선언하는 것은 앱이 아니라 브로커다
 
 **메시지가 남아 있으면 지우기 전에 옮긴다.** 아웃박스에 남아 있는 것은 다시 발행되지만,
 이미 발행된 것은 큐에만 있다.
