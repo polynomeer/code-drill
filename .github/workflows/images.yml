@@ -151,5 +151,6 @@ jobs:
           restore-keys: trivy-db-
       - run: |
           docker pull --quiet eclipse-temurin:21-jre
+          docker pull --quiet eclipse-temurin:21-jdk
           docker pull --quiet python:3.12-alpine
-          python3 scripts/scan-images.py eclipse-temurin:21-jre python:3.12-alpine
+          python3 scripts/scan-images.py eclipse-temurin:21-jre eclipse-temurin:21-jdk python:3.12-alpine

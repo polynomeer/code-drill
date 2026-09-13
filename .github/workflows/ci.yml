@@ -66,6 +66,7 @@ jobs:
       - name: 런타임 이미지 받기
         run: |
           docker pull --quiet eclipse-temurin:21-jre
+          docker pull --quiet eclipse-temurin:21-jdk
           docker pull --quiet python:3.12-alpine
       - name: 격리 회귀
         env:
@@ -91,6 +92,7 @@ jobs:
       - name: 런타임 이미지 받기
         run: |
           docker pull --quiet eclipse-temurin:21-jre
+          docker pull --quiet eclipse-temurin:21-jdk
           docker pull --quiet python:3.12-alpine
 
       # --seed 가 §6.3 검증과 §3.2 공개까지 한다. 웹 개발 서버는 띄우지 않는다 —

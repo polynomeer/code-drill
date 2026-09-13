@@ -45,9 +45,12 @@ judge/runner-agent/build/install/runner-agent/bin/runner-agent
 격리가 실제로 섰는지 확인한다.
 
 ```bash
-docker pull eclipse-temurin:21-jre
+docker pull eclipse-temurin:21-jre   # Kotlin — 컴파일러는 Runner 가 jar 로 들여보낸다
+docker pull eclipse-temurin:21-jdk   # Java — javac 이 이 안에서 돈다
 docker pull python:3.12-alpine
 ```
+
+컴파일도 이 이미지 안에서 돈다 (§5.5). 그래서 Java 만 JDK 다.
 
 다른 이미지를 쓰려면 환경변수로 바꾼다.
 
@@ -63,10 +66,13 @@ KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=pyt
 이라고 나오면 allowlist 가 걸리지 않은 것이다 — 그 상태는 §5.2 의 시스템 호출 통제만
 빠진 채 나머지가 다 서 있어서 로그를 보지 않으면 알아채기 어렵다.
 
-**Runner 만 fat jar 가 아니다.** `kotlin-compiler-embeddable` 이 자기 jar 안의
-`extensions/compiler.xml` 을 클래스패스에서 직접 찾는데, Spring Boot fat jar 의 중첩 jar
-안에서는 찾지 못하고 컴파일이 통째로 실패한다. 그래서 `installDist` 로 평범한
-클래스패스 배포를 만들어 실행한다.
+**Runner 만 fat jar 가 아니다.** Kotlin 컴파일러를 Runner 가 직접 돌리지 않고 그 jar
+(`kotlin-compiler-embeddable` 과 딸린 것들)를 샌드박스에 읽기 전용으로 들여보내는데,
+그러려면 jar 가 파일로 있어야 한다. Spring Boot fat jar 의 중첩 jar 는 마운트할 수 없다.
+그래서 `installDist` 로 평범한 클래스패스 배포를 만들어 실행한다.
+
+컨테이너 없이 돌 때(프로세스 샌드박스)는 호스트의 `javac` 과 `python3` 를 그대로 부른다.
+개발 편의이고, 그 둘이 PATH 에 있어야 한다.
 
 기본 포트는 Control Plane 8080, Orchestrator 8081, Runner 8082. 셋 다
 `/actuator/health` 를 연다.
@@ -270,6 +276,7 @@ python3 scripts/drill.py all      # 장애 주입 훈련 — 컨테이너와 Run
 | 증상 | 원인 |
 |---|---|
 | 큐 선언 실패로 앱이 안 뜬다 | RabbitMQ 가 아직 healthy 가 아니다. 10초쯤 기다린다 |
+| `PLAIN login refused: user 'codedrill'` | 브로커 볼륨을 배포 스택(docker-compose.apps.yml)이 만들었다. 정의를 읽은 노드는 기본 사용자를 만들지 않는다. `docker volume rm code-drill_rabbitmq-data` 뒤 다시 띄운다 |
 | 제출이 `QUEUED` 에서 멈춘다 | Orchestrator 가 안 떴거나 `CONTENT_ROOT` 가 틀렸다 |
 | 모든 제출이 `COMPILE_ERROR` | Runner 를 fat jar 로 띄웠다. `installDist` 배포를 쓴다 |
 | 판정은 오는데 리플레이가 없다 | 풀이가 `Drill.*` 를 호출하지 않는다. 계측은 선택이다 |

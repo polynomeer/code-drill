@@ -22,7 +22,7 @@ done
 |---|---|---|
 | control-plane | JRE + bootJar + **문제 패키지** | ~590MB |
 | orchestrator | JRE + bootJar + 문제 패키지 | ~580MB |
-| runner-agent | **JDK** + installDist + python3 + docker CLI | ~1.35GB |
+| runner-agent | JRE + installDist + docker CLI | 아래 참조 |
 | web | nginx + 정적 번들 | ~82MB |
 
 기반 이미지 판은 §11.4 스캔이 정한다. `nginx-unprivileged` 를 1.27 에서 1.29 로 올린
@@ -37,12 +37,13 @@ done
 볼륨으로 빼면 "어느 콘텐츠로 뜬 서비스인가"를 태그로 말할 수 없다. 콘텐츠를 고치면
 이미지를 다시 만든다.
 
-**Runner 만 JDK 다.** `javax.tools` 로 자바를 in-process 컴파일하는데 JRE 에는 그
-컴파일러가 없다. 파이썬 문법 검사에 `python3`, 격리 실행에 컨테이너 CLI 가 더 든다.
-그래서 셋 중 유일하게 무겁다.
+**Runner 에는 컴파일러가 없다.** 컴파일은 실행과 같은 샌드박스 안에서 돈다 (§5.5).
+Java 는 런타임 이미지(JDK)의 `javac`, Python 은 인터프리터, Kotlin 은 Runner 가 자기
+클래스패스의 컴파일러 jar 를 읽기 전용으로 들여보낸다. 전에는 JDK 와 `python3` 를 담고
+Runner 프로세스 안에서 컴파일했고, 그래서 1.35GB 였다.
 
-**Runner 는 fat jar 로 못 만든다.** `kotlin-compiler-embeddable` 이 jar 안에서
-`extensions/compiler.xml` 을 찾지 못한다. 그래서 이것만 `installDist` 다.
+**Runner 는 fat jar 로 못 만든다.** Kotlin 컴파일러 jar 를 샌드박스에 마운트하려면 파일로
+있어야 하는데, fat jar 의 중첩 jar 는 마운트할 수 없다. 그래서 이것만 `installDist` 다.
 
 ## Runner 를 어디서 돌리나
 
@@ -257,8 +258,9 @@ HIGH 가 상시 존재하고, **상시 빨간 게이트는 게이트가 아니�
 
 ### 샌드박스 런타임도 스캔한다
 
-`eclipse-temurin:21-jre` 와 `python:3.12-alpine` 은 우리가 만들지 않았지만 **우리가 고른
-것**이고, 사용자 코드가 실제로 도는 자리다 (§5.5). 우리 이미지만 보고 여기를 빼면 정작
+`eclipse-temurin:21-jre`·`eclipse-temurin:21-jdk`·`python:3.12-alpine` 은 우리가 만들지
+않았지만 **우리가 고른 것**이고, 사용자 코드가 실제로 도는 자리다 (§5.5). 컴파일도 여기서
+돈다. 우리 이미지만 보고 여기를 빼면 정작
 공격자가 서 있는 바닥은 아무도 보지 않는 셈이 된다.
 
 이 잡은 우리 빌드와 무관하게 깨질 수 있다. 상류가 새 CVE 를 받으면 코드를 한 줄도 바꾸지

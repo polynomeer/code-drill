@@ -43,7 +43,8 @@ services:
       # 운영에서는 태그가 아니라 digest 로 고정한다 (§5.5). 태그는 같은 이름이 다른
       # 내용을 가리킬 수 있어, 지난 제출을 그때의 런타임으로 재현하지 못한다.
       KOTLIN_IMAGE: ${KOTLIN_IMAGE:-eclipse-temurin:21-jre}
-      JAVA_IMAGE: ${JAVA_IMAGE:-eclipse-temurin:21-jre}
+      # JDK 다. Java 는 컴파일도 이 안에서 돌고, javac 은 JRE 에 없다 (§5.5).
+      JAVA_IMAGE: ${JAVA_IMAGE:-eclipse-temurin:21-jdk}
       PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-alpine}
 
     volumes:

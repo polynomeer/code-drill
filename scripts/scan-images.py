@@ -51,7 +51,7 @@ OURS = ["control-plane", "orchestrator", "runner-agent", "web"]
 # 사용자 코드가 실제로 도는 곳 (§5.5). 우리가 만들지 않았지만 **우리가 고른 것**이고,
 # 신뢰 경계 바깥에서 가장 노출된 자리라 우리 이미지보다 덜 중요하지 않다.
 # judge/runner-agent/src/main/resources/application.yml 의 기본값과 같아야 한다.
-SANDBOX = ["eclipse-temurin:21-jre", "python:3.12-alpine"]
+SANDBOX = ["eclipse-temurin:21-jre", "eclipse-temurin:21-jdk", "python:3.12-alpine"]
 
 
 def scanner_command() -> list[str]:

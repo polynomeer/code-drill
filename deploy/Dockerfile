@@ -61,20 +61,20 @@ ENTRYPOINT ["java", "-jar", "/app/app.jar"]
 
 # --- Runner ------------------------------------------------------------------
 #
-# 셋 중 유일하게 무거운 이미지다. 필요한 것이 셋이다.
-#
-#   JDK        javax.tools 로 자바를 in-process 컴파일한다 (JRE 로는 안 된다)
-#   python3    py_compile 로 파이썬 문법을 검사한다
-#   docker CLI 사용자 코드를 격리 컨테이너에서 돌린다 (§5.2)
+# JRE 하나에 컨테이너 CLI 를 얹는다. **이 이미지에는 컴파일러가 없다.** 컴파일은 사용자
+# 코드를 읽는 첫 프로그램이라 실행과 같은 샌드박스 안에서 돈다 (§5.5) — Java 는 런타임
+# 이미지(JDK)의 javac 으로, Kotlin 은 Runner 가 자기 클래스패스의 컴파일러 jar 를 읽기
+# 전용으로 들여보내서, Python 은 인터프리터 자신으로. 전에는 JDK 와 python3 를 여기 담고
+# Runner 프로세스 안에서 컴파일했다. 그 시절의 1.35GB 가 이제 필요 없다.
 #
 # **이 이미지는 컨테이너 런타임에 접근할 수 있어야 제 일을 한다.** 그 접근을 어떻게
 # 주느냐가 이 배포에서 가장 위험한 결정이며, docs/deploying.md 에 따로 적었다.
 
-FROM eclipse-temurin:21-jdk AS runner-agent
+FROM eclipse-temurin:21-jre AS runner-agent
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends python3 docker.io \
+    && apt-get install --yes --no-install-recommends docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /src/judge/runner-agent/build/install/runner-agent /app/runner-agent
