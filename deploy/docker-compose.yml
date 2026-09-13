@@ -37,11 +37,16 @@ services:
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
+    # 노드 이름이 호스트 이름에서 나온다. 고정하지 않으면 컨테이너를 다시 만들 때마다
+    # 다른 노드가 되어 아래 볼륨의 큐를 자기 것으로 보지 않는다.
+    hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: codedrill
       RABBITMQ_DEFAULT_PASS: codedrill
-    # 채점 작업 큐는 운영에서 quorum queue 로 선언한다 (§0.1, §12.3).
+    # 채점 작업 큐는 운영에서 quorum queue 로 선언한다 (§0.1, §12.3). quorum 은 디스크에
+    # 남는 큐다 — 볼륨이 없으면 컨테이너와 함께 사라져 "유실 0"이 빈말이 된다.
     ports: ["${RABBITMQ_PORT:-5672}:5672", "${RABBITMQ_UI_PORT:-15672}:15672"]
+    volumes: ["rabbitmq-data:/var/lib/rabbitmq"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -111,4 +116,5 @@ services:
 
 volumes:
   postgres-data:
+  rabbitmq-data:
   minio-data:

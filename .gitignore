@@ -47,3 +47,6 @@ __pycache__/
 
 # scripts/backup.py 가 받는 덤프. 실데이터라 저장소에 두지 않는다.
 build/backups/
+
+# 브로커 mTLS 인증서 (scripts/certs.py). 키가 들어 있다.
+deploy/certs/

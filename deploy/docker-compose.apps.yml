@@ -11,18 +11,35 @@
 # **Runner 는 여기 없다.** 이유는 docs/deploying.md 의 "Runner 를 어디서 돌리나" 에 있다.
 # 한 줄로 줄이면: 사용자 코드를 격리하는 컴포넌트에 호스트 컨테이너 런타임을 통째로
 # 내주면 격리가 뒤집힌다.
+#
+# **브로커는 인증서로만 받는다** (§11.2). 먼저 `python3 scripts/certs.py` 로 deploy/certs/ 를
+# 만든다. 앱마다 자기 신원 디렉터리만 들고 가고, 브로커 사용자·권한·토폴로지는
+# deploy/broker/definitions.json 이 정한다 — 앱은 큐를 선언하지 않는다.
 
 name: code-drill
 
 services:
+  rabbitmq:
+    # 개발용 브로커(docker-compose.yml)와 다른 점 셋: 평문 5672 가 없고, 인증서로만
+    # 들어오며, 토폴로지와 권한을 정의 파일에서 읽는다. 자세한 것은 broker/rabbitmq.conf.
+    ports: !override ["${RABBITMQ_TLS_PORT:-5671}:5671", "${RABBITMQ_UI_PORT:-15672}:15672"]
+    volumes:
+      - ./broker/rabbitmq.conf:/etc/rabbitmq/conf.d/20-codedrill.conf:ro
+      - ./broker/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./broker/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./certs/broker:/etc/rabbitmq/certs:ro
+
   control-plane:
     image: codedrill/control-plane:${CODEDRILL_TAG:-dev}
     profiles: ["apps"]
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/codedrill
       REDIS_URL: redis://redis:6379
-      BROKER_URL: amqp://codedrill:codedrill@rabbitmq:5672
+      BROKER_URL: amqps://rabbitmq:5671
+      BROKER_TLS_DIR: /etc/codedrill/broker-tls
+      BROKER_DECLARE_TOPOLOGY: "false"
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+    volumes: ["./certs/control-plane:/etc/codedrill/broker-tls:ro"]
     ports: ["${CONTROL_PLANE_PORT:-8080}:8080"]
     depends_on:
       postgres: {condition: service_healthy}
@@ -43,7 +60,10 @@ services:
     image: codedrill/orchestrator:${CODEDRILL_TAG:-dev}
     profiles: ["apps"]
     environment:
-      BROKER_URL: amqp://codedrill:codedrill@rabbitmq:5672
+      BROKER_URL: amqps://rabbitmq:5671
+      BROKER_TLS_DIR: /etc/codedrill/broker-tls
+      BROKER_DECLARE_TOPOLOGY: "false"
+    volumes: ["./certs/orchestrator:/etc/codedrill/broker-tls:ro"]
     ports: ["${ORCHESTRATOR_PORT:-8081}:8081"]
     depends_on:
       rabbitmq: {condition: service_healthy}

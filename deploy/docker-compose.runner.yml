@@ -8,9 +8,14 @@
 # 그래서 **Runner 말고 아무것도 없는 노드**에서 이것만 띄운다. 노드 자체가 폐기 가능한
 # 격리 단위가 된다. 자세한 이유와 남은 위험은 docs/deploying.md 에 있다.
 #
-#   BROKER_URL=amqp://codedrill:codedrill@<브로커 호스트>:5672 \
+#   BROKER_URL=amqps://<브로커 호스트>:5671 \
+#   BROKER_TLS=<runner 신원 디렉터리> \
 #   CODEDRILL_TAG=<커밋 SHA> \
 #     docker compose -f deploy/docker-compose.runner.yml up -d
+#
+# 이 노드가 들고 가는 비밀은 runner 신원 하나다 (scripts/certs.py 의 deploy/certs/runner/).
+# 브로커는 그 인증서를 `runner` 사용자로 보고, 실행 큐를 읽고 결과 exchange 에 쓰는 것만
+# 허락한다. 이 노드를 통째로 잃어도 제출 큐를 읽거나 판정 진행을 꾸며 낼 수는 없다.
 
 name: code-drill-runner
 
@@ -21,6 +26,9 @@ services:
       # 브로커는 다른 노드에 있다. 기본값을 두지 않는다 — localhost 로 조용히 붙어
       # 아무 작업도 받지 못한 채 "떠 있는" 것이 가장 알아채기 어려운 실패다.
       BROKER_URL: ${BROKER_URL:?브로커 주소가 필요하다}
+      BROKER_TLS_DIR: /etc/codedrill/broker-tls
+      # 토폴로지는 브로커의 것이다. 이 노드에는 선언 권한이 없고, 있어서도 안 된다.
+      BROKER_DECLARE_TOPOLOGY: "false"
 
       # 격리 없이는 뜨지 않는다 (§5.2). 런타임을 못 찾으면 프로세스 샌드박스로 내려가는
       # 개발 편의가 있는데, 공개 환경에서 그것은 사용자 코드를 호스트에서 그냥 돌리는
@@ -39,6 +47,8 @@ services:
       PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-alpine}
 
     volumes:
+      # 이 노드의 신원. cert.pem·key.pem·ca.pem 셋이다.
+      - ${BROKER_TLS:?runner 신원 디렉터리가 필요하다}:/etc/codedrill/broker-tls:ro
       # 안과 밖의 이름이 같다. 위 SANDBOX_WORK_ROOT 와 짝이다.
       - /var/lib/codedrill/work:/var/lib/codedrill/work
       # 샌드박스 컨테이너를 띄우기 위한 접근. **이 한 줄이 이 파일을 따로 둔 이유다.**
