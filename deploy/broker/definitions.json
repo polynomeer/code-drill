@@ -1,0 +1,662 @@
+{
+  "rabbit_version" : "4.0.0",
+  "users" : [ {
+    "name" : "control-plane",
+    "password_hash" : "",
+    "hashing_algorithm" : "rabbit_password_hashing_sha256",
+    "tags" : [ ]
+  }, {
+    "name" : "orchestrator",
+    "password_hash" : "",
+    "hashing_algorithm" : "rabbit_password_hashing_sha256",
+    "tags" : [ ]
+  }, {
+    "name" : "runner",
+    "password_hash" : "",
+    "hashing_algorithm" : "rabbit_password_hashing_sha256",
+    "tags" : [ ]
+  } ],
+  "vhosts" : [ {
+    "name" : "/"
+  } ],
+  "permissions" : [ {
+    "user" : "control-plane",
+    "vhost" : "/",
+    "configure" : "^(spring\\.gen-.*)$",
+    "write" : "^(judge\\.from\\.control-plane|codedrill\\.submission-events|spring\\.gen-.*)$",
+    "read" : "^(judge\\.progress|judge\\.trial-results|judge\\.mutation-results|judge\\.reference-trace-results|judge\\.shrink-results|judge\\.lab-results|judge\\.arena-results|judge\\.submissions\\.dead|codedrill\\.submission-events|spring\\.gen-.*)$"
+  }, {
+    "user" : "orchestrator",
+    "vhost" : "/",
+    "configure" : "^$",
+    "write" : "^(judge\\.from\\.orchestrator)$",
+    "read" : "^(judge\\.submissions|judge\\.results|judge\\.heartbeats)$"
+  }, {
+    "user" : "runner",
+    "vhost" : "/",
+    "configure" : "^$",
+    "write" : "^(judge\\.from\\.runner)$",
+    "read" : "^(judge\\.executions|judge\\.trials|judge\\.mutations|judge\\.reference-traces|judge\\.shrinks|judge\\.labs|judge\\.arena)$"
+  } ],
+  "exchanges" : [ {
+    "name" : "judge.dead",
+    "vhost" : "/",
+    "type" : "direct",
+    "durable" : true,
+    "auto_delete" : false,
+    "internal" : false,
+    "arguments" : { }
+  }, {
+    "name" : "judge.from.control-plane",
+    "vhost" : "/",
+    "type" : "direct",
+    "durable" : true,
+    "auto_delete" : false,
+    "internal" : false,
+    "arguments" : { }
+  }, {
+    "name" : "judge.from.orchestrator",
+    "vhost" : "/",
+    "type" : "direct",
+    "durable" : true,
+    "auto_delete" : false,
+    "internal" : false,
+    "arguments" : { }
+  }, {
+    "name" : "judge.from.runner",
+    "vhost" : "/",
+    "type" : "direct",
+    "durable" : true,
+    "auto_delete" : false,
+    "internal" : false,
+    "arguments" : { }
+  }, {
+    "name" : "codedrill.submission-events",
+    "vhost" : "/",
+    "type" : "fanout",
+    "durable" : true,
+    "auto_delete" : false,
+    "internal" : false,
+    "arguments" : { }
+  } ],
+  "queues" : [ {
+    "name" : "judge.submissions",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.submissions"
+    }
+  }, {
+    "name" : "judge.submissions.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.executions",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.executions"
+    }
+  }, {
+    "name" : "judge.executions.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.results"
+    }
+  }, {
+    "name" : "judge.results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.progress",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.progress"
+    }
+  }, {
+    "name" : "judge.progress.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.heartbeats",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.heartbeats"
+    }
+  }, {
+    "name" : "judge.heartbeats.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.trials",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.trials"
+    }
+  }, {
+    "name" : "judge.trials.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.trial-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.trial-results"
+    }
+  }, {
+    "name" : "judge.trial-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.mutations",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.mutations"
+    }
+  }, {
+    "name" : "judge.mutations.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.mutation-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.mutation-results"
+    }
+  }, {
+    "name" : "judge.mutation-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.reference-traces",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.reference-traces"
+    }
+  }, {
+    "name" : "judge.reference-traces.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.reference-trace-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.reference-trace-results"
+    }
+  }, {
+    "name" : "judge.reference-trace-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.shrinks",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.shrinks"
+    }
+  }, {
+    "name" : "judge.shrinks.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.shrink-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.shrink-results"
+    }
+  }, {
+    "name" : "judge.shrink-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.labs",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.labs"
+    }
+  }, {
+    "name" : "judge.labs.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.lab-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.lab-results"
+    }
+  }, {
+    "name" : "judge.lab-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.arena",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.arena"
+    }
+  }, {
+    "name" : "judge.arena.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.arena-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.arena-results"
+    }
+  }, {
+    "name" : "judge.arena-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  } ],
+  "bindings" : [ {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.submissions",
+    "destination_type" : "queue",
+    "routing_key" : "judge.submissions",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.submissions.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.submissions",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.orchestrator",
+    "vhost" : "/",
+    "destination" : "judge.executions",
+    "destination_type" : "queue",
+    "routing_key" : "judge.executions",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.executions.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.executions",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.orchestrator",
+    "vhost" : "/",
+    "destination" : "judge.progress",
+    "destination_type" : "queue",
+    "routing_key" : "judge.progress",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.progress.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.progress",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.heartbeats",
+    "destination_type" : "queue",
+    "routing_key" : "judge.heartbeats",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.heartbeats.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.heartbeats",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.trials",
+    "destination_type" : "queue",
+    "routing_key" : "judge.trials",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.trials.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.trials",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.trial-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.trial-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.trial-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.trial-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.mutations",
+    "destination_type" : "queue",
+    "routing_key" : "judge.mutations",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.mutations.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.mutations",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.mutation-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.mutation-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.mutation-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.mutation-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.reference-traces",
+    "destination_type" : "queue",
+    "routing_key" : "judge.reference-traces",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.reference-traces.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.reference-traces",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.reference-trace-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.reference-trace-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.reference-trace-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.reference-trace-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.shrinks",
+    "destination_type" : "queue",
+    "routing_key" : "judge.shrinks",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.shrinks.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.shrinks",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.shrink-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.shrink-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.shrink-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.shrink-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.labs",
+    "destination_type" : "queue",
+    "routing_key" : "judge.labs",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.labs.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.labs",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.lab-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.lab-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.lab-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.lab-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.arena",
+    "destination_type" : "queue",
+    "routing_key" : "judge.arena",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.arena.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.arena",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.arena-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.arena-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.arena-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.arena-results",
+    "arguments" : { }
+  } ]
+}

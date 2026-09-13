@@ -17,6 +17,14 @@ spring:
     addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
 
 codedrill:
+  messaging:
+    # 브로커에 밝히는 신원 (§11.2). 발행은 전부 judge.from.control-plane 로 나간다.
+    identity: control-plane
+    # 배포에서는 false — 브로커가 정의 파일로 토폴로지를 갖고, 앱에는 선언 권한이 없다.
+    declare-topology: ${BROKER_DECLARE_TOPOLOGY:true}
+    tls:
+      # cert.pem·key.pem·ca.pem 이 있는 디렉터리. 주면 mTLS 로 붙고 인증서로 로그인한다.
+      dir: ${BROKER_TLS_DIR:}
   admin:
     # 첫 SECURITY_ADMIN 을 받을 계정의 이메일 (§11.2).
     #

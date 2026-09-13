@@ -25,7 +25,9 @@ class SubmissionEventFanout(private val events: SubmissionEventStream) {
         bindings = [
             QueueBinding(
                 value = Queue(exclusive = "true", durable = "false", autoDelete = "true"),
-                exchange = Exchange(name = JudgeQueues.SUBMISSION_EVENTS, type = "fanout", durable = "true"),
+                // exchange 는 여기서 선언하지 않는다. 개발에서는 AmqpConfig 가, 배포에서는
+                // 브로커 정의가 갖는다 — 이 앱에는 exchange 를 만들 권한이 없다 (§11.2).
+                exchange = Exchange(name = JudgeQueues.SUBMISSION_EVENTS, type = "fanout", durable = "true", declare = "false"),
             ),
         ],
     )

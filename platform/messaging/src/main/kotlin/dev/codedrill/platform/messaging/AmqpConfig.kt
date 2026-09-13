@@ -1,6 +1,7 @@
 package dev.codedrill.platform.messaging
 
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.rabbitmq.client.DefaultSaslConfig
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
@@ -14,8 +15,14 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate
 import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter
 import org.springframework.amqp.support.converter.MessageConverter
-import org.springframework.context.annotation.Bean
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
+import org.springframework.boot.autoconfigure.amqp.ConnectionFactoryCustomizer
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.ssl.SslBundle
+import org.springframework.boot.ssl.pem.PemSslStoreBundle
+import org.springframework.boot.ssl.pem.PemSslStoreDetails
+import org.springframework.context.annotation.Bean
 
 /**
  * 채점 경로 큐와 직렬화 설정.
@@ -25,27 +32,47 @@ import org.springframework.boot.autoconfigure.AutoConfiguration
  *
  * 큐는 durable + quorum 으로 선언한다. 브로커 노드가 죽어도 작업이 사라지면 안 된다
  * (§12.3 작업 유실 0).
+ *
+ * 앱은 자기 신원(`codedrill.messaging.identity`)을 밝혀야 뜬다. 발행은 전부 그 신원의
+ * exchange 로 나가고([JudgeIdentity.exchange]), 브로커는 그 exchange 에 대한 쓰기 권한
+ * 하나로 이 앱이 보낼 수 있는 큐를 가른다.
  */
 @AutoConfiguration
 class AmqpConfig {
 
+    /**
+     * 큐·exchange·바인딩 선언.
+     *
+     * 개발에서는 앱이 선언한다 — 브로커가 비어 있어도 뜨면 된다. 배포에서는 끈다
+     * (`codedrill.messaging.declare-topology=false`). 거기서는 브로커가 정의 파일로
+     * 토폴로지를 갖고 앱에는 선언 권한이 없다. 선언 권한은 곧 삭제 권한이라, 그것을 가진
+     * Runner 를 깬 사람은 제출 큐를 지울 수 있다.
+     *
+     * 두 곳의 토폴로지가 어긋나지 않는 것은 [BrokerDefinitions] 와 그 테스트가 지킨다.
+     */
     // Declarables 로 감싸야 RabbitAdmin 이 선언 대상으로 인식한다. List<Queue> 빈은 무시된다.
     @Bean
+    @ConditionalOnProperty("codedrill.messaging.declare-topology", havingValue = "true", matchIfMissing = true)
     fun judgeQueues() = Declarables(
         buildList {
             val dead = DirectExchange(JudgeQueues.DEAD_EXCHANGE, true, false)
             add(dead)
 
-            for (name in JudgeQueues.all) {
+            val outlets = JudgeIdentity.entries.associateWith { DirectExchange(it.exchange, true, false) }
+            outlets.values.forEach { add(it) }
+
+            for (lane in JudgeTopology.lanes) {
+                val name = lane.queue
                 // 배달 횟수는 브로커가 센다. 애플리케이션 재시도로 세면 소비자가 죽었다
                 // 살아날 때마다 0 부터 다시 세고, 그러면 한도가 없는 것과 같다.
-                add(
-                    QueueBuilder.durable(name).quorum()
-                        .deliveryLimit(DELIVERY_LIMIT)
-                        .deadLetterExchange(JudgeQueues.DEAD_EXCHANGE)
-                        .deadLetterRoutingKey(name)
-                        .build(),
-                )
+                val queue = QueueBuilder.durable(name).quorum()
+                    .deliveryLimit(DELIVERY_LIMIT)
+                    .deadLetterExchange(JudgeQueues.DEAD_EXCHANGE)
+                    .deadLetterRoutingKey(name)
+                    .build()
+                add(queue)
+                // 큐는 자기를 채우는 신원의 exchange 에만 묶인다. 라우팅 키는 큐 이름이다.
+                add(BindingBuilder.bind(queue).to(outlets.getValue(lane.from)).with(name))
                 // 옆으로 치운 메시지는 남겨 둔다. 다만 영원히는 아니다 — 아무도 보지
                 // 않는 큐가 브로커 디스크를 채우는 것이 그 다음 사고다.
                 val deadQueue = QueueBuilder.durable(JudgeQueues.dead(name)).quorum()
@@ -65,6 +92,7 @@ class AmqpConfig {
      * 인스턴스의 큐에 이벤트가 영원히 쌓인다.
      */
     @Bean
+    @ConditionalOnProperty("codedrill.messaging.declare-topology", havingValue = "true", matchIfMissing = true)
     fun submissionEvents() = FanoutExchange(JudgeQueues.SUBMISSION_EVENTS, true, false)
 
     @Bean
@@ -87,10 +115,41 @@ class AmqpConfig {
         }
 
     @Bean
-    fun rabbitTemplate(factory: ConnectionFactory, converter: MessageConverter) =
-        RabbitTemplate(factory).apply { messageConverter = converter }
+    fun rabbitTemplate(
+        factory: ConnectionFactory,
+        converter: MessageConverter,
+        @Value("\${codedrill.messaging.identity}") identity: String,
+    ) = RabbitTemplate(factory).apply {
+        messageConverter = converter
+        // 큐 이름으로 보내면 이 exchange 를 거친다. 다른 신원의 큐에는 바인딩이 없어
+        // 브로커가 버리고, 권한이 없어 애초에 받지도 않는다.
+        setExchange(JudgeIdentity.of(identity).exchange)
+    }
 
-    private companion object {
+    /**
+     * 인증서로 붙고 인증서로 로그인한다 (§11.2 mTLS).
+     *
+     * `codedrill.messaging.tls.dir` 아래의 `cert.pem`·`key.pem`·`ca.pem` 이 이 앱의 신원이다
+     * (scripts/certs.py 가 만든다). 브로커는 TLS 핸드셰이크에서 본 클라이언트 인증서의 CN 을
+     * 사용자 이름으로 삼는다. 비밀번호는 오가지 않는다 — 복사해 갈 비밀이 아니라 노드에
+     * 있는 키가 신원이다.
+     *
+     * 비워 두면 주소의 비밀번호로 붙는다. 개발용이다.
+     */
+    @Bean
+    fun certificateLogin(@Value("\${codedrill.messaging.tls.dir:}") dir: String) = ConnectionFactoryCustomizer { factory ->
+        if (dir.isBlank()) return@ConnectionFactoryCustomizer
+        val stores = PemSslStoreBundle(
+            PemSslStoreDetails.forCertificate("file:$dir/cert.pem").withPrivateKey("file:$dir/key.pem"),
+            PemSslStoreDetails.forCertificate("file:$dir/ca.pem"),
+        )
+        factory.useSslProtocol(SslBundle.of(stores).createSslContext())
+        // 브로커 인증서의 이름이 우리가 부른 이름과 같아야 한다. CA 가 같다고 다 브로커는 아니다.
+        factory.enableHostnameVerification()
+        factory.saslConfig = DefaultSaslConfig.EXTERNAL
+    }
+
+    companion object {
         /**
          * 한 메시지를 몇 번까지 배달해 볼 것인가.
          *
