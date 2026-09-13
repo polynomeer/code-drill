@@ -2,7 +2,9 @@ package dev.codedrill.judge.runner.execution.sandbox
 
 import dev.codedrill.judge.runner.execution.CaseOutcome
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.absolutePathString
@@ -124,6 +126,42 @@ class ContainerSandbox(
         )
     }
 
+    override fun exec(spec: SandboxSpec): ExecOutcome {
+        val containerName = "$CONTAINER_PREFIX${UUID.randomUUID()}"
+        val mapping = containerPaths(spec)
+        openForSandboxUser(spec.writablePaths)
+        val process = ProcessBuilder(buildCommand(spec, containerName))
+            .redirectErrorStream(true)
+            .start()
+
+        val outcome = SandboxStream.collect(
+            process = process,
+            timeoutMillis = spec.perCaseTimeoutMillis + startupGraceMillis(),
+            outputByteLimit = spec.outputByteLimit,
+            onTeardown = { forceRemove(containerName) },
+        )
+        // 컴파일러가 찍는 경로는 컨테이너 안의 것이다. 호출부는 호스트 경로만 안다.
+        val inverse = mapping.entries.associate { (host, inside) -> inside to host }
+        return outcome.copy(output = rewrite(outcome.output, inverse))
+    }
+
+    /**
+     * 쓰기 경로를 샌드박스 사용자가 쓸 수 있게 한다.
+     *
+     * Runner 가 root 로 돌면 샌드박스는 nobody 로 내려간다 ([unprivilegedUser]). 그때 Runner 가
+     * 만든 디렉터리는 root 소유 755 라 nobody 는 읽기만 한다 — 컴파일러가 산출물을 쓰지
+     * 못해 "Permission denied" 로 끝났다. 실제로 그랬다. 디렉터리는 실행마다 새로 만드는
+     * 빈 것이라 열어 줘도 잃는 것이 없다.
+     */
+    private fun openForSandboxUser(paths: List<Path>) {
+        if (unprivilegedUser().startsWith("${hostId("-u")}:")) return
+        for (path in paths) {
+            runCatching {
+                Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwxrwxrwx"))
+            }.onFailure { log.warn("쓰기 경로 권한을 열지 못했다: {} ({})", path, it.message) }
+        }
+    }
+
     /**
      * 컨테이너를 확실히 없앤다. 실행 경로가 어떻게 끝났든 마지막에 반드시 한 번 돈다.
      *
@@ -185,7 +223,7 @@ class ContainerSandbox(
             "--user", unprivilegedUser(),
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
-            "--pids-limit", pidsLimit.toString(),
+            "--pids-limit", (spec.pidsLimit ?: pidsLimit).toString(),
             "--memory", "${containerMemory}m",
             // swap 을 메모리와 같은 값으로 두면 스왑이 비활성화된다.
             "--memory-swap", "${containerMemory}m",
@@ -202,8 +240,11 @@ class ContainerSandbox(
 
         // 들여보내는 경로는 이 목록이 전부다. 여기 없는 것은 실행 중인 코드가 볼 수 없다.
         val mapping = containerPaths(spec)
+        val writable = spec.writablePaths.map { it.absolutePathString() }.toSet()
         for ((host, inside) in mapping) {
-            command += listOf("--volume", "$host:$inside:ro")
+            // 쓸 수 있는 곳은 작업 디렉터리 안의 하위 마운트 하나다. 컴파일 산출물이
+            // 거기 남고, 실행 단계는 그것을 다시 읽기 전용으로 받는다.
+            command += listOf("--volume", "$host:$inside:${if (host in writable) "rw" else "ro"}")
         }
 
         for ((key, value) in spec.env) {
@@ -226,7 +267,14 @@ class ContainerSandbox(
      */
     private fun containerPaths(spec: SandboxSpec): Map<String, String> =
         buildMap {
-            put(spec.workDir.absolutePathString(), SANDBOX_ROOT)
+            val work = spec.workDir.absolutePathString()
+            put(work, SANDBOX_ROOT)
+            // 작업 디렉터리 아래의 경로는 같은 상대 위치로 겹쳐 마운트한다 (rw 를 주기 위해).
+            for (path in spec.writablePaths) {
+                val host = path.absolutePathString()
+                require(host.startsWith("$work/")) { "쓰기 경로는 작업 디렉터리 아래여야 한다: $host" }
+                put(host, SANDBOX_ROOT + host.removePrefix(work))
+            }
             spec.readOnlyPaths.forEachIndexed { index, path ->
                 put(path.absolutePathString(), "$RUNTIME_ROOT/$index-${path.fileName}")
             }

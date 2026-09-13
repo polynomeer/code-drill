@@ -1,6 +1,7 @@
 package dev.codedrill.judge.runner.execution.sandbox
 
 import dev.codedrill.judge.runner.execution.CaseOutcome
+import java.util.concurrent.TimeUnit
 
 /**
  * 별도 프로세스로만 격리하는 샌드박스. **개발 편의용이다.**
@@ -47,5 +48,14 @@ class ProcessSandbox : Sandbox {
             onEvent = onEvent,
             shouldContinue = shouldContinue,
         )
+    }
+
+    override fun exec(spec: SandboxSpec): ExecOutcome {
+        val process = ProcessBuilder(spec.command)
+            .directory(spec.workDir.toFile())
+            .apply { environment().putAll(spec.env) }
+            .redirectErrorStream(true)
+            .start()
+        return SandboxStream.collect(process, spec.perCaseTimeoutMillis + startupGraceMillis(), spec.outputByteLimit)
     }
 }

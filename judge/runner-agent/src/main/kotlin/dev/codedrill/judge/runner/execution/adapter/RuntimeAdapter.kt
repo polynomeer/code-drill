@@ -5,6 +5,7 @@ import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.platform.problempackage.ValueType
 import java.nio.file.Path
+import kotlin.io.path.absolutePathString
 
 /**
  * 런타임 어댑터 계약 (기술 설계서 §5.3).
@@ -27,12 +28,25 @@ interface RuntimeAdapter {
     fun prepare(request: ExecutionRequest, sourceDir: Path)
 
     /**
-     * 컴파일한다. 인터프리터 언어는 문법 검사만 수행한다.
+     * 컴파일 명령. 인터프리터 언어는 문법 검사다.
      *
-     * 실패는 전부 사용자 코드 오류(COMPILE_ERROR)로 다룬다. 플랫폼 문제로 컴파일이
-     * 불가능하면 예외를 던져 SYSTEM_ERROR 로 흐르게 한다 (§4.4).
+     * **샌드박스가 돌린다** (§5.5). 컴파일러는 사용자 코드를 읽는 첫 프로그램이라 실행과
+     * 같은 통제 아래 있어야 한다. 어댑터는 명령과 그 명령이 들여보내야 할 경로만 안다.
+     *
+     * 경로는 [command] 와 같은 규칙으로 호스트 절대 경로다. 산출물은 [outputDir] 에 쓴다 —
+     * 샌드박스가 쓰기를 허락하는 유일한 곳이다.
      */
-    fun compile(sourceDir: Path, outputDir: Path): CompileOutcome
+    fun compileStep(sourceDir: Path, outputDir: Path): CompileStep
+
+    /**
+     * 컴파일러 출력을 사용자에게 보여줄 로그로 다듬는다.
+     *
+     * 절대 경로를 지운다 — 서버의 디렉터리 구조는 사용자가 알 것이 아니다 (§11.3). 그
+     * 이상의 해석은 하지 않는다. 컴파일러의 말을 고쳐 쓰면 사용자가 검색할 수 없는
+     * 메시지가 된다.
+     */
+    fun compileLog(output: String, sourceDir: Path): String =
+        output.replace(sourceDir.absolutePathString() + "/", "").take(MAX_COMPILE_LOG_CHARS)
 
     /**
      * 샌드박스 안에서 실행할 명령.
@@ -62,6 +76,25 @@ interface RuntimeAdapter {
 
         /** 사용자에게 그대로 보여줄 수 있는 로그. 서버 절대 경로를 담지 않는다. */
         data class Failure(val log: String) : CompileOutcome
+    }
+
+    /**
+     * 샌드박스에서 돌릴 컴파일 한 판.
+     *
+     * [memoryMb] 와 [timeoutMillis] 는 문제의 한도가 아니라 **컴파일러의** 한도다. 사용자
+     * 코드가 컴파일러를 무한히 돌게 만들 수 있고(깊은 제네릭 추론 등), 그것도 사용자
+     * 코드 오류다.
+     */
+    data class CompileStep(
+        val command: List<String>,
+        val readOnlyPaths: List<Path> = emptyList(),
+        val memoryMb: Int,
+        val timeoutMillis: Long,
+        val env: Map<String, String> = emptyMap(),
+    )
+
+    companion object {
+        const val MAX_COMPILE_LOG_CHARS = 8_000
     }
 }
 

@@ -7,7 +7,6 @@ import dev.codedrill.judge.runner.execution.qualifiedId
 import dev.codedrill.platform.problempackage.Signature
 import dev.codedrill.platform.problempackage.ValueType
 import java.nio.file.Path
-import java.util.concurrent.TimeUnit
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.writeText
 
@@ -49,28 +48,20 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
     override fun enforcesMemoryWithoutContainer(): Boolean =
         System.getProperty("os.name").orEmpty().lowercase().contains("linux")
 
-    override fun compile(sourceDir: Path, outputDir: Path): RuntimeAdapter.CompileOutcome {
-        val process = ProcessBuilder(
-            interpreter,
-            "-m",
-            "py_compile",
+    /**
+     * 문법 검사. 바이트코드는 [outputDir] 에 쓴다 — 소스 옆의 `__pycache__` 는 읽기
+     * 전용이라, 거기 쓰려다 난 OSError 가 문법 오류로 둔갑한다.
+     */
+    override fun compileStep(sourceDir: Path, outputDir: Path) = RuntimeAdapter.CompileStep(
+        command = listOf(
+            interpreter, "-B", "-c", SYNTAX_CHECK,
             sourceDir.resolve("solution.py").absolutePathString(),
-        )
-            .directory(sourceDir.toFile())
-            .redirectErrorStream(true)
-            .start()
-
-        val log = process.inputStream.bufferedReader().readText()
-        if (!process.waitFor(SYNTAX_CHECK_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            process.destroyForcibly()
-            error("문법 검사가 끝나지 않았다")
-        }
-        if (process.exitValue() == 0) return RuntimeAdapter.CompileOutcome.Success
-
-        return RuntimeAdapter.CompileOutcome.Failure(
-            log.replace(sourceDir.absolutePathString(), "").take(MAX_LOG_CHARS),
-        )
-    }
+            outputDir.resolve("solution.pyc").absolutePathString(),
+        ),
+        memoryMb = SYNTAX_CHECK_MEMORY_MB,
+        timeoutMillis = SYNTAX_CHECK_TIMEOUT_MILLIS,
+        env = DETERMINISM_ENV,
+    )
 
     override fun command(
         sourceDir: Path,
@@ -315,7 +306,14 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
         val DETERMINISM_ENV = mapOf("PYTHONHASHSEED" to "0", "PYTHONDONTWRITEBYTECODE" to "1")
 
         private const val EVENT_BUDGET = 1_000
-        private const val MAX_LOG_CHARS = 8_000
-        private const val SYNTAX_CHECK_TIMEOUT_SECONDS = 10L
+        private const val SYNTAX_CHECK_MEMORY_MB = 128
+        private const val SYNTAX_CHECK_TIMEOUT_MILLIS = 10_000L
+
+        /**
+         * `py_compile` 의 CLI 는 바이트코드를 소스 옆에만 쓴다. 자리를 정하려면 함수를
+         * 직접 부른다. 실패는 stderr 에 CLI 와 같은 모양으로 찍힌다 (doraise=False).
+         */
+        private const val SYNTAX_CHECK =
+            "import py_compile, sys; sys.exit(0 if py_compile.compile(sys.argv[1], cfile=sys.argv[2]) else 1)"
     }
 }

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
-import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
+import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -33,7 +33,8 @@ object ValidateContent {
 
         val validator = ContentValidator(
             engine = ExecutionEngine(
-                adapters = mapOf(Language.KOTLIN to KotlinAdapter()),
+                // 컴파일마다 JVM 이 뜬다 (§5.5). 아카이브가 있으면 절반쯤 빠르다.
+                adapters = mapOf(Language.KOTLIN to KotlinCompilerArchive.warmedAdapter(reportRoot.resolve(".cds"))),
                 sandboxes = { ProcessSandbox() },
             ),
             contentRoot = contentRoot,

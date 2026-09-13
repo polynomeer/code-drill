@@ -73,6 +73,37 @@ class ExecutionEngine(
         }
     }
 
+    private fun compile(
+        adapter: RuntimeAdapter,
+        sandbox: Sandbox,
+        sourceDir: Path,
+        outputDir: Path,
+    ): RuntimeAdapter.CompileOutcome {
+        val step = adapter.compileStep(sourceDir, outputDir)
+        val outcome = sandbox.exec(
+            SandboxSpec(
+                command = step.command,
+                workDir = sourceDir.parent,
+                readOnlyPaths = step.readOnlyPaths,
+                env = step.env,
+                memoryMb = step.memoryMb,
+                perCaseTimeoutMillis = step.timeoutMillis,
+                outputByteLimit = RuntimeAdapter.MAX_COMPILE_LOG_CHARS.toLong(),
+                writablePaths = listOf(outputDir),
+                pidsLimit = COMPILER_PIDS_LIMIT,
+            ),
+        )
+        val log = adapter.compileLog(outcome.output, sourceDir)
+        return when (outcome.exitCode) {
+            0 -> RuntimeAdapter.CompileOutcome.Success
+            // 끝나지 않는 컴파일도 사용자 코드 오류다. 컴파일러를 멈추게 하는 코드가 있다.
+            null -> RuntimeAdapter.CompileOutcome.Failure(
+                "컴파일이 ${step.timeoutMillis / 1000}초 안에 끝나지 않았다\n$log".trim(),
+            )
+            else -> RuntimeAdapter.CompileOutcome.Failure(log.ifBlank { "컴파일러가 코드 ${outcome.exitCode} 로 끝났다" })
+        }
+    }
+
     private fun runPipeline(request: ExecutionRequest, sandboxDir: Path): ExecutionResult {
         val adapter = adapters[request.language]
             ?: error("지원하지 않는 언어다: ${request.language}")
@@ -82,9 +113,9 @@ class ExecutionEngine(
         val outputDir = sandboxDir.resolve("out").also { it.createDirectories() }
         adapter.prepare(request, sourceDir)
 
-        // compile
+        // compile — 실행과 같은 샌드박스 안에서 (§5.5). 산출물 디렉터리만 쓸 수 있다.
         val compileStart = System.nanoTime()
-        val compiled = adapter.compile(sourceDir, outputDir)
+        val compiled = compile(adapter, sandboxes(request.language), sourceDir, outputDir)
         onPhase(
             "compile", request.language,
             if (compiled is RuntimeAdapter.CompileOutcome.Success) "success" else "failure",
@@ -343,7 +374,10 @@ class ExecutionEngine(
         mode = request.mode,
     )
 
-    private companion object {
+    companion object {
+        /** 컴파일러는 JVM 이라 스레드가 수십 개다. 실행의 상한(64)으로는 뜨지도 못한다. */
+        const val COMPILER_PIDS_LIMIT = 256
+
         /**
          * 실행마다 결과가 달라지지 않게 하는 환경 (§12.1 재현성).
          *

@@ -2,7 +2,7 @@ package dev.codedrill.judge.runner.content
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
-import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
+import dev.codedrill.judge.runner.TestAdapters
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
 import java.nio.file.Path
 import kotlin.test.Test
@@ -28,7 +28,7 @@ class PerformanceMarginTest {
 
     private val validator = ContentValidator(
         engine = ExecutionEngine(
-            adapters = mapOf(Language.KOTLIN to KotlinAdapter()),
+            adapters = mapOf(Language.KOTLIN to TestAdapters.kotlin),
             sandboxes = { ProcessSandbox() },
         ),
         contentRoot = Path.of("src/test/resources/content-margin"),

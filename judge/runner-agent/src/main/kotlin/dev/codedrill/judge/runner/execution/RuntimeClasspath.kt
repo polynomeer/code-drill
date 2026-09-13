@@ -21,6 +21,26 @@ object RuntimeClasspath {
     val all: List<Path> get() = listOf(kotlinStdlib, annotations).filter { it.exists() }
 
     /**
+     * Kotlin 컴파일러와 그것이 끌고 오는 jar (§5.5 컴파일도 샌드박스 안에서).
+     *
+     * Runner 의 클래스패스에 이미 있는 `kotlin-compiler-embeddable` 을 그대로 샌드박스에
+     * 들여보낸다. 컴파일러를 이미지에 굽지 않으므로 실행 이미지는 JRE 로 남고, 컴파일러
+     * 판은 Runner 빌드가 고정한다. 그래서 Runner 는 fat jar 로 만들 수 없다 — 이 jar 들이
+     * 파일로 있어야 마운트할 수 있다.
+     *
+     * 목록은 클래스 하나씩으로 찾는다. 판을 올릴 때 jar 이름이 바뀌어도 여기는 그대로다.
+     */
+    val kotlinCompiler: List<Path> by lazy {
+        listOf(
+            "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",              // kotlin-compiler-embeddable
+            "kotlin.script.templates.standard.ScriptTemplateWithArgs", // kotlin-script-runtime
+            "kotlin.reflect.jvm.internal.KClassImpl",                  // kotlin-reflect
+            "kotlinx.coroutines.Dispatchers",                          // kotlinx-coroutines-core-jvm
+            "gnu.trove.THashMap",                                      // trove4j
+        ).map(::locate) + all
+    }
+
+    /**
      * 같은 jar 를 [root] 아래로 옮겨 담고 그 경로를 돌려준다.
      *
      * **Runner 가 컨테이너 안에서 돌 때 필요하다.** 이 jar 들은 Runner 이미지 안에
@@ -32,9 +52,9 @@ object RuntimeClasspath {
      * [root] 는 호스트와 이름이 같은 디렉터리다 (`codedrill.sandbox.work-root`).
      * 거기로 옮기면 안과 밖이 같은 곳을 가리킨다.
      */
-    fun sharedInto(root: Path): List<Path> {
+    fun sharedInto(root: Path, jars: List<Path> = all): List<Path> {
         val runtime = root.resolve("runtime").also { it.createDirectories() }
-        return all.map { jar ->
+        return jars.map { jar ->
             val target = runtime.resolve(jar.fileName.toString())
             // 매 기동마다 덮어쓴다. 이미지를 올렸는데 지난 jar 가 남아 있으면, 판정은
             // 새 이미지로 도는데 stdlib 만 옛것인 조합이 된다.

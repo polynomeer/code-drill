@@ -6,11 +6,7 @@ import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.qualifiedId
 import dev.codedrill.platform.problempackage.Signature
 import dev.codedrill.platform.problempackage.ValueType
-import java.io.StringWriter
 import java.nio.file.Path
-import javax.tools.DiagnosticCollector
-import javax.tools.JavaFileObject
-import javax.tools.ToolProvider
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeText
@@ -21,8 +17,9 @@ import kotlin.io.path.writeText
  * 사용자는 `Solution` 클래스에 메서드를 작성한다. Java 에는 최상위 함수가 없으므로
  * 클래스 규약이 필요하고, 이 규약은 문제 본문에 명시된다.
  *
- * 컴파일은 JDK 의 `javax.tools` 컴파일러를 in-process 로 쓴다. 외부 `javac` 실행 파일에
- * 기대지 않으므로 런타임 이미지가 JDK 하나만 담으면 된다.
+ * 컴파일은 샌드박스 안의 `javac` 다. 그래서 Java 의 런타임 이미지는 JRE 가 아니라 **JDK**
+ * 여야 한다 — 셋 중 유일하게 컴파일러를 이미지에서 받는 언어다. Kotlin 은 Runner 가 가진
+ * 컴파일러 jar 를 들여보내고, Python 은 인터프리터가 곧 검사기다.
  */
 class JavaAdapter : RuntimeAdapter {
 
@@ -41,32 +38,17 @@ class JavaAdapter : RuntimeAdapter {
         }
     }
 
-    override fun compile(sourceDir: Path, outputDir: Path): RuntimeAdapter.CompileOutcome {
-        val compiler = ToolProvider.getSystemJavaCompiler()
-            ?: error("JDK 의 java 컴파일러를 찾지 못했다. JRE 로 실행 중일 수 있다")
-
-        val diagnostics = DiagnosticCollector<JavaFileObject>()
-        val output = StringWriter()
-
-        compiler.getStandardFileManager(diagnostics, null, null).use { fileManager ->
-            val sources = fileManager.getJavaFileObjectsFromPaths(
-                sourceDir.listDirectoryEntries("*.java").sorted(),
-            )
-            val options = listOf("-d", outputDir.absolutePathString(), "-encoding", "UTF-8")
-            val task = compiler.getTask(output, fileManager, diagnostics, options, null, sources)
-
-            if (task.call() == true) return RuntimeAdapter.CompileOutcome.Success
-        }
-
-        // 진단 메시지에는 소스 파일의 절대 경로가 들어간다. 줄·칸만 남겨 서버 경로가
-        // 사용자에게 노출되지 않게 한다 (§11.3).
-        val log = diagnostics.diagnostics
-            .filter { it.kind == javax.tools.Diagnostic.Kind.ERROR }
-            .joinToString("\n") { "(${it.lineNumber}:${it.columnNumber}) ${it.getMessage(null)}" }
-            .ifBlank { output.toString() }
-
-        return RuntimeAdapter.CompileOutcome.Failure(log.take(MAX_LOG_CHARS))
-    }
+    override fun compileStep(sourceDir: Path, outputDir: Path) = RuntimeAdapter.CompileStep(
+        command = listOf(
+            "javac",
+            // 몇 초 사는 프로세스다. C1 만으로 충분하고 기동이 빠르다.
+            "-J-XX:+UseSerialGC", "-J-XX:TieredStopAtLevel=1", "-J-Xmx${COMPILER_HEAP_MB}m",
+            "-d", outputDir.absolutePathString(),
+            "-encoding", "UTF-8",
+        ) + sourceDir.listDirectoryEntries("*.java").sorted().map { it.absolutePathString() },
+        memoryMb = COMPILER_HEAP_MB,
+        timeoutMillis = COMPILE_TIMEOUT_MILLIS,
+    )
 
     override fun command(
         sourceDir: Path,
@@ -308,8 +290,9 @@ class JavaAdapter : RuntimeAdapter {
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-    private companion object {
-        const val EVENT_BUDGET = 1_000
-        const val MAX_LOG_CHARS = 8_000
+    companion object {
+        private const val EVENT_BUDGET = 1_000
+        const val COMPILER_HEAP_MB = 512
+        const val COMPILE_TIMEOUT_MILLIS = 60_000L
     }
 }

@@ -9,7 +9,7 @@ import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
-import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
+import dev.codedrill.judge.runner.TestAdapters
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
 import dev.codedrill.platform.problempackage.Limits
@@ -36,14 +36,14 @@ class GoldenJudgeTest {
         ProblemPackageLoader(Path.of("../../content/problems")).load("two-sum")
 
     private val engine = ExecutionEngine(
-        adapters = listOf(KotlinAdapter(), JavaAdapter(), PythonAdapter())
+        adapters = listOf(TestAdapters.kotlin, JavaAdapter(), PythonAdapter())
             .associateBy { it.language },
         sandboxes = { ProcessSandbox() },
     )
 
     @Test
     fun `언어 × 판정 행렬이 전부 일치한다`() {
-        val adapters = listOf(KotlinAdapter(), JavaAdapter(), PythonAdapter()).associateBy { it.language }
+        val adapters = listOf(TestAdapters.kotlin, JavaAdapter(), PythonAdapter()).associateBy { it.language }
 
         // 프로세스 샌드박스에서 메모리 상한을 강제하지 못하는 언어는 이 스위트가 검증할 수
         // 없다. 건너뛰는 대신 통과시키면 격리가 없는 상태를 초록불로 덮게 된다. 해당 칸은

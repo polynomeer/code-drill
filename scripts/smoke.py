@@ -37,7 +37,13 @@ USER: accounts.Account | None = None
 
 # 이 스모크가 실제로 제출하는 문제들.
 REQUIRED_PROBLEMS = ["two-sum", "max-subarray", "island-count", "is-palindrome", "rotate-grid"]
-TIMEOUT = 60
+
+# 판정 하나를 기다리는 상한. 지연 목표가 아니다 — 그것은 loadtest.py 가 잰다.
+#
+# Runner 는 하나이고 큐는 직렬이라, 쿼터 절에서 걸어 둔 끝나지 않는 풀이 다섯이 뒤의 제출
+# 앞에 선다. 각각이 컴파일 한 번에 그룹 수만큼의 시간 초과다. 컴파일이 샌드박스 안으로
+# 들어가며(§5.5) 그 값이 커졌고, 60초로는 그 뒤의 첫 제출이 간발로 넘겼다.
+TIMEOUT = 120
 
 ACCEPTED_SOURCE = """
 fun twoSum(nums: IntArray, target: Int): IntArray {

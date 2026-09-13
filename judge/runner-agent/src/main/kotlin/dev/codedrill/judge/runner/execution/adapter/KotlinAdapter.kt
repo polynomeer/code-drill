@@ -4,7 +4,7 @@ import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.RequestedGroup
-import dev.codedrill.judge.runner.execution.KotlinSourceCompiler
+import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
 import dev.codedrill.judge.runner.execution.RuntimeClasspath
 import dev.codedrill.judge.runner.execution.qualifiedId
 import dev.codedrill.platform.problempackage.Signature
@@ -12,6 +12,7 @@ import dev.codedrill.platform.problempackage.ValueType
 import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
+import kotlin.io.path.exists
 import kotlin.io.path.writeText
 
 /**
@@ -29,7 +30,19 @@ class KotlinAdapter(
      * 같아야 한다 ([RuntimeClasspath.sharedInto]).
      */
     private val runtime: List<Path> = RuntimeClasspath.all,
-    private val compiler: KotlinSourceCompiler = KotlinSourceCompiler(runtime),
+    /**
+     * 컴파일러 jar. Runner 의 클래스패스에 있는 것을 샌드박스에 들여보낸다.
+     *
+     * 컴파일러를 Runner 프로세스 안에서 돌리지 않는다. 런타임 이미지는 JRE 라 컴파일러가
+     * 없고, 이미지에 컴파일러를 굽는 대신 Runner 가 가진 것을 읽기 전용으로 붙인다 —
+     * 실행 이미지와 컴파일 이미지가 하나로 남고, 컴파일러 판은 Runner 빌드가 고정한다.
+     */
+    private val compiler: List<Path> = RuntimeClasspath.kotlinCompiler,
+    /**
+     * 컴파일러 클래스 아카이브(AppCDS)가 있을 자리. 기동 때 [KotlinCompilerArchive] 가
+     * 만든다. 아직 없으면 그냥 돈다 — 느릴 뿐이다.
+     */
+    private val classArchive: Path? = null,
 ) : RuntimeAdapter {
 
     override val language = Language.KOTLIN
@@ -47,8 +60,70 @@ class KotlinAdapter(
         }
     }
 
-    override fun compile(sourceDir: Path, outputDir: Path): RuntimeAdapter.CompileOutcome =
-        compiler.compile(sourceDir, outputDir)
+    override fun compileStep(sourceDir: Path, outputDir: Path): RuntimeAdapter.CompileStep {
+        val archive = classArchive?.takeIf { it.exists() }
+        return compilerStep(
+            sourceDir, outputDir,
+            jvmFlags = if (archive == null) {
+                emptyList()
+            } else {
+                listOf(
+                    "-XX:SharedArchiveFile=${archive.absolutePathString()}",
+                    // 아카이브가 이 JVM·클래스패스와 맞지 않으면 무시하고 돈다. 그 경고를
+                    // 끈다 — 켜 두면 사용자의 컴파일 로그 첫 줄이 JVM 이야기가 된다.
+                    "-Xshare:auto", "-Xlog:cds=off", "-Xlog:cds+dynamic=off",
+                )
+            },
+            extraReadOnly = listOfNotNull(archive),
+        )
+    }
+
+    /** 같은 컴파일을 돌리되 끝날 때 [archive] 에 클래스 아카이브를 남긴다. [KotlinCompilerArchive] 가 쓴다. */
+    fun archiveStep(sourceDir: Path, outputDir: Path, archive: Path): RuntimeAdapter.CompileStep =
+        compilerStep(
+            sourceDir, outputDir,
+            jvmFlags = listOf("-XX:ArchiveClassesAtExit=${archive.absolutePathString()}", "-Xlog:cds=off", "-Xlog:cds+dynamic=off"),
+            extraReadOnly = emptyList(),
+        )
+
+    private fun compilerStep(
+        sourceDir: Path,
+        outputDir: Path,
+        jvmFlags: List<String>,
+        extraReadOnly: List<Path>,
+    ) = RuntimeAdapter.CompileStep(
+        command = listOf(
+            "java",
+            "-Xmx${COMPILER_HEAP_MB}m",
+            // 컴파일러는 몇 초 사는 프로세스다. C2 까지 데우는 시간이 컴파일 시간보다 길다 —
+            // C1 만 쓰면 같은 파일이 4.3초에서 2.6초가 된다.
+            "-XX:+UseSerialGC",
+            "-XX:TieredStopAtLevel=1",
+            "-XX:-UsePerfData",
+            // 색을 끈다. 켜 두면 jansi 가 /tmp 에 네이티브 라이브러리를 풀어 실행하려 하고,
+            // noexec 인 샌드박스 /tmp 에서 그 시도가 오류 줄로 남는다.
+            "-Dkotlin.colors.enabled=false",
+            "-Dfile.encoding=UTF-8",
+        ) + jvmFlags + listOf(
+            "-cp", compiler.joinToString(File.pathSeparator) { it.absolutePathString() },
+            "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+            "-no-stdlib", "-no-reflect",
+            // 채점 결과가 컴파일러 경고 정책에 흔들리지 않도록 경고는 판정에 쓰지 않는다.
+            "-nowarn",
+            "-cp", runtime.joinToString(File.pathSeparator) { it.absolutePathString() },
+            "-d", outputDir.absolutePathString(),
+            sourceDir.absolutePathString(),
+        ),
+        // 아카이브는 맨 뒤다. 컨테이너 안의 jar 경로는 이 목록의 순서로 정해지고, 아카이브는
+        // 만들 때의 경로와 같아야 맞는다 — 앞에 끼우면 만들 때와 쓸 때의 경로가 어긋난다.
+        readOnlyPaths = (runtime + compiler).distinct() + extraReadOnly,
+        memoryMb = COMPILER_HEAP_MB,
+        timeoutMillis = COMPILE_TIMEOUT_MILLIS,
+    )
+
+    /** 컴파일러는 `경로:줄:칸: error: …` 로 찍는다. 경로를 지우면 `Solution.kt:3:5: …` 가 남는다. */
+    override fun compileLog(output: String, sourceDir: Path): String =
+        super.compileLog(output, sourceDir).lines().filter { it.isNotBlank() }.joinToString("\n")
 
     override fun command(
         sourceDir: Path,
@@ -248,7 +323,11 @@ class KotlinAdapter(
 
     private fun quote(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-    private companion object {
-        const val EVENT_BUDGET = 1_000
+    companion object {
+        private const val EVENT_BUDGET = 1_000
+
+        /** K2 는 작은 파일에도 수백 MB 를 쓴다. 512 로도 돌지만 여유를 둔다. */
+        const val COMPILER_HEAP_MB = 768
+        const val COMPILE_TIMEOUT_MILLIS = 60_000L
     }
 }

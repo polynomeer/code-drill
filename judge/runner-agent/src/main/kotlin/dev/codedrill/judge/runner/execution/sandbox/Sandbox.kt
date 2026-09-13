@@ -37,7 +37,27 @@ interface Sandbox {
         onEvent: (String, String) -> Unit = { _, _ -> },
         shouldContinue: (String, CaseOutcome) -> Boolean = { _, _ -> true },
     ): SandboxRun
+
+    /**
+     * 프로토콜 없이 명령 하나를 돌리고 종료 코드와 출력을 받는다. **컴파일이 여기서 돈다.**
+     *
+     * 컴파일러는 사용자 코드를 읽는 첫 프로그램이고, 그래서 공격 표면이다 (§5.5).
+     * 실행만 격리하고 컴파일을 Runner 프로세스에서 돌리면 격리가 반쪽이다. 같은 이미지,
+     * 같은 통제 아래서 돌리되, [SandboxSpec.writablePaths] 에 적은 곳에만 산출물을 쓸 수
+     * 있다.
+     *
+     * 출력의 경로는 호스트 경로로 되돌려 준다. 컨테이너 안의 경로를 그대로 주면 호출부가
+     * 어느 샌드박스로 돌았는지에 따라 다른 문자열을 다듬어야 한다.
+     */
+    fun exec(spec: SandboxSpec): ExecOutcome
 }
+
+/**
+ * [Sandbox.exec] 의 결과.
+ *
+ * [exitCode] 가 null 이면 [SandboxSpec.perCaseTimeoutMillis] 안에 끝나지 않아 죽인 것이다.
+ */
+data class ExecOutcome(val exitCode: Int?, val output: String)
 
 /**
  * 실행 한 판의 명세.
@@ -53,6 +73,17 @@ data class SandboxSpec(
     val memoryMb: Int,
     val perCaseTimeoutMillis: Long,
     val outputByteLimit: Long,
+    /**
+     * [workDir] 아래에서 쓸 수 있는 곳. 컴파일 산출물이 여기 남는다.
+     *
+     * 실행에는 비어 있다 — 사용자 코드는 아무 데도 쓰지 못한다.
+     */
+    val writablePaths: List<Path> = emptyList(),
+    /**
+     * 프로세스 수 상한. 컴파일러는 JVM 이라 스레드가 수십 개고, 실행의 상한으로는
+     * 뜨지도 못한다.
+     */
+    val pidsLimit: Int? = null,
 )
 
 /**

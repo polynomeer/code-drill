@@ -3,6 +3,7 @@ package dev.codedrill.judge.runner
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ArenaRunner
 import dev.codedrill.judge.runner.execution.ExecutionEngine
+import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
 import dev.codedrill.judge.runner.execution.LabRunner
 import dev.codedrill.judge.runner.execution.MutationEvaluator
 import dev.codedrill.judge.runner.execution.Shrinker
@@ -15,6 +16,7 @@ import dev.codedrill.judge.runner.execution.sandbox.SandboxSelector
 import dev.codedrill.platform.observability.Metrics
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
+import org.springframework.boot.ApplicationRunner
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -34,13 +36,48 @@ import kotlin.io.path.createDirectories
 class RunnerConfig {
 
     @Bean
-    fun runtimeAdapters(properties: SandboxProperties): Map<Language, RuntimeAdapter> = listOf(
-        // Kotlin 만 자기 런타임 jar 를 샌드박스에 들여보낸다. Java 와 Python 은
-        // 샌드박스 이미지 안의 런타임을 쓰므로 경로를 맞출 것이 없다.
-        KotlinAdapter(runtime = workRoot(properties)?.let(RuntimeClasspath::sharedInto) ?: RuntimeClasspath.all),
-        JavaAdapter(),
-        PythonAdapter(),
-    ).associateBy { it.language }
+    fun kotlinAdapter(properties: SandboxProperties): KotlinAdapter {
+        // Kotlin 만 자기 런타임과 컴파일러 jar 를 샌드박스에 들여보낸다. Java 와 Python 은
+        // 샌드박스 이미지 안의 것을 쓰므로 경로를 맞출 것이 없다.
+        val root = workRoot(properties)
+        return if (root == null) {
+            KotlinAdapter(classArchive = archiveDirectory().resolve(KotlinCompilerArchive.FILE_NAME))
+        } else {
+            KotlinAdapter(
+                runtime = RuntimeClasspath.sharedInto(root),
+                compiler = RuntimeClasspath.sharedInto(root, RuntimeClasspath.kotlinCompiler),
+                classArchive = root.resolve("runtime").resolve(KotlinCompilerArchive.FILE_NAME),
+            )
+        }
+    }
+
+    @Bean
+    fun runtimeAdapters(kotlin: KotlinAdapter): Map<Language, RuntimeAdapter> =
+        listOf(kotlin, JavaAdapter(), PythonAdapter()).associateBy { it.language }
+
+    /**
+     * 컴파일러 클래스 아카이브를 기동 때 만든다 (§5.5, 컴파일마다 JVM 이 새로 뜨는 값).
+     *
+     * 첫 채점 앞에 돈다. 실패해도 기동은 계속한다 — 아카이브 없는 컴파일은 느릴 뿐 틀리지
+     * 않는다.
+     */
+    @Bean
+    fun kotlinCompilerArchive(kotlin: KotlinAdapter, selector: SandboxSelector, properties: SandboxProperties) =
+        ApplicationRunner {
+            val root = workRoot(properties)
+            KotlinCompilerArchive(
+                adapter = kotlin,
+                sandbox = { selector.forLanguage(Language.KOTLIN) },
+                archive = (root?.resolve("runtime") ?: archiveDirectory()).resolve(KotlinCompilerArchive.FILE_NAME),
+                workRoot = root,
+            ).build()
+        }
+
+    /** 작업 루트가 없을 때 아카이브를 둘 곳. 컨테이너 데몬이 볼 수 있는 임시 디렉터리다. */
+    private fun archiveDirectory(): Path =
+        Path.of(System.getProperty("java.io.tmpdir"), "codedrill-runtime").toRealPathIfExists()
+
+    private fun Path.toRealPathIfExists(): Path = also { it.createDirectories() }.toRealPath()
 
     private fun workRoot(properties: SandboxProperties): Path? =
         properties.workRoot.takeIf { it.isNotBlank() }?.let(Path::of)?.also { it.createDirectories() }
@@ -139,7 +176,8 @@ data class SandboxProperties(
 ) {
     data class Images(
         val kotlin: String = "eclipse-temurin:21-jre",
-        val java: String = "eclipse-temurin:21-jre",
+        // JDK 다. 컴파일이 이 이미지 안에서 돌고, javac 은 JRE 에 없다.
+        val java: String = "eclipse-temurin:21-jdk",
         val python: String = "python:3.12-alpine",
     )
 }

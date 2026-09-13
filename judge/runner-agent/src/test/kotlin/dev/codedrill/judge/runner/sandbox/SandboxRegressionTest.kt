@@ -64,6 +64,8 @@ class SandboxRegressionTest {
         candidates.firstOrNull { ContainerSandbox(it).available() }
 
     private val jvmImage = pick("eclipse-temurin:21-jre", "gradle:8.10.2-jdk21")
+    // Java 는 컴파일도 이미지 안에서 돌므로 JDK 여야 한다 (§5.5).
+    private val jdkImage = pick("eclipse-temurin:21-jdk", "gradle:8.10.2-jdk21")
     private val pythonImage = pick("python:3.12-alpine", "python:3.12-slim")
 
     /**
@@ -77,7 +79,7 @@ class SandboxRegressionTest {
     private val engine by lazy {
         val images = mapOf(
             Language.KOTLIN to jvmImage.orEmpty(),
-            Language.JAVA to jvmImage.orEmpty(),
+            Language.JAVA to jdkImage.orEmpty(),
             Language.PYTHON to pythonImage.orEmpty(),
         )
         ExecutionEngine(
@@ -96,8 +98,8 @@ class SandboxRegressionTest {
      * 실행 영역이 `REQUIRE_ISOLATION` 으로 기동을 막는 것과 같은 자리에 있는 스위치다.
      */
     private fun requireContainers() {
-        val ready = jvmImage != null && pythonImage != null
-        val why = "런타임 이미지가 로컬에 없어 격리를 검증할 수 없다 (JVM=$jvmImage, Python=$pythonImage)"
+        val ready = jvmImage != null && jdkImage != null && pythonImage != null
+        val why = "런타임 이미지가 로컬에 없어 격리를 검증할 수 없다 (JVM=$jvmImage, JDK=$jdkImage, Python=$pythonImage)"
 
         if (System.getenv(REQUIRE) == "true") assertTrue(ready, "$REQUIRE=true 인데 $why")
         assumeTrue(ready, why)
@@ -356,7 +358,16 @@ class SandboxRegressionTest {
         assertEquals(Verdict.TIME_LIMIT, result.cases.first().verdict)
 
         // 판정이 맞는 것으로는 부족하다. 누수는 판정이 정확할 때도 일어난다.
-        val leaked = sandboxContainerIds() - before
+        //
+        // 잠깐은 기다린다. 컴파일 컨테이너는 스스로 끝나 `--rm` 이 지우는데 그 제거는
+        // 비동기라, 판정 직후의 목록에 아직 보일 수 있다. 누수는 몇 초 뒤에도 남아 있는
+        // 것이고, 지워지는 중인 것은 누수가 아니다.
+        val deadline = System.currentTimeMillis() + 5_000
+        var leaked = sandboxContainerIds() - before
+        while (leaked.isNotEmpty() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(250)
+            leaked = sandboxContainerIds() - before
+        }
         assertTrue(
             leaked.isEmpty(),
             "데드라인 뒤에도 샌드박스 컨테이너가 남았다: $leaked",

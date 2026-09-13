@@ -7,7 +7,7 @@ import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
-import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
+import dev.codedrill.judge.runner.TestAdapters
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.adapter.SandboxProtocol
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
@@ -42,7 +42,7 @@ import kotlin.test.assertTrue
 class MatrixValueTest {
 
     private val engine = ExecutionEngine(
-        adapters = listOf(KotlinAdapter(), JavaAdapter(), PythonAdapter())
+        adapters = listOf(TestAdapters.kotlin, JavaAdapter(), PythonAdapter())
             .associateBy { it.language },
         sandboxes = { ProcessSandbox() },
     )
