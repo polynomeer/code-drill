@@ -10,6 +10,7 @@
 #
 #   BROKER_URL=amqps://<브로커 호스트>:5671 \
 #   BROKER_TLS=<runner 신원 디렉터리> \
+#   STORAGE_ENDPOINT=http://<스토어 호스트>:9000 STORAGE_RUNNER_SECRET=<runner 의 스토어 비밀> \
 #   CODEDRILL_TAG=<커밋 SHA> \
 #     docker compose -f deploy/docker-compose.runner.yml up -d
 #
@@ -29,6 +30,11 @@ services:
       BROKER_TLS_DIR: /etc/codedrill/broker-tls
       # 토폴로지는 브로커의 것이다. 이 노드에는 선언 권한이 없고, 있어서도 안 된다.
       BROKER_DECLARE_TOPOLOGY: "false"
+
+      # 테스트 번들을 받는 곳 (§8.3). 이 신원은 읽기만 한다 — deploy/storage/init.sh.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:?스토어 주소가 필요하다}
+      STORAGE_ACCESS_KEY: runner
+      STORAGE_SECRET_KEY: ${STORAGE_RUNNER_SECRET:?Runner 의 스토어 비밀이 필요하다}
 
       # 격리 없이는 뜨지 않는다 (§5.2). 런타임을 못 찾으면 프로세스 샌드박스로 내려가는
       # 개발 편의가 있는데, 공개 환경에서 그것은 사용자 코드를 호스트에서 그냥 돌리는

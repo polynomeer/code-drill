@@ -19,6 +19,22 @@
 name: code-drill
 
 services:
+  # 오브젝트 스토어의 버킷과 신원 (§8.3, §11.2). 스토어가 뜬 뒤 한 번 돌고 끝난다.
+  # 비밀 둘은 밖에서 준다 — 오케스트레이터(읽기·쓰기)와 Runner 노드(읽기)의 것이다.
+  storage-init:
+    # 서버 이미지에 mc 가 들어 있다. 이미지를 하나 더 받지 않는다.
+    image: minio/minio:latest
+    profiles: ["apps"]
+    entrypoint: ["/bin/sh", "/init.sh"]
+    environment:
+      MINIO_ROOT_USER: codedrill
+      MINIO_ROOT_PASSWORD: codedrill
+      STORAGE_ORCHESTRATOR_SECRET: ${STORAGE_ORCHESTRATOR_SECRET:?오케스트레이터의 스토어 비밀이 필요하다}
+      STORAGE_RUNNER_SECRET: ${STORAGE_RUNNER_SECRET:?Runner 의 스토어 비밀이 필요하다}
+    volumes: ["./storage/init.sh:/init.sh:ro"]
+    depends_on:
+      minio: {condition: service_healthy}
+
   rabbitmq:
     # 개발용 브로커(docker-compose.yml)와 다른 점 셋: 평문 5672 가 없고, 인증서로만
     # 들어오며, 토폴로지와 권한을 정의 파일에서 읽는다. 자세한 것은 broker/rabbitmq.conf.
@@ -65,11 +81,16 @@ services:
       BROKER_DECLARE_TOPOLOGY: "false"
       # 임대와 fencing 토큰이 여기 있다 (§4.3). 재시작과 인스턴스 여럿을 넘기는 유일한 자리다.
       REDIS_URL: redis://redis:6379
+      # 테스트 번들을 올리는 곳 (§8.3). 이 버킷에 읽고 쓴다.
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: orchestrator
+      STORAGE_SECRET_KEY: ${STORAGE_ORCHESTRATOR_SECRET:?}
     volumes: ["./certs/orchestrator:/etc/codedrill/broker-tls:ro"]
     ports: ["${ORCHESTRATOR_PORT:-8081}:8081"]
     depends_on:
       rabbitmq: {condition: service_healthy}
       redis: {condition: service_healthy}
+      storage-init: {condition: service_completed_successfully}
 
   # 배포 단위 넷째. 정적 자산을 내주고 /api 를 제어 영역으로 넘긴다 — 개발에서 Vite 가
   # 하던 일이다 (deploy/web.nginx.conf).
