@@ -1,9 +1,11 @@
 package dev.codedrill.judge.orchestrator
 
 import dev.codedrill.judge.orchestrator.aggregation.VerdictAggregator
+import dev.codedrill.judge.orchestrator.bundle.BundlePublisher
 import dev.codedrill.judge.orchestrator.lease.Acceptance
 import dev.codedrill.judge.orchestrator.lease.Lease
 import dev.codedrill.judge.orchestrator.lease.LeaseRegistry
+import dev.codedrill.judge.protocol.CaseSelection
 import dev.codedrill.judge.protocol.CompletedGroup
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
@@ -12,7 +14,6 @@ import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
 import dev.codedrill.judge.protocol.JudgeStatus
-import dev.codedrill.judge.protocol.RequestedGroup
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.judge.orchestrator.trace.TraceProcessor
 import dev.codedrill.judge.protocol.TraceReady
@@ -37,6 +38,7 @@ class JudgeCoordinator(
     private val packages: ProblemPackageLoader,
     private val registry: LeaseRegistry,
     private val gateway: JudgeGateway,
+    private val bundles: BundlePublisher,
     private val metrics: JudgeMetrics = JudgeMetrics(),
     /**
      * 같은 제출을 몇 번까지 다시 실행할지.
@@ -263,7 +265,11 @@ class JudgeCoordinator(
         return pkg
     }
 
-    /** 임대 하나가 곧 실행 요청 하나다. 다시 걸 때도 같은 길로 만든다. */
+    /**
+     * 임대 하나가 곧 실행 요청 하나다. 다시 걸 때도 같은 길로 만든다.
+     *
+     * 테스트는 메시지에 싣지 않는다. 번들을 스토어에 올려 두고 참조만 실린다 (§8.3).
+     */
     private fun request(lease: Lease, pkg: ProblemPackage) = ExecutionRequest(
         executionId = lease.executionId,
         submissionId = lease.submissionId,
@@ -276,7 +282,7 @@ class JudgeCoordinator(
         source = lease.origin.source,
         signature = pkg.manifest.signature,
         limits = pkg.manifest.limits,
-        groups = pkg.groups.map { RequestedGroup(it.policy, it.cases) },
+        bundle = bundles.ensure(pkg),
     )
 
     /**
@@ -322,7 +328,8 @@ class JudgeCoordinator(
                 signature = pkg.manifest.signature,
                 limits = pkg.manifest.limits,
                 mode = ExecutionMode.TRACE,
-                groups = listOf(RequestedGroup(chosen.first, listOf(chosen.second))),
+                bundle = bundles.ensure(pkg),
+                selection = listOf(CaseSelection(chosen.first.id, chosen.second.id)),
             ),
         )
     }

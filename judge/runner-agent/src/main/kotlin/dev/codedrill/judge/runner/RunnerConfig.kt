@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ArenaRunner
+import dev.codedrill.judge.runner.execution.BundleResolver
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
 import dev.codedrill.judge.runner.execution.LabRunner
@@ -14,6 +15,7 @@ import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
 import dev.codedrill.judge.runner.execution.sandbox.SandboxSelector
 import dev.codedrill.platform.observability.Metrics
+import dev.codedrill.platform.storage.BlobStore
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.springframework.boot.ApplicationRunner
@@ -112,18 +114,22 @@ class RunnerConfig {
         selector: SandboxSelector,
         registry: MeterRegistry,
         properties: SandboxProperties,
+        store: BlobStore,
     ) = ExecutionEngine(
         adapters,
         selector::forLanguage,
         workRoot = workRoot(properties),
-    ) { phase, language, outcome, nanos ->
-        Timer.builder(if (phase == "compile") Metrics.COMPILE else Metrics.EXECUTE)
-            .tag(Metrics.Tag.LANGUAGE, language.name)
-            .tag(if (phase == "compile") Metrics.Tag.OUTCOME else Metrics.Tag.MODE, outcome)
-            .publishPercentileHistogram()
-            .register(registry)
-            .record(nanos, TimeUnit.NANOSECONDS)
-    }
+        onPhase = { phase, language, outcome, nanos ->
+            Timer.builder(if (phase == "compile") Metrics.COMPILE else Metrics.EXECUTE)
+                .tag(Metrics.Tag.LANGUAGE, language.name)
+                .tag(if (phase == "compile") Metrics.Tag.OUTCOME else Metrics.Tag.MODE, outcome)
+                .publishPercentileHistogram()
+                .register(registry)
+                .record(nanos, TimeUnit.NANOSECONDS)
+        },
+        // 판정의 테스트는 오브젝트 스토어의 번들에서 온다 (§8.3). 읽기만 한다.
+        bundles = BundleResolver(store),
+    )
 
     /**
      * 변이 평가 (FR-804).

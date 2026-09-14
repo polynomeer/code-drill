@@ -1,9 +1,11 @@
 package dev.codedrill.judge.orchestrator
 
+import dev.codedrill.judge.orchestrator.bundle.BundlePublisher
 import dev.codedrill.judge.orchestrator.lease.LeaseRegistry
 import dev.codedrill.judge.orchestrator.lease.MemoryLeaseRegistry
 import dev.codedrill.judge.orchestrator.lease.RedisLeaseRegistry
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
+import dev.codedrill.platform.storage.BlobStore
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
@@ -66,14 +68,19 @@ class OrchestratorConfig {
     @Bean
     fun judgeMetrics(registry: MeterRegistry) = JudgeMetrics(registry)
 
+    /** 테스트 번들은 오브젝트 스토어로 간다 (§8.3). 스토어 자체는 platform:storage 가 조립한다. */
+    @Bean
+    fun bundlePublisher(store: BlobStore) = BundlePublisher(store)
+
     @Bean
     fun judgeCoordinator(
         packages: ProblemPackageLoader,
         registry: LeaseRegistry,
         gateway: JudgeGateway,
+        bundles: BundlePublisher,
         metrics: JudgeMetrics,
         @Value("\${codedrill.judge.max-attempts:3}") maxAttempts: Int,
-    ) = JudgeCoordinator(packages, registry, gateway, metrics, maxAttempts)
+    ) = JudgeCoordinator(packages, registry, gateway, bundles, metrics, maxAttempts)
 }
 
 /**

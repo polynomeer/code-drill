@@ -30,6 +30,7 @@ micrometer-tracing-otel = { module = "io.micrometer:micrometer-tracing-bridge-ot
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 otel-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
 aws-s3 = { module = "software.amazon.awssdk:s3", version.ref = "awsSdk" }
+aws-url-connection-client = { module = "software.amazon.awssdk:url-connection-client", version.ref = "awsSdk" }
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
 testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
 testcontainers-postgresql = { module = "org.testcontainers:postgresql" }

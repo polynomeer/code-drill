@@ -52,9 +52,19 @@ class ExecutionEngine(
      */
     private val onPhase: (phase: String, language: Language, outcome: String, nanos: Long) -> Unit =
         { _, _, _, _ -> },
+    /** 요청이 가리키는 테스트 번들을 케이스로 푸는 곳 (§8.3). 케이스가 메시지에 실려 오면 지나간다. */
+    private val bundles: BundleResolver = BundleResolver.NONE,
 ) {
 
-    fun execute(request: ExecutionRequest): ExecutionResult {
+    fun execute(envelope: ExecutionRequest): ExecutionResult {
+        // 번들을 못 받거나 digest 가 다르면 사용자 코드가 아니라 우리 쪽 문제다. 여기서
+        // 예외로 새면 브로커가 재전달하고 같은 실패를 반복한다.
+        val request = try {
+            bundles.resolve(envelope)
+        } catch (e: Exception) {
+            return terminal(envelope, Verdict.SYSTEM_ERROR, compileLog = null, reason = e.message)
+        }
+
         // 심볼릭 링크를 풀어 실제 경로로 만든다. macOS 의 임시 디렉터리는 /var/folders 로
         // 보이지만 실제로는 /private/var/folders 이고, 컨테이너 런타임의 파일 공유 설정은
         // 실제 경로 기준이라 링크된 경로로 마운트하면 조용히 비어 있는 디렉터리가 된다.

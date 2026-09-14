@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":judge:protocol"))
     implementation(project(":platform:common"))
     implementation(project(":platform:messaging"))
+    implementation(project(":platform:storage"))
     implementation(project(":platform:observability"))
     implementation(libs.spring.boot.starter)
     implementation(libs.spring.boot.starter.actuator)

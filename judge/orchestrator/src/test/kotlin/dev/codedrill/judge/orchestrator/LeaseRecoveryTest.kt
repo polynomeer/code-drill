@@ -1,6 +1,10 @@
 package dev.codedrill.judge.orchestrator
 
+import dev.codedrill.judge.orchestrator.bundle.BundlePublisher
 import dev.codedrill.judge.orchestrator.lease.MemoryLeaseRegistry
+import dev.codedrill.judge.protocol.Bundles
+import dev.codedrill.judge.protocol.RequestedGroup
+import dev.codedrill.platform.storage.DirectoryBlobStore
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.JudgeCompleted
@@ -18,9 +22,11 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -230,6 +236,9 @@ class LeaseRecoveryTest {
             override fun instant(): Instant = now
         }
 
+        /** 테스트 번들이 가는 곳. 요청에는 참조만 실린다 (§8.3). */
+        val store = DirectoryBlobStore(createTempDirectory("bundles"))
+
         val coordinator = JudgeCoordinator(
             packages = ProblemPackageLoader(Path.of(CONTENT_ROOT)),
             registry = MemoryLeaseRegistry(
@@ -238,6 +247,7 @@ class LeaseRecoveryTest {
                 dispatchTimeout = Duration.ofMinutes(5),
             ),
             gateway = gateway,
+            bundles = BundlePublisher(store),
             maxAttempts = maxAttempts,
         )
 
@@ -267,6 +277,13 @@ class LeaseRecoveryTest {
             fencingToken = request.fencingToken,
         )
 
+        /** 요청이 지목한 케이스 — 번들에 있다. 메시지에는 실리지 않는다. */
+        fun groupsOf(request: ExecutionRequest): List<RequestedGroup> {
+            val bundle = assertNotNull(request.bundle, "판정 요청은 번들을 가리켜야 한다")
+            assertTrue(request.groups.isEmpty(), "테스트가 메시지에 실렸다")
+            return Bundles.decode(assertNotNull(store.get(bundle.key), "번들이 스토어에 없다"))
+        }
+
         /** 요청이 지목한 모든 케이스를 통과한 결과. */
         fun resultOf(request: ExecutionRequest) = dev.codedrill.judge.protocol.ExecutionResult(
             executionId = request.executionId,
@@ -276,7 +293,7 @@ class LeaseRecoveryTest {
             problemVersionId = request.problemVersionId,
             terminalVerdict = null,
             compileLog = null,
-            cases = request.groups.flatMap { group ->
+            cases = groupsOf(request).flatMap { group ->
                 group.cases.map {
                     TestCaseResult("${group.policy.id}/${it.id}", group.policy.id, Verdict.ACCEPTED, Measurements.NONE)
                 }

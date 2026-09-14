@@ -155,6 +155,10 @@ def env_for(ports: dict) -> dict:
         DB_URL=f"jdbc:postgresql://localhost:{ports['postgres']}/codedrill",
         REDIS_URL=f"redis://localhost:{ports['redis']}",
         BROKER_URL=f"amqp://codedrill:codedrill@localhost:{ports['rabbitmq']}",
+        # 테스트 번들이 가는 곳 (§8.3). 오케스트레이터가 올리고 Runner 가 받는다.
+        STORAGE_ENDPOINT=f"http://localhost:{ports['minio']}",
+        STORAGE_ACCESS_KEY="codedrill",
+        STORAGE_SECRET_KEY="codedrill",
         CONTENT_ROOT=str(ROOT / "content" / "problems"),
         ADMIN_BOOTSTRAP_EMAIL=BOOTSTRAP_EMAIL,
     )
@@ -227,6 +231,14 @@ def start_infra(ports: dict, env: dict) -> None:
     # --wait 는 healthcheck 가 통과할 때까지 기다린다. 기다리지 않으면 앱이 먼저 떠서
     # 커넥션 오류를 내고 죽는다.
     subprocess.run([*COMPOSE, "up", "-d", "--wait"], cwd=ROOT, env=compose_env, check=True)
+
+    # 테스트 번들이 가는 버킷 (§8.3). 앱은 버킷을 만들지 않는다 — 만들 수 있는 자격증명은
+    # 너무 넓은 자격증명이다. 배포에서는 deploy/ 의 초기화가, 여기서는 이 한 줄이 만든다.
+    subprocess.run(
+        [*COMPOSE, "exec", "-T", "minio", "sh", "-c",
+         "mc alias set local http://localhost:9000 codedrill codedrill >/dev/null && mc mb --ignore-existing local/codedrill"],
+        cwd=ROOT, env=compose_env, check=True, capture_output=True,
+    )
 
 
 def build() -> None:

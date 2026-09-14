@@ -9,6 +9,13 @@ spring:
       url: ${REDIS_URL:redis://localhost:6379}
 
 codedrill:
+  storage:
+    # 테스트 번들이 가는 오브젝트 스토어 (§8.3). 비우면 디렉터리로 내려간다 — 같은 머신에서만 통한다.
+    endpoint: ${STORAGE_ENDPOINT:}
+    bucket: ${STORAGE_BUCKET:codedrill}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    directory: ${STORAGE_DIRECTORY:}
   judge:
     # redis 가 기본이다. memory 는 Redis 없는 개발용 — 재시작하면 진행 중인 실행을 회수하지 못한다.
     lease-store: ${JUDGE_LEASE_STORE:redis}
