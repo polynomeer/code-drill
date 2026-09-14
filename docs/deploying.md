@@ -167,6 +167,33 @@ docker compose -f deploy/docker-compose.yml exec -e PW=<비밀번호> rabbitmq s
 **누구를 받아들이느냐**뿐이다. 그래서 개발에서 지나간 코드가 배포에서 권한 거부를 받는
 일은 exchange 를 잘못 짚었을 때뿐이고, 그것은 배포 스택에서 스모크가 잡는다.
 
+## 오브젝트 스토어
+
+테스트 번들이 여기 간다 (§8.3). 오케스트레이터가 올리고 Runner 노드가 받는다. 요청에는
+참조와 digest 만 실리고, Runner 는 받은 것의 SHA-256 을 대조한 뒤에야 쓴다.
+
+스토어에도 신원이 둘이다. 앱 스택의 `storage-init` 이 스토어가 뜬 뒤 한 번 돌아 버킷과
+신원을 만든다 ([deploy/storage/init.sh](../deploy/storage/init.sh)).
+
+| 신원 | 할 수 있는 것 |
+|---|---|
+| `orchestrator` | 이 버킷에 읽고 쓴다 |
+| `runner` | 이 버킷을 읽는다 |
+
+둘 다 지우지 못하고 버킷을 만들지 못한다. 앱이 버킷을 만들 수 있다는 것은 곧 그 자격증명이
+너무 넓다는 뜻이다. 비밀 둘은 밖에서 준다.
+
+```bash
+STORAGE_ORCHESTRATOR_SECRET=… STORAGE_RUNNER_SECRET=… \
+  docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.apps.yml --profile apps up -d
+```
+
+Runner 노드에는 `runner` 의 비밀과 스토어 주소를 준다 (`STORAGE_ENDPOINT`,
+`STORAGE_RUNNER_SECRET`). 노드를 잃어도 얻는 것은 읽기뿐이다.
+
+번들은 백업하지 않는다. 키가 패키지 digest 라 문제 패키지에서 언제든 다시 만들어지고,
+오케스트레이터는 10분마다 저장된 digest 를 다시 물어 없거나 다르면 다시 올린다.
+
 ## 태그 규칙
 
 `<커밋 SHA 앞 12자>` 를 진실의 원천으로 삼고, 사람이 읽을 이름은 별칭으로 단다.
