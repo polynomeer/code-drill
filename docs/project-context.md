@@ -103,6 +103,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Evidence Ledger | 제출·질문·테스트·트레이스·도움 이력을 append-only로 쌓는 증거 원장 |
 | Projection | 증거에서 재계산 가능한 파생값. Level과 Confidence를 분리해 계산한다 |
 | Mutant | 대표 오답·성능 결함 구현. 테스트가 이를 잡아내는 비율로 문제 품질을 잰다 |
+| 기부 (arena donation) | 사용자가 자기 오답 제출을 아레나의 과녁으로 내놓는 것. 검수(REVIEWER)를 거쳐 익명의 과녁이 되고, 신고로 내려간다 (§8.3, §8.5) |
 | 검증 보고서 | §6.3 파이프라인의 산출물. 이 digest 가 맞는 버전만 공개할 수 있다 |
 | Trace Event | 코드 줄이 아니라 의미 단위(compare, swap, push, enqueue…)로 기록하는 실행 이벤트 |
 | Trace manifest | 트레이스 목차. 청크 범위와 요약을 담고 이벤트 본문은 담지 않는다 (§7.4) |
