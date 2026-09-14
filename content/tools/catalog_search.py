@@ -399,3 +399,110 @@ fun countInversions(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 66. 정수 제곱근 ------------------------------------------------------------------
+
+def _isqrt(n):
+    import math
+    return math.isqrt(n)
+
+
+PROBLEMS.append(Problem(
+    id="integer-square-root",
+    title="정수 제곱근",
+    summary="""
+0 이상의 정수 `n` 이 주어진다. 제곱이 `n` 을 넘지 않는 **가장 큰 정수**를 반환한다.
+즉 `√n` 을 내림한 값이다. 예: `8` → `2`, `9` → `3`, `2147395599` → `46339`.
+
+부동소수점 제곱근 함수는 쓰지 않는다 — 큰 수에서 반올림이 어긋난다.
+""",
+    notes="""
+답은 0 부터 n 사이에서 "제곱이 n 이하인가"가 참에서 거짓으로 한 번 바뀌는 지점이다.
+이분 탐색이 맞고, 가운데 값의 제곱이 **Int 를 넘칠 수 있다**는 것이 이 문제의 함정이다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 탐색 구간
+Drill.visit(mid, 0)           // 가운데를 시험했다
+""",
+    constraints="""
+- `0 <= n <= 2^31 - 1`
+""",
+    signature=dict(name="isqrt", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_isqrt,
+    cases={
+        "sample": [
+            ("01", [8]),
+            ("02", [9]),
+        ],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-one", [1]),
+            ("03-two", [2]),
+            ("04-three", [3]),
+            ("05-four", [4]),
+            # 완전제곱수 직전과 직후.
+            ("06-before-square", [99]),
+            ("07-after-square", [101]),
+            # 46340² = 2147395600 은 Int 안이고, 46341² 은 넘친다. 그 사이의 값들.
+            ("08-near-overflow-below", [2147395599]),
+            ("09-near-overflow-exact", [2147395600]),
+            ("10-max-int", [2147483647]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(1, 0, 1000, salt=2601)[0]]),
+            ("02-random-large", [randoms(1, 0, 2147483647, salt=2602)[0]]),
+            ("03-square", [1000000 * 1000000 // 1000000 * 1000]),
+            ("04-large-square", [46340 * 46340]),
+            ("05-large-plus-one", [46340 * 46340 + 1]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 답에 대한 이분 탐색, 제곱은 Long 으로.
+fun isqrt(n: Int): Int {
+    var lo = 0
+    var hi = minOf(n.toLong(), 46340L).toInt()
+    while (lo < hi) {
+        val mid = (lo + hi + 1) / 2
+        Drill.compare(lo, hi)
+        Drill.visit(mid, 0)
+        if (mid.toLong() * mid <= n) lo = mid else hi = mid - 1
+    }
+    return lo
+}
+""",
+    mutants=[
+        ("int-square--overflows", "MISSING_EDGE_CASE",
+         "가운데 값의 제곱을 Int 로 계산한다. 46341 부터 넘쳐 음수가 되고 조건이 뒤집힌다.",
+         """
+fun isqrt(n: Int): Int {
+    var lo = 0
+    var hi = n
+    while (lo < hi) {
+        val mid = (lo + hi + 1) / 2
+        if (mid * mid <= n) lo = mid else hi = mid - 1
+    }
+    return lo
+}
+"""),
+        ("rounds-up", "OFF_BY_ONE",
+         "제곱이 n 을 처음 넘는 값을 답한다. 완전제곱수가 아니면 하나 크다.",
+         """
+fun isqrt(n: Int): Int {
+    var lo = 0
+    var hi = 46341
+    while (lo < hi) {
+        val mid = (lo + hi) / 2
+        if (mid.toLong() * mid < n) lo = mid + 1 else hi = mid
+    }
+    return lo
+}
+"""),
+        ("float-sqrt", "WRONG_ALGORITHM",
+         "부동소수점 제곱근을 내림한다. 큰 수에서 반올림이 어긋난다 — 그리고 문제가 쓰지 말라고 했다.",
+         """
+fun isqrt(n: Int): Int = Math.sqrt(n.toFloat().toDouble()).toInt()
+"""),
+    ],
+))

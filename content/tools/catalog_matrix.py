@@ -1178,3 +1178,185 @@ fun islandsAfterEach(rows: Int, cols: Int, positions: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 67. 생명 게임 한 세대 -------------------------------------------------------------
+
+def _life_step(grid):
+    rows = len(grid)
+    cols = len(grid[0]) if rows else 0
+    out = [[0] * cols for _ in range(rows)]
+    for r in range(rows):
+        for c in range(cols):
+            alive = 0
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    if dr == 0 and dc == 0:
+                        continue
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
+                        alive += 1
+            if grid[r][c] == 1:
+                out[r][c] = 1 if alive in (2, 3) else 0
+            else:
+                out[r][c] = 1 if alive == 3 else 0
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="game-of-life-step",
+    title="생명 게임 한 세대",
+    summary="""
+`0`(죽음) 과 `1`(삶) 의 격자 `grid` 가 주어진다. **다음 세대**의 격자를 반환한다. 각 칸의
+이웃은 상하좌우와 대각선의 **여덟 칸**이고, 격자 밖은 죽은 것으로 본다. 규칙은 넷이다.
+
+1. 살아 있는 칸의 이웃 중 산 것이 2 개 미만이면 죽는다.
+2. 살아 있는 칸의 이웃 중 산 것이 2 개 또는 3 개면 산다.
+3. 살아 있는 칸의 이웃 중 산 것이 4 개 이상이면 죽는다.
+4. 죽은 칸의 이웃 중 산 것이 **정확히** 3 개면 산다.
+
+모든 칸은 **동시에** 바뀐다 — 한 칸을 바꾼 결과가 옆 칸의 이웃 수에 들어가면 안 된다.
+""",
+    notes="""
+규칙 넷을 그대로 옮기면 된다. 두 가지가 문제다. 이웃은 여덟이지 넷이 아니고, 갱신은 동시다 —
+제자리에서 바꾸면 위와 왼쪽 이웃은 이미 다음 세대가 되어 있다.
+""",
+    drill_doc="""
+Drill.visit(r * cols + c, alive)  // 칸의 산 이웃 수를 셌다
+Drill.write(r * cols + c, next)   // 다음 세대의 값
+""",
+    constraints="""
+- `0 <= rows, cols <= 200`
+- 모든 행의 길이는 같다
+- 각 칸은 `0` 또는 `1`
+""",
+    signature=dict(name="lifeStep", parameters=[("grid", "INT_MATRIX")], returns="INT_MATRIX"),
+    groups=standard_groups(),
+    reference=_life_step,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [[[0, 1, 0], [0, 0, 1], [1, 1, 1], [0, 0, 0]]]),
+            ("02", [[[1, 1], [1, 0]]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-no-columns", [[[], []]]),
+            ("03-single-alive", [[[1]]]),
+            ("04-all-dead", [[[0, 0], [0, 0]]]),
+            # 2×2 블록. 안정하다 — 각 칸의 이웃이 셋.
+            ("05-block", [[[1, 1], [1, 1]]]),
+            # 세로 막대 셋 → 가로 막대. 대각선을 세지 않으면 다르게 나온다.
+            ("06-blinker", [[[0, 0, 0], [1, 1, 1], [0, 0, 0]]]),
+            # 제자리에서 바꾸면 틀리는 모양. 위 칸을 먼저 바꾸면 아래 칸의 이웃 수가 달라진다.
+            ("07-in-place-trap", [[[1, 1, 0], [1, 0, 0], [0, 0, 0]]]),
+            # 죽은 칸의 이웃이 넷. 3 이상으로 살리면 틀린다.
+            ("08-four-neighbours-dead", [[[1, 0, 1], [0, 0, 0], [1, 0, 1]]]),
+            ("09-single-row", [[[1, 1, 1, 0, 1]]]),
+        ],
+        "hidden": [
+            ("01-glider", [[[0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [1, 1, 1, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]]),
+            ("02-random-small", [_rect(6, 7, randoms(42, 0, 1, salt=2701))]),
+            ("03-random-medium", [_rect(40, 50, randoms(2000, 0, 1, salt=2702))]),
+            ("04-large", [_rect(200, 200, randoms(40000, 0, 1, salt=2703))]),
+            ("05-all-alive", [_rect(5, 5, [1] * 25)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 새 격자에 쓴다 — 동시 갱신.
+fun lifeStep(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val next = Array(rows) { IntArray(cols) }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        var alive = 0
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr
+            val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] == 1) alive += 1
+        }
+        Drill.visit(r * cols + c, alive)
+        next[r][c] = if (grid[r][c] == 1) (if (alive == 2 || alive == 3) 1 else 0) else (if (alive == 3) 1 else 0)
+        Drill.write(r * cols + c, next[r][c])
+    }
+    return next
+}
+""",
+    mutants=[
+        ("in-place--sequential", "WRONG_ALGORITHM",
+         "제자리에서 바꾼다. 먼저 바뀐 칸이 아직 안 바뀐 칸의 이웃 수에 들어간다.",
+         """
+fun lifeStep(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val out = Array(rows) { grid[it].copyOf() }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        var alive = 0
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && out[nr][nc] == 1) alive += 1
+        }
+        out[r][c] = if (out[r][c] == 1) (if (alive == 2 || alive == 3) 1 else 0) else (if (alive == 3) 1 else 0)
+    }
+    return out
+}
+"""),
+        ("four-neighbours", "MISSING_EDGE_CASE",
+         "상하좌우만 이웃으로 센다. 대각선을 잊었다.",
+         """
+fun lifeStep(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val next = Array(rows) { IntArray(cols) }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        var alive = 0
+        for ((dr, dc) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] == 1) alive += 1
+        }
+        next[r][c] = if (grid[r][c] == 1) (if (alive == 2 || alive == 3) 1 else 0) else (if (alive == 3) 1 else 0)
+    }
+    return next
+}
+"""),
+        ("birth-at-least-three", "WRONG_BRANCH",
+         "죽은 칸의 이웃이 3 이상이면 살린다. 정확히 3 이어야 한다.",
+         """
+fun lifeStep(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val next = Array(rows) { IntArray(cols) }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        var alive = 0
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] == 1) alive += 1
+        }
+        next[r][c] = if (grid[r][c] == 1) (if (alive == 2 || alive == 3) 1 else 0) else (if (alive >= 3) 1 else 0)
+    }
+    return next
+}
+"""),
+        ("counts-self", "OFF_BY_ONE",
+         "자기 자신을 이웃에 넣어 센다. 산 칸의 이웃 수가 하나 많다.",
+         """
+fun lifeStep(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val next = Array(rows) { IntArray(cols) }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        var alive = 0
+        for (dr in -1..1) for (dc in -1..1) {
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] == 1) alive += 1
+        }
+        next[r][c] = if (grid[r][c] == 1) (if (alive == 2 || alive == 3) 1 else 0) else (if (alive == 3) 1 else 0)
+    }
+    return next
+}
+"""),
+    ],
+))

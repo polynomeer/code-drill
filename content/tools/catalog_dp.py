@@ -780,3 +780,162 @@ fun editDistance(source: IntArray, target: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 59. 가장 긴 공통 부분 수열 (메모리로 잡는 오답) ---------------------------------------
+
+def _lcs_length(first, second):
+    """비트 병렬 LCS (Hyyrö). 15,000 × 15,000 의 표를 파이썬으로 채우면 몇 분이다."""
+    n = len(first)
+    if n == 0 or not second:
+        return 0
+    masks = {}
+    for i, ch in enumerate(first):
+        masks[ch] = masks.get(ch, 0) | (1 << i)
+    full = (1 << n) - 1
+    row = full
+    for ch in second:
+        hit = row & masks.get(ch, 0)
+        row = ((row + hit) | (row - hit)) & full
+    return n - bin(row).count("1")
+
+
+def _letters(count, alphabet, salt):
+    picks = randoms(count, 0, len(alphabet) - 1, salt=salt)
+    return "".join(alphabet[p] for p in picks)
+
+
+PROBLEMS.append(Problem(
+    id="longest-common-subsequence",
+    title="가장 긴 공통 부분 수열",
+    summary="""
+두 문자열 `first` 와 `second` 가 주어진다. 둘 모두의 **부분 수열**(순서를 지키되 건너뛸 수
+있는 문자열)인 것 중 가장 긴 것의 길이를 반환한다.
+
+예: `"abcde"` 와 `"ace"` 의 답은 `3` (`"ace"`), `"abc"` 와 `"def"` 의 답은 `0` 이다.
+""",
+    notes="""
+`first` 의 앞 i 글자와 `second` 의 앞 j 글자의 답을 표로 채우면 된다. 다만 **표 전체를
+들고 있을 필요가 없다** — 한 행을 채우는 데 필요한 것은 바로 앞 행뿐이다. 두 문자열이
+15,000 자면 표 전체는 2 억 2 천만 칸이고, 그것을 정수로 두면 메모리 한도의 세 배가 넘는다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 두 글자를 견줬다
+Drill.write(j, length)        // 그 자리까지의 답
+""",
+    constraints="""
+- `0 <= first.length, second.length <= 15_000`
+- 영문 소문자만
+- 메모리 256MB — 표 전체는 여기 들어가지 않는다
+""",
+    signature=dict(name="lcsLength", parameters=[("first", "STRING"), ("second", "STRING")],
+                   returns="INT"),
+    groups=perf_groups(),
+    reference=_lcs_length,
+    cases={
+        "sample": [
+            ("01", ["abcde", "ace"]),
+            ("02", ["abc", "def"]),
+        ],
+        "boundary": [
+            ("01-both-empty", ["", ""]),
+            ("02-one-empty", ["abc", ""]),
+            ("03-identical", ["kotlin", "kotlin"]),
+            ("04-single-match", ["a", "a"]),
+            ("05-single-mismatch", ["a", "b"]),
+            # 같은 글자가 여러 번. 한 번 맞춘 글자를 다시 쓰면 안 된다.
+            ("06-repeats", ["aaaa", "aa"]),
+            # 순서가 뒤집혔다. 공통 글자는 많지만 순서를 지키면 하나뿐이다.
+            ("07-reversed", ["abcd", "dcba"]),
+            # 앞 행의 대각선 값을 써야 한다. 같은 행을 쓰면 하나 더 센다.
+            ("08-diagonal", ["ab", "ba"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_letters(40, "abc", salt=1901), _letters(35, "abc", salt=1902)]),
+            ("02-random-medium", [_letters(800, "abcd", salt=1903), _letters(900, "abcd", salt=1904)]),
+            ("03-subsequence", ["abcdefghij" * 20, "acegi" * 20]),
+            ("04-disjoint", ["a" * 500, "b" * 500]),
+        ],
+        "performance": [
+            ("01-small", [_letters(2000, "abcd", salt=1905), _letters(2000, "abcd", salt=1906)]),
+            ("02-medium", [_letters(8000, "abcd", salt=1907), _letters(8000, "abcd", salt=1908)]),
+            # 15,000 × 15,000. 표 전체는 900MB — 시간은 넉넉한데 메모리에서 진다.
+            ("03-large", [_letters(15000, "abcd", salt=1909), _letters(15000, "abcd", salt=1910)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 행 두 개만 든다.
+fun lcsLength(first: String, second: String): Int {
+    var previous = IntArray(second.length + 1)
+    var current = IntArray(second.length + 1)
+    for (i in 1..first.length) {
+        val a = first[i - 1]
+        for (j in 1..second.length) {
+            current[j] = if (a == second[j - 1]) previous[j - 1] + 1 else maxOf(previous[j], current[j - 1])
+        }
+        Drill.write(i, current[second.length])
+        val swap = previous
+        previous = current
+        current = swap
+    }
+    return previous[second.length]
+}
+""",
+    mutants=[
+        ("full-table--memory", "PERFORMANCE",
+         "표 전체를 든다. 시간은 넉넉한데 15,000 × 15,000 의 정수 표는 메모리 한도의 세 배다.",
+         """
+fun lcsLength(first: String, second: String): Int {
+    val table = Array(first.length + 1) { IntArray(second.length + 1) }
+    for (i in 1..first.length) {
+        for (j in 1..second.length) {
+            table[i][j] = if (first[i - 1] == second[j - 1]) table[i - 1][j - 1] + 1 else maxOf(table[i - 1][j], table[i][j - 1])
+        }
+    }
+    return table[first.length][second.length]
+}
+"""),
+        ("same-row-diagonal", "WRONG_BRANCH",
+         "글자가 맞았을 때 앞 행의 대각선이 아니라 같은 행의 왼쪽에 1 을 더한다. 한 글자를 두 번 센다.",
+         """
+fun lcsLength(first: String, second: String): Int {
+    var previous = IntArray(second.length + 1)
+    var current = IntArray(second.length + 1)
+    for (i in 1..first.length) {
+        for (j in 1..second.length) {
+            current[j] = if (first[i - 1] == second[j - 1]) current[j - 1] + 1 else maxOf(previous[j], current[j - 1])
+        }
+        val swap = previous; previous = current; current = swap
+    }
+    return previous[second.length]
+}
+"""),
+        ("greedy-match--first-occurrence", "WRONG_ALGORITHM",
+         "first 를 훑으며 second 에서 다음에 나오는 같은 글자를 탐욕으로 짝짓는다. 뒤의 더 긴 짝을 놓친다.",
+         """
+fun lcsLength(first: String, second: String): Int {
+    var j = 0
+    var count = 0
+    for (a in first) {
+        var k = j
+        while (k < second.length && second[k] != a) k += 1
+        if (k < second.length) { count += 1; j = k + 1 }
+    }
+    return count
+}
+"""),
+        ("stale-row--no-swap", "OFF_BY_ONE",
+         "행을 바꿔 끼우지 않고 현재 행을 앞 행 위에 덮어쓴다. 대각선 값이 이미 갱신된 것을 읽는다.",
+         """
+fun lcsLength(first: String, second: String): Int {
+    val row = IntArray(second.length + 1)
+    for (i in 1..first.length) {
+        for (j in 1..second.length) {
+            row[j] = if (first[i - 1] == second[j - 1]) row[j - 1] + 1 else maxOf(row[j], row[j - 1])
+        }
+    }
+    return row[second.length]
+}
+"""),
+    ],
+))

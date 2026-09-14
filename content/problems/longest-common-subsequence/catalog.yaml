@@ -1,0 +1,16 @@
+# longest-common-subsequence 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - string
+  - dynamic-programming
+competencies:
+  - MODELING
+  - COMPLEXITY
+  - OPTIMIZATION
+  - CORRECTNESS
+prerequisites:
+  - edit-distance
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "시간 O(n·m) 은 피할 수 없고, 공간을 O(min(n, m)) 으로 줄이는 것이 이 문제다"

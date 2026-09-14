@@ -1,0 +1,16 @@
+# longest-unique-substring 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - sliding-window
+  - hash-map
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - longest-ones-after-flip
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "창의 양끝이 각각 한 번씩만 전진한다. 시작점마다 새로 세면 O(n²)"

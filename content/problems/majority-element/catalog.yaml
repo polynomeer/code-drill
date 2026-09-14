@@ -1,0 +1,15 @@
+# majority-element 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - array
+  - counting
+competencies:
+  - CONSTRAINTS
+  - CORRECTNESS
+  - ALGORITHM_CHOICE
+prerequisites:
+  - most-frequent-small-values
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "후보 하나와 개수 하나"

@@ -1,0 +1,16 @@
+# grid-path-sequence 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - backtracking
+  - dfs
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - island-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "시작점 × 갈래. 격자와 수열이 작아 되추적으로 충분하다"

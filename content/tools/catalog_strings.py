@@ -11,7 +11,7 @@
 | count-distinct-chars | STRING → INT_ARRAY |
 """
 
-from author import Problem, standard_groups
+from author import Problem, standard_groups, perf_groups, randoms
 
 PROBLEMS = []
 
@@ -590,6 +590,162 @@ fun isomorphic(first: String, second: String): Int {
 fun isomorphic(first: String, second: String): Int {
     if (first.length != second.length) return 0
     return if (first.toSet().size == second.toSet().size) 1 else 0
+}
+"""),
+    ],
+))
+
+
+# --- 65. 같은 글자가 없는 가장 긴 부분 문자열 ----------------------------------------------
+
+def _longest_unique(text):
+    last = {}
+    start = 0
+    best = 0
+    for i, ch in enumerate(text):
+        if ch in last and last[ch] >= start:
+            start = last[ch] + 1
+        last[ch] = i
+        best = max(best, i - start + 1)
+    return best
+
+
+def _distinct_run(count):
+    """서로 다른 BMP 글자 count 개. 대리쌍 앞에서 멈춘다 — 코틀린의 Char 와 파이썬의 글자가 같아야 한다."""
+    assert count <= 0xD7FF - 0x100
+    return "".join(chr(0x100 + i) for i in range(count))
+
+
+def _text_of(count, alphabet, salt):
+    picks = randoms(count, 0, len(alphabet) - 1, salt=salt)
+    return "".join(alphabet[p] for p in picks)
+
+
+PROBLEMS.append(Problem(
+    id="longest-unique-substring",
+    title="같은 글자가 없는 가장 긴 부분 문자열",
+    summary="""
+문자열 `text` 가 주어진다. **같은 글자가 두 번 나오지 않는** 연속 부분 문자열 중 가장 긴
+것의 길이를 반환한다. 빈 문자열의 답은 `0` 이다.
+
+예: `"abcabcbb"` 는 `"abc"` 로 `3`, `"bbbbb"` 는 `1`, `"pwwkew"` 는 `"wke"` 로 `3` 이다.
+""",
+    notes="""
+창의 왼쪽 끝과 오른쪽 끝을 둔다. 오른쪽 글자가 창 안에 이미 있으면 왼쪽 끝을 그 글자의
+**다음 자리**까지 당긴다 — 당기는 것이지 되돌리는 것이 아니다. 글자가 마지막으로 나온
+자리를 기억해 두면 창 안에 있는지가 비교 한 번이다.
+""",
+    drill_doc="""
+Drill.pointer("start", start) // 창의 왼쪽 끝
+Drill.visit(i, best)          // 오른쪽 끝을 옮기고 본 최선
+""",
+    constraints="""
+- `0 <= text.length <= 100_000`
+- 임의의 유니코드 문자가 올 수 있다 (기본 다국어 평면 안)
+""",
+    signature=dict(name="longestUnique", parameters=[("text", "STRING")], returns="INT"),
+    groups=perf_groups(),
+    reference=_longest_unique,
+    cases={
+        "sample": [
+            ("01", ["abcabcbb"]),
+            ("02", ["pwwkew"]),
+        ],
+        "boundary": [
+            ("01-empty", [""]),
+            ("02-single", ["a"]),
+            ("03-all-same", ["bbbbb"]),
+            ("04-all-unique", ["abcdef"]),
+            # 창 밖에 있던 글자를 다시 만난다. 왼쪽 끝을 뒤로 되돌리면 안 된다.
+            ("05-stale-last-seen", ["abba"]),
+            # 탭과 쉼표가 글자다.
+            ("06-tab-and-comma", ["a\tb,a\t"]),
+            ("07-non-ascii", ["한글한글글"]),
+            ("08-space", ["a b a"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_text_of(40, "abcd", salt=2501)]),
+            ("02-random-medium", [_text_of(3000, "abcdefgh", salt=2502)]),
+            ("03-long-unique-tail", ["aaaa" + "bcdefghijklmnop"]),
+            ("04-periodic", ["abcde" * 100]),
+        ],
+        "performance": [
+            # 서로 다른 글자가 길게 이어져야 시작점마다 끝까지 훑는 풀이가 진다. 알파벳이
+            # 작으면 창이 알파벳 크기에서 멈춰 O(n²) 도 빠르다.
+            ("01-small", [_distinct_run(5000)]),
+            ("02-medium", [_distinct_run(20000)]),
+            ("03-large", [_distinct_run(55000)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 슬라이딩 윈도우 + 마지막 위치.
+fun longestUnique(text: String): Int {
+    val last = HashMap<Char, Int>()
+    var start = 0
+    var best = 0
+    for (i in text.indices) {
+        val seen = last[text[i]]
+        if (seen != null && seen >= start) {
+            start = seen + 1
+            Drill.pointer("start", start)
+        }
+        last[text[i]] = i
+        best = maxOf(best, i - start + 1)
+        Drill.visit(i, best)
+    }
+    return best
+}
+""",
+    mutants=[
+        ("moves-start-backward", "WRONG_BRANCH",
+         "창 밖에 있던 글자를 다시 만나도 왼쪽 끝을 그 자리로 되돌린다. 창이 다시 넓어진다.",
+         """
+fun longestUnique(text: String): Int {
+    val last = HashMap<Char, Int>()
+    var start = 0
+    var best = 0
+    for (i in text.indices) {
+        val seen = last[text[i]]
+        if (seen != null) start = seen + 1
+        last[text[i]] = i
+        best = maxOf(best, i - start + 1)
+    }
+    return best
+}
+"""),
+        ("start-at-repeat--off-by-one", "OFF_BY_ONE",
+         "왼쪽 끝을 반복된 글자의 다음이 아니라 그 자리로 당긴다. 같은 글자 둘이 창에 남는다.",
+         """
+fun longestUnique(text: String): Int {
+    val last = HashMap<Char, Int>()
+    var start = 0
+    var best = 0
+    for (i in text.indices) {
+        val seen = last[text[i]]
+        if (seen != null && seen >= start) start = seen
+        last[text[i]] = i
+        best = maxOf(best, i - start + 1)
+    }
+    return best
+}
+"""),
+        ("distinct-count--not-window", "WRONG_ALGORITHM",
+         "서로 다른 글자의 수를 답한다. 연속이라는 조건을 잊었다.",
+         """
+fun longestUnique(text: String): Int = text.toSet().size
+"""),
+        ("all-substrings--quadratic", "PERFORMANCE",
+         "시작점마다 집합을 새로 만들어 늘려 간다. O(n²).",
+         """
+fun longestUnique(text: String): Int {
+    var best = 0
+    for (i in text.indices) {
+        val seen = HashSet<Char>()
+        var j = i
+        while (j < text.length && seen.add(text[j])) { Drill.compare(i, j); j += 1 }
+        best = maxOf(best, j - i)
+    }
+    return best
 }
 """),
     ],

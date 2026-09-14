@@ -684,3 +684,367 @@ fun minCapacity(weights: IntArray, days: Int): Int {
 """),
     ],
 ))
+
+
+# --- 68. 격자에서 수열 경로 찾기 (백트래킹) --------------------------------------------------
+
+def _path_exists(grid, sequence):
+    rows = len(grid)
+    cols = len(grid[0]) if rows else 0
+    if not sequence:
+        return 1
+    used = [[False] * cols for _ in range(rows)]
+
+    def walk(r, c, k):
+        if grid[r][c] != sequence[k]:
+            return False
+        if k == len(sequence) - 1:
+            return True
+        used[r][c] = True
+        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols and not used[nr][nc] and walk(nr, nc, k + 1):
+                used[r][c] = False
+                return True
+        used[r][c] = False
+        return False
+
+    return 1 if any(walk(r, c, 0) for r in range(rows) for c in range(cols)) else 0
+
+
+PROBLEMS.append(Problem(
+    id="grid-path-sequence",
+    title="격자에서 수열 경로 찾기",
+    summary="""
+정수 격자 `grid` 와 정수 수열 `sequence` 가 주어진다. 격자의 어느 칸에서 시작해 **상하좌우로
+한 칸씩** 옮겨 가며 `sequence` 를 순서대로 밟을 수 있으면 `1`, 없으면 `0` 을 반환한다.
+**같은 칸을 두 번 밟을 수 없다.** 빈 수열은 항상 `1` 이다.
+""",
+    notes="""
+시작 칸마다 깊이 우선으로 따라가 본다. 지나온 칸을 표시했다가 **되돌아올 때 지워야**
+다른 시작점이나 다른 갈래가 그 칸을 다시 쓸 수 있다. 표시를 지우지 않는 것이 이 문제에서
+가장 흔한 실수다.
+""",
+    drill_doc="""
+Drill.visit(r * cols + c, k)      // 수열의 k 번째를 이 칸에서 시험했다
+Drill.match(r * cols + c, k)      // 수열을 끝까지 밟았다
+""",
+    constraints="""
+- `0 <= rows, cols <= 12`
+- `0 <= sequence.size <= 12`
+- 격자와 수열의 값은 `0` 이상 `9` 이하
+""",
+    signature=dict(name="pathExists", parameters=[("grid", "INT_MATRIX"), ("sequence", "INT_ARRAY")],
+                   returns="INT"),
+    groups=standard_groups(),
+    reference=_path_exists,
+    cases={
+        "sample": [
+            ("01", [[[1, 2, 3], [4, 5, 6], [7, 8, 9]], [1, 2, 5, 8, 9]]),
+            ("02", [[[1, 2, 3], [4, 5, 6], [7, 8, 9]], [1, 5, 9]]),
+        ],
+        "boundary": [
+            ("01-empty-sequence", [[[1]], []]),
+            ("02-empty-grid", [[], [1]]),
+            ("03-single-match", [[[7]], [7]]),
+            ("04-single-mismatch", [[[7]], [8]]),
+            # 같은 칸을 두 번 밟아야만 만들 수 있는 수열. 답은 0.
+            ("05-reuse-needed", [[[1, 2]], [1, 2, 1]]),
+            # 첫 갈래는 막히고 둘째 갈래로 가야 한다. 되돌아올 때 표시를 안 지우면 막힌다.
+            ("06-backtrack-needed", [[[1, 1, 1], [1, 0, 1], [1, 1, 2]], [1, 1, 1, 1, 1, 1, 1, 2]]),
+            # 시작점이 여럿. 첫 시작점에서 실패한 표시가 남으면 둘째 시작점이 막힌다.
+            ("07-two-starts", [[[1, 2, 1], [3, 3, 2]], [1, 2, 2]]),
+            # 대각선은 이동이 아니다.
+            ("08-diagonal", [[[1, 0], [0, 2]], [1, 2]]),
+        ],
+        "hidden": [
+            ("01-spiral", [[[1, 2, 3], [8, 9, 4], [7, 6, 5]], [1, 2, 3, 4, 5, 6, 7, 8, 9]]),
+            ("02-long-dead-ends", [[[1, 1, 1, 1], [1, 0, 0, 1], [1, 1, 1, 1], [0, 0, 0, 2]], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2]]),
+            ("03-random-hit", [[[3, 1, 4, 1], [5, 9, 2, 6], [5, 3, 5, 8]], [9, 2, 6, 8, 5, 3]]),
+            ("04-random-miss", [[[3, 1, 4, 1], [5, 9, 2, 6], [5, 3, 5, 8]], [9, 2, 6, 8, 5, 5]]),
+            # 전부 같은 값. 경로가 많아 한 번에 찾지만, 표시를 안 지우는 풀이도 우연히 맞을 수 있다 —
+            # 그래서 위의 막다른 길 케이스가 따로 있다.
+            ("05-all-same", [[[1] * 4 for _ in range(4)], [1] * 12]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). DFS + 되돌리기.
+fun pathExists(grid: Array<IntArray>, sequence: IntArray): Int {
+    if (sequence.isEmpty()) return 1
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val used = Array(rows) { BooleanArray(cols) }
+    val dr = intArrayOf(1, -1, 0, 0)
+    val dc = intArrayOf(0, 0, 1, -1)
+    fun walk(r: Int, c: Int, k: Int): Boolean {
+        if (grid[r][c] != sequence[k]) return false
+        Drill.visit(r * cols + c, k)
+        if (k == sequence.size - 1) { Drill.match(r * cols + c, k); return true }
+        used[r][c] = true
+        for (d in 0 until 4) {
+            val nr = r + dr[d]
+            val nc = c + dc[d]
+            if (nr in 0 until rows && nc in 0 until cols && !used[nr][nc] && walk(nr, nc, k + 1)) {
+                used[r][c] = false
+                return true
+            }
+        }
+        used[r][c] = false
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+""",
+    mutants=[
+        ("never-unmarks", "WRONG_BRANCH",
+         "되돌아올 때 표시를 지우지 않는다. 막힌 갈래가 지나간 칸을 다른 갈래가 쓰지 못한다.",
+         """
+fun pathExists(grid: Array<IntArray>, sequence: IntArray): Int {
+    if (sequence.isEmpty()) return 1
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val used = Array(rows) { BooleanArray(cols) }
+    fun walk(r: Int, c: Int, k: Int): Boolean {
+        if (grid[r][c] != sequence[k]) return false
+        if (k == sequence.size - 1) return true
+        used[r][c] = true
+        for ((dr, dc) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && !used[nr][nc] && walk(nr, nc, k + 1)) return true
+        }
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+"""),
+        ("allows-reuse", "MISSING_EDGE_CASE",
+         "같은 칸을 다시 밟는 것을 막지 않는다.",
+         """
+fun pathExists(grid: Array<IntArray>, sequence: IntArray): Int {
+    if (sequence.isEmpty()) return 1
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    fun walk(r: Int, c: Int, k: Int): Boolean {
+        if (grid[r][c] != sequence[k]) return false
+        if (k == sequence.size - 1) return true
+        for ((dr, dc) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && walk(nr, nc, k + 1)) return true
+        }
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+"""),
+        ("first-start-only", "WRONG_ALGORITHM",
+         "수열의 첫 값과 같은 첫 칸에서만 시작한다. 다른 시작점을 보지 않는다.",
+         """
+fun pathExists(grid: Array<IntArray>, sequence: IntArray): Int {
+    if (sequence.isEmpty()) return 1
+    val rows = grid.size
+    val cols = if (rows == 0) 0 else grid[0].size
+    val used = Array(rows) { BooleanArray(cols) }
+    fun walk(r: Int, c: Int, k: Int): Boolean {
+        if (grid[r][c] != sequence[k]) return false
+        if (k == sequence.size - 1) return true
+        used[r][c] = true
+        for ((dr, dc) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && !used[nr][nc] && walk(nr, nc, k + 1)) { used[r][c] = false; return true }
+        }
+        used[r][c] = false
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (grid[r][c] == sequence[0]) return if (walk(r, c, 0)) 1 else 0
+    return 0
+}
+"""),
+    ],
+))
+
+
+# --- 69. k 개의 같은 합 묶음 (가지치기가 곧 답이다) ------------------------------------------
+
+def _can_partition_k(nums, k):
+    total = sum(nums)
+    if k <= 0 or total % k != 0:
+        return 0
+    target = total // k
+    values = sorted(nums, reverse=True)
+    if values and values[0] > target:
+        return 0
+    buckets = [0] * k
+
+    def place(i):
+        if i == len(values):
+            return True
+        v = values[i]
+        seen = set()
+        for b in range(k):
+            if buckets[b] + v > target or buckets[b] in seen:
+                continue
+            seen.add(buckets[b])
+            buckets[b] += v
+            if place(i + 1):
+                return True
+            buckets[b] -= v
+            if buckets[b] == 0:
+                break
+        return False
+
+    return 1 if place(0) else 0
+
+
+PROBLEMS.append(Problem(
+    id="partition-k-equal-sums",
+    title="k 개의 같은 합 묶음",
+    summary="""
+양의 정수 배열 `nums` 와 정수 `k` 가 주어진다. 배열을 **합이 같은 k 개의 묶음**으로 남김없이
+나눌 수 있으면 `1`, 없으면 `0` 을 반환한다. 각 원소는 정확히 한 묶음에 들어간다.
+""",
+    notes="""
+답을 찾는 것은 되추적이다. 그런데 되추적은 **가지치기 없이는 끝나지 않는다** — 원소 16 개에
+묶음 4 개면 4^16 이다. 큰 원소부터 놓고, 같은 값의 빈 묶음은 하나만 시험하고, 원소를 넣었을 때
+목표를 넘으면 곧바로 물러선다. 그러면 같은 문제가 순식간에 끝난다.
+""",
+    drill_doc="""
+Drill.visit(i, bucket)        // i 번째 원소를 그 묶음에 넣어 봤다
+Drill.match(i, bucket)        // 놓을 자리를 찾았다
+""",
+    constraints="""
+- `1 <= nums.size <= 16`
+- `1 <= nums[i] <= 10_000`
+- `1 <= k <= nums.size`
+""",
+    signature=dict(name="canPartition", parameters=[("nums", "INT_ARRAY"), ("k", "INT")],
+                   returns="INT"),
+    # 성능 그룹의 케이스도 16 개다. 가지치기 없는 되추적은 그 크기에서 끝나지 않는다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_can_partition_k,
+    cases={
+        "sample": [
+            ("01", [[4, 3, 2, 3, 5, 2, 1], 4]),
+            ("02", [[1, 2, 3, 4], 3]),
+        ],
+        "boundary": [
+            ("01-k-one", [[5, 7], 1]),
+            ("02-k-equals-size", [[3, 3, 3], 3]),
+            ("03-k-equals-size-unequal", [[3, 4, 3], 3]),
+            # 합은 나누어떨어지지만 한 원소가 목표보다 크다.
+            ("04-element-too-big", [[10, 1, 1], 2]),
+            ("05-sum-not-divisible", [[1, 1, 1], 2]),
+            ("06-single", [[9], 1]),
+            # 같은 값이 많다. 같은 값의 빈 묶음을 전부 시험하면 오래 걸린다.
+            ("07-many-equal", [[2] * 12, 4]),
+            # 마지막 원소 하나가 들어갈 자리가 없다. 마지막을 놓기 전에 끝내면 1 을 낸다.
+            ("08-last-element-decides", [[2, 2, 2, 3, 3], 3]),
+        ],
+        "hidden": [
+            ("01-possible", [[2, 2, 2, 2, 3, 4, 5], 4]),
+            ("02-impossible-close", [[2, 2, 2, 2, 3, 4, 6], 4]),
+            ("03-big-values", [[10000, 5000, 5000, 3000, 7000, 2500, 2500, 5000], 4]),
+            ("04-sixteen-possible", [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], 4]),
+            ("05-sixteen-impossible", [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20], 4]),
+        ],
+        "performance": [
+            # 합은 나누어떨어지는데 답이 없는 입력. 가지치기 없이는 4^16 을 다 돈다.
+            ("01-hard-no", [[15, 15, 15, 15, 15, 15, 15, 15, 14, 14, 14, 14, 14, 14, 14, 26], 4]),
+            ("02-hard-no-2", [[9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 33], 8]),
+            ("03-hard-no-3", [[7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 21], 6]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 큰 것부터, 같은 값의 묶음은 하나만, 넘치면 물러선다.
+fun canPartition(nums: IntArray, k: Int): Int {
+    val total = nums.sum()
+    if (k <= 0 || total % k != 0) return 0
+    val target = total / k
+    val values = nums.sortedDescending()
+    if (values.first() > target) return 0
+    val buckets = IntArray(k)
+    fun place(i: Int): Boolean {
+        if (i == values.size) return true
+        val v = values[i]
+        var tried = -1
+        for (b in 0 until k) {
+            if (buckets[b] + v > target || buckets[b] == tried) continue
+            tried = buckets[b]
+            Drill.visit(i, b)
+            buckets[b] += v
+            if (place(i + 1)) { Drill.match(i, b); return true }
+            buckets[b] -= v
+            if (buckets[b] == 0) break
+        }
+        return false
+    }
+    return if (place(0)) 1 else 0
+}
+""",
+    mutants=[
+        ("last-element-unplaced", "OFF_BY_ONE",
+         "마지막 원소를 놓기 전에 성공으로 본다. 마지막 하나가 들어갈 자리가 없어도 1 을 낸다.",
+         """
+fun canPartition(nums: IntArray, k: Int): Int {
+    val total = nums.sum()
+    if (k <= 0 || total % k != 0) return 0
+    val target = total / k
+    val values = nums.sortedDescending()
+    if (values.first() > target) return 0
+    val buckets = IntArray(k)
+    fun place(i: Int): Boolean {
+        if (i >= values.size - 1) return true
+        var tried = -1
+        for (b in 0 until k) {
+            if (buckets[b] + values[i] > target || buckets[b] == tried) continue
+            tried = buckets[b]
+            buckets[b] += values[i]
+            if (place(i + 1)) return true
+            buckets[b] -= values[i]
+            if (buckets[b] == 0) break
+        }
+        return false
+    }
+    return if (place(0)) 1 else 0
+}
+"""),
+        ("greedy-largest-first", "WRONG_ALGORITHM",
+         "큰 것부터 지금 가장 덜 찬 묶음에 넣고 끝낸다. 되돌아오지 않는다.",
+         """
+fun canPartition(nums: IntArray, k: Int): Int {
+    val total = nums.sum()
+    if (total % k != 0) return 0
+    val target = total / k
+    val buckets = IntArray(k)
+    for (v in nums.sortedDescending()) {
+        val b = (0 until k).minByOrNull { buckets[it] }!!
+        buckets[b] += v
+    }
+    return if (buckets.all { it == target }) 1 else 0
+}
+"""),
+        ("no-pruning--exponential", "PERFORMANCE",
+         "가지치기 없이 모든 배치를 시험한다. 4^16 이다.",
+         """
+fun canPartition(nums: IntArray, k: Int): Int {
+    val total = nums.sum()
+    if (k <= 0 || total % k != 0) return 0
+    val target = total / k
+    val buckets = IntArray(k)
+    fun place(i: Int): Boolean {
+        if (i == nums.size) return buckets.all { it == target }
+        for (b in 0 until k) {
+            Drill.visit(i, b)
+            buckets[b] += nums[i]
+            if (place(i + 1)) return true
+            buckets[b] -= nums[i]
+        }
+        return false
+    }
+    return if (place(0)) 1 else 0
+}
+"""),
+    ],
+))

@@ -1,0 +1,16 @@
+# trapping-rain-water 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - two-pointers
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - COMPLEXITY
+  - OPTIMIZATION
+prerequisites:
+  - container-water
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "양끝 포인터. 칸마다 양쪽을 훑으면 O(n²)"

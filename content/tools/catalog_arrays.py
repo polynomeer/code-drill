@@ -5,7 +5,7 @@
 엉성하다는 뜻이다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms
+from author import Problem, standard_groups, perf_groups, randoms, shuffled
 
 PROBLEMS = []
 
@@ -1069,6 +1069,679 @@ fun mostFrequent(nums: IntArray): Int {
     }
     return best
 }
+"""),
+    ],
+))
+
+
+# --- 60. 합이 k 로 나누어떨어지는 부분배열 수 ----------------------------------------------
+
+def _divisible_subarrays(nums, k):
+    counts = {0: 1}
+    prefix = 0
+    total = 0
+    for v in nums:
+        prefix = (prefix + v) % k
+        total += counts.get(prefix, 0)
+        counts[prefix] = counts.get(prefix, 0) + 1
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="subarrays-divisible-by-k",
+    title="합이 k 의 배수인 부분배열의 수",
+    summary="""
+정수 배열 `nums` 와 양의 정수 `k` 가 주어진다. 원소의 합이 `k` 로 **나누어떨어지는**
+연속 부분배열(길이 1 이상)의 개수를 반환한다. 음수도 있다.
+""",
+    notes="""
+구간 합은 누적 합 두 개의 차다. 두 누적 합의 차가 k 의 배수라는 것은 **k 로 나눈 나머지가
+같다**는 것이고, 그러면 나머지마다 몇 번 나왔는지만 세면 된다. 음수의 나머지는 언어마다
+다르게 나온다 — 0 이상으로 맞춰 둔다.
+""",
+    drill_doc="""
+Drill.visit(i, remainder)     // i 까지의 누적 합의 나머지
+Drill.write(remainder, count) // 그 나머지가 몇 번 나왔나
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `-10^4 <= nums[i] <= 10^4`
+- `1 <= k <= 10_000`
+- 답은 `Int` 범위 안
+""",
+    signature=dict(name="divisibleSubarrays", parameters=[("nums", "INT_ARRAY"), ("k", "INT")],
+                   returns="INT"),
+    groups=perf_groups(),
+    reference=_divisible_subarrays,
+    cases={
+        "sample": [
+            ("01", [[4, 5, 0, -2, -3, 1], 5]),
+            ("02", [[5], 9]),
+        ],
+        "boundary": [
+            ("01-single-divisible", [[6], 3]),
+            # k = 1 이면 모든 부분배열이다.
+            ("02-k-one", [[1, 2, 3], 1]),
+            # 음수의 나머지. 언어의 % 를 그대로 쓰면 -2 와 3 이 다른 칸에 간다.
+            ("03-negative-remainder", [[-2, 3], 5]),
+            ("04-all-zero", [[0, 0, 0], 7]),
+            # 누적 합 자체가 k 의 배수인 접두사. 빈 접두사(나머지 0)를 하나로 세어야 한다.
+            ("05-prefix-itself", [[2, 3, 5], 5]),
+            ("06-none", [[1, 1, 1], 5]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(30, -50, 50, salt=2001), 7]),
+            ("02-random-medium", [randoms(2000, -10000, 10000, salt=2002), 97]),
+            ("03-big-k", [randoms(500, -10000, 10000, salt=2003), 10000]),
+            ("04-negatives-only", [[-v for v in randoms(300, 1, 1000, salt=2004)], 13]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, -10000, 10000, salt=2005), 101]),
+            ("02-medium", [randoms(50000, -10000, 10000, salt=2006), 1009]),
+            ("03-large", [randoms(200000, -10000, 10000, salt=2007), 9973]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 나머지별 누적 합 개수.
+fun divisibleSubarrays(nums: IntArray, k: Int): Int {
+    val counts = IntArray(k)
+    counts[0] = 1
+    var prefix = 0
+    var total = 0
+    for ((i, v) in nums.withIndex()) {
+        prefix = ((prefix + v) % k + k) % k
+        Drill.visit(i, prefix)
+        total += counts[prefix]
+        counts[prefix] += 1
+        Drill.write(prefix, counts[prefix])
+    }
+    return total
+}
+""",
+    mutants=[
+        ("negative-remainder--unnormalized", "MISSING_EDGE_CASE",
+         "음수 누적 합의 나머지를 0 이상으로 맞추지 않는다. -2 와 3 을 다른 나머지로 센다.",
+         """
+fun divisibleSubarrays(nums: IntArray, k: Int): Int {
+    val counts = HashMap<Int, Int>()
+    counts[0] = 1
+    var prefix = 0
+    var total = 0
+    for (v in nums) {
+        prefix = (prefix + v) % k
+        total += counts[prefix] ?: 0
+        counts[prefix] = (counts[prefix] ?: 0) + 1
+    }
+    return total
+}
+"""),
+        ("empty-prefix-missing", "OFF_BY_ONE",
+         "빈 접두사(나머지 0 하나)를 세어 두지 않는다. 처음부터 시작하는 부분배열을 놓친다.",
+         """
+fun divisibleSubarrays(nums: IntArray, k: Int): Int {
+    val counts = IntArray(k)
+    var prefix = 0
+    var total = 0
+    for (v in nums) {
+        prefix = ((prefix + v) % k + k) % k
+        total += counts[prefix]
+        counts[prefix] += 1
+    }
+    return total
+}
+"""),
+        ("counts-after-increment", "WRONG_BRANCH",
+         "개수를 올린 뒤에 더한다. 자기 자신과의 쌍을 센다.",
+         """
+fun divisibleSubarrays(nums: IntArray, k: Int): Int {
+    val counts = IntArray(k)
+    counts[0] = 1
+    var prefix = 0
+    var total = 0
+    for (v in nums) {
+        prefix = ((prefix + v) % k + k) % k
+        counts[prefix] += 1
+        total += counts[prefix]
+    }
+    return total
+}
+"""),
+        ("all-pairs--quadratic", "PERFORMANCE",
+         "시작점마다 끝점을 늘려 가며 합을 센다. O(n²).",
+         """
+fun divisibleSubarrays(nums: IntArray, k: Int): Int {
+    var total = 0
+    for (i in nums.indices) {
+        var sum = 0L
+        for (j in i until nums.size) {
+            Drill.compare(i, j)
+            sum += nums[j]
+            if (sum % k == 0L) total += 1
+        }
+    }
+    return total
+}
+"""),
+    ],
+))
+
+
+# --- 61. 세 가지 색 정렬 (값의 범위가 셋뿐이다) ----------------------------------------------
+
+def _sort_colors(nums):
+    return sorted(nums)
+
+
+PROBLEMS.append(Problem(
+    id="sort-colors",
+    title="세 가지 색 정렬",
+    summary="""
+`0`, `1`, `2` 만 들어 있는 배열 `nums` 가 주어진다. 오름차순으로 정렬한 배열을 반환한다.
+
+값이 **세 가지뿐**이다. 일반 정렬로도 답은 나오지만, 이 문제가 묻는 것은 그 사실을 읽고
+한 번 훑는 것으로 끝내는 것이다.
+""",
+    notes="""
+값이 셋뿐이면 개수를 세어 다시 쓰면 되고(두 번 훑기), 한 번에 하려면 왼쪽 끝에 0 을, 오른쪽
+끝에 2 를 보내면서 가운데를 지나간다. 오른쪽으로 보낸 뒤에는 **그 자리에 온 값을 아직 보지
+않았으므로** 포인터를 옮기면 안 된다.
+""",
+    drill_doc="""
+Drill.swap(i, j)              // 두 자리를 바꿨다
+Drill.pointer("low", low)     // 0 의 경계
+Drill.pointer("high", high)   // 2 의 경계
+""",
+    constraints="""
+- `0 <= nums.size <= 200_000`
+- `nums[i]` 는 `0`, `1`, `2` 중 하나
+""",
+    signature=dict(name="sortColors", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_sort_colors,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [[2, 0, 2, 1, 1, 0]]),
+            ("02", [[2, 0, 1]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-single", [[1]]),
+            ("03-already-sorted", [[0, 0, 1, 1, 2, 2]]),
+            ("04-reversed", [[2, 2, 1, 1, 0, 0]]),
+            # 2 를 오른쪽으로 보낸 자리에 0 이 온다. 포인터를 옮기면 그 0 을 놓친다.
+            ("05-two-then-zero", [[2, 0]]),
+            ("06-all-twos", [[2, 2, 2]]),
+            ("07-no-ones", [[2, 0, 2, 0]]),
+            ("08-all-same-ones", [[1, 1, 1, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(30, 0, 2, salt=2101)]),
+            ("02-random-medium", [randoms(3000, 0, 2, salt=2102)]),
+            ("03-large", [randoms(200000, 0, 2, salt=2103)]),
+            ("04-zeros-late", [[2] * 100 + [1] * 100 + [0] * 100]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 네덜란드 국기 — 한 번 훑는다.
+fun sortColors(nums: IntArray): IntArray {
+    val out = nums.copyOf()
+    var low = 0
+    var mid = 0
+    var high = out.size - 1
+    while (mid <= high) {
+        when (out[mid]) {
+            0 -> { val t = out[low]; out[low] = out[mid]; out[mid] = t; Drill.swap(low, mid); low += 1; mid += 1 }
+            2 -> { val t = out[high]; out[high] = out[mid]; out[mid] = t; Drill.swap(mid, high); high -= 1 }
+            else -> mid += 1
+        }
+        Drill.pointer("low", low)
+        Drill.pointer("high", high)
+    }
+    return out
+}
+""",
+    mutants=[
+        ("advances-after-high-swap", "WRONG_BRANCH",
+         "2 를 오른쪽으로 보낸 뒤 가운데 포인터도 옮긴다. 오른쪽에서 온 값을 보지 않고 지나친다.",
+         """
+fun sortColors(nums: IntArray): IntArray {
+    val out = nums.copyOf()
+    var low = 0; var mid = 0; var high = out.size - 1
+    while (mid <= high) {
+        when (out[mid]) {
+            0 -> { val t = out[low]; out[low] = out[mid]; out[mid] = t; low += 1; mid += 1 }
+            2 -> { val t = out[high]; out[high] = out[mid]; out[mid] = t; high -= 1; mid += 1 }
+            else -> mid += 1
+        }
+    }
+    return out
+}
+"""),
+        ("stops-before-high", "OFF_BY_ONE",
+         "가운데 포인터가 오른쪽 경계와 같아지면 멈춘다. 마지막 칸을 보지 않는다.",
+         """
+fun sortColors(nums: IntArray): IntArray {
+    val out = nums.copyOf()
+    var low = 0; var mid = 0; var high = out.size - 1
+    while (mid < high) {
+        when (out[mid]) {
+            0 -> { val t = out[low]; out[low] = out[mid]; out[mid] = t; low += 1; mid += 1 }
+            2 -> { val t = out[high]; out[high] = out[mid]; out[mid] = t; high -= 1 }
+            else -> mid += 1
+        }
+    }
+    return out
+}
+"""),
+        ("counts-two-values", "MISSING_EDGE_CASE",
+         "0 과 1 만 세고 나머지를 2 로 채운다고 믿는다 — 세는 순서가 어긋나 1 의 자리가 밀린다.",
+         """
+fun sortColors(nums: IntArray): IntArray {
+    var zeros = 0; var ones = 0
+    for (v in nums) if (v == 0) zeros += 1 else if (v == 1) ones += 1
+    val out = IntArray(nums.size) { 2 }
+    for (i in 0 until zeros) out[i] = 0
+    for (i in zeros until minOf(nums.size, zeros + ones + 1)) out[i] = 1
+    return out
+}
+"""),
+    ],
+))
+
+
+# --- 62. 과반수 원소 (제약이 곧 힌트다) --------------------------------------------------
+
+def _majority(nums):
+    candidate = None
+    count = 0
+    for v in nums:
+        if count == 0:
+            candidate = v
+            count = 1
+        elif v == candidate:
+            count += 1
+        else:
+            count -= 1
+    return candidate
+
+
+PROBLEMS.append(Problem(
+    id="majority-element",
+    title="과반수 원소",
+    summary="""
+정수 배열 `nums` 가 주어진다. 배열 길이의 **절반보다 많이** 나오는 원소를 반환한다.
+그런 원소는 **항상 정확히 하나 존재한다** — 이 약속이 문제의 절반이다.
+""",
+    notes="""
+과반수가 있다고 약속했으므로 다른 값 하나와 짝지어 지워 나가도 그 값은 살아남는다.
+후보 하나와 개수 하나면 된다. 약속이 없다면 두 번째로 훑어 확인해야 하지만, 여기서는
+그 확인이 필요 없다.
+""",
+    drill_doc="""
+Drill.visit(i, count)         // i 번째를 보고 난 뒤의 개수
+Drill.write(0, candidate)     // 후보가 바뀌었다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`, 홀수
+- `-10^9 <= nums[i] <= 10^9`
+- 과반수 원소가 정확히 하나 존재한다
+""",
+    signature=dict(name="majority", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_majority,
+    cases={
+        "sample": [
+            ("01", [[3, 2, 3]]),
+            ("02", [[2, 2, 1, 1, 1, 2, 2]]),
+        ],
+        "boundary": [
+            ("01-single", [[7]]),
+            # 과반수가 앞에 몰려 있다.
+            ("02-front", [[5, 5, 5, 1, 2]]),
+            # 과반수가 뒤에 몰려 있다. 앞에서 후보가 여러 번 바뀐다.
+            ("03-back", [[1, 2, 5, 5, 5]]),
+            ("04-alternating", [[4, 9, 4, 9, 4]]),
+            ("05-negative", [[-1, -1, 3]]),
+            ("06-large-values", [[1000000000, -1000000000, 1000000000]]),
+        ],
+        "hidden": [
+            ("01-random-small", [[7] * 16 + randoms(15, 0, 3, salt=2201)]),
+            ("02-shuffled-medium", [shuffled([42] * 1001 + randoms(1000, 0, 100, salt=2202), salt=2203)]),
+            ("03-shuffled-large", [shuffled([-5] * 100001 + randoms(99999, -1000, 1000, salt=2204), salt=2205)]),
+            # 과반수가 딱 절반 + 1.
+            ("04-bare-majority", [shuffled([1] * 501 + [2] * 500, salt=2206)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). Boyer–Moore 투표.
+fun majority(nums: IntArray): Int {
+    var candidate = nums[0]
+    var count = 0
+    for ((i, v) in nums.withIndex()) {
+        if (count == 0) { candidate = v; Drill.write(0, candidate) }
+        count += if (v == candidate) 1 else -1
+        Drill.visit(i, count)
+    }
+    return candidate
+}
+""",
+    mutants=[
+        ("first-half-only", "WRONG_ALGORITHM",
+         "앞 절반만 보고 가장 많이 나온 값을 답한다. 과반수가 뒤에 몰려 있으면 틀린다.",
+         """
+fun majority(nums: IntArray): Int {
+    val counts = HashMap<Int, Int>()
+    for (i in 0..nums.size / 2) counts[nums[i]] = (counts[nums[i]] ?: 0) + 1
+    return counts.maxByOrNull { it.value }!!.key
+}
+"""),
+        ("never-resets", "WRONG_BRANCH",
+         "개수가 0 이 돼도 후보를 바꾸지 않는다. 첫 원소가 곧 답이 된다.",
+         """
+fun majority(nums: IntArray): Int {
+    val candidate = nums[0]
+    var count = 0
+    for (v in nums) count += if (v == candidate) 1 else -1
+    return candidate
+}
+"""),
+        ("longest-run--not-count", "WRONG_ALGORITHM",
+         "가장 길게 연속으로 이어진 값을 답한다. 과반수는 흩어져 있어도 과반수다.",
+         """
+fun majority(nums: IntArray): Int {
+    var best = nums[0]; var bestRun = 0
+    var run = 0
+    for (i in nums.indices) {
+        run = if (i > 0 && nums[i] == nums[i - 1]) run + 1 else 1
+        if (run > bestRun) { bestRun = run; best = nums[i] }
+    }
+    return best
+}
+"""),
+    ],
+))
+
+
+# --- 63. 빗물 가두기 ---------------------------------------------------------------
+
+def _trapped_water(heights):
+    left, right = 0, len(heights) - 1
+    left_max = right_max = 0
+    total = 0
+    while left < right:
+        if heights[left] < heights[right]:
+            left_max = max(left_max, heights[left])
+            total += left_max - heights[left]
+            left += 1
+        else:
+            right_max = max(right_max, heights[right])
+            total += right_max - heights[right]
+            right -= 1
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="trapping-rain-water",
+    title="빗물 가두기",
+    summary="""
+막대의 높이가 배열 `heights` 로 주어진다. 막대의 너비는 모두 1 이다. 비가 온 뒤 막대
+사이에 **고이는 물의 총량**을 반환한다.
+
+예: `[0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]` 이면 `6` 이다.
+""",
+    notes="""
+한 칸에 고이는 물은 "왼쪽에서 가장 높은 것과 오른쪽에서 가장 높은 것 중 낮은 쪽" 에서 그
+칸의 높이를 뺀 것이다. 양끝에서 포인터를 옮기되 **낮은 쪽을 옮긴다** — 낮은 쪽의 물은
+반대편이 더 높다는 것만으로 이미 정해진다.
+""",
+    drill_doc="""
+Drill.pointer("left", left)   // 왼쪽 포인터
+Drill.pointer("right", right) // 오른쪽 포인터
+Drill.write(i, water)         // 그 칸에 고인 물
+""",
+    constraints="""
+- `0 <= heights.size <= 200_000`
+- `0 <= heights[i] <= 10^4`, 답은 `Int` 범위 안
+""",
+    signature=dict(name="trappedWater", parameters=[("heights", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_trapped_water,
+    cases={
+        "sample": [
+            ("01", [[0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]]),
+            ("02", [[4, 2, 0, 3, 2, 5]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-single", [[5]]),
+            ("03-two", [[3, 1]]),
+            # 단조 증가·감소. 아무것도 안 고인다.
+            ("04-increasing", [[1, 2, 3, 4]]),
+            ("05-decreasing", [[4, 3, 2, 1]]),
+            # 평평한 바닥. 0 이다.
+            ("06-flat", [[2, 2, 2]]),
+            # 한가운데 깊은 우물.
+            ("07-well", [[5, 0, 0, 0, 5]]),
+            # 오른쪽 벽이 더 낮다. 왼쪽 최대만 보면 넘친다.
+            ("08-right-lower", [[5, 0, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(30, 0, 10, salt=2301)]),
+            ("02-random-medium", [randoms(3000, 0, 10000, salt=2302)]),
+            ("03-valleys", [[9, 1, 9, 1, 9, 1, 9]]),
+            ("04-plateau-inside", [[6, 2, 2, 2, 4, 4, 6]]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, 0, 10000, salt=2303)]),
+            ("02-medium", [randoms(50000, 0, 10000, salt=2304)]),
+            ("03-large", [randoms(200000, 0, 10000, salt=2305)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 양끝 포인터 — 낮은 쪽을 옮긴다.
+fun trappedWater(heights: IntArray): Int {
+    var left = 0
+    var right = heights.size - 1
+    var leftMax = 0
+    var rightMax = 0
+    var total = 0
+    while (left < right) {
+        if (heights[left] < heights[right]) {
+            leftMax = maxOf(leftMax, heights[left])
+            total += leftMax - heights[left]
+            Drill.write(left, leftMax - heights[left])
+            left += 1
+            Drill.pointer("left", left)
+        } else {
+            rightMax = maxOf(rightMax, heights[right])
+            total += rightMax - heights[right]
+            Drill.write(right, rightMax - heights[right])
+            right -= 1
+            Drill.pointer("right", right)
+        }
+    }
+    return total
+}
+""",
+    mutants=[
+        ("left-max-only", "WRONG_ALGORITHM",
+         "왼쪽 최대 높이만 본다. 오른쪽 벽이 더 낮으면 넘치는 물까지 센다.",
+         """
+fun trappedWater(heights: IntArray): Int {
+    var leftMax = 0
+    var total = 0
+    for (h in heights) {
+        leftMax = maxOf(leftMax, h)
+        total += leftMax - h
+    }
+    return total
+}
+"""),
+        ("moves-higher-side", "WRONG_BRANCH",
+         "높은 쪽 포인터를 옮긴다. 물의 높이가 아직 정해지지 않은 칸을 계산한다.",
+         """
+fun trappedWater(heights: IntArray): Int {
+    var left = 0; var right = heights.size - 1
+    var leftMax = 0; var rightMax = 0
+    var total = 0
+    while (left < right) {
+        if (heights[left] >= heights[right]) {
+            leftMax = maxOf(leftMax, heights[left]); total += leftMax - heights[left]; left += 1
+        } else {
+            rightMax = maxOf(rightMax, heights[right]); total += rightMax - heights[right]; right -= 1
+        }
+    }
+    return total
+}
+"""),
+        ("skips-last-column", "OFF_BY_ONE",
+         "포인터가 만나는 마지막 칸을 계산하지 않는다 — 그 칸은 물이 0 이라 답은 같다. 대신 첫 칸을 건너뛴다.",
+         """
+fun trappedWater(heights: IntArray): Int {
+    if (heights.size < 3) return 0
+    var left = 1; var right = heights.size - 1
+    var leftMax = heights[1]; var rightMax = 0
+    var total = 0
+    while (left < right) {
+        if (heights[left] < heights[right]) {
+            leftMax = maxOf(leftMax, heights[left]); total += leftMax - heights[left]; left += 1
+        } else {
+            rightMax = maxOf(rightMax, heights[right]); total += rightMax - heights[right]; right -= 1
+        }
+    }
+    return total
+}
+"""),
+        ("scan-both-sides--quadratic", "PERFORMANCE",
+         "칸마다 왼쪽과 오른쪽 전체를 훑어 최대를 찾는다. O(n²).",
+         """
+fun trappedWater(heights: IntArray): Int {
+    var total = 0
+    for (i in heights.indices) {
+        var leftMax = 0; var rightMax = 0
+        for (j in 0..i) { Drill.compare(i, j); leftMax = maxOf(leftMax, heights[j]) }
+        for (j in i until heights.size) rightMax = maxOf(rightMax, heights[j])
+        total += minOf(leftMax, rightMax) - heights[i]
+    }
+    return total
+}
+"""),
+    ],
+))
+
+
+# --- 64. 정렬된 두 배열 합치기 --------------------------------------------------------
+
+def _merge_sorted(first, second):
+    out = []
+    i = j = 0
+    while i < len(first) and j < len(second):
+        if first[i] <= second[j]:
+            out.append(first[i])
+            i += 1
+        else:
+            out.append(second[j])
+            j += 1
+    out.extend(first[i:])
+    out.extend(second[j:])
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="merge-sorted-arrays",
+    title="정렬된 두 배열 합치기",
+    summary="""
+**오름차순으로 정렬된** 두 정수 배열 `first` 와 `second` 가 주어진다. 둘의 모든 원소를
+담은 오름차순 배열을 반환한다. 같은 값은 그대로 여러 번 들어간다.
+""",
+    notes="""
+둘 다 정렬돼 있으니 앞에서부터 작은 쪽을 하나씩 뽑으면 된다. 한쪽이 먼저 끝나면 남은 쪽을
+그대로 붙인다 — 그 마무리를 빠뜨리는 것이 이 문제에서 가장 흔한 실수다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 두 배열의 앞 원소를 견줬다
+Drill.write(k, value)         // 결과의 k 번째 칸을 채웠다
+""",
+    constraints="""
+- `0 <= first.size, second.size <= 100_000`
+- `-10^9 <= 원소 <= 10^9`, 각각 오름차순
+""",
+    signature=dict(name="mergeSorted", parameters=[("first", "INT_ARRAY"), ("second", "INT_ARRAY")],
+                   returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_merge_sorted,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [
+            ("01", [[1, 3, 5], [2, 4, 6]]),
+            ("02", [[1, 2], [3]]),
+        ],
+        "boundary": [
+            ("01-both-empty", [[], []]),
+            ("02-first-empty", [[], [1, 2]]),
+            ("03-second-empty", [[7, 9], []]),
+            # 한쪽이 먼저 끝난다. 남은 쪽을 붙이지 않으면 짧아진다.
+            ("04-first-ends-first", [[1, 2], [3, 4, 5, 6]]),
+            ("05-second-ends-first", [[5, 6, 7, 8], [1]]),
+            ("06-duplicates", [[1, 1, 2], [1, 2, 2]]),
+            ("07-negative", [[-5, -1], [-3, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [sorted(randoms(20, -100, 100, salt=2401)), sorted(randoms(25, -100, 100, salt=2402))]),
+            ("02-random-medium", [sorted(randoms(3000, -100000, 100000, salt=2403)), sorted(randoms(2000, -100000, 100000, salt=2404))]),
+            ("03-large", [sorted(randoms(100000, -1000000000, 1000000000, salt=2405)), sorted(randoms(100000, -1000000000, 1000000000, salt=2406))]),
+            ("04-interleaved", [list(range(0, 200, 2)), list(range(1, 200, 2))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 두 포인터.
+fun mergeSorted(first: IntArray, second: IntArray): IntArray {
+    val out = IntArray(first.size + second.size)
+    var i = 0
+    var j = 0
+    var k = 0
+    while (i < first.size && j < second.size) {
+        Drill.compare(i, j)
+        out[k] = if (first[i] <= second[j]) first[i++] else second[j++]
+        Drill.write(k, out[k])
+        k += 1
+    }
+    while (i < first.size) { out[k] = first[i++]; Drill.write(k, out[k]); k += 1 }
+    while (j < second.size) { out[k] = second[j++]; Drill.write(k, out[k]); k += 1 }
+    return out
+}
+""",
+    mutants=[
+        ("drops-tail", "MISSING_EDGE_CASE",
+         "한쪽이 끝나면 멈춘다. 남은 쪽을 붙이지 않는다.",
+         """
+fun mergeSorted(first: IntArray, second: IntArray): IntArray {
+    val out = mutableListOf<Int>()
+    var i = 0; var j = 0
+    while (i < first.size && j < second.size) {
+        out.add(if (first[i] <= second[j]) first[i++] else second[j++])
+    }
+    return out.toIntArray()
+}
+"""),
+        ("drops-second-tail", "MISSING_EDGE_CASE",
+         "first 의 나머지는 붙이는데 second 의 나머지는 잊는다.",
+         """
+fun mergeSorted(first: IntArray, second: IntArray): IntArray {
+    val out = mutableListOf<Int>()
+    var i = 0; var j = 0
+    while (i < first.size && j < second.size) {
+        out.add(if (first[i] <= second[j]) first[i++] else second[j++])
+    }
+    while (i < first.size) out.add(first[i++])
+    return out.toIntArray()
+}
+"""),
+        ("concat-only", "WRONG_ALGORITHM",
+         "그냥 이어 붙인다. 정렬을 잊었다.",
+         """
+fun mergeSorted(first: IntArray, second: IntArray): IntArray = first + second
 """),
     ],
 ))

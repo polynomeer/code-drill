@@ -1,0 +1,18 @@
+# partition-k-equal-sums 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - backtracking
+  - recursion
+competencies:
+  - ALGORITHM_CHOICE
+  - OPTIMIZATION
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - subset-sum-count
+  - n-queens-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "되추적 + 가지치기. 가지치기 없이는 k^n"

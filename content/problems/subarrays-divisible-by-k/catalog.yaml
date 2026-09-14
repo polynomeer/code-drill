@@ -1,0 +1,17 @@
+# subarrays-divisible-by-k 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - prefix-sum
+  - hash-map
+  - counting
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - subarray-sum-count
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(n + k). 시작점마다 끝점을 늘리면 O(n²)"

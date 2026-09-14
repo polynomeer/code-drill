@@ -1,0 +1,17 @@
+# sort-colors 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - array
+  - two-pointers
+  - in-place
+  - sorting
+competencies:
+  - CONSTRAINTS
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - move-zeros
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "한 번 훑는다. 값이 셋뿐이라는 제약이 그것을 허락한다"
