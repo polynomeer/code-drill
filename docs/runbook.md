@@ -149,6 +149,11 @@ dead 큐의 메시지는 7일 뒤 사라진다. 그 전에 원인을 봐야 한�
 임대 시간이 재는 것은 **실행 시간이 아니라 워커의 생존**이다. 실행이 오래 걸려도
 박동이 오는 한 회수되지 않으므로, 느린 문제 때문에 임대를 늘릴 이유는 없다.
 
+임대는 Redis 에 있다 (§4.3). 그래서 오케스트레이터가 재시작하거나 여럿이어도 회수는
+이어진다 — 회수 인스턴스가 여럿이면 토큰 비교로 한 쪽만 다시 건다. **Redis 가 죽으면
+채점이 선다.** 임대 없이는 실행을 걸지 않으므로 제출은 QUEUED 에 머물고, Redis 가
+돌아오면 브로커가 재전달한 메시지부터 다시 흐른다.
+
 ### conflicting-result
 
 **증상**: 종료된 제출에 다른 판정 결과가 도착했다. **한 건이라도 조사한다.**
@@ -205,7 +210,7 @@ curl -H "Authorization: Bearer $JUDGE_OPERATOR_TOKEN" \
 |---|---|---|
 | `queued_without_outbox` | 아웃박스를 우회해 제출이 만들어졌다 | 코드 경로를 찾는다. 그 제출은 영영 채점되지 않는다 |
 | `queued_unpublished` | 발행이 멈췄다 | [queue-lag](#queue-lag) |
-| `stuck_in_flight` | 임대 회수가 동작하지 않는다 | 오케스트레이터가 재시작됐는지 본다. 회수 대상은 메모리에 있다 |
+| `stuck_in_flight` | 임대 회수가 동작하지 않는다 | Redis 가 살아 있는지, 오케스트레이터가 `redis` 임대로 떠 있는지 본다 (`memory` 로 떴다면 재시작 이전 실행은 회수되지 않는다) |
 | `completed_without_verdict` | 종료됐는데 판정이 없다 | 해당 제출을 재채점한다 → [rejudge](#rejudge) |
 | `orphan_trace` | 없는 제출의 트레이스 | 무해하다. 보존 기간 정리에서 함께 지운다 |
 | `published_version_missing` | 공개 포인터가 빈 곳을 가리킨다 | 목록에는 보이는데 열리지 않는다. 즉시 이전 버전으로 되돌린다 |
@@ -321,17 +326,19 @@ python3 scripts/drill.py all
 | `broker` | 브로커 정지 후 재기동 | 제출은 받아지고, 복구 후 전부 판정된다 (§12.2) |
 | `duplicate` | 같은 멱등 키로 동시 제출 | 제출도 판정도 하나다 (§4.3) |
 | `worker-loss` | 채점 중 Runner 강제 종료 | 임대 회수로 판정이 끝난다 (§4.3) |
+| `orchestrator-loss` | 채점 중 Runner 와 오케스트레이터 강제 종료 | 재시작한 오케스트레이터가 Redis 의 임대를 회수해 판정이 끝난다. 재전달만으로 끝난 것이 아님을 `codedrill_lease_reclaimed_total` 로 확인한다 |
 | `trace-loss` | 판정 직후 Runner 강제 종료 | 판정은 그대로, 트레이스 부재가 오류가 아니다 (§12.2) |
 
-`worker-loss` 는 임대가 만료되기를 기다린다. 기본 120초를 그대로 두면 훈련이 오래
-걸리므로 짧게 띄운 오케스트레이터로 돌린다.
+`worker-loss` 와 `orchestrator-loss` 는 임대가 만료되기를 기다린다. 기본 120초를 그대로
+두면 훈련이 오래 걸리므로 짧게 띄운 오케스트레이터로 돌린다. 임대 기간은 **연장하는
+시점에** Redis 에 적히므로, 훈련 앞에 이미 떠 있던 오케스트레이터도 짧아야 한다.
 
 ```bash
 ./gradlew :judge:orchestrator:bootRun --args='--codedrill.judge.lease-seconds=15'
 ```
 
-`broker` 와 `worker-loss` 는 컨테이너와 Runner 프로세스를 실제로 죽인다. **운영
-환경에서 돌리지 않는다.**
+`broker`·`worker-loss`·`orchestrator-loss` 는 컨테이너와 앱 프로세스를 실제로 죽인다.
+**운영 환경에서 돌리지 않는다.**
 
 ## capacity
 

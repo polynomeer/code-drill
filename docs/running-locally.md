@@ -276,6 +276,7 @@ python3 scripts/drill.py all      # 장애 주입 훈련 — 컨테이너와 Run
 | 증상 | 원인 |
 |---|---|
 | 큐 선언 실패로 앱이 안 뜬다 | RabbitMQ 가 아직 healthy 가 아니다. 10초쯤 기다린다 |
+| 제출이 QUEUED 에서 멈춘다 | 오케스트레이터가 Redis 에 못 붙는다 (임대가 거기 있다, §4.3). `REDIS_URL` 을 본다. Redis 없이 띄우려면 `JUDGE_LEASE_STORE=memory` — 재시작하면 진행 중인 실행을 회수하지 못한다 |
 | `PLAIN login refused: user 'codedrill'` | 브로커 볼륨을 배포 스택(docker-compose.apps.yml)이 만들었다. 정의를 읽은 노드는 기본 사용자를 만들지 않는다. `docker volume rm code-drill_rabbitmq-data` 뒤 다시 띄운다 |
 | 제출이 `QUEUED` 에서 멈춘다 | Orchestrator 가 안 떴거나 `CONTENT_ROOT` 가 틀렸다 |
 | 모든 제출이 `COMPILE_ERROR` | Runner 를 fat jar 로 띄웠다. `installDist` 배포를 쓴다 |
