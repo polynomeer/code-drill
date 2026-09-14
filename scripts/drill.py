@@ -11,22 +11,30 @@
     broker       브로커를 멈추고 제출한 뒤 되살린다. 제출이 유실되지 않아야 한다
     duplicate    같은 멱등 키로 동시에 제출한다. 제출과 판정이 하나여야 한다
     worker-loss  채점 중 Runner 를 죽인다. 임대 회수로 판정이 끝나야 한다
+    orchestrator-loss
+                 채점 중 Runner 와 오케스트레이터를 함께 죽인다. 재시작한 오케스트레이터가
+                 Redis 의 임대를 회수해 판정이 끝나야 한다 (production-readiness A3)
     trace-loss   트레이스를 잃는다. 판정은 그대로 유효해야 한다
 
 사용법:
     python3 scripts/drill.py all
     python3 scripts/drill.py worker-loss --lease-seconds 15
 
-worker-loss 는 오케스트레이터의 임대 기간만큼 기다린다. 기본 120초를 그대로 두면
-훈련이 2분 넘게 걸리므로, 아래처럼 짧게 띄운 오케스트레이터로 돌린다.
+worker-loss 와 orchestrator-loss 는 오케스트레이터의 임대 기간만큼 기다린다. 기본 120초를
+그대로 두면 훈련이 2분 넘게 걸리므로, 아래처럼 짧게 띄운 오케스트레이터로 돌린다.
 
     ./gradlew :judge:orchestrator:bootRun --args='--codedrill.judge.lease-seconds=15'
+
+orchestrator-loss 는 오케스트레이터를 스스로 다시 띄우므로 그 값을 직접 건다.
+scripts/up.py 로 띄운 스택이면 포트와 환경을 상태 파일에서 읽는다.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import pathlib
 import subprocess
 import sys
 import time
@@ -37,12 +45,16 @@ import uuid
 import accounts
 from concurrent.futures import ThreadPoolExecutor
 
-BASE = "http://localhost:8080/api/v1"
+BASE = os.environ.get("CODEDRILL_BASE", "http://localhost:8080").rstrip("/") + "/api/v1"
 COMPOSE = ["docker", "compose", "-f", "deploy/docker-compose.yml"]
 
 # installDist 로 만든 Runner 배포. worker-loss 가 이걸 죽였다 되살린다.
 RUNNER_BIN = "judge/runner-agent/build/install/runner-agent/bin/runner-agent"
 RUNNER_MAIN = "dev.codedrill.judge.runner.RunnerAgentApplicationKt"
+
+# bootJar 로 만든 오케스트레이터. orchestrator-loss 가 이걸 죽였다 되살린다.
+ORCHESTRATOR_JAR = "judge/orchestrator/build/libs/orchestrator-0.1.0-SNAPSHOT.jar"
+STACK_STATE = pathlib.Path(".codedrill-stack.json")
 
 ACCEPTED_SOURCE = """
 fun twoSum(nums: IntArray, target: Int): IntArray {
@@ -120,8 +132,74 @@ def compose(*args: str) -> None:
 
 
 def runner_pids() -> list[int]:
-    result = subprocess.run(["pgrep", "-f", RUNNER_MAIN], capture_output=True, text=True)
+    return pids_of(RUNNER_MAIN)
+
+
+def orchestrator_pids() -> list[int]:
+    return pids_of(pathlib.Path(ORCHESTRATOR_JAR).name)
+
+
+def pids_of(pattern: str) -> list[int]:
+    result = subprocess.run(["pgrep", "-f", pattern], capture_output=True, text=True)
     return [int(line) for line in result.stdout.split() if line.isdigit()]
+
+
+def app_env(app: str) -> dict:
+    """앱을 다시 띄울 때 줄 환경.
+
+    scripts/up.py 로 띄운 스택은 기본 포트를 비켜 갔을 수 있다. 그 선택은 상태 파일에
+    있으므로 같은 값을 준다 — 아니면 되살린 앱이 엉뚱한 브로커에 붙거나, 다른 앱이 쓰는
+    포트에 뜨려다 곧바로 죽는다. 둘 다 조용하다.
+    """
+    if STACK_STATE.exists():
+        import up  # noqa: PLC0415 - 같은 디렉터리의 형제 스크립트
+        ports = json.loads(STACK_STATE.read_text())["ports"]
+        return {**up.env_for(ports), "PORT": str(ports[app])}
+    return dict(os.environ)
+
+
+def start_runner() -> subprocess.Popen:
+    return subprocess.Popen([RUNNER_BIN], env=app_env("runner-agent"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def start_orchestrator(lease_seconds: int) -> subprocess.Popen:
+    # 큐 대기 한계도 함께 줄인다. 죽인 시점에 Runner 의 첫 심장 박동이 아직 처리되지
+    # 않았으면 임대는 "집어 든 적 없음"이고, 기본값 10분을 기다려야 회수된다. 다만 Runner
+    # 가 다시 뜨는 시간(JVM 과 컴파일러 아카이브)보다는 길어야 한다 — 짧으면 다시 건
+    # 실행이 집어 들리기도 전에 만료돼 재시도 한계까지 굴러간다. 실제로 그랬다.
+    return subprocess.Popen(
+        [
+            "java", "-jar", ORCHESTRATOR_JAR,
+            f"--codedrill.judge.lease-seconds={lease_seconds}",
+            f"--codedrill.judge.dispatch-timeout-seconds={lease_seconds * 4}",
+        ],
+        env=app_env("orchestrator"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
+def orchestrator_port() -> int:
+    return int(app_env("orchestrator").get("PORT", "8081"))
+
+
+def await_http(url: str, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(url, timeout=3):
+                return True
+        except Exception:  # noqa: BLE001 - 뜰 때까지 무엇이든 실패다
+            time.sleep(1)
+    return False
+
+
+def counter(url: str, name: str) -> float:
+    """프로메테우스 텍스트에서 카운터 하나를 합산한다. 없으면 0."""
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            text = response.read().decode()
+    except Exception:  # noqa: BLE001
+        return 0.0
+    return sum(float(line.rsplit(" ", 1)[1]) for line in text.splitlines() if line.startswith(name + "{") or line.startswith(name + " "))
 
 
 class Drill:
@@ -223,9 +301,7 @@ def drill_worker_loss(args) -> Drill:
     time.sleep(1)
     drill.check("Runner 가 죽었다", not runner_pids())
 
-    process = subprocess.Popen(
-        [RUNNER_BIN], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
+    process = start_runner()
     print(f"  Runner 재기동 (pid {process.pid})")
 
     # 임대가 만료돼야 회수가 일어난다. 만료 + 회수 주기 + 실행 시간만큼 기다린다.
@@ -235,6 +311,68 @@ def drill_worker_loss(args) -> Drill:
         "임대 회수로 판정이 끝난다", final is not None,
         f"{wait}초 안에 수렴" if final else f"{wait}초 안에 수렴하지 않았다",
     )
+    if final:
+        drill.check("판정이 정상이다", final["verdict"] == "ACCEPTED", final["verdict"])
+        drill.check("점수도 정상이다", final["score"] == 100, str(final["score"]))
+    return drill
+
+
+def drill_orchestrator_loss(args) -> Drill:
+    """오케스트레이터 유실 (§4.3, production-readiness A3).
+
+    worker-loss 와 다른 점 하나: 임대를 들고 있던 오케스트레이터도 함께 죽는다. 임대가
+    프로세스 메모리에 있던 시절에는 이 제출이 영영 LEASED 로 남았다 — 결과를 보낼 워커도,
+    회수할 기록도 없었다. 재시작한 오케스트레이터가 Redis 의 임대를 보고 다시 걸어야 한다.
+
+    브로커의 재전달만으로도 판정은 끝날 수 있다(죽은 Runner 가 ack 하지 못한 메시지는
+    되돌아간다). 그 길이 먼저 끝나면 회수는 필요 없어지므로, Runner 는 임대가 만료된 뒤에
+    되살린다. 그리고 판정이 끝났다는 것으로는 모자라고, **회수가 실제로 일어났는지**를
+    지표로 본다.
+    """
+    drill = Drill("orchestrator-loss")
+    print("\n[orchestrator-loss] 채점 중 Runner 와 오케스트레이터를 함께 죽인다")
+
+    runners = runner_pids()
+    orchestrators = orchestrator_pids()
+    if not drill.check("Runner 가 떠 있다", bool(runners), f"pid {runners}"):
+        return drill
+    if not drill.check("오케스트레이터가 떠 있다", bool(orchestrators), f"pid {orchestrators}"):
+        return drill
+    port = orchestrator_port()
+    metrics_url = f"http://localhost:{port}/actuator/prometheus"
+
+    submission = submit()
+    if not await_status(submission["id"], "LEASED", timeout=15):
+        drill.check("실행이 시작됐다", False, "LEASED 로 넘어가지 않았다")
+        return drill
+    # Runner 가 집어 들어 심장 박동을 보낸 뒤여야 "실행 중"이다.
+    time.sleep(3)
+
+    for pid in runners + orchestrators:
+        subprocess.run(["kill", "-9", str(pid)], check=False)
+    print(f"  Runner·오케스트레이터 강제 종료 (pid {runners + orchestrators})")
+    time.sleep(1)
+    drill.check("둘 다 죽었다", not runner_pids() and not orchestrator_pids())
+
+    orchestrator = start_orchestrator(args.lease_seconds)
+    print(f"  오케스트레이터 재기동 (pid {orchestrator.pid}, 임대 {args.lease_seconds}초)")
+    if not drill.check("오케스트레이터가 다시 떴다", await_http(f"http://localhost:{port}/actuator/health", 120)):
+        return drill
+
+    # 임대가 만료되고 회수 한 바퀴가 돌 때까지 Runner 없이 둔다. 재전달이 먼저 끝나면
+    # 회수를 검증한 것이 아니다. 너무 오래 두면 회수가 거듭돼 재시도 한계에 닿는다.
+    time.sleep(args.lease_seconds + 10)
+    runner = start_runner()
+    print(f"  Runner 재기동 (pid {runner.pid}, 임대 만료 뒤)")
+
+    wait = args.lease_seconds + 60
+    final = await_status(submission["id"], "COMPLETED", timeout=wait)
+    drill.check(
+        "재시작한 오케스트레이터가 임대를 회수해 판정이 끝난다", final is not None,
+        f"{wait}초 안에 수렴" if final else f"{wait}초 안에 수렴하지 않았다",
+    )
+    reclaimed = counter(metrics_url, "codedrill_lease_reclaimed_total")
+    drill.check("회수가 실제로 일어났다 (재전달만으로 끝난 것이 아니다)", reclaimed >= 1, f"reclaimed={reclaimed:g}")
     if final:
         drill.check("판정이 정상이다", final["verdict"] == "ACCEPTED", final["verdict"])
         drill.check("점수도 정상이다", final["score"] == 100, str(final["score"]))
@@ -261,9 +399,7 @@ def drill_trace_loss(args) -> Drill:
         subprocess.run(["kill", "-9", str(pid)], check=False)
     print("  Runner 강제 종료")
 
-    process = subprocess.Popen(
-        [RUNNER_BIN], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
+    process = start_runner()
     print(f"  Runner 재기동 (pid {process.pid})")
 
     still = status_of(submission["id"])
@@ -287,6 +423,7 @@ SCENARIOS = {
     "broker": drill_broker,
     "duplicate": drill_duplicate,
     "worker-loss": drill_worker_loss,
+    "orchestrator-loss": drill_orchestrator_loss,
     "trace-loss": drill_trace_loss,
 }
 
