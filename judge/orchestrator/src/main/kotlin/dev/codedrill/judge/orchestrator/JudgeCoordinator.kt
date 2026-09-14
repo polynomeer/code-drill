@@ -1,7 +1,9 @@
 package dev.codedrill.judge.orchestrator
 
 import dev.codedrill.judge.orchestrator.aggregation.VerdictAggregator
-import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
+import dev.codedrill.judge.orchestrator.lease.Acceptance
+import dev.codedrill.judge.orchestrator.lease.Lease
+import dev.codedrill.judge.orchestrator.lease.LeaseRegistry
 import dev.codedrill.judge.protocol.CompletedGroup
 import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
@@ -23,7 +25,6 @@ import dev.codedrill.judge.protocol.Verdict
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -34,7 +35,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class JudgeCoordinator(
     private val packages: ProblemPackageLoader,
-    private val registry: AttemptRegistry,
+    private val registry: LeaseRegistry,
     private val gateway: JudgeGateway,
     private val metrics: JudgeMetrics = JudgeMetrics(),
     /**
@@ -51,45 +52,16 @@ class JudgeCoordinator(
     private val progressSeq = AtomicLong()
 
     /**
-     * 판정이 끝난 뒤 트레이스를 이어 만들기 위해 원 요청을 잠시 들고 있는다.
+     * 제출을 임대하고 Runner 에게 실행을 요청한다.
      *
-     * 슬라이스는 메모리에 둔다. 오케스트레이터가 재시작하면 대기 중이던 트레이스 요청은
-     * 사라지지만, 판정은 이미 끝났고 트레이스는 재요청할 수 있으므로 사용자에게 남는
-     * 피해가 없다 (§12.2 장애 격리).
+     * 조정자는 아무것도 들고 있지 않는다. 다시 걸 때 필요한 원 요청과 판정 뒤 트레이스를
+     * 이을지의 여부는 임대 안에 있다 — 그래야 재시작한 인스턴스도, 다른 인스턴스도 같은
+     * 것을 본다 (§4.3).
      */
-    private val pendingTrace = ConcurrentHashMap<String, ExecutionRequest>()
-
-    /**
-     * 아직 결과가 오지 않은 실행 요청.
-     *
-     * 워커가 죽으면 요청 자체가 사라지므로, 다시 띄우려면 원본을 들고 있어야 한다.
-     * pendingTrace 와 같은 이유로 메모리에 둔다 — 오케스트레이터가 재시작하면 이 맵이
-     * 비고, 그때는 제어 영역의 일관성 점검(§12.4)이 멈춘 제출을 찾아낸다.
-     */
-    private val inFlight = ConcurrentHashMap<String, ExecutionRequest>()
-
-    /** 제출을 임대하고 Runner 에게 실행을 요청한다. */
     fun onSubmissionQueued(message: SubmissionQueued) {
-        val pkg = packages.load(message.problemId)
-        require(pkg.manifest.version == message.problemVersion) {
-            "요청한 문제 버전이 로드된 패키지와 다르다: ${message.problemVersion} != ${pkg.manifest.version}"
-        }
-
-        val lease = registry.lease(message.submissionId)
-        val request = ExecutionRequest(
-            executionId = UUID.randomUUID().toString(),
-            submissionId = message.submissionId,
-            attempt = lease.attempt,
-            fencingToken = lease.token,
-            correlationId = message.correlationId,
-            problemVersionId = pkg.problemVersionId,
-            packageDigest = pkg.packageDigest,
-            language = message.language,
-            source = message.source,
-            signature = pkg.manifest.signature,
-            limits = pkg.manifest.limits,
-            groups = pkg.groups.map { RequestedGroup(it.policy, it.cases) },
-        )
+        val pkg = load(message)
+        val lease = registry.lease(message, executionId = UUID.randomUUID().toString())
+        val request = request(lease, pkg)
 
         log.atInfo()
             .addKeyValue(CorrelationIds.SUBMISSION_ID, message.submissionId)
@@ -99,8 +71,6 @@ class JudgeCoordinator(
 
         message.queuedAt?.let { metrics.queueWait(Duration.between(it, Instant.now())) }
 
-        if (message.requestTrace) pendingTrace[message.submissionId] = request
-        inFlight[message.submissionId] = request
         gateway.requestExecution(request)
         gateway.publishProgress(
             JudgeProgressed(
@@ -160,30 +130,31 @@ class JudgeCoordinator(
         metrics.acceptance(acceptance)
 
         when (acceptance) {
-            AttemptRegistry.Acceptance.Accepted -> complete(result, correlationId)
+            is Acceptance.Accepted -> complete(result, correlationId, acceptance.origin)
 
-            // 임대 기록이 없어도 결과는 넘긴다. 버리면 그 제출은 결과가 멀쩡히
-            // 도착했는데도 영영 끝나지 않는다 — 재시작이나 인스턴스 증설만으로 생긴다.
-            AttemptRegistry.Acceptance.Unleased -> {
+            // 임대 기록이 없어도 결과는 넘긴다. 버리면 그 제출은 결과가 멀쩡히 도착했는데도
+            // 영영 끝나지 않는다. 임대가 Redis 에 있으므로 이제 재시작만으로는 생기지 않는다 —
+            // 보인다면 임대가 치워진 뒤 결과가 온 것이고, 트레이스는 이어 만들지 못한다.
+            Acceptance.Unleased -> {
                 log.atWarn()
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, result.submissionId)
                     .addKeyValue(CorrelationIds.EXECUTION_ID, result.executionId)
-                    .log("임대 기록이 없는 결과다. 넘긴다 — 재시작했거나 다른 인스턴스가 띄운 실행이다")
-                complete(result, correlationId)
+                    .log("임대 기록이 없는 결과다. 넘긴다")
+                complete(result, correlationId, origin = null)
             }
 
-            AttemptRegistry.Acceptance.Duplicate ->
+            Acceptance.Duplicate ->
                 log.atInfo()
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, result.submissionId)
                     .log("같은 결과가 다시 도착했다. no-op")
 
-            AttemptRegistry.Acceptance.AlreadyCompleted ->
+            Acceptance.AlreadyCompleted ->
                 log.atWarn()
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, result.submissionId)
                     .addKeyValue(CorrelationIds.EXECUTION_ID, result.executionId)
                     .log("종료된 제출에 다른 결과가 도착했다. 감사 대상")
 
-            is AttemptRegistry.Acceptance.Stale ->
+            is Acceptance.Stale ->
                 log.atWarn()
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, result.submissionId)
                     .addKeyValue(CorrelationIds.EXECUTION_ID, result.executionId)
@@ -191,10 +162,9 @@ class JudgeCoordinator(
         }
     }
 
-    private fun complete(result: ExecutionResult, correlationId: String) {
-        inFlight.remove(result.submissionId)
+    private fun complete(result: ExecutionResult, correlationId: String, origin: SubmissionQueued?) {
         val pkg = packageOf(result)
-        dispatchTrace(result)
+        if (origin != null && origin.requestTrace) dispatchTrace(result, origin, pkg)
         val aggregated = VerdictAggregator.aggregate(pkg.groups.map { it.policy }, result)
 
         gateway.publishCompleted(
@@ -247,21 +217,20 @@ class JudgeCoordinator(
      * "다시 실행"과 "중복 판정"이 동시에 일어나지 않는다.
      */
     fun reclaimExpiredLeases() {
-        for (submissionId in registry.expired()) {
-            val previous = inFlight[submissionId] ?: continue
+        for (expired in registry.expired()) {
+            val submissionId = expired.submissionId
 
-            if (previous.attempt >= maxAttempts) {
-                inFlight.remove(submissionId)
+            if (expired.attempt >= maxAttempts) {
                 registry.abandon(submissionId)
                 log.atError()
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, submissionId)
-                    .addKeyValue(CorrelationIds.ATTEMPT, previous.attempt)
+                    .addKeyValue(CorrelationIds.ATTEMPT, expired.attempt)
                     .log("재시도 한계를 넘었다. SYSTEM_ERROR 로 끝낸다")
                 gateway.publishCompleted(
                     JudgeCompleted(
                         submissionId = submissionId,
-                        executionId = previous.executionId,
-                        correlationId = previous.correlationId,
+                        executionId = expired.executionId,
+                        correlationId = expired.origin.correlationId,
                         verdict = Verdict.SYSTEM_ERROR,
                         score = 0,
                         compileLog = null,
@@ -271,13 +240,9 @@ class JudgeCoordinator(
                 continue
             }
 
-            val lease = registry.lease(submissionId)
-            val retry = previous.copy(
-                executionId = UUID.randomUUID().toString(),
-                attempt = lease.attempt,
-                fencingToken = lease.token,
-            )
-            inFlight[submissionId] = retry
+            // 다른 인스턴스가 먼저 다시 걸었으면 물러난다. 같은 제출을 두 번 걸지 않는다.
+            val lease = registry.reclaim(expired, executionId = UUID.randomUUID().toString()) ?: continue
+            val retry = request(lease, load(lease.origin))
             metrics.leaseReclaimed(retry.language)
 
             log.atWarn()
@@ -289,6 +254,30 @@ class JudgeCoordinator(
             gateway.requestExecution(retry)
         }
     }
+
+    private fun load(origin: SubmissionQueued): ProblemPackage {
+        val pkg = packages.load(origin.problemId)
+        require(pkg.manifest.version == origin.problemVersion) {
+            "요청한 문제 버전이 로드된 패키지와 다르다: ${origin.problemVersion} != ${pkg.manifest.version}"
+        }
+        return pkg
+    }
+
+    /** 임대 하나가 곧 실행 요청 하나다. 다시 걸 때도 같은 길로 만든다. */
+    private fun request(lease: Lease, pkg: ProblemPackage) = ExecutionRequest(
+        executionId = lease.executionId,
+        submissionId = lease.submissionId,
+        attempt = lease.attempt,
+        fencingToken = lease.token,
+        correlationId = lease.origin.correlationId,
+        problemVersionId = pkg.problemVersionId,
+        packageDigest = pkg.packageDigest,
+        language = lease.origin.language,
+        source = lease.origin.source,
+        signature = pkg.manifest.signature,
+        limits = pkg.manifest.limits,
+        groups = pkg.groups.map { RequestedGroup(it.policy, it.cases) },
+    )
 
     /**
      * 판정이 끝난 뒤 학습용 트레이스를 별도 작업으로 띄운다 (§7.1).
@@ -303,9 +292,8 @@ class JudgeCoordinator(
      *
      * 숨은 케이스는 고르지 않는다. 그 상태 변화를 보여주면 테스트가 그대로 샌다 (§8.3).
      */
-    private fun dispatchTrace(result: ExecutionResult) {
-        val original = pendingTrace.remove(result.submissionId) ?: return
-        val public = original.groups.filter { it.policy.exposesInput }
+    private fun dispatchTrace(result: ExecutionResult, origin: SubmissionQueued, pkg: ProblemPackage) {
+        val public = pkg.groups.filter { it.policy.exposesInput }
         if (public.isEmpty()) return
 
         val failedIds = result.cases
@@ -321,8 +309,18 @@ class JudgeCoordinator(
         } ?: return
 
         gateway.requestExecution(
-            original.copy(
+            ExecutionRequest(
                 executionId = UUID.randomUUID().toString(),
+                submissionId = result.submissionId,
+                attempt = result.attempt,
+                fencingToken = result.fencingToken,
+                correlationId = origin.correlationId,
+                problemVersionId = pkg.problemVersionId,
+                packageDigest = pkg.packageDigest,
+                language = origin.language,
+                source = origin.source,
+                signature = pkg.manifest.signature,
+                limits = pkg.manifest.limits,
                 mode = ExecutionMode.TRACE,
                 groups = listOf(RequestedGroup(chosen.first, listOf(chosen.second))),
             ),

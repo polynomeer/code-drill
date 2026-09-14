@@ -1,6 +1,6 @@
 package dev.codedrill.judge.orchestrator
 
-import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
+import dev.codedrill.judge.orchestrator.lease.MemoryLeaseRegistry
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.JudgeCompleted
@@ -232,7 +232,7 @@ class LeaseRecoveryTest {
 
         val coordinator = JudgeCoordinator(
             packages = ProblemPackageLoader(Path.of(CONTENT_ROOT)),
-            registry = AttemptRegistry(
+            registry = MemoryLeaseRegistry(
                 clock = clock,
                 leaseDuration = Duration.ofSeconds(30),
                 dispatchTimeout = Duration.ofMinutes(5),

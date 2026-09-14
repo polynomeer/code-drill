@@ -1,9 +1,14 @@
 package dev.codedrill.judge.orchestrator
 
-import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
+import dev.codedrill.judge.orchestrator.lease.LeaseRegistry
+import dev.codedrill.judge.orchestrator.lease.MemoryLeaseRegistry
+import dev.codedrill.judge.orchestrator.lease.RedisLeaseRegistry
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import io.micrometer.core.instrument.MeterRegistry
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableScheduling
@@ -27,23 +32,36 @@ class OrchestratorConfig {
         ProblemPackageLoader(Path.of(root))
 
     /**
-     * 두 시간 한계는 재는 것이 다르다.
+     * 임대 저장소 (§4.3, production-readiness A3).
+     *
+     * 기본은 Redis 다. 재시작과 인스턴스 여럿을 넘기는 것은 그쪽뿐이다. `memory` 는 Redis
+     * 없는 개발용이며, 그 사실을 기동 로그에 남긴다 — 조용히 내려가면 재시작 뒤에 멈춘
+     * 제출이 왜 회수되지 않는지 아무도 모른다.
      *
      * `lease-seconds` 는 실행을 집어 든 워커의 생존을 재고, `dispatch-timeout-seconds`
-     * 는 아무도 집어 들지 않은 채 큐에서 기다린 시간을 잰다. 둘을 하나로 묶으면 큐가
-     * 밀렸을 뿐인 제출이 워커 유실로 처리돼, 바쁠 때만 멀쩡한 제출이 SYSTEM_ERROR 가 된다.
-     *
-     * DR 훈련은 `lease-seconds` 만 줄여 회수 경로를 몇 초 안에 확인한다
-     * (docs/runbook.md#worker-loss).
+     * 는 아무도 집어 들지 않은 채 큐에서 기다린 시간을 잰다 (LeaseTiming). DR 훈련은
+     * `lease-seconds` 만 줄여 회수 경로를 몇 초 안에 확인한다 (docs/runbook.md#worker-loss).
      */
     @Bean
-    fun attemptRegistry(
+    fun leaseRegistry(
+        @Value("\${codedrill.judge.lease-store:redis}") store: String,
         @Value("\${codedrill.judge.lease-seconds:120}") leaseSeconds: Long,
         @Value("\${codedrill.judge.dispatch-timeout-seconds:600}") dispatchSeconds: Long,
-    ) = AttemptRegistry(
-        leaseDuration = Duration.ofSeconds(leaseSeconds),
-        dispatchTimeout = Duration.ofSeconds(dispatchSeconds),
-    )
+        redis: ObjectProvider<StringRedisTemplate>,
+    ): LeaseRegistry {
+        val lease = Duration.ofSeconds(leaseSeconds)
+        val dispatch = Duration.ofSeconds(dispatchSeconds)
+        return when (store) {
+            "redis" -> RedisLeaseRegistry(redis.getObject(), leaseDuration = lease, dispatchTimeout = dispatch)
+            "memory" -> {
+                LoggerFactory.getLogger(javaClass).warn(
+                    "임대를 프로세스 메모리에 둔다. 재시작하면 진행 중인 실행을 회수하지 못한다 — 공개 환경에서는 redis 를 쓴다",
+                )
+                MemoryLeaseRegistry(leaseDuration = lease, dispatchTimeout = dispatch)
+            }
+            else -> throw IllegalArgumentException("codedrill.judge.lease-store 는 redis 또는 memory 다: $store")
+        }
+    }
 
     @Bean
     fun judgeMetrics(registry: MeterRegistry) = JudgeMetrics(registry)
@@ -51,7 +69,7 @@ class OrchestratorConfig {
     @Bean
     fun judgeCoordinator(
         packages: ProblemPackageLoader,
-        registry: AttemptRegistry,
+        registry: LeaseRegistry,
         gateway: JudgeGateway,
         metrics: JudgeMetrics,
         @Value("\${codedrill.judge.max-attempts:3}") maxAttempts: Int,

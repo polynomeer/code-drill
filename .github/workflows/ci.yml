@@ -21,6 +21,14 @@ concurrency:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    # 임대 계약은 Redis 구현에 대해서도 돈다 (§4.3). Redis 가 없으면 그 절반은 건너뛰고
+    # 초록으로 보이므로, 여기 하나 띄우고 건너뛰기를 실패로 바꾼다.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    env:
+      CODEDRILL_REQUIRE_REDIS: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

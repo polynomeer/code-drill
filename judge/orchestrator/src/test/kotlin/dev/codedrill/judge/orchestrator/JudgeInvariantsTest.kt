@@ -1,7 +1,6 @@
 package dev.codedrill.judge.orchestrator
 
 import dev.codedrill.judge.orchestrator.aggregation.VerdictAggregator
-import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
 import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Measurements
@@ -11,19 +10,15 @@ import dev.codedrill.platform.problempackage.Aggregation
 import dev.codedrill.platform.problempackage.GroupPolicy
 import dev.codedrill.platform.problempackage.StopPolicy
 import dev.codedrill.platform.problempackage.Visibility
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
  * §16.2 의 성공 기준: **중복 전달, 워커 유실, 트레이스 실패에도 판정 불변식이 유지된다.**
  *
- * 이 테스트가 그 기준을 고정한다.
+ * 이 테스트가 집계 쪽을 고정한다. 임대와 fencing 은 [LeaseRegistryContract] 가 두 구현에
+ * 대해 고정한다.
  */
 class JudgeInvariantsTest {
 
@@ -109,84 +104,6 @@ class JudgeInvariantsTest {
         assertEquals(Verdict.COMPILE_ERROR, result.verdict)
         assertEquals(0, result.score)
         assertEquals("(3:5) expecting an element", result.compileLog)
-    }
-
-    // --- 임대와 fencing (§4.3) ---
-
-    @Test
-    fun `같은 결과가 다시 오면 no-op 이다`() {
-        val registry = AttemptRegistry()
-        val lease = registry.lease(SUBMISSION)
-        val result = resultOf(allPassing(), lease.attempt, lease.token)
-
-        assertIs<AttemptRegistry.Acceptance.Accepted>(registry.accept(result))
-        assertIs<AttemptRegistry.Acceptance.Duplicate>(registry.accept(result))
-    }
-
-    @Test
-    fun `워커 유실 후 살아 돌아온 결과는 거절한다`() {
-        val registry = AttemptRegistry()
-        val lost = registry.lease(SUBMISSION)
-        val staleResult = resultOf(allPassing(), lost.attempt, lost.token)
-
-        // 임대가 만료돼 재임대했다. 이 순간 이전 임대는 무효다.
-        val current = registry.lease(SUBMISSION)
-        assertTrue(current.token > lost.token, "재임대는 토큰을 올려야 한다")
-        assertEquals(2, current.attempt)
-
-        val acceptance = registry.accept(staleResult)
-
-        val stale = assertIs<AttemptRegistry.Acceptance.Stale>(acceptance)
-        assertTrue(stale.reason.contains("fencing"), "거절 사유: ${stale.reason}")
-    }
-
-    @Test
-    fun `재임대 후 새 워커의 결과는 받아들인다`() {
-        val registry = AttemptRegistry()
-        registry.lease(SUBMISSION)
-        val current = registry.lease(SUBMISSION)
-
-        val acceptance = registry.accept(resultOf(allPassing(), current.attempt, current.token))
-
-        assertIs<AttemptRegistry.Acceptance.Accepted>(acceptance)
-    }
-
-    @Test
-    fun `종료된 제출에 다른 결과가 오면 감사 대상이다`() {
-        val registry = AttemptRegistry()
-        val lease = registry.lease(SUBMISSION)
-        registry.accept(resultOf(allPassing(), lease.attempt, lease.token))
-
-        val different = resultOf(allPassing(), lease.attempt, lease.token).copy(resultDigest = "다른-digest")
-
-        assertIs<AttemptRegistry.Acceptance.AlreadyCompleted>(registry.accept(different))
-    }
-
-    @Test
-    fun `임대는 워커가 집어 든 뒤부터 시간을 잰다`() {
-        val start = Instant.parse("2026-09-05T00:00:00Z")
-        var now = start
-        val registry = AttemptRegistry(
-            clock = object : Clock() {
-                override fun getZone() = ZoneOffset.UTC
-                override fun withZone(zone: java.time.ZoneId) = this
-                override fun instant() = now
-            },
-            leaseDuration = Duration.ofSeconds(30),
-            dispatchTimeout = Duration.ofMinutes(5),
-        )
-
-        val lease = registry.lease(SUBMISSION)
-        assertTrue(!registry.isExpired(SUBMISSION), "방금 임대한 실행은 살아 있다")
-
-        // 아직 아무도 집어 들지 않았다. 이 구간은 큐 대기이지 워커 유실이 아니다.
-        now = start.plusSeconds(31)
-        assertTrue(!registry.isExpired(SUBMISSION), "큐에서 기다린 시간은 임대를 소모하지 않는다")
-
-        // 워커가 집어 들었다. 이제부터 만료는 "워커가 죽었다"를 뜻한다.
-        registry.renew(SUBMISSION, lease.token)
-        now = start.plusSeconds(62)
-        assertTrue(registry.isExpired(SUBMISSION), "심장 박동이 끊기면 회수 대상이다")
     }
 
     // --- 픽스처 ---

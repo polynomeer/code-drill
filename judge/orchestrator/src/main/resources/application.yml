@@ -3,8 +3,15 @@ spring:
     name: code-drill-judge-orchestrator
   rabbitmq:
     addresses: ${BROKER_URL:amqp://codedrill:codedrill@localhost:5672}
+  data:
+    redis:
+      # 임대와 fencing 토큰이 여기 있다 (§4.3). 제어 영역과 같은 Redis 라도 키 접두사가 다르다.
+      url: ${REDIS_URL:redis://localhost:6379}
 
 codedrill:
+  judge:
+    # redis 가 기본이다. memory 는 Redis 없는 개발용 — 재시작하면 진행 중인 실행을 회수하지 못한다.
+    lease-store: ${JUDGE_LEASE_STORE:redis}
   messaging:
     # 브로커에 밝히는 신원 (§11.2). 발행은 전부 judge.from.orchestrator 로 나간다.
     identity: orchestrator

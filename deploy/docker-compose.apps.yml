@@ -63,10 +63,13 @@ services:
       BROKER_URL: amqps://rabbitmq:5671
       BROKER_TLS_DIR: /etc/codedrill/broker-tls
       BROKER_DECLARE_TOPOLOGY: "false"
+      # 임대와 fencing 토큰이 여기 있다 (§4.3). 재시작과 인스턴스 여럿을 넘기는 유일한 자리다.
+      REDIS_URL: redis://redis:6379
     volumes: ["./certs/orchestrator:/etc/codedrill/broker-tls:ro"]
     ports: ["${ORCHESTRATOR_PORT:-8081}:8081"]
     depends_on:
       rabbitmq: {condition: service_healthy}
+      redis: {condition: service_healthy}
 
   # 배포 단위 넷째. 정적 자산을 내주고 /api 를 제어 영역으로 넘긴다 — 개발에서 Vite 가
   # 하던 일이다 (deploy/web.nginx.conf).

@@ -1,6 +1,6 @@
 package dev.codedrill.judge.orchestrator
 
-import dev.codedrill.judge.orchestrator.lease.AttemptRegistry
+import dev.codedrill.judge.orchestrator.lease.Acceptance
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.platform.observability.Metrics
 import io.micrometer.core.instrument.MeterRegistry
@@ -34,13 +34,13 @@ class JudgeMetrics(private val registry: MeterRegistry = SimpleMeterRegistry()) 
      * 자연스럽지만, 꾸준히 나온다면 임대가 제 일을 못 하고 있다는 뜻이고 그러면 만료로
      * 워커 유실을 잡는 장치도 함께 무너져 있다.
      */
-    fun acceptance(outcome: AttemptRegistry.Acceptance) {
+    fun acceptance(outcome: Acceptance) {
         val label = when (outcome) {
-            AttemptRegistry.Acceptance.Accepted -> "accepted"
-            AttemptRegistry.Acceptance.Duplicate -> "duplicate"
-            AttemptRegistry.Acceptance.AlreadyCompleted -> "already_completed"
-            is AttemptRegistry.Acceptance.Stale -> "stale"
-            AttemptRegistry.Acceptance.Unleased -> "unleased"
+            is Acceptance.Accepted -> "accepted"
+            Acceptance.Duplicate -> "duplicate"
+            Acceptance.AlreadyCompleted -> "already_completed"
+            is Acceptance.Stale -> "stale"
+            Acceptance.Unleased -> "unleased"
         }
         registry.counter(Metrics.RESULT_ACCEPTANCE, Metrics.Tag.OUTCOME, label).increment()
     }
