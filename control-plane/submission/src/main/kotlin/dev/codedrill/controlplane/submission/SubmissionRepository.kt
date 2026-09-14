@@ -64,6 +64,19 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
         MAPPER, userId, problemId,
     ).firstOrNull()
 
+    /**
+     * 이 문제에서 이 사람이 틀린 제출 — 판정이 WRONG_ANSWER 이고 소스가 남아 있는 것.
+     * 아레나에 내놓을 수 있는 후보다 (§8.3). 시간 초과나 컴파일 실패는 "오답"이 아니다.
+     */
+    fun wrongAnswers(userId: String, problemId: String, language: String): List<Submission> = jdbc.query(
+        """
+        SELECT * FROM submission
+         WHERE user_id = ? AND problem_id = ? AND language = ? AND verdict = 'WRONG_ANSWER' AND source IS NOT NULL
+         ORDER BY created_at DESC LIMIT 20
+        """.trimIndent(),
+        MAPPER, userId, problemId, language,
+    )
+
     fun findByIdempotencyKey(userId: String, key: String): Submission? =
         jdbc.query(
             "SELECT * FROM submission WHERE user_id = ? AND idempotency_key = ?",

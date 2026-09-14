@@ -25,14 +25,16 @@ import java.util.UUID
  * **맞힌 사람에게만 연다.** 오답의 소스가 보이는데, 오답은 정답에서 한 곳만 다른 코드라
  * 그것을 보는 것은 정답을 보는 것과 거의 같다.
  *
- * **지금의 오답은 저작자의 대표 오답이다.** 남의 실제 제출을 익명화해 세우는 것은 검수
- * 절차(§8.3 마지막 줄)가 서기 전에는 하지 않는다 — 익명화해도 코드는 그 사람의 것이다.
+ * **과녁은 두 출처다.** 저작자의 대표 오답과, 검수를 거쳐 세운 남의 오답
+ * ([CommunityMutantService]). 여기서는 둘을 구분하지 않고 같은 과녁으로 돌린다 —
+ * 다른 것은 화면에서 "누가 세운 것인가"뿐이다.
  */
 @Service
 class ArenaService(
     private val repository: ArenaRepository,
     private val packages: ProblemPackageLoader,
     private val json: ObjectMapper,
+    private val community: CommunityMutantService,
     private val gate: ArenaGate = ArenaGate.CLOSED,
     private val learning: LearningSignals = LearningSignals.NONE,
 ) {
@@ -42,10 +44,13 @@ class ArenaService(
     /** 깨뜨릴 오답들과 기록판. 잠겨 있으면 오답 없이 잠겼다는 사실만. */
     fun board(userId: String, problemId: String): ArenaBoard {
         val open = gate.solved(userId, problemId)
-        val targets = if (!open) emptyList() else packages.mutants(problemId)
+        val authored = if (!open) emptyList() else packages.mutants(problemId)
             // 성능 오답은 뺀다. 손으로 적는 입력으로는 깨뜨릴 수 없다 (DefectKind.PERFORMANCE).
             .filter { it.kind.reachableByHandWrittenCase }
-            .map { ArenaTarget(it.name, it.kind, it.kind.label, it.note.substringBefore(". ").trimEnd('.') + ".", it.source) }
+            .map { ArenaTarget(it.name, it.kind, it.kind.label, it.note.substringBefore(". ").trimEnd('.') + ".", it.source, community = false) }
+        val donated = if (!open) emptyList() else community.targets(problemId)
+            .map { ArenaTarget(it.name, it.kind, it.kind.label, it.note, it.source, community = true) }
+        val targets = authored + donated
         return ArenaBoard(
             problemId = problemId,
             locked = !open,
@@ -66,7 +71,7 @@ class ArenaService(
         CaseShape.mismatch(args, parameters.map { it.type })?.let { return Outcome.Invalid(it) }
 
         val reference = packages.referenceSolution(problemId) ?: return Outcome.Invalid("대조할 정답이 없다")
-        val mutants = packages.mutants(problemId).filter { it.kind.reachableByHandWrittenCase }
+        val mutants = packages.mutants(problemId).filter { it.kind.reachableByHandWrittenCase } + community.targets(problemId)
         if (mutants.isEmpty()) return Outcome.Invalid("깨뜨릴 오답이 없다")
 
         val id = UUID.randomUUID()
@@ -167,4 +172,6 @@ data class ArenaTarget(
     /** 무엇을 잘못하는지 한 줄. 힌트가 아니라 과녁의 설명이다. */
     val note: String,
     val source: String,
+    /** 저작자의 대표 오답이 아니라 검수를 거쳐 세운 남의 오답인가 (§8.3). 신고는 이쪽에만 걸린다. */
+    val community: Boolean,
 )

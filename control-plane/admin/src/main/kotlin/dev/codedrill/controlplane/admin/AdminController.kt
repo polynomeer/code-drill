@@ -28,7 +28,61 @@ class AdminController(
     private val rejudge: RejudgeService,
     private val audit: AuditLog,
     private val roles: AdminRoles,
+    private val arena: ArenaModeration,
 ) {
+
+    // --- 아레나 검수 (§8.3 익명화된 오답, §8.5 신고·검수) ---
+
+    /**
+     * 검수 큐. 기부된 오답의 소스가 실린다 — 검수자가 보는 것이 곧 검수다.
+     *
+     * 재채점 승인과 같은 REVIEWER 다. 둘 다 "다른 사람의 판정에 영향을 주는 결정을 한 번
+     * 더 보는" 역할이고, 역할을 늘리면 부여 절차만 늘어난다.
+     */
+    @RequiresRole(AdminRole.REVIEWER)
+    @GetMapping("/arena/queue")
+    fun arenaQueue(): Any = arena.queue()
+
+    @RequiresRole(AdminRole.REVIEWER)
+    @PostMapping("/arena/donations/{id}/approve")
+    fun approveDonation(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ApproveDonationRequest,
+    ): ResponseEntity<Any> = decided(arena.approve(id, actor, request.kind, request.note)) {
+        audit.record(AuditAction.ARENA_DONATION_APPROVED, id.toString(), actor, mapOf("kind" to request.kind))
+    }
+
+    @RequiresRole(AdminRole.REVIEWER)
+    @PostMapping("/arena/donations/{id}/reject")
+    fun rejectDonation(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ArchiveRequest,
+    ): ResponseEntity<Any> = decided(arena.reject(id, actor, request.reason)) {
+        audit.record(AuditAction.ARENA_DONATION_REJECTED, id.toString(), actor, mapOf("reason" to request.reason))
+    }
+
+    @RequiresRole(AdminRole.REVIEWER)
+    @PostMapping("/arena/reports/{id}/resolve")
+    fun resolveReport(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ResolveReportRequest,
+    ): ResponseEntity<Any> = decided(arena.resolve(id, actor, request.retire, request.resolution)) {
+        audit.record(
+            if (request.retire) AuditAction.ARENA_DONATION_RETIRED else AuditAction.ARENA_REPORT_DISMISSED,
+            id.toString(), actor, mapOf("resolution" to request.resolution),
+        )
+    }
+
+    private inline fun decided(decision: ArenaModeration.Decision, onDecided: () -> Unit): ResponseEntity<Any> {
+        if (decision.rejected != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to decision.rejected))
+        }
+        onDecided()
+        return ResponseEntity.ok(decision.result)
+    }
 
     // --- 콘텐츠 수명주기 ---
 
@@ -304,6 +358,11 @@ data class PublishRequest(
 )
 
 data class ArchiveRequest(@field:NotBlank val reason: String)
+
+/** 세울 때 검수자가 결함군을 정한다. 기부자는 자기 오답이 무슨 종류인지 모르는 것이 보통이다. */
+data class ApproveDonationRequest(@field:NotBlank val kind: String, val note: String? = null)
+
+data class ResolveReportRequest(val retire: Boolean, @field:NotBlank val resolution: String)
 
 /**
  * 역할 부여 요청 (§11.2).

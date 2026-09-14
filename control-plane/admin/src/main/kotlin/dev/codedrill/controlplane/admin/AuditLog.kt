@@ -81,6 +81,19 @@ enum class AuditAction {
     JUDGEMENT_REVISED,
 
     /**
+     * 남의 오답을 아레나에 세웠다 (§8.3, §8.5 검수).
+     *
+     * 다른 사람의 코드가 여러 사람에게 보이기 시작하는 순간이다. 누가 보고 세웠는지가
+     * 남아야, 정답이 새거나 남의 풀이를 베낀 것이 걸렸을 때 검수를 되짚을 수 있다.
+     */
+    ARENA_DONATION_APPROVED,
+    ARENA_DONATION_REJECTED,
+
+    /** 신고를 받아 세웠던 오답을 내렸거나, 신고를 기각했다 (§8.5). */
+    ARENA_DONATION_RETIRED,
+    ARENA_REPORT_DISMISSED,
+
+    /**
      * 관리자 역할 부여를 요청했다 (§11.2).
      *
      * 아직 권한은 늘지 않았다. 부여와 갈라 남기는 이유는, 승인되지 않고 남은 요청과

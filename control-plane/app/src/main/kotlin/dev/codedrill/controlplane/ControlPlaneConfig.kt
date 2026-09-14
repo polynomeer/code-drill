@@ -46,7 +46,14 @@ import dev.codedrill.controlplane.trace.TraceRetentionPolicy
 import dev.codedrill.controlplane.workspace.DraftPersonalData
 import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
+import dev.codedrill.controlplane.admin.ArenaModeration
 import dev.codedrill.controlplane.workspace.ArenaGate
+import dev.codedrill.controlplane.workspace.CommunityMutantRepository
+import dev.codedrill.controlplane.workspace.CommunityMutantService
+import dev.codedrill.controlplane.workspace.DonatableSubmission
+import dev.codedrill.controlplane.workspace.DonatableSubmissions
+import dev.codedrill.controlplane.submission.Submission
+import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.controlplane.workspace.ArenaRepository
 import dev.codedrill.controlplane.workspace.ArenaService
 import dev.codedrill.controlplane.workspace.MutationLimits
@@ -437,6 +444,57 @@ class ControlPlaneConfig {
         override val area = "arena"
         override fun export(userId: String) = mapOf("attempts" to repository.export(userId))
         override fun erase(userId: String) = mapOf("attempts" to repository.erase(userId))
+    }
+
+    /**
+     * 아레나에 내놓을 수 있는 제출 (§3.1 조립 지점, §8.3 익명화된 오답).
+     *
+     * 아레나가 돌리는 오답은 Kotlin 이다 — 저작자의 대표 오답과 같은 길로 컴파일한다. 다른
+     * 언어의 오답은 그 길이 생길 때 열린다.
+     */
+    @Bean
+    fun donatableSubmissions(submissions: SubmissionRepository) = object : DonatableSubmissions {
+        override fun donatable(userId: String, problemId: String) =
+            submissions.wrongAnswers(userId, problemId, "KOTLIN").map { it.asDonatable() }
+
+        override fun donatable(userId: String, submissionId: java.util.UUID): DonatableSubmission? =
+            submissions.findById(submissionId)
+                ?.takeIf { it.userId == userId && it.language == "KOTLIN" && it.verdict == Verdict.WRONG_ANSWER }
+                ?.asDonatable()
+
+        private fun Submission.asDonatable() = DonatableSubmission(
+            id = id, problemId = problemId, source = submissions.findSource(id).orEmpty(), score = score, createdAt = createdAt,
+        )
+    }
+
+    /** 기부한 코드와 신고도 그 사람의 것이다 (§11.3). 소스를 비우면 세워진 과녁은 내려간다. */
+    @Bean
+    fun arenaDonationPersonalArea(repository: CommunityMutantRepository) = object : PersonalData {
+        override val area = "arena-donations"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = mapOf("donations" to repository.erase(userId))
+    }
+
+    /** 검수는 Admin 의 결정, 세우고 내리는 것은 아레나의 일 (§3.1). */
+    @Bean
+    fun arenaModeration(community: CommunityMutantService) = object : ArenaModeration {
+        override fun queue() = community.queue()
+
+        override fun approve(id: java.util.UUID, reviewer: String, kind: String, note: String?): ArenaModeration.Decision {
+            val defect = DefectKind.entries.firstOrNull { it.name == kind }
+                ?: return ArenaModeration.Decision.rejected("결함군이 아니다: $kind (${DefectKind.entries.joinToString { it.name }})")
+            return community.approve(id, reviewer, defect, note).asDecision()
+        }
+
+        override fun reject(id: java.util.UUID, reviewer: String, reason: String) = community.reject(id, reviewer, reason).asDecision()
+
+        override fun resolve(reportId: java.util.UUID, reviewer: String, retire: Boolean, resolution: String) =
+            community.resolve(reportId, reviewer, retire, resolution).asDecision()
+
+        private fun CommunityMutantService.ReviewOutcome.asDecision() = when (this) {
+            is CommunityMutantService.ReviewOutcome.Decided -> ArenaModeration.Decision.ok(donation)
+            is CommunityMutantService.ReviewOutcome.Rejected -> ArenaModeration.Decision.rejected(reason)
+        }
     }
 
     /** 역량 증거도 사용자의 기록이다 (§11.3). */

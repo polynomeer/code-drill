@@ -271,6 +271,7 @@ def submit(
     key: str | None = None,
     language: str = "KOTLIN",
     problem: str = "two-sum",
+    headers: dict | None = None,
 ) -> dict:
     return request(
         "POST",
@@ -281,15 +282,15 @@ def submit(
             "language": language,
             "source": source,
         },
-        {"Idempotency-Key": key or str(uuid.uuid4())},
+        {**(headers or {}), "Idempotency-Key": key or str(uuid.uuid4())},
     )
 
 
-def await_verdict(submission_id: str) -> dict:
+def await_verdict(submission_id: str, headers: dict | None = None) -> dict:
     deadline = time.time() + TIMEOUT
     last = {}
     while time.time() < deadline:
-        last = request("GET", f"/submissions/{submission_id}")
+        last = request("GET", f"/submissions/{submission_id}", None, headers)
         if last["status"] == "COMPLETED":
             return last
         time.sleep(0.5)
@@ -895,6 +896,80 @@ def main() -> int:
     first = submit(ACCEPTED_SOURCE, key)
     second = submit(ACCEPTED_SOURCE, key)
     results.append(check("같은 키는 같은 제출", second["id"], first["id"]))
+
+    print("\n아레나에 남의 오답 세우기 (§8.3, §8.5 신고·검수)")
+    # 틀린 사람이 내놓고, 검수자가 세우고, 맞힌 사람이 깨뜨리거나 신고한다. 세 사람이다.
+    donor = accounts.create("donor")
+    wrong = submit(WRONG_SOURCE, headers=donor.headers)
+    await_verdict(wrong["id"], headers=donor.headers)
+    status, refused = raw_request("POST", "/arena/two-sum/donations",
+                                  {"submissionId": wrong["id"], "note": "짧다"}, donor.headers)
+    results.append(check("사유가 짧으면 거절", status, 400))
+    status, refused = raw_request("POST", "/arena/two-sum/donations",
+                                  {"submissionId": wrong["id"], "note": "남이 낸 것을 내놓을 수는 없다"})
+    results.append(check("남의 제출은 내놓지 못한다", status, 400))
+    status, donation = raw_request("POST", "/arena/two-sum/donations",
+                                   {"submissionId": wrong["id"], "note": "인덱스를 보지 않고 0, 0 을 돌려준다"}, donor.headers)
+    results.append(check("내 오답을 내놓는다", status, 202))
+    results.append(check("  소스는 응답에 없다", donation.get("source"), None))
+    status, again = raw_request("POST", "/arena/two-sum/donations",
+                                {"submissionId": wrong["id"], "note": "인덱스를 보지 않고 0, 0 을 돌려준다"}, donor.headers)
+    results.append(check("  같은 제출은 한 번만", status, 409))
+
+    # 맞힌 사람. 아직 과녁은 없다 — 검수 전이다.
+    await_verdict(submit(ACCEPTED_SOURCE)["id"])
+    board = request("GET", "/arena/two-sum")
+    results.append(check("검수 전에는 과녁이 아니다", any(t["community"] for t in board["targets"]), False))
+
+    reviewer = operators.with_roles("REVIEWER").headers
+    status, _ = raw_request("GET", "/admin/arena/queue")
+    results.append(check("검수 큐는 검수자만", status, 403))
+    queue = request("GET", "/admin/arena/queue", None, reviewer)
+    results.append(check("검수 큐에 올라 있다", any(d["id"] == donation["id"] for d in queue["pending"]), True))
+    results.append(check("  검수자는 소스를 본다",
+                         next(d for d in queue["pending"] if d["id"] == donation["id"])["source"], WRONG_SOURCE))
+    status, bad_kind = raw_request("POST", f"/admin/arena/donations/{donation['id']}/approve",
+                                   {"kind": "PERFORMANCE"}, reviewer)
+    results.append(check("손으로 못 깨뜨리는 종류로는 못 세운다", status, 409))
+    approved = request("POST", f"/admin/arena/donations/{donation['id']}/approve",
+                       {"kind": "WRONG_ALGORITHM", "note": "무엇을 받든 0, 0 이다"}, reviewer)
+    results.append(check("세웠다", approved["status"], "APPROVED"))
+    target_name = approved["targetName"]
+
+    board = request("GET", "/arena/two-sum")
+    target = next((t for t in board["targets"] if t["name"] == target_name), None)
+    results.append(check("과녁이 됐다", target is not None, True))
+    if target:
+        results.append(check("  누군가의 오답으로 표시", target["community"], True))
+        results.append(check("  검수자의 설명이 과녁의 설명", target["note"], "무엇을 받든 0, 0 이다"))
+        attempt = request("POST", "/arena/two-sum/attempts", {"args": [[2, 7, 11, 15], 9]})
+        deadline = time.time() + TIMEOUT
+        while attempt["status"] == "PENDING" and time.time() < deadline:
+            time.sleep(1)
+            attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+        broken = next((r for r in attempt["results"] if r["name"] == target_name), None)
+        results.append(check("  깨뜨렸다", bool(broken and broken["broken"]), True))
+        mine = request("GET", "/arena/two-sum/donations/mine", None, donor.headers)
+        results.append(check("기부자에게 세워졌다고 보인다", mine[0]["status"], "APPROVED"))
+
+    status, report = raw_request("POST", f"/arena/two-sum/targets/{target_name}/reports",
+                                 {"reason": "이건 오답이 아니라 자리표다"}, donor.headers)
+    results.append(check("못 맞힌 사람은 신고하지 못한다", status, 409))
+    status, report = raw_request("POST", f"/arena/two-sum/targets/{target_name}/reports",
+                                 {"reason": "이건 오답이 아니라 자리표다"})
+    results.append(check("맞힌 사람은 신고한다", status, 202))
+    status, _ = raw_request("POST", f"/arena/two-sum/targets/{target_name}/reports",
+                            {"reason": "이건 오답이 아니라 자리표다"})
+    results.append(check("  두 번째 신고는 조용히", status, 204))
+    queue = request("GET", "/admin/arena/queue", None, reviewer)
+    results.append(check("신고가 큐에 올라 있다", any(r["report"]["id"] == report["id"] for r in queue["reports"]), True))
+    retired = request("POST", f"/admin/arena/reports/{report['id']}/resolve",
+                      {"retire": True, "resolution": "확인. 내린다"}, reviewer)
+    results.append(check("신고를 받아 내렸다", retired["status"], "RETIRED"))
+    board = request("GET", "/arena/two-sum")
+    results.append(check("  과녁에서 사라졌다", any(t["name"] == target_name for t in board["targets"]), False))
+    mine = request("GET", "/arena/two-sum/donations/mine", None, donor.headers)
+    results.append(check("  기부자에게 사유가 보인다", mine[0]["reason"], "확인. 내린다"))
 
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
