@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { attemptArena, getArena, getArenaAttempt } from '../../api/client'
+import { attemptArena, getArena, getArenaAttempt, reportArenaTarget } from '../../api/client'
 import type { ArenaAttempt, ArenaBoard } from '../../shared/types'
 
 /**
@@ -20,6 +20,7 @@ export function ArenaPanel({ problemId, problemSignature }: { problemId: string;
   const [attempt, setAttempt] = useState<ArenaAttempt | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [reported, setReported] = useState<Set<string>>(new Set())
   const timer = useRef<number | null>(null)
 
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current) }, [])
@@ -68,6 +69,18 @@ export function ArenaPanel({ problemId, problemSignature }: { problemId: string;
   const recordOf = (name: string) => board.records.find((r) => r.mutantName === name)
   const resultOf = (name: string) => attempt?.results.find((r) => r.name === name)
 
+  // 남의 오답만 신고할 수 있다. 저작자의 대표 오답은 검증 파이프라인이 이미 봤다.
+  const report = async (name: string) => {
+    const reason = window.prompt('무엇이 문제입니까? (정답과 같다, 남의 풀이다, 악의적이다 …)')
+    if (!reason || reason.trim().length < 10) return
+    try {
+      await reportArenaTarget(problemId, name, reason)
+      setReported((prev) => new Set(prev).add(name))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '신고하지 못했습니다')
+    }
+  }
+
   return (
     <div className="arena-gym">
       <h4>반례 아레나</h4>
@@ -84,10 +97,16 @@ export function ArenaPanel({ problemId, problemSignature }: { problemId: string;
               <div className="prescription-head">
                 <span className="test-mark">{result ? (result.broken ? '✓' : '✗') : '·'}</span>
                 <span className="reason">{target.kindLabel}</span>
+                {target.community && <span className="muted small">누군가의 오답</span>}
                 <span className="small">{target.note}</span>
                 <button type="button" className="linklike small" onClick={() => setOpen(open === target.name ? null : target.name)}>
                   {open === target.name ? '코드 접기' : '코드 보기'}
                 </button>
+                {target.community && (
+                  reported.has(target.name)
+                    ? <span className="muted small">신고했습니다</span>
+                    : <button type="button" className="linklike small" onClick={() => void report(target.name)}>신고</button>
+                )}
                 {/* 기록판. 이름은 없다 — 내 것인가 아닌가만 (§8.5 평판 정책 전). */}
                 {record && (
                   <span className="muted small">

@@ -1079,7 +1079,8 @@ table.groups td {
 }
 
 /* 반례 아레나 (§8.3). */
-.arena-gym {
+.arena-gym,
+.arena-donate {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border);

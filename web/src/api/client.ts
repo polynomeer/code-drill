@@ -17,6 +17,7 @@ import type {
   SubmissionLanguage,
   ArenaAttempt,
   ArenaBoard,
+  ArenaDonation,
   CoachingSession,
   Collection,
   Prescription,
@@ -291,6 +292,32 @@ export async function attemptArena(problemId: string, args: unknown[]): Promise<
 
 export async function getArenaAttempt(id: string): Promise<ArenaAttempt> {
   return json<ArenaAttempt>(await authed(`/arena/attempts/${id}`))
+}
+
+/** 내 오답을 아레나에 내놓는다 (§8.3). 검수를 거쳐 세워진다. 409 는 이미 내놓은 제출이다. */
+export async function donateToArena(problemId: string, submissionId: string, note: string): Promise<ArenaDonation> {
+  const response = await authed(`/arena/${problemId}/donations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ submissionId, note }),
+  })
+  return json<ArenaDonation>(response)
+}
+
+export async function getMyDonations(problemId: string): Promise<ArenaDonation[]> {
+  return json<ArenaDonation[]>(await authed(`/arena/${problemId}/donations/mine`))
+}
+
+/** 세워진 남의 오답을 신고한다 (§8.5). 204 는 이미 신고한 것이다. */
+export async function reportArenaTarget(problemId: string, name: string, reason: string): Promise<void> {
+  const response = await authed(`/arena/${problemId}/targets/${encodeURIComponent(name)}/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (!response.ok && response.status !== 204) {
+    throw new ApiFailure(response.status, (await response.json()) as ApiError)
+  }
 }
 
 /**

@@ -1,4 +1,5 @@
 import { CounterexamplePanel } from './CounterexamplePanel'
+import { DonatePanel } from '../arena/DonatePanel'
 import { IN_FLIGHT, VERDICT_LABEL } from '../../shared/types'
 import type { Submission } from '../../shared/types'
 
@@ -81,6 +82,8 @@ export function VerdictPanel({ submission }: { submission: Submission }) {
       {!inFlight && submission.verdict && submission.verdict !== 'ACCEPTED' && (
         <CounterexamplePanel submissionId={submission.id} />
       )}
+      {/* 틀린 제출은 남에게 과녁이 될 수 있다 (§8.3). 내놓는 것은 본인만 한다. */}
+      {!inFlight && <DonatePanel submission={submission} />}
     </section>
   )
 }

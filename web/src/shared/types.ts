@@ -423,6 +423,21 @@ export interface ArenaTarget {
   kindLabel: string
   note: string
   source: string
+  /** 저작자의 대표 오답이 아니라 검수를 거쳐 세운 남의 오답 (§8.3). 신고는 이쪽에만. */
+  community: boolean
+}
+
+/** 내가 아레나에 내놓은 오답 (§8.3 익명화된 오답, §8.5 검수). 소스는 실리지 않는다. */
+export interface ArenaDonation {
+  id: string
+  problemId: string
+  submissionId: string
+  note: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'RETIRED'
+  kind: DefectKind | null
+  reason: string | null
+  createdAt: string
+  targetName: string
 }
 
 export interface ArenaRecord {
