@@ -787,3 +787,477 @@ fun isBipartite(n: Int, edges: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 53. 최소 학기 수 (위상 정렬) ----------------------------------------------------
+
+def _min_semesters(n, prereqs):
+    from collections import deque
+    graph = [[] for _ in range(n)]
+    indegree = [0] * n
+    for i in range(0, len(prereqs), 2):
+        before, after = prereqs[i], prereqs[i + 1]
+        graph[before].append(after)
+        indegree[after] += 1
+    queue = deque(v for v in range(n) if indegree[v] == 0)
+    taken = 0
+    semesters = 0
+    while queue:
+        semesters += 1
+        for _ in range(len(queue)):
+            node = queue.popleft()
+            taken += 1
+            for nxt in graph[node]:
+                indegree[nxt] -= 1
+                if indegree[nxt] == 0:
+                    queue.append(nxt)
+    return semesters if taken == n else -1
+
+
+def _chain_prereqs(n):
+    return sum(([i, i + 1] for i in range(n - 1)), [])
+
+
+PROBLEMS.append(Problem(
+    id="minimum-semesters",
+    title="모든 과목을 듣는 최소 학기",
+    summary="""
+과목이 `0` 부터 `n-1` 까지 있다. `prereqs` 는 선수 관계를 평탄하게 이은 배열로,
+`[a1, b1, a2, b2, ...]` 는 "`a` 를 들어야 `b` 를 들을 수 있다"는 뜻이다.
+
+한 학기에는 **선수 과목을 전부 마친 과목을 몇 개든** 들을 수 있다. 모든 과목을 듣는 데
+필요한 **최소 학기 수**를 반환한다. 선수 관계가 돌아서 다 들을 수 없으면 `-1` 이다.
+""",
+    notes="""
+첫 학기에 들을 수 있는 것은 선수 과목이 없는 과목 전부다. 그것을 듣고 나면 선수 과목이
+새로 다 채워진 과목이 다음 학기다. 층을 세다 보면 답이 나오고, 끝났는데 못 들은 과목이
+있으면 순환이다.
+""",
+    drill_doc="""
+Drill.node("c3")              // 과목을 들었다
+Drill.edge("c3", "c5")        // 선수 관계를 따라 다음 과목의 남은 선수 수를 줄였다
+Drill.enqueue(next)           // 들을 수 있게 된 과목을 다음 학기에 넣었다
+Drill.write(semester, count)  // 한 학기를 마쳤다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `prereqs.size` 는 짝수이며 `0 <= prereqs.size <= 400_000`
+- 같은 관계가 두 번 나오지 않는다
+""",
+    signature=dict(
+        name="minSemesters",
+        parameters=[("n", "INT"), ("prereqs", "INT_ARRAY")],
+        returns="INT",
+    ),
+    groups=perf_groups(),
+    reference=_min_semesters,
+    cases={
+        "sample": [
+            ("01", [3, [0, 1, 0, 2]]),
+            ("02", [3, [0, 1, 1, 2, 2, 0]]),
+        ],
+        "boundary": [
+            ("01-single", [1, []]),
+            # 선수 관계가 없다. 한 학기.
+            ("02-no-prereqs", [5, []]),
+            # 한 줄 사슬. 과목 수만큼 학기.
+            ("03-chain", [4, _chain_prereqs(4)]),
+            # 자기 자신이 선수 과목이다.
+            ("04-self-loop", [2, [0, 0]]),
+            # 순환이 일부에만 있다. 나머지는 들을 수 있어도 답은 -1.
+            ("05-partial-cycle", [5, [0, 1, 1, 2, 2, 1, 3, 4]]),
+            # 다이아몬드. 두 길 중 긴 쪽이 학기를 정한다.
+            ("06-diamond", [5, [0, 1, 0, 2, 1, 3, 2, 3, 3, 4, 1, 4]]),
+        ],
+        "hidden": [
+            ("01-two-chains", [6, [0, 1, 1, 2, 3, 4, 4, 5]]),
+            ("02-wide", [8, [0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7]]),
+            ("03-late-cycle", [6, _chain_prereqs(6) + [5, 3]]),
+            ("04-long-and-short", [7, [0, 1, 1, 2, 2, 3, 3, 4, 0, 5, 5, 4, 6, 4]]),
+        ],
+        "performance": [
+            ("01-small", [3000, _chain_prereqs(3000)]),
+            ("02-medium", [20000, _chain_prereqs(20000)]),
+            ("03-large", [100000, _chain_prereqs(100000)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). Kahn 알고리즘을 층 단위로.
+fun minSemesters(n: Int, prereqs: IntArray): Int {
+    val indegree = IntArray(n)
+    val head = IntArray(n) { -1 }
+    val next = IntArray(prereqs.size / 2)
+    val to = IntArray(prereqs.size / 2)
+    var i = 0
+    var e = 0
+    while (i < prereqs.size) {
+        val before = prereqs[i]
+        val after = prereqs[i + 1]
+        to[e] = after
+        next[e] = head[before]
+        head[before] = e
+        indegree[after] += 1
+        i += 2
+        e += 1
+    }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) { queue.addLast(v); Drill.enqueue(v) }
+    var taken = 0
+    var semesters = 0
+    while (queue.isNotEmpty()) {
+        semesters += 1
+        repeat(queue.size) {
+            val node = queue.removeFirst()
+            Drill.node("c$node")
+            taken += 1
+            var edge = head[node]
+            while (edge != -1) {
+                val after = to[edge]
+                Drill.edge("c$node", "c$after")
+                indegree[after] -= 1
+                if (indegree[after] == 0) { queue.addLast(after); Drill.enqueue(after) }
+                edge = next[edge]
+            }
+        }
+        Drill.write(semesters, taken)
+    }
+    return if (taken == n) semesters else -1
+}
+""",
+    mutants=[
+        ("ignores-cycle--returns-semesters", "MISSING_EDGE_CASE",
+         "못 들은 과목이 남아도 학기 수를 돌려준다. 순환을 알아채지 못한다.",
+         """
+fun minSemesters(n: Int, prereqs: IntArray): Int {
+    val indegree = IntArray(n)
+    val graph = Array(n) { mutableListOf<Int>() }
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i]].add(prereqs[i + 1]); indegree[prereqs[i + 1]] += 1; i += 2 }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) queue.addLast(v)
+    var semesters = 0
+    while (queue.isNotEmpty()) {
+        semesters += 1
+        repeat(queue.size) {
+            val node = queue.removeFirst()
+            for (after in graph[node]) { indegree[after] -= 1; if (indegree[after] == 0) queue.addLast(after) }
+        }
+    }
+    return semesters
+}
+"""),
+        ("counts-nodes--not-layers", "WRONG_ALGORITHM",
+         "과목을 하나씩 꺼내며 학기를 센다. 같은 학기에 들을 수 있는 과목을 따로 센다.",
+         """
+fun minSemesters(n: Int, prereqs: IntArray): Int {
+    val indegree = IntArray(n)
+    val graph = Array(n) { mutableListOf<Int>() }
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i]].add(prereqs[i + 1]); indegree[prereqs[i + 1]] += 1; i += 2 }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) queue.addLast(v)
+    var taken = 0
+    while (queue.isNotEmpty()) {
+        val node = queue.removeFirst()
+        taken += 1
+        for (after in graph[node]) { indegree[after] -= 1; if (indegree[after] == 0) queue.addLast(after) }
+    }
+    return if (taken == n) taken else -1
+}
+"""),
+        ("last-layer-uncounted--off-by-one", "OFF_BY_ONE",
+         "다음 학기에 들을 과목이 생길 때만 학기를 센다. 마지막 학기가 빠진다.",
+         """
+fun minSemesters(n: Int, prereqs: IntArray): Int {
+    val indegree = IntArray(n)
+    val graph = Array(n) { mutableListOf<Int>() }
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i]].add(prereqs[i + 1]); indegree[prereqs[i + 1]] += 1; i += 2 }
+    var layer = (0 until n).filter { indegree[it] == 0 }
+    var taken = 0
+    var semesters = 0
+    while (layer.isNotEmpty()) {
+        taken += layer.size
+        val nextLayer = mutableListOf<Int>()
+        for (node in layer) for (after in graph[node]) { indegree[after] -= 1; if (indegree[after] == 0) nextLayer.add(after) }
+        if (nextLayer.isNotEmpty()) semesters += 1
+        layer = nextLayer
+    }
+    return if (taken == n) semesters else -1
+}
+"""),
+        ("rescans-indegrees--per-semester", "PERFORMANCE",
+         "학기마다 모든 관계를 다시 훑어 들을 수 있는 과목을 찾는다. O(학기 × 관계).",
+         """
+fun minSemesters(n: Int, prereqs: IntArray): Int {
+    val taken = BooleanArray(n)
+    var count = 0
+    var semesters = 0
+    while (count < n) {
+        val ready = mutableListOf<Int>()
+        for (v in 0 until n) {
+            if (taken[v]) continue
+            var ok = true
+            var i = 0
+            while (i < prereqs.size) {
+                Drill.compare(v, i / 2)
+                if (prereqs[i + 1] == v && !taken[prereqs[i]]) { ok = false; break }
+                i += 2
+            }
+            if (ok) ready.add(v)
+        }
+        if (ready.isEmpty()) return -1
+        for (v in ready) taken[v] = true
+        count += ready.size
+        semesters += 1
+    }
+    return semesters
+}
+"""),
+    ],
+))
+
+
+# --- 54. 가장 싼 길 (다익스트라) ----------------------------------------------------
+
+def _cheapest_paths(n, edges, source):
+    import heapq
+    graph = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        a, b, w = edges[i], edges[i + 1], edges[i + 2]
+        graph[a].append((b, w))
+        graph[b].append((a, w))
+    dist = [-1] * n
+    dist[source] = 0
+    heap = [(0, source)]
+    while heap:
+        d, node = heapq.heappop(heap)
+        if d > dist[node]:
+            continue
+        for nxt, w in graph[node]:
+            nd = d + w
+            if dist[nxt] == -1 or nd < dist[nxt]:
+                dist[nxt] = nd
+                heapq.heappush(heap, (nd, nxt))
+    return dist
+
+
+def _weighted_chain(n, salt):
+    weights = randoms(n - 1, 1, 100, salt=salt)
+    return sum(([i, i + 1, weights[i]] for i in range(n - 1)), [])
+
+
+def _weighted_random(n, m, salt):
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    w = randoms(m, 1, 1000, salt=salt + 2)
+    return sum(([a[i], b[i], w[i]] for i in range(m)), [])
+
+
+PROBLEMS.append(Problem(
+    id="cheapest-paths",
+    title="가장 싼 길",
+    summary="""
+정점이 `0` 부터 `n-1` 까지 있는 **무방향 가중 그래프**가 주어진다. `edges` 는 간선을
+평탄하게 이은 배열로 `[a1, b1, w1, a2, b2, w2, ...]` 이며, `w` 는 그 간선의 비용이다.
+비용은 항상 `1` 이상이다.
+
+`source` 에서 각 정점까지의 **최소 비용**을 담은 길이 `n` 의 배열을 반환한다. 갈 수
+없는 정점은 `-1` 이다.
+""",
+    notes="""
+비용이 다르면 간선 수가 적은 길이 싼 길이 아니다. "지금까지 찾은 가장 싼 정점"을 먼저
+확정해 나가면 되고, 그 정점을 빨리 꺼내는 구조가 힙이다. 같은 정점이 힙에 여러 번 들어갈
+수 있으니, 꺼낸 값이 이미 확정된 값보다 크면 지나간다.
+""",
+    drill_doc="""
+Drill.node("v3")              // 정점의 비용을 확정했다
+Drill.edge("v3", "v7")        // 간선으로 이웃의 비용을 낮췄다
+Drill.write(v, cost)          // 정점의 비용을 적었다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `edges.size` 는 3 의 배수이며 `0 <= edges.size <= 600_000`
+- `1 <= w <= 1000`, 모든 비용의 합은 `Int` 범위 안이다
+- `0 <= source < n`
+""",
+    signature=dict(
+        name="cheapestPaths",
+        parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("source", "INT")],
+        returns="INT_ARRAY",
+    ),
+    groups=perf_groups(),
+    reference=_cheapest_paths,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 4, 0, 2, 1, 2, 1, 2, 1, 3, 5], 0]),
+            ("02", [3, [0, 1, 7], 0]),
+        ],
+        "boundary": [
+            ("01-single", [1, [], 0]),
+            # 간선 수는 적지만 비싼 길과, 간선 수는 많지만 싼 길.
+            ("02-hops-vs-cost", [4, [0, 3, 10, 0, 1, 1, 1, 2, 1, 2, 3, 1], 0]),
+            ("03-unreachable", [4, [0, 1, 3, 2, 3, 3], 0]),
+            # 같은 두 정점 사이에 간선이 둘. 싼 쪽이다.
+            ("04-parallel-edges", [2, [0, 1, 9, 0, 1, 2], 0]),
+            # 출발점이 0 이 아니다.
+            ("05-source-not-zero", [3, [0, 1, 5, 1, 2, 5], 2]),
+            # 더 싼 길이 나중에 발견된다. 처음 적은 값을 고치지 않으면 틀린다.
+            ("06-relax-later", [4, [0, 1, 1, 0, 2, 5, 1, 2, 1, 2, 3, 1], 0]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _weighted_random(8, 14, salt=1201), 0]),
+            ("02-random-medium", [50, _weighted_random(50, 120, salt=1204), 7]),
+            ("03-chain", [10, _weighted_chain(10, salt=1207), 9]),
+            ("04-star", [6, [0, 1, 1, 0, 2, 2, 0, 3, 3, 0, 4, 4, 0, 5, 5], 3]),
+        ],
+        "performance": [
+            ("01-small", [3000, _weighted_chain(3000, salt=1211), 0]),
+            ("02-medium", [20000, _weighted_chain(20000, salt=1212), 0]),
+            ("03-large", [100000, _weighted_chain(100000, salt=1213), 0]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 힙으로 가장 싼 정점부터 확정한다.
+fun cheapestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }
+    val next = IntArray(2 * m)
+    val to = IntArray(2 * m)
+    val cost = IntArray(2 * m)
+    var e = 0
+    var i = 0
+    while (i < edges.size) {
+        val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+        to[e] = b; cost[e] = w; next[e] = head[a]; head[a] = e; e += 1
+        to[e] = a; cost[e] = w; next[e] = head[b]; head[b] = e; e += 1
+        i += 3
+    }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0].toInt()
+        val node = top[1].toInt()
+        if (d > dist[node]) continue
+        Drill.node("v$node")
+        var edge = head[node]
+        while (edge != -1) {
+            val nxt = to[edge]
+            val nd = d + cost[edge]
+            if (dist[nxt] == -1 || nd < dist[nxt]) {
+                dist[nxt] = nd
+                Drill.edge("v$node", "v$nxt")
+                Drill.write(nxt, nd)
+                heap.add(longArrayOf(nd.toLong(), nxt.toLong()))
+            }
+            edge = next[edge]
+        }
+    }
+    return dist
+}
+""",
+    mutants=[
+        ("bfs-ignores-weights", "WRONG_ALGORITHM",
+         "비용을 보지 않고 간선 수로 고른다. 간선은 적지만 비싼 길을 답으로 삼는다.",
+         """
+fun cheapestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) {
+        graph[edges[i]].add(edges[i + 1] to edges[i + 2]); graph[edges[i + 1]].add(edges[i] to edges[i + 2]); i += 3
+    }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val queue = ArrayDeque<Int>()
+    queue.addLast(source)
+    while (queue.isNotEmpty()) {
+        val node = queue.removeFirst()
+        for ((nxt, w) in graph[node]) {
+            if (dist[nxt] != -1) continue
+            dist[nxt] = dist[node] + w
+            queue.addLast(nxt)
+        }
+    }
+    return dist
+}
+"""),
+        ("first-visit-final--no-relax", "WRONG_BRANCH",
+         "처음 적은 비용을 다시 낮추지 않는다. 더 싼 길이 나중에 발견되면 틀린다.",
+         """
+fun cheapestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) {
+        graph[edges[i]].add(edges[i + 1] to edges[i + 2]); graph[edges[i + 1]].add(edges[i] to edges[i + 2]); i += 3
+    }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val node = top[1].toInt()
+        for ((nxt, w) in graph[node]) {
+            if (dist[nxt] != -1) continue
+            dist[nxt] = dist[node] + w
+            heap.add(longArrayOf(dist[nxt].toLong(), nxt.toLong()))
+        }
+    }
+    return dist
+}
+"""),
+        ("directed-only--one-way", "MISSING_EDGE_CASE",
+         "간선을 한 방향으로만 넣는다. 무방향인데 되돌아가지 못한다.",
+         """
+fun cheapestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) { graph[edges[i]].add(edges[i + 1] to edges[i + 2]); i += 3 }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0].toInt(); val node = top[1].toInt()
+        if (d > dist[node]) continue
+        for ((nxt, w) in graph[node]) {
+            if (dist[nxt] == -1 || d + w < dist[nxt]) { dist[nxt] = d + w; heap.add(longArrayOf(dist[nxt].toLong(), nxt.toLong())) }
+        }
+    }
+    return dist
+}
+"""),
+        ("array-scan--quadratic", "PERFORMANCE",
+         "힙 없이 매번 모든 정점을 훑어 가장 싼 미확정 정점을 고른다. O(n²).",
+         """
+fun cheapestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) {
+        graph[edges[i]].add(edges[i + 1] to edges[i + 2]); graph[edges[i + 1]].add(edges[i] to edges[i + 2]); i += 3
+    }
+    val dist = IntArray(n) { -1 }
+    val done = BooleanArray(n)
+    dist[source] = 0
+    repeat(n) {
+        var best = -1
+        for (v in 0 until n) {
+            Drill.compare(v, best)
+            if (!done[v] && dist[v] != -1 && (best == -1 || dist[v] < dist[best])) best = v
+        }
+        if (best == -1) return dist
+        done[best] = true
+        for ((nxt, w) in graph[best]) {
+            if (dist[nxt] == -1 || dist[best] + w < dist[nxt]) dist[nxt] = dist[best] + w
+        }
+    }
+    return dist
+}
+"""),
+    ],
+))

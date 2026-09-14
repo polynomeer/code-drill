@@ -1,0 +1,15 @@
+# most-frequent-small-values 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - array
+  - counting
+competencies:
+  - CONSTRAINTS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - count-letters
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(n + 값의 범위). 값의 범위가 상수라 표도 상수"

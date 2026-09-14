@@ -388,6 +388,7 @@ def catalog() -> list[Problem]:
     바로 import 하면 순환이 된다.
     """
     import catalog_arrays
+    import catalog_bits
     import catalog_dp
     import catalog_graph
     import catalog_math
@@ -401,7 +402,7 @@ def catalog() -> list[Problem]:
 
     problems: list[Problem] = []
     for module in (
-        catalog_arrays, catalog_dp, catalog_graph, catalog_greedy, catalog_math,
+        catalog_arrays, catalog_bits, catalog_dp, catalog_graph, catalog_greedy, catalog_math,
         catalog_matrix, catalog_recursion, catalog_search, catalog_stack, catalog_strings, catalog_tree,
     ):
         problems += module.PROBLEMS

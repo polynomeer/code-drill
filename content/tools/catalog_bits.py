@@ -1,0 +1,220 @@
+"""비트 연산 (역량: 문제 독해, 최적화 — "수를 비트의 열로 보면 무엇이 보이나").
+
+비트 문제의 오답은 두 갈래다. 점화를 잘못 잡아 값 자체가 틀리거나, 쌍마다 세어서 맞지만
+느리거나. 둘 다 여기 있다.
+"""
+
+from author import Problem, standard_groups, perf_groups, randoms
+
+PROBLEMS = []
+
+
+# --- 1. 0 부터 n 까지의 1 비트 수 -------------------------------------------------
+
+def _count_bits(n):
+    bits = [0] * (n + 1)
+    for i in range(1, n + 1):
+        bits[i] = bits[i >> 1] + (i & 1)
+    return bits
+
+
+PROBLEMS.append(Problem(
+    id="count-bits",
+    title="0부터 n까지의 1비트 수",
+    summary="""
+정수 `n` 이 주어진다. `0` 부터 `n` 까지 **각 수를 이진수로 적었을 때 1 의 개수**를 순서대로
+담은 배열을 반환한다. 배열의 길이는 `n + 1` 이다.
+
+예: `n = 5` 이면 `0, 1, 10, 11, 100, 101` 이므로 `[0, 1, 1, 2, 1, 2]` 다.
+""",
+    notes="""
+수마다 비트를 세어도 되지만, `i` 의 1 비트 수는 `i` 를 오른쪽으로 한 칸 민 수의 1 비트 수에
+마지막 비트를 더한 것이다 — 앞에서 센 값을 다시 쓸 수 있다.
+""",
+    drill_doc="""
+Drill.write(i, bits)          // i 의 1 비트 수를 적었다
+""",
+    constraints="""
+- `0 <= n <= 20_000`
+""",
+    signature=dict(name="countBits", parameters=[("n", "INT")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_count_bits,
+    cases={
+        "sample": [
+            ("01", [5]),
+            ("02", [2]),
+        ],
+        "boundary": [
+            # 0 하나. 길이 1 의 배열이다.
+            ("01-zero", [0]),
+            ("02-one", [1]),
+            # 2 의 거듭제곱과 그 직전. 비트가 한꺼번에 바뀌는 자리다.
+            ("03-power-of-two", [8]),
+            ("04-before-power", [7]),
+            ("05-all-ones", [1023]),
+        ],
+        "hidden": [
+            ("01-small", [100]),
+            ("02-medium", [4096]),
+            ("03-max", [20000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). bits[i] = bits[i shr 1] + (i and 1).
+fun countBits(n: Int): IntArray {
+    val bits = IntArray(n + 1)
+    for (i in 1..n) {
+        bits[i] = bits[i shr 1] + (i and 1)
+        Drill.write(i, bits[i])
+    }
+    return bits
+}
+""",
+    mutants=[
+        ("excludes-n--off-by-one", "OFF_BY_ONE",
+         "n 을 빼고 n-1 까지만 만든다. 길이가 하나 모자란다.",
+         """
+fun countBits(n: Int): IntArray {
+    val bits = IntArray(n)
+    for (i in 1 until n) bits[i] = bits[i shr 1] + (i and 1)
+    return bits
+}
+"""),
+        ("drops-low-bit--wrong-recurrence", "WRONG_BRANCH",
+         "밀어낸 마지막 비트를 더하지 않는다. 홀수마다 1 씩 모자란다.",
+         """
+fun countBits(n: Int): IntArray {
+    val bits = IntArray(n + 1)
+    for (i in 1..n) bits[i] = bits[i shr 1]
+    return bits
+}
+"""),
+        ("parity-only--counts-one-bit", "WRONG_ALGORITHM",
+         "마지막 비트만 본다. 3 이상에서 갈린다.",
+         """
+fun countBits(n: Int): IntArray = IntArray(n + 1) { it and 1 }
+"""),
+    ],
+))
+
+
+# --- 2. 모든 쌍의 해밍 거리 합 ----------------------------------------------------
+
+def _total_hamming(nums):
+    n = len(nums)
+    total = 0
+    for bit in range(16):
+        ones = sum((v >> bit) & 1 for v in nums)
+        total += ones * (n - ones)
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="total-hamming-distance",
+    title="모든 쌍의 해밍 거리 합",
+    summary="""
+두 정수의 **해밍 거리**는 이진수로 적었을 때 서로 다른 자리의 개수다. 정수 배열 `nums` 가
+주어진다. **모든 서로 다른 두 원소 쌍**의 해밍 거리를 전부 더해 반환한다.
+
+예: `[4, 14, 2]` 는 `100, 1110, 0010` 이고, 쌍 `(4,14)`, `(4,2)`, `(14,2)` 의 거리는
+`2 + 2 + 2 = 6` 이다.
+""",
+    notes="""
+쌍마다 세면 쌍의 수만큼 든다. 자리를 고정하고 보면, 그 자리가 1 인 원소 수와 0 인 원소
+수의 **곱**이 그 자리가 기여하는 거리다. 자리 수는 상수다.
+""",
+    drill_doc="""
+Drill.visit(bit, ones)        // bit 번째 자리의 1 개수를 셌다
+Drill.write(bit, total)       // 그 자리의 기여를 더했다
+""",
+    constraints="""
+- `1 <= nums.size <= 20_000`
+- `0 <= nums[i] < 2^16`
+""",
+    signature=dict(name="totalHamming", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_total_hamming,
+    cases={
+        "sample": [
+            ("01", [[4, 14, 2]]),
+            ("02", [[1, 2, 3]]),
+        ],
+        "boundary": [
+            # 원소 하나. 쌍이 없다.
+            ("01-single", [[7]]),
+            # 전부 같다. 거리 0.
+            ("02-all-same", [[5, 5, 5, 5]]),
+            ("03-zero-and-max", [[0, 65535]]),
+            # 각 자리마다 1 이 딱 하나. 자리 수 × (n-1).
+            ("04-powers", [[1, 2, 4, 8, 16]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(50, 0, 65535, salt=1101)]),
+            ("02-random-medium", [randoms(500, 0, 65535, salt=1102)]),
+            ("03-two-values", [[0, 65535] * 100]),
+        ],
+        "performance": [
+            ("01-small", [randoms(1500, 0, 65535, salt=1103)]),
+            ("02-medium", [randoms(5000, 0, 65535, salt=1104)]),
+            ("03-large", [randoms(20000, 0, 65535, salt=1105)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 자리마다 1 의 개수 × 0 의 개수.
+fun totalHamming(nums: IntArray): Int {
+    var total = 0
+    for (bit in 0 until 16) {
+        var ones = 0
+        for (v in nums) ones += (v shr bit) and 1
+        Drill.visit(bit, ones)
+        total += ones * (nums.size - ones)
+        Drill.write(bit, total)
+    }
+    return total
+}
+""",
+    mutants=[
+        ("ones-squared--wrong-product", "WRONG_BRANCH",
+         "1 의 개수끼리 곱한다. 서로 다른 쌍이 아니라 같은 쌍을 센다.",
+         """
+fun totalHamming(nums: IntArray): Int {
+    var total = 0
+    for (bit in 0 until 16) {
+        var ones = 0
+        for (v in nums) ones += (v shr bit) and 1
+        total += ones * ones
+    }
+    return total
+}
+"""),
+        ("fifteen-bits--drops-top", "OFF_BY_ONE",
+         "자리를 15 개만 본다. 가장 높은 자리가 다른 쌍을 놓친다.",
+         """
+fun totalHamming(nums: IntArray): Int {
+    var total = 0
+    for (bit in 0 until 15) {
+        var ones = 0
+        for (v in nums) ones += (v shr bit) and 1
+        total += ones * (nums.size - ones)
+    }
+    return total
+}
+"""),
+        ("pairwise--counts-each-pair", "PERFORMANCE",
+         "쌍마다 xor 의 비트를 하나씩 센다. O(n² · 비트 수).",
+         """
+fun totalHamming(nums: IntArray): Int {
+    var total = 0
+    for (i in nums.indices) {
+        for (j in i + 1 until nums.size) {
+            var x = nums[i] xor nums[j]
+            Drill.compare(i, j)
+            while (x != 0) { total += x and 1; x = x shr 1 }
+        }
+    }
+    return total
+}
+"""),
+    ],
+))

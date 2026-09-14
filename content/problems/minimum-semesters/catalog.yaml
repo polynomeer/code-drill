@@ -1,0 +1,18 @@
+# minimum-semesters 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - topological-sort
+  - bfs
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - detect-cycle-directed
+  - shortest-hops
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(과목 + 관계). 학기마다 다시 훑으면 O(학기 × 관계)"

@@ -554,3 +554,150 @@ fun topK(nums: IntArray, k: Int): IntArray {
 """),
     ],
 ))
+
+
+# --- 5. 밧줄 잇기 비용 ------------------------------------------------------------
+
+def _connect_cost(lengths):
+    import heapq
+    heap = list(lengths)
+    heapq.heapify(heap)
+    total = 0
+    while len(heap) > 1:
+        a = heapq.heappop(heap)
+        b = heapq.heappop(heap)
+        total += a + b
+        heapq.heappush(heap, a + b)
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="connect-ropes",
+    title="밧줄을 하나로 잇는 최소 비용",
+    summary="""
+밧줄의 길이가 배열 `lengths` 로 주어진다. 두 밧줄을 하나로 이으면 **두 길이의 합**만큼
+비용이 들고, 이은 밧줄의 길이는 그 합이다. 모든 밧줄을 하나로 이을 때까지의 **최소 총
+비용**을 반환한다. 밧줄이 하나뿐이면 `0` 이다.
+""",
+    notes="""
+먼저 이은 밧줄은 뒤의 잇기마다 비용에 다시 들어간다. 그러니 긴 것은 늦게, 짧은 것은
+일찍 이어야 한다 — 매번 **지금 가장 짧은 둘**을 잇는다. 이은 결과가 다시 후보에 들어가므로
+정렬 한 번으로는 안 되고, 가장 작은 둘을 계속 꺼낼 수 있는 구조가 필요하다.
+""",
+    drill_doc="""
+Drill.compare(a, b)           // 가장 짧은 둘을 골랐다
+Drill.push(a + b)             // 이은 밧줄을 다시 넣었다
+Drill.write(0, total)         // 지금까지의 비용
+""",
+    constraints="""
+- `1 <= lengths.size <= 100_000`
+- `1 <= lengths[i] <= 1000`, 총 비용은 `Int` 범위 안
+""",
+    signature=dict(name="connectCost", parameters=[("lengths", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_connect_cost,
+    cases={
+        "sample": [
+            ("01", [[4, 3, 2, 6]]),
+            ("02", [[1, 8, 3, 5]]),
+        ],
+        "boundary": [
+            # 하나뿐. 이을 것이 없다.
+            ("01-single", [[7]]),
+            ("02-two", [[3, 9]]),
+            # 전부 같다. 어느 순서든 같다 — 여기서는 갈리지 않아야 한다.
+            ("03-all-equal", [[5, 5, 5, 5]]),
+            # 정렬한 뒤 앞에서부터 차례로 이으면 틀린다: 이은 결과가 남은 것보다 클 수 있다.
+            ("04-merged-exceeds", [[1, 2, 3, 4, 5]]),
+            # 짝지어 이으면 틀린다.
+            ("05-pairwise-wrong", [[1, 1, 1, 100]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, 1, 100, salt=1701)]),
+            ("02-random-medium", [randoms(500, 1, 1000, salt=1702)]),
+            ("03-descending", [list(range(200, 0, -1))]),
+            ("04-ones-and-big", [[1] * 50 + [1000] * 5]),
+        ],
+        "performance": [
+            ("01-small", [randoms(3000, 1, 1000, salt=1703)]),
+            ("02-medium", [randoms(20000, 1, 1000, salt=1704)]),
+            ("03-large", [randoms(100000, 1, 1000, salt=1705)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최소 힙에서 가장 짧은 둘을 꺼내 잇고 다시 넣는다.
+fun connectCost(lengths: IntArray): Int {
+    val heap = java.util.PriorityQueue<Int>()
+    for (v in lengths) heap.add(v)
+    var total = 0
+    while (heap.size > 1) {
+        val a = heap.poll()
+        val b = heap.poll()
+        Drill.compare(a, b)
+        total += a + b
+        Drill.push(a + b)
+        heap.add(a + b)
+        Drill.write(0, total)
+    }
+    return total
+}
+""",
+    mutants=[
+        ("sort-once--merge-in-order", "WRONG_ALGORITHM",
+         "정렬한 뒤 앞에서부터 차례로 잇는다. 이은 결과가 남은 것보다 길어지는 순간을 놓친다.",
+         """
+fun connectCost(lengths: IntArray): Int {
+    val sorted = lengths.sorted()
+    var total = 0
+    var current = sorted[0]
+    for (i in 1 until sorted.size) { current += sorted[i]; total += current }
+    return total
+}
+"""),
+        ("pairwise--merges-neighbors", "WRONG_ALGORITHM",
+         "정렬한 뒤 이웃끼리 짝지어 잇는다. 짧은 것 셋을 먼저 잇는 편이 싼 경우를 놓친다.",
+         """
+fun connectCost(lengths: IntArray): Int {
+    var current = lengths.sorted()
+    var total = 0
+    while (current.size > 1) {
+        val next = mutableListOf<Int>()
+        var i = 0
+        while (i + 1 < current.size) { total += current[i] + current[i + 1]; next.add(current[i] + current[i + 1]); i += 2 }
+        if (i < current.size) next.add(current[i])
+        current = next.sorted()
+    }
+    return total
+}
+"""),
+        ("counts-final-length--not-cost", "WRONG_BRANCH",
+         "마지막 밧줄의 길이를 답한다. 비용은 잇는 횟수마다 쌓인다.",
+         """
+fun connectCost(lengths: IntArray): Int {
+    val heap = java.util.PriorityQueue<Int>()
+    for (v in lengths) heap.add(v)
+    while (heap.size > 1) heap.add(heap.poll() + heap.poll())
+    return if (lengths.size == 1) 0 else heap.poll()
+}
+"""),
+        ("scan-min--quadratic", "PERFORMANCE",
+         "매번 목록을 훑어 가장 짧은 둘을 찾는다. O(n²).",
+         """
+fun connectCost(lengths: IntArray): Int {
+    val list = lengths.toMutableList()
+    var total = 0
+    while (list.size > 1) {
+        var a = 0
+        for (i in 1 until list.size) { Drill.compare(i, a); if (list[i] < list[a]) a = i }
+        val first = list.removeAt(a)
+        var b = 0
+        for (i in 1 until list.size) if (list[i] < list[b]) b = i
+        val second = list.removeAt(b)
+        total += first + second
+        list.add(first + second)
+    }
+    return total
+}
+"""),
+    ],
+))

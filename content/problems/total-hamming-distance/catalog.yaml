@@ -1,0 +1,16 @@
+# total-hamming-distance 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - bit-manipulation
+  - counting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+  - OPTIMIZATION
+prerequisites:
+  - count-bits
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(n × 비트 수) — 비트 수는 상수"

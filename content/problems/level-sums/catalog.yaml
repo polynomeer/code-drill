@@ -1,0 +1,15 @@
+# level-sums 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - tree
+  - bfs
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - tree-height
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "정점마다 깊이를 한 번만 정한다"

@@ -457,3 +457,140 @@ fun countLetters(text: String): IntArray {
 """),
     ],
 ))
+
+
+# --- 57. 같은 모양의 두 문자열 ------------------------------------------------------
+
+def _isomorphic(first, second):
+    if len(first) != len(second):
+        return 0
+    forward = {}
+    backward = {}
+    for a, b in zip(first, second):
+        if forward.get(a, b) != b or backward.get(b, a) != a:
+            return 0
+        forward[a] = b
+        backward[b] = a
+    return 1
+
+
+PROBLEMS.append(Problem(
+    id="isomorphic-strings",
+    title="같은 모양의 두 문자열",
+    summary="""
+두 문자열 `first` 와 `second` 가 주어진다. `first` 의 각 문자를 어떤 문자로 바꾸어
+`second` 를 만들 수 있으면 두 문자열은 **같은 모양**이다. 단, 같은 문자는 늘 같은 문자로
+바뀌어야 하고, **서로 다른 문자가 같은 문자로 바뀌어서는 안 된다.** 문자는 자기 자신으로
+바뀔 수 있다.
+
+같은 모양이면 `1`, 아니면 `0` 을 반환한다.
+
+- `"egg"` 와 `"add"` 는 같은 모양이다 (e→a, g→d).
+- `"foo"` 와 `"bar"` 는 아니다 (o 가 a 와 r 둘로 바뀌어야 한다).
+- `"badc"` 와 `"baba"` 는 아니다 (d 와 c 가 둘 다 a 로 바뀐다).
+""",
+    notes="""
+한 방향의 대응만 기억하면 "서로 다른 문자가 같은 문자로"를 놓친다. 두 방향을 다 기억하거나,
+각 자리에서 "그 문자가 처음 나온 위치"가 두 문자열에서 같은지를 본다.
+""",
+    drill_doc="""
+Drill.visit(i, 0)             // i 번째 자리를 봤다
+Drill.match(i, 1)             // 대응이 맞았다
+""",
+    constraints="""
+- `0 <= first.length, second.length <= 100_000`
+- 임의의 유니코드 문자가 올 수 있다
+""",
+    signature=dict(name="isomorphic", parameters=[("first", "STRING"), ("second", "STRING")],
+                   returns="INT"),
+    groups=standard_groups(),
+    reference=_isomorphic,
+    cases={
+        "sample": [
+            ("01", ["egg", "add"]),
+            ("02", ["foo", "bar"]),
+        ],
+        "boundary": [
+            ("01-both-empty", ["", ""]),
+            # 길이가 다르면 모양이 같을 수 없다.
+            ("02-different-length", ["ab", "abc"]),
+            ("03-same-string", ["paper", "paper"]),
+            # 서로 다른 문자가 같은 문자로. 한 방향만 보면 놓친다.
+            ("04-two-to-one", ["badc", "baba"]),
+            ("05-one-to-two", ["baba", "badc"]),
+            ("06-single-char", ["a", "z"]),
+            # 탭과 쉼표. 프로토콜의 구분자가 값 안에 들어 있어도 안전해야 한다.
+            ("07-tab-and-comma", ["a\tb,c", "x\ty,z"]),
+            # 비ASCII. 문자 단위로 대응해야 한다.
+            ("08-non-ascii", ["한글한", "abca"]),
+            ("09-non-ascii-match", ["한글한", "aba"]),
+        ],
+        "hidden": [
+            ("01-long-match", ["abcabcabc" * 100, "xyzxyzxyz" * 100]),
+            ("02-long-mismatch-late", ["ab" * 500 + "a", "cd" * 500 + "d"]),
+            ("03-identity-mapping", ["abcdefg", "abcdefg"]),
+            ("04-swap", ["abab", "baba"]),
+            ("05-digits-and-letters", ["a1b2", "x9y8"]),
+            ("06-two-to-one-late", ["abcdefghij", "abcdefghii"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 두 방향의 대응을 함께 기억한다.
+fun isomorphic(first: String, second: String): Int {
+    if (first.length != second.length) return 0
+    val forward = HashMap<Char, Char>()
+    val backward = HashMap<Char, Char>()
+    for (i in first.indices) {
+        val a = first[i]
+        val b = second[i]
+        Drill.visit(i, 0)
+        val f = forward[a]
+        val g = backward[b]
+        if ((f != null && f != b) || (g != null && g != a)) return 0
+        forward[a] = b
+        backward[b] = a
+        Drill.match(i, 1)
+    }
+    return 1
+}
+""",
+    mutants=[
+        ("one-direction-only", "MISSING_EDGE_CASE",
+         "first 에서 second 로의 대응만 기억한다. 서로 다른 문자가 같은 문자로 바뀌는 것을 놓친다.",
+         """
+fun isomorphic(first: String, second: String): Int {
+    if (first.length != second.length) return 0
+    val forward = HashMap<Char, Char>()
+    for (i in first.indices) {
+        val f = forward[first[i]]
+        if (f != null && f != second[i]) return 0
+        forward[first[i]] = second[i]
+    }
+    return 1
+}
+"""),
+        ("ignores-length", "MISSING_EDGE_CASE",
+         "길이가 다른 것을 확인하지 않는다. 짧은 쪽까지만 맞으면 같다고 본다.",
+         """
+fun isomorphic(first: String, second: String): Int {
+    val forward = HashMap<Char, Char>()
+    val backward = HashMap<Char, Char>()
+    for (i in 0 until minOf(first.length, second.length)) {
+        val a = first[i]; val b = second[i]
+        val f = forward[a]; val g = backward[b]
+        if ((f != null && f != b) || (g != null && g != a)) return 0
+        forward[a] = b; backward[b] = a
+    }
+    return 1
+}
+"""),
+        ("distinct-count--not-structure", "WRONG_ALGORITHM",
+         "서로 다른 문자의 개수만 비교한다. 개수가 같아도 자리가 다르면 다른 모양이다.",
+         """
+fun isomorphic(first: String, second: String): Int {
+    if (first.length != second.length) return 0
+    return if (first.toSet().size == second.toSet().size) 1 else 0
+}
+"""),
+    ],
+))

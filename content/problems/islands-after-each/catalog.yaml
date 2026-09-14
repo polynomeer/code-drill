@@ -1,0 +1,18 @@
+# islands-after-each 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - matrix
+  - union-find
+  - graph
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - island-count
+  - redundant-connection
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "추가마다 거의 O(1). 매번 다시 세면 O(추가 × 격자)"

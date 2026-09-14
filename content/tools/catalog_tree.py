@@ -760,3 +760,399 @@ fun rangeSums(nums: IntArray, queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 6. 깊이별 값의 합 ------------------------------------------------------------
+
+def _level_sums(parent, values):
+    depth = _depths(parent)
+    out = [0] * (max(depth) + 1)
+    for v, d in enumerate(depth):
+        out[d] += values[v]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="level-sums",
+    title="깊이별 값의 합",
+    summary="""
+정점 `0..n-1` 의 트리가 부모 배열 `parent` 로, 정점의 값이 `values` 로 주어진다.
+`parent[i]` 는 `i` 의 부모이고 루트는 `-1` 이다.
+
+**깊이가 같은 정점들의 값을 더한 배열**을 깊이 순으로 반환한다. 루트의 깊이는 `0`
+이고, 배열의 길이는 트리의 높이 + 1 이다.
+""",
+    notes="""
+정점마다 깊이만 알면 된다. 부모가 자식보다 먼저 온다는 보장이 없으므로, 배열 순서대로
+훑으며 "부모의 깊이 + 1" 을 쓰면 아직 안 정해진 부모를 만난다. 루트에서 내려가거나,
+정점마다 올라가되 한 번 정한 깊이를 기억한다.
+""",
+    drill_doc="""
+Drill.node(i)                  // 정점 i 의 깊이를 정했다
+Drill.write(depth, sum)        // 그 깊이의 합에 값을 더했다
+""",
+    constraints="""
+- `1 <= parent.size = values.size <= 200_000`
+- `-10^4 <= values[i] <= 10^4`, 합은 `Int` 범위 안
+- 루트는 정확히 하나이며 입력은 항상 트리다
+""",
+    signature=dict(name="levelSums", parameters=[("parent", "INT_ARRAY"), ("values", "INT_ARRAY")],
+                   returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_level_sums,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0, 1, 1, 2], [1, 2, 3, 4, 5, 6]]),
+            ("02", [[1, -1], [7, 3]]),
+        ],
+        "boundary": [
+            ("01-single", [[-1], [5]]),
+            # 루트가 마지막에 온다. 순서대로 부모의 깊이를 믿으면 틀린다.
+            ("02-root-last", [[2, 2, -1], [1, 1, 10]]),
+            # 사슬. 깊이마다 정점 하나.
+            ("03-chain", [[-1, 0, 1, 2, 3], [1, 2, 3, 4, 5]]),
+            # 별. 깊이 1 에 전부.
+            ("04-star", [[-1, 0, 0, 0, 0], [0, 1, 2, 3, 4]]),
+            # 음수와 0 이 섞여 합이 0 인 깊이.
+            ("05-zero-sum-level", [[-1, 0, 0], [5, -3, 3]]),
+            # 자식이 부모보다 앞에 온다.
+            ("06-child-before-parent", [[3, 0, 0, -1], [1, 2, 3, 4]]),
+            # 사슬이 거꾸로 적혀 있다. 순서대로 부모의 깊이를 믿으면 아직 0 인 값을 읽는다 —
+            # 부모가 루트일 때는 우연히 맞으므로, 부모가 루트가 아닌 자리가 있어야 갈린다.
+            ("07-chain-reversed", [[1, 2, -1], [1, 2, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(30, salt=1501), randoms(30, -100, 100, salt=1502)]),
+            ("02-random-medium", [_random_parents(2000, salt=1503), randoms(2000, -10000, 10000, salt=1504)]),
+            ("03-deep-chain", [[-1] + list(range(0, 4999)), randoms(5000, -10000, 10000, salt=1505)]),
+            ("04-large", [_random_parents(200000, salt=1506), randoms(200000, -10000, 10000, salt=1507)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 깊이를 한 번씩만 정한다 — 올라가다 정해진 정점을 만나면 멈춘다.
+fun levelSums(parent: IntArray, values: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    val path = IntArray(n)
+    var height = 0
+    for (start in 0 until n) {
+        var v = start
+        var len = 0
+        while (v != -1 && depth[v] == -1) { path[len++] = v; v = parent[v] }
+        var d = if (v == -1) -1 else depth[v]
+        while (len > 0) {
+            val u = path[--len]
+            d += 1
+            depth[u] = d
+            Drill.node("v$u")
+            if (d > height) height = d
+        }
+    }
+    val sums = IntArray(height + 1)
+    for (v in 0 until n) {
+        sums[depth[v]] += values[v]
+        Drill.write(depth[v], sums[depth[v]])
+    }
+    return sums
+}
+""",
+    mutants=[
+        ("trusts-order--parent-first", "MISSING_EDGE_CASE",
+         "부모가 자식보다 먼저 온다고 믿고 순서대로 깊이를 정한다. 루트가 뒤에 오면 틀린다.",
+         """
+fun levelSums(parent: IntArray, values: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n)
+    for (v in 0 until n) depth[v] = if (parent[v] == -1) 0 else depth[parent[v]] + 1
+    val sums = IntArray(depth.max() + 1)
+    for (v in 0 until n) sums[depth[v]] += values[v]
+    return sums
+}
+"""),
+        ("depth-from-one--extra-level", "OFF_BY_ONE",
+         "루트의 깊이를 1 로 둔다. 앞에 0 인 칸이 하나 생긴다.",
+         """
+fun levelSums(parent: IntArray, values: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    fun depthOf(v: Int): Int {
+        if (depth[v] == -1) depth[v] = if (parent[v] == -1) 1 else depthOf(parent[v]) + 1
+        return depth[v]
+    }
+    val sums = IntArray(n + 1)
+    var height = 0
+    for (v in 0 until n) { val d = depthOf(v); sums[d] += values[v]; if (d > height) height = d }
+    return sums.copyOf(height + 1)
+}
+"""),
+        ("counts-nodes--not-values", "WRONG_BRANCH",
+         "값 대신 정점 수를 더한다.",
+         """
+fun levelSums(parent: IntArray, values: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    fun depthOf(v: Int): Int {
+        if (depth[v] == -1) depth[v] = if (parent[v] == -1) 0 else depthOf(parent[v]) + 1
+        return depth[v]
+    }
+    var height = 0
+    for (v in 0 until n) height = maxOf(height, depthOf(v))
+    val sums = IntArray(height + 1)
+    for (v in 0 until n) sums[depth[v]] += 1
+    return sums
+}
+"""),
+    ],
+))
+
+
+# --- 7. 가장 가까운 공통 조상 ------------------------------------------------------
+
+def _lca_queries(parent, queries):
+    depth = _depths(parent)
+    out = []
+    for i in range(0, len(queries), 2):
+        a, b = queries[i], queries[i + 1]
+        while depth[a] > depth[b]:
+            a = parent[a]
+        while depth[b] > depth[a]:
+            b = parent[b]
+        while a != b:
+            a = parent[a]
+            b = parent[b]
+        out.append(a)
+    return out
+
+
+def _lca_queries_fast(parent, queries):
+    """이진 리프팅. 20 만 사슬에 2 만 질의면 단순 오르기는 파이썬에서 너무 느리다."""
+    n = len(parent)
+    depth = _depths(parent)
+    log = max(1, (n - 1).bit_length())
+    up = [[p if p != -1 else v for v, p in enumerate(parent)]]
+    for k in range(1, log):
+        prev = up[k - 1]
+        up.append([prev[prev[v]] for v in range(n)])
+    out = []
+    for i in range(0, len(queries), 2):
+        a, b = queries[i], queries[i + 1]
+        if depth[a] < depth[b]:
+            a, b = b, a
+        diff = depth[a] - depth[b]
+        k = 0
+        while diff:
+            if diff & 1:
+                a = up[k][a]
+            diff >>= 1
+            k += 1
+        if a != b:
+            for k in range(log - 1, -1, -1):
+                if up[k][a] != up[k][b]:
+                    a = up[k][a]
+                    b = up[k][b]
+            a = parent[a]
+        out.append(a)
+    return out
+
+
+def _random_pairs(n, count, salt):
+    a = randoms(count, 0, n - 1, salt=salt)
+    b = randoms(count, 0, n - 1, salt=salt + 1)
+    return sum(([a[i], b[i]] for i in range(count)), [])
+
+
+PROBLEMS.append(Problem(
+    id="lowest-common-ancestor",
+    title="가장 가까운 공통 조상",
+    summary="""
+정점 `0..n-1` 의 트리가 부모 배열 `parent` 로 주어진다. `parent[i]` 는 `i` 의 부모이고
+루트는 `-1` 이다. `queries` 는 `[a1, b1, a2, b2, ...]` 로 평탄하게 이은 정점 쌍이다.
+
+각 쌍에 대해 두 정점의 **가장 가까운 공통 조상**을 담은 배열을 반환한다. 정점은 자기
+자신의 조상이기도 하다 — 한쪽이 다른 쪽의 조상이면 답은 그 조상이다.
+""",
+    notes="""
+깊이를 맞춘 뒤 함께 올라가면 답은 나오지만, 질의마다 깊이만큼 걸린다. 사슬 모양 트리에
+질의가 많으면 감당이 안 된다. "2^k 번째 조상"을 미리 표로 두면 어떤 높이든 log 번의
+점프로 오른다.
+""",
+    drill_doc="""
+Drill.compare(a, b)            // 두 정점의 깊이를 견줬다
+Drill.match(a, b)              // 공통 조상을 찾았다
+""",
+    constraints="""
+- `1 <= parent.size <= 200_000`
+- `queries.size` 는 짝수이며 `2 <= queries.size <= 100_000`
+- 루트는 정확히 하나이며 입력은 항상 트리다
+""",
+    signature=dict(
+        name="lowestCommonAncestors",
+        parameters=[("parent", "INT_ARRAY"), ("queries", "INT_ARRAY")],
+        returns="INT_ARRAY",
+    ),
+    # 한 칸씩 오르는 풀이는 사슬에서 질의 × 깊이다. 입력을 더 못 키우므로 시간을 조인다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_lca_queries_fast,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0, 1, 1, 2], [3, 4, 3, 5, 4, 2]]),
+            ("02", [[1, -1], [0, 1, 0, 0]]),
+        ],
+        "boundary": [
+            ("01-single", [[-1], [0, 0]]),
+            # 한쪽이 다른 쪽의 조상이다. 답은 그 조상 자신.
+            ("02-ancestor", [[-1, 0, 1, 2], [0, 3, 3, 1]]),
+            # 같은 정점.
+            ("03-same", [[-1, 0, 0], [1, 1, 2, 2]]),
+            # 루트가 마지막에 온다.
+            ("04-root-last", [[2, 2, -1], [0, 1, 0, 2]]),
+            # 깊이가 크게 다른 두 정점.
+            ("05-uneven-depth", [[-1, 0, 1, 2, 3, 0], [4, 5, 5, 4]]),
+            # 순서를 바꿔 물어도 같은 답.
+            ("06-symmetric", [[-1, 0, 0, 1, 1], [3, 4, 4, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(30, salt=1601), _random_pairs(30, 20, salt=1602)]),
+            ("02-random-medium", [_random_parents(3000, salt=1604), _random_pairs(3000, 300, salt=1605)]),
+            ("03-chain", [[-1] + list(range(0, 199)), _random_pairs(200, 40, salt=1607)]),
+            ("04-star", [[-1] + [0] * 99, _random_pairs(100, 40, salt=1609)]),
+        ],
+        "performance": [
+            # 사슬. 단순히 오르면 질의마다 깊이만큼 걸린다.
+            ("01-small", [[-1] + list(range(0, 19999)), _random_pairs(20000, 4000, salt=1611)]),
+            ("02-medium", [[-1] + list(range(0, 99999)), _random_pairs(100000, 10000, salt=1613)]),
+            ("03-large", [[-1] + list(range(0, 199999)), _random_pairs(200000, 50000, salt=1615)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 이진 리프팅 — 2^k 번째 조상 표.
+fun lowestCommonAncestors(parent: IntArray, queries: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    val path = IntArray(n)
+    for (start in 0 until n) {
+        var v = start
+        var len = 0
+        while (v != -1 && depth[v] == -1) { path[len++] = v; v = parent[v] }
+        var d = if (v == -1) -1 else depth[v]
+        while (len > 0) { d += 1; depth[path[--len]] = d }
+    }
+    var log = 1
+    while ((1 shl log) < n) log += 1
+    val up = Array(log) { IntArray(n) }
+    for (v in 0 until n) up[0][v] = if (parent[v] == -1) v else parent[v]
+    for (k in 1 until log) for (v in 0 until n) up[k][v] = up[k - 1][up[k - 1][v]]
+
+    val out = IntArray(queries.size / 2)
+    for (i in out.indices) {
+        var a = queries[2 * i]
+        var b = queries[2 * i + 1]
+        Drill.compare(a, b)
+        if (depth[a] < depth[b]) { val t = a; a = b; b = t }
+        var diff = depth[a] - depth[b]
+        var k = 0
+        while (diff > 0) { if (diff and 1 == 1) a = up[k][a]; diff = diff shr 1; k += 1 }
+        if (a != b) {
+            for (j in log - 1 downTo 0) if (up[j][a] != up[j][b]) { a = up[j][a]; b = up[j][b] }
+            a = parent[a]
+        }
+        Drill.match(a, a)
+        out[i] = a
+    }
+    return out
+}
+""",
+    mutants=[
+        ("lifts-without-final-step", "WRONG_BRANCH",
+         "점프를 다 한 뒤 마지막으로 부모 한 칸을 올리지 않는다. 공통 조상의 자식을 답한다.",
+         """
+fun lowestCommonAncestors(parent: IntArray, queries: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    fun depthOf(v: Int): Int { if (depth[v] == -1) depth[v] = if (parent[v] == -1) 0 else depthOf(parent[v]) + 1; return depth[v] }
+    for (v in 0 until n) depthOf(v)
+    var log = 1
+    while ((1 shl log) < n) log += 1
+    val up = Array(log) { IntArray(n) }
+    for (v in 0 until n) up[0][v] = if (parent[v] == -1) v else parent[v]
+    for (k in 1 until log) for (v in 0 until n) up[k][v] = up[k - 1][up[k - 1][v]]
+    val out = IntArray(queries.size / 2)
+    for (i in out.indices) {
+        var a = queries[2 * i]; var b = queries[2 * i + 1]
+        if (depth[a] < depth[b]) { val t = a; a = b; b = t }
+        var diff = depth[a] - depth[b]
+        var k = 0
+        while (diff > 0) { if (diff and 1 == 1) a = up[k][a]; diff = diff shr 1; k += 1 }
+        if (a != b) {
+            for (j in log - 1 downTo 0) if (up[j][a] != up[j][b]) { a = up[j][a]; b = up[j][b] }
+        }
+        out[i] = a
+    }
+    return out
+}
+"""),
+        ("equalizes-too-far--off-by-one", "OFF_BY_ONE",
+         "깊이를 맞출 때 같아진 뒤에도 한 칸 더 올린다. 한쪽이 다른 쪽의 조상이면 지나친다.",
+         """
+fun lowestCommonAncestors(parent: IntArray, queries: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    fun depthOf(v: Int): Int { if (depth[v] == -1) depth[v] = if (parent[v] == -1) 0 else depthOf(parent[v]) + 1; return depth[v] }
+    for (v in 0 until n) depthOf(v)
+    val out = IntArray(queries.size / 2)
+    for (i in out.indices) {
+        var a = queries[2 * i]; var b = queries[2 * i + 1]
+        while (depth[a] >= depth[b] && parent[a] != -1 && a != b) a = parent[a]
+        while (depth[b] > depth[a]) b = parent[b]
+        while (a != b) { a = parent[a]; b = parent[b] }
+        out[i] = a
+    }
+    return out
+}
+"""),
+        ("trusts-order--parent-first", "MISSING_EDGE_CASE",
+         "부모가 자식보다 먼저 온다고 믿고 순서대로 깊이를 정한다. 루트가 뒤에 오면 깊이가 틀린다.",
+         """
+fun lowestCommonAncestors(parent: IntArray, queries: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n)
+    for (v in 0 until n) depth[v] = if (parent[v] == -1) 0 else depth[parent[v]] + 1
+    val out = IntArray(queries.size / 2)
+    for (i in out.indices) {
+        var a = queries[2 * i]; var b = queries[2 * i + 1]
+        while (depth[a] > depth[b]) a = parent[a]
+        while (depth[b] > depth[a]) b = parent[b]
+        while (a != b) { a = parent[a]; b = parent[b] }
+        out[i] = a
+    }
+    return out
+}
+"""),
+        ("walks-up--per-query", "PERFORMANCE",
+         "질의마다 한 칸씩 올라간다. 사슬에서 질의 × 깊이.",
+         """
+fun lowestCommonAncestors(parent: IntArray, queries: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    val path = IntArray(n)
+    for (start in 0 until n) {
+        var v = start; var len = 0
+        while (v != -1 && depth[v] == -1) { path[len++] = v; v = parent[v] }
+        var d = if (v == -1) -1 else depth[v]
+        while (len > 0) { d += 1; depth[path[--len]] = d }
+    }
+    val out = IntArray(queries.size / 2)
+    for (i in out.indices) {
+        var a = queries[2 * i]; var b = queries[2 * i + 1]
+        while (depth[a] > depth[b]) { Drill.compare(a, b); a = parent[a] }
+        while (depth[b] > depth[a]) { Drill.compare(a, b); b = parent[b] }
+        while (a != b) { Drill.compare(a, b); a = parent[a]; b = parent[b] }
+        out[i] = a
+    }
+    return out
+}
+"""),
+    ],
+))

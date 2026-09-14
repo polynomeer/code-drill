@@ -1,0 +1,18 @@
+# lowest-common-ancestor 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - tree
+  - binary-search
+  - dynamic-programming
+competencies:
+  - ALGORITHM_CHOICE
+  - IMPLEMENTATION
+  - COMPLEXITY
+  - CORRECTNESS
+prerequisites:
+  - tree-height
+  - level-sums
+complexity:
+  time: LINEARITHMIC
+  space: LINEARITHMIC
+  note: "표 O(n log n), 질의마다 O(log n). 한 칸씩 오르면 질의마다 O(높이)"

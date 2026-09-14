@@ -1,0 +1,14 @@
+# count-bits 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - bit-manipulation
+  - dynamic-programming
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - CORRECTNESS
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "수마다 O(1) — 앞에서 센 값을 다시 쓴다"

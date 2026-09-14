@@ -1,0 +1,15 @@
+# isomorphic-strings 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - hash-map
+competencies:
+  - READING
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - count-letters
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(n). 대응표는 서로 다른 문자 수만큼"

@@ -939,3 +939,136 @@ fun longestOnes(bits: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 58. 가장 자주 나온 값 (값의 범위가 작다) ----------------------------------------------
+
+def _most_frequent(nums):
+    counts = [0] * 101
+    for v in nums:
+        counts[v] += 1
+    best = 0
+    for v in range(1, 101):
+        if counts[v] > counts[best]:
+            best = v
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="most-frequent-small-values",
+    title="가장 자주 나온 값",
+    summary="""
+정수 배열 `nums` 가 주어진다. **가장 자주 나온 값**을 반환한다. 가장 많이 나온 값이 여럿이면
+그중 **가장 작은 값**이다.
+""",
+    notes="""
+값의 범위를 보라. `0` 이상 `100` 이하라면 값마다 칸을 하나씩 둔 배열이 곧 빈도표이고,
+해시도 정렬도 필요 없다. 그리고 그 배열을 작은 값부터 훑으면 동률 규칙이 저절로 지켜진다.
+""",
+    drill_doc="""
+Drill.write(value, count)     // 값의 개수를 올렸다
+Drill.compare(value, best)    // 지금까지의 최빈값과 견줬다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `0 <= nums[i] <= 100`
+""",
+    signature=dict(name="mostFrequent", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_most_frequent,
+    cases={
+        "sample": [
+            ("01", [[3, 1, 3, 2, 1, 3]]),
+            ("02", [[5, 7, 5, 7]]),
+        ],
+        "boundary": [
+            ("01-single", [[42]]),
+            # 전부 한 번씩. 가장 작은 값.
+            ("02-all-once", [[9, 4, 7, 1]]),
+            # 0 도 값이다.
+            ("03-zero-wins", [[0, 0, 1]]),
+            ("04-max-value", [[100, 100, 99]]),
+            # 동률인데 해시 순서가 오름차순이 아닌 값들.
+            ("05-tie-hash-order", [[100, 3, 17, 100, 3, 17]]),
+            # 큰 값이 먼저 나오지만 작은 값과 동률.
+            ("06-tie-big-first", [[50, 50, 2, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(30, 0, 100, salt=1801)]),
+            ("02-random-medium", [randoms(3000, 0, 100, salt=1802)]),
+            ("03-two-values", [[7, 8] * 100 + [8]]),
+            ("04-all-same", [[13] * 500]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, 0, 100, salt=1803)]),
+            ("02-medium", [randoms(50000, 0, 100, salt=1804)]),
+            ("03-large", [randoms(200000, 0, 100, salt=1805)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 값의 범위가 작으니 배열이 빈도표다.
+fun mostFrequent(nums: IntArray): Int {
+    val counts = IntArray(101)
+    for (v in nums) {
+        counts[v] += 1
+        Drill.write(v, counts[v])
+    }
+    var best = 0
+    for (v in 1..100) {
+        Drill.compare(v, best)
+        if (counts[v] > counts[best]) best = v
+    }
+    return best
+}
+""",
+    mutants=[
+        ("tie-takes-later", "WRONG_BRANCH",
+         "동률이면 나중에 본 값으로 바꾼다. 가장 작은 값이어야 한다.",
+         """
+fun mostFrequent(nums: IntArray): Int {
+    val counts = IntArray(101)
+    for (v in nums) counts[v] += 1
+    var best = 0
+    for (v in 1..100) if (counts[v] >= counts[best]) best = v
+    return best
+}
+"""),
+        ("hash-order--tie-by-iteration", "MISSING_EDGE_CASE",
+         "해시맵을 만난 순서로 훑어 동률을 정한다. 순서가 값 순이라는 보장이 없다.",
+         """
+fun mostFrequent(nums: IntArray): Int {
+    val counts = HashMap<Int, Int>()
+    for (v in nums) counts[v] = (counts[v] ?: 0) + 1
+    var best = -1
+    var bestCount = -1
+    for ((v, c) in counts) if (c > bestCount) { best = v; bestCount = c }
+    return best
+}
+"""),
+        ("skips-zero--starts-at-one", "OFF_BY_ONE",
+         "값 0 을 세지 않는다. 범위는 0 부터다.",
+         """
+fun mostFrequent(nums: IntArray): Int {
+    val counts = IntArray(101)
+    for (v in nums) if (v >= 1) counts[v] += 1
+    var best = 1
+    for (v in 2..100) if (counts[v] > counts[best]) best = v
+    return best
+}
+"""),
+        ("count-per-element--quadratic", "PERFORMANCE",
+         "원소마다 배열 전체를 훑어 자기 개수를 센다. O(n²).",
+         """
+fun mostFrequent(nums: IntArray): Int {
+    var best = -1
+    var bestCount = 0
+    for (i in nums.indices) {
+        var count = 0
+        for (j in nums.indices) { Drill.compare(i, j); if (nums[j] == nums[i]) count += 1 }
+        if (count > bestCount || (count == bestCount && nums[i] < best)) { best = nums[i]; bestCount = count }
+    }
+    return best
+}
+"""),
+    ],
+))

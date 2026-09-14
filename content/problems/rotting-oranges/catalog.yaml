@@ -1,0 +1,17 @@
+# rotting-oranges 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - bfs
+  - queue
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - island-count
+  - shortest-hops
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(칸 수). 썩은 오렌지마다 따로 퍼뜨리면 O(썩은 수 × 칸 수)"
