@@ -12,7 +12,12 @@ python3 content/tools/author.py            # 전체 생성
 python3 content/tools/author.py two-sum    # 하나만
 python3 content/tools/author.py --status   # 문제 × 산출물 표 — 무엇이 비었나
 ./gradlew :judge:runner-agent:validateContent
+./gradlew :judge:runner-agent:validateContent --args='content/problems content/reports two-sum,move-zeros'
 ```
+
+마지막 줄은 **저작 중에만** 쓴다. 전체는 문제당 10~30초라 새 문제 하나를 고치며 매번 전체를
+기다릴 수 없다. 고른 문제의 보고서만 다시 쓰고 나머지는 그대로 둔다 — 공개 앞에는 언제나
+전체다.
 
 **정의가 진실의 원천이다.** 정의에서 뺀 케이스와 오답은 파일도 함께 지워진다. 생성된
 파일을 손으로 고치면 다음 생성에서 사라진다 — 7단계에서 성능 오답에 붙인 계측이 그렇게

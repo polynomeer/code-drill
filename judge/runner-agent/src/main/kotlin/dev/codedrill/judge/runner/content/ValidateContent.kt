@@ -22,7 +22,12 @@ import kotlin.system.exitProcess
  *
  * ```
  * ./gradlew :judge:runner-agent:validateContent
+ * ./gradlew :judge:runner-agent:validateContent --args='content/problems content/reports two-sum,move-zeros'
  * ```
+ *
+ * 셋째 인자는 **저작 중에만** 쓴다. 전체는 문제당 10~30초라, 새 문제 하나를 고치며 매번 전체를
+ * 돌리면 손이 멈춘다. 고른 문제의 보고서만 다시 쓰고 나머지는 그대로 둔다 — CI 와 공개 앞에는
+ * 언제나 전체다.
  */
 object ValidateContent {
 
@@ -43,13 +48,15 @@ object ValidateContent {
         val json = ObjectMapper().registerKotlinModule()
             .enable(SerializationFeature.INDENT_OUTPUT)
 
+        val only = args.getOrNull(2)?.split(',')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty()
+
         reportRoot.createDirectories()
         // 지난 실행이 남긴 보고서를 지우고 시작한다. 문제의 version 을 올리면 옛 버전의
         // 보고서가 그대로 남아, 시딩이 **이미 대체된 버전을 다시 공개**한다. 보고서는
         // 검증의 산출물이지 쌓아 두는 기록이 아니다.
-        reportRoot.listDirectoryEntries("*.json").forEach { it.deleteExisting() }
+        if (only.isEmpty()) reportRoot.listDirectoryEntries("*.json").forEach { it.deleteExisting() }
 
-        val reports = validator.validateAll()
+        val reports = if (only.isEmpty()) validator.validateAll() else only.map(validator::validate)
 
         for (report in reports) {
             val marker = if (report.passed) "PASS" else "FAIL"
