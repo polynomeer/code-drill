@@ -66,7 +66,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 
 | 모듈 | 소유 데이터 | 금지 |
 |---|---|---|
-| Identity | user, role, consent | Judge 내부 모델 참조 |
+| Identity | user, role, consent, sanction | Judge 내부 모델 참조 |
 | Problem | problem, version, competency tag, pack | Submission 테이블 직접 수정 |
 | Workspace | draft, custom test, response, preference | 판정 상태 변경 |
 | Submission | submission, test result summary | Runner 직접 호출 |
@@ -108,6 +108,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 붙임 (anchor) | 질문 게시판의 글에 붙인 자기 제출의 한 자리 — 코드의 줄 범위, 리플레이의 걸음, 또는 둘 다. 붙은 제출의 판정과 트레이스는 글을 볼 수 있는 사람에게 열린다 (§8.5) |
 | 도움됐다 (helpful) | 맞힌 사람이 남의 글(풀이·답·질문)에 한 번 남기는 표시. 받은 수와 세워진 기부가 기여 점수이고, 남에게는 등급만 나간다 (§8.5 기여자 평판) |
 | 유사도 신호 (similarity flag) | 맞힌 제출의 구조 지문이 같은 문제·언어의 다른 사람 제출과 겹칠 때 서는 검수 후보 쌍. 판정을 바꾸지 않고, 사람이 두 소스를 보고 확인·기각한다 (§11.4, §10.4) |
+| 제재 (sanction) | 경고·글쓰기 정지·제출 정지. 근거(신호나 신고)를 가리키고 기간이 있으며, 문 앞에서 쓰기를 거른다. 이의는 한 번, 발부하지 않은 보안 관리자가 본다 (§8.5, §10.4) |
 | 검증 보고서 | §6.3 파이프라인의 산출물. 이 digest 가 맞는 버전만 공개할 수 있다 |
 | Trace Event | 코드 줄이 아니라 의미 단위(compare, swap, push, enqueue…)로 기록하는 실행 이벤트 |
 | Trace manifest | 트레이스 목차. 청크 범위와 요약을 담고 이벤트 본문은 담지 않는다 (§7.4) |
