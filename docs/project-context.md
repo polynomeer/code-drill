@@ -47,7 +47,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 경로 | 배포 단위 | 경계 |
 |---|---|---|
 | `platform/` | 라이브러리 | 세 영역이 공유하는 기반(오류 코드·아웃박스·상관관계 ID) |
-| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 8개를 조립하는 모듈형 모놀리스 |
+| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 9개를 조립하는 모듈형 모놀리스 |
 | `judge/orchestrator`, `judge/runner-agent` | 각각 별도 앱 | Control DB·인터넷에 직접 접근하지 않는 실행 영역 |
 | `judge/protocol` | 라이브러리 | 제어 영역 ↔ 실행 영역 메시지 계약 |
 | `content/` | 데이터 | 문제 패키지. 실행 영역의 read-only 아티팩트 자리 |
@@ -74,6 +74,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Coaching | session, prescription, assistance | 판정을 주관적으로 변경 |
 | Learning | problem state, collection, activity | 채점 원본 로그 의존 |
 | Admin | review, publish, rejudge, audit | 감사 로그 우회 |
+| Integrity | submission fingerprint, similarity flag | 소스 보관, 판정·계정 변경 |
 
 ## 문제 패키지 값 타입
 
@@ -106,6 +107,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 기부 (arena donation) | 사용자가 자기 오답 제출을 아레나의 과녁으로 내놓는 것. 검수(REVIEWER)를 거쳐 익명의 과녁이 되고, 신고로 내려간다 (§8.3, §8.5) |
 | 붙임 (anchor) | 질문 게시판의 글에 붙인 자기 제출의 한 자리 — 코드의 줄 범위, 리플레이의 걸음, 또는 둘 다. 붙은 제출의 판정과 트레이스는 글을 볼 수 있는 사람에게 열린다 (§8.5) |
 | 도움됐다 (helpful) | 맞힌 사람이 남의 글(풀이·답·질문)에 한 번 남기는 표시. 받은 수와 세워진 기부가 기여 점수이고, 남에게는 등급만 나간다 (§8.5 기여자 평판) |
+| 유사도 신호 (similarity flag) | 맞힌 제출의 구조 지문이 같은 문제·언어의 다른 사람 제출과 겹칠 때 서는 검수 후보 쌍. 판정을 바꾸지 않고, 사람이 두 소스를 보고 확인·기각한다 (§11.4, §10.4) |
 | 검증 보고서 | §6.3 파이프라인의 산출물. 이 digest 가 맞는 버전만 공개할 수 있다 |
 | Trace Event | 코드 줄이 아니라 의미 단위(compare, swap, push, enqueue…)로 기록하는 실행 이벤트 |
 | Trace manifest | 트레이스 목차. 청크 범위와 요약을 담고 이벤트 본문은 담지 않는다 (§7.4) |
