@@ -1,0 +1,19 @@
+# maximal-rectangle 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - matrix
+  - stack
+  - monotonic-stack
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+  - OPTIMIZATION
+prerequisites:
+  - histogram-rectangle
+  - island-perimeter
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "O(rows × cols). 행마다 히스토그램을 스택으로 한 번"

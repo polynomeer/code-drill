@@ -1,0 +1,18 @@
+# tree-diameter 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - tree
+  - dfs
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - tree-height
+  - subtree-sizes
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "깊이 순 한 번. 모든 정점에서 BFS 하면 O(n²)"

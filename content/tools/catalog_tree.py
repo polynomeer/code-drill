@@ -1156,3 +1156,301 @@ fun lowestCommonAncestors(parent: IntArray, queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 8. 서브트리 크기 -------------------------------------------------------------
+
+def _subtree_sizes(parent):
+    n = len(parent)
+    depth = _depths(parent)
+    order = sorted(range(n), key=lambda v: -depth[v])
+    size = [1] * n
+    for v in order:
+        if parent[v] != -1:
+            size[parent[v]] += size[v]
+    return size
+
+
+PROBLEMS.append(Problem(
+    id="subtree-sizes",
+    title="서브트리 크기",
+    summary="""
+정점 `0..n-1` 의 트리가 부모 배열 `parent` 로 주어진다. `parent[i]` 는 `i` 의 부모이고 루트는
+`-1` 이다. 정점마다 **자기를 뿌리로 하는 서브트리의 정점 수**(자기 자신 포함)를 담은 배열을
+반환한다. 루트의 값은 `n` 이다.
+""",
+    notes="""
+자식의 크기를 다 알아야 부모의 크기를 안다. 깊은 정점부터 처리하면 자식이 부모보다 먼저
+끝난다 — 깊이 순으로 정렬하거나, 자식 목록을 만들어 재귀로 내려간다. 재귀는 20 만 사슬에서
+스택을 넘길 수 있다.
+""",
+    drill_doc="""
+Drill.node(v)                 // 정점의 크기를 정했다
+Drill.write(parent, size)     // 부모의 크기에 더했다
+""",
+    constraints="""
+- `1 <= parent.size <= 200_000`
+- 루트는 정확히 하나이며 입력은 항상 트리다
+""",
+    signature=dict(name="subtreeSizes", parameters=[("parent", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_subtree_sizes,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0, 1, 1, 2]]),
+            ("02", [[1, -1]]),
+        ],
+        "boundary": [
+            ("01-single", [[-1]]),
+            ("02-chain", [[-1, 0, 1, 2]]),
+            ("03-star", [[-1, 0, 0, 0]]),
+            # 루트가 마지막에 온다.
+            ("04-root-last", [[2, 2, -1]]),
+            # 사슬이 거꾸로 적혀 있다. 순서대로 부모에 더하면 아직 완성 안 된 값을 더한다.
+            ("05-chain-reversed", [[1, 2, 3, -1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(30, salt=3701)]),
+            ("02-random-medium", [_random_parents(3000, salt=3702)]),
+            ("03-deep-chain", [[-1] + list(range(0, 4999))]),
+            ("04-reversed-deep-chain", [list(range(1, 5000)) + [-1]]),
+            ("05-large", [_random_parents(200000, salt=3703)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 깊은 정점부터 부모에 더한다 — 재귀 없이.
+fun subtreeSizes(parent: IntArray): IntArray {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    val path = IntArray(n)
+    for (start in 0 until n) {
+        var v = start
+        var len = 0
+        while (v != -1 && depth[v] == -1) { path[len++] = v; v = parent[v] }
+        var d = if (v == -1) -1 else depth[v]
+        while (len > 0) { d += 1; depth[path[--len]] = d }
+    }
+    val order = (0 until n).sortedByDescending { depth[it] }
+    val size = IntArray(n) { 1 }
+    for (v in order) {
+        Drill.node("v$v")
+        if (parent[v] != -1) {
+            size[parent[v]] += size[v]
+            Drill.write(parent[v], size[parent[v]])
+        }
+    }
+    return size
+}
+""",
+    mutants=[
+        ("adds-in-input-order", "MISSING_EDGE_CASE",
+         "배열 순서대로 부모에 더한다. 자식이 부모보다 앞에 오면 아직 완성 안 된 값을 더한다.",
+         """
+fun subtreeSizes(parent: IntArray): IntArray {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    for (v in n - 1 downTo 0) if (parent[v] != -1) size[parent[v]] += size[v]
+    return size
+}
+"""),
+        ("counts-children-only", "OFF_BY_ONE",
+         "자기 자신을 세지 않는다. 잎이 0 이 된다.",
+         """
+fun subtreeSizes(parent: IntArray): IntArray {
+    val n = parent.size
+    val children = Array(n) { mutableListOf<Int>() }
+    var root = 0
+    for (v in 0 until n) if (parent[v] == -1) root = v else children[parent[v]].add(v)
+    val size = IntArray(n)
+    fun walk(v: Int): Int { var s = 0; for (c in children[v]) s += walk(c) + 1; size[v] = s; return s }
+    walk(root)
+    return size
+}
+"""),
+        ("direct-children-count", "WRONG_ALGORITHM",
+         "직접 자식의 수에 1 을 더한 값을 답한다. 손자 이하를 세지 않는다.",
+         """
+fun subtreeSizes(parent: IntArray): IntArray {
+    val size = IntArray(parent.size) { 1 }
+    for (v in parent.indices) if (parent[v] != -1) size[parent[v]] += 1
+    return size
+}
+"""),
+    ],
+))
+
+
+# --- 9. 트리의 지름 ------------------------------------------------------------------
+def _deep_chain_then_fan_parents(n):
+    """긴 사슬에 부채를 단 트리. 모든 정점에서 BFS 하는 풀이가 사슬을 매번 끝까지 걷는다."""
+    half = n // 2
+    return [-1] + list(range(0, half - 1)) + [half - 1] * (n - half)
+
+
+def _tree_diameter(parent):
+    n = len(parent)
+    depth = _depths(parent)
+    order = sorted(range(n), key=lambda v: -depth[v])
+    down = [0] * n     # 아래로 가장 긴 경로(간선 수)
+    best = 0
+    for v in order:
+        p = parent[v]
+        if p == -1:
+            continue
+        # v 의 down 이 확정됐다. 부모의 두 번째로 긴 가지와 합쳐 본다.
+        best = max(best, down[p] + down[v] + 1)
+        down[p] = max(down[p], down[v] + 1)
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="tree-diameter",
+    title="트리의 지름",
+    summary="""
+정점 `0..n-1` 의 트리가 부모 배열 `parent` 로 주어진다. `parent[i]` 는 `i` 의 부모이고 루트는
+`-1` 이다. 트리에서 **가장 먼 두 정점 사이의 간선 수**를 반환한다. 정점이 하나면 `0` 이다.
+""",
+    notes="""
+가장 긴 경로는 어느 정점에서 꺾인다. 그 정점에서 아래로 뻗는 가장 긴 가지 둘을 합친 것이
+그 정점을 지나는 가장 긴 경로이고, 답은 그 최댓값이다. 정점마다 "아래로 가장 긴 길이"를
+깊은 것부터 채우면 한 번에 된다. 루트에서 가장 먼 것을 찾고 거기서 다시 가장 먼 것을 찾는
+두 번 BFS 도 맞다.
+""",
+    drill_doc="""
+Drill.write(v, down)          // 정점에서 아래로 가장 긴 길이
+Drill.match(v, through)       // 정점을 지나는 경로로 최선을 갱신했다
+""",
+    constraints="""
+- `1 <= parent.size <= 200_000`
+- 루트는 정확히 하나이며 입력은 항상 트리다
+""",
+    signature=dict(name="treeDiameter", parameters=[("parent", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_tree_diameter,
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0, 1, 1, 2]]),
+            ("02", [[-1, 0, 1, 2]]),
+        ],
+        "boundary": [
+            ("01-single", [[-1]]),
+            ("02-two", [[-1, 0]]),
+            ("03-star", [[-1, 0, 0, 0, 0]]),
+            # 지름이 루트를 지나지 않는다. 루트의 높이 두 배로 답하면 틀린다.
+            ("04-not-through-root", [[-1, 0, 1, 1, 2, 2, 3, 3]]),
+            # 루트가 마지막에 온다.
+            ("05-root-last", [[2, 2, -1]]),
+            # 한쪽 가지만 길다. 두 가지의 합이 아니라 한 가지의 길이가 답인 경우.
+            ("06-one-branch", [[-1, 0, 1, 2, 3, 0]]),
+            # 사슬이 거꾸로 적혀 있다. 배열 순서로 올리면 아직 안 올라온 값을 쓴다.
+            ("07-chain-reversed", [[1, 2, 3, -1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(30, salt=3801)]),
+            ("02-random-medium", [_random_parents(3000, salt=3802)]),
+            ("03-caterpillar", [[-1] + list(range(0, 99)) + [i for i in range(100)]]),
+            ("04-deep-chain", [[-1] + list(range(0, 4999))]),
+        ],
+        "performance": [
+            ("01-small", [_random_parents(20000, salt=3803)]),
+            ("02-medium", [_random_parents(100000, salt=3804)]),
+            ("03-large", [_deep_chain_then_fan_parents(200000)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 깊은 정점부터 "아래로 가장 긴 길이"를 부모에 올린다.
+fun treeDiameter(parent: IntArray): Int {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    val path = IntArray(n)
+    for (start in 0 until n) {
+        var v = start
+        var len = 0
+        while (v != -1 && depth[v] == -1) { path[len++] = v; v = parent[v] }
+        var d = if (v == -1) -1 else depth[v]
+        while (len > 0) { d += 1; depth[path[--len]] = d }
+    }
+    val order = (0 until n).sortedByDescending { depth[it] }
+    val down = IntArray(n)
+    var best = 0
+    for (v in order) {
+        val p = parent[v]
+        if (p == -1) continue
+        val through = down[p] + down[v] + 1
+        if (through > best) { best = through; Drill.match(p, through) }
+        if (down[v] + 1 > down[p]) { down[p] = down[v] + 1; Drill.write(p, down[p]) }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("twice-height", "WRONG_ALGORITHM",
+         "루트의 높이 두 배를 답한다. 지름이 루트를 지나지 않으면 틀린다.",
+         """
+fun treeDiameter(parent: IntArray): Int {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    fun depthOf(v: Int): Int { if (depth[v] == -1) depth[v] = if (parent[v] == -1) 0 else depthOf(parent[v]) + 1; return depth[v] }
+    var height = 0
+    for (v in 0 until n) height = maxOf(height, depthOf(v))
+    return minOf(height * 2, n - 1)
+}
+"""),
+        ("longest-single-branch", "WRONG_BRANCH",
+         "정점마다 아래로 가장 긴 가지 하나만 본다. 두 가지를 합치지 않는다.",
+         """
+fun treeDiameter(parent: IntArray): Int {
+    val n = parent.size
+    val depth = IntArray(n) { -1 }
+    val path = IntArray(n)
+    for (start in 0 until n) {
+        var v = start; var len = 0
+        while (v != -1 && depth[v] == -1) { path[len++] = v; v = parent[v] }
+        var d = if (v == -1) -1 else depth[v]
+        while (len > 0) { d += 1; depth[path[--len]] = d }
+    }
+    return depth.max()
+}
+"""),
+        ("uses-input-order", "MISSING_EDGE_CASE",
+         "배열 순서를 뒤에서부터 훑으며 부모에 올린다. 자식이 부모보다 앞에 오면 아직 안 올라온 값을 쓴다.",
+         """
+fun treeDiameter(parent: IntArray): Int {
+    val n = parent.size
+    val down = IntArray(n)
+    var best = 0
+    for (v in n - 1 downTo 0) {
+        val p = parent[v]
+        if (p == -1) continue
+        best = maxOf(best, down[p] + down[v] + 1)
+        down[p] = maxOf(down[p], down[v] + 1)
+    }
+    return best
+}
+"""),
+        ("bfs-from-every-node", "PERFORMANCE",
+         "모든 정점에서 BFS 로 가장 먼 정점을 찾는다. O(n²).",
+         """
+fun treeDiameter(parent: IntArray): Int {
+    val n = parent.size
+    val adj = Array(n) { mutableListOf<Int>() }
+    for (v in 0 until n) if (parent[v] != -1) { adj[v].add(parent[v]); adj[parent[v]].add(v) }
+    var best = 0
+    val dist = IntArray(n)
+    for (s in 0 until n) {
+        java.util.Arrays.fill(dist, -1)
+        dist[s] = 0
+        val queue = ArrayDeque<Int>(); queue.addLast(s)
+        while (queue.isNotEmpty()) {
+            val v = queue.removeFirst()
+            Drill.visit(v, dist[v])
+            best = maxOf(best, dist[v])
+            for (u in adj[v]) if (dist[u] == -1) { dist[u] = dist[v] + 1; queue.addLast(u) }
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

@@ -1261,3 +1261,220 @@ fun cheapestPaths(n: Int, edges: IntArray, source: Int): IntArray {
 """),
     ],
 ))
+
+
+# --- 76. 모두 잇는 최소 비용 (크루스칼) -------------------------------------------------
+
+def _min_spanning_cost(n, edges):
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    order = sorted(range(len(edges) // 3), key=lambda i: edges[3 * i + 2])
+    total = 0
+    joined = 0
+    for i in order:
+        a, b, w = edges[3 * i], edges[3 * i + 1], edges[3 * i + 2]
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+            total += w
+            joined += 1
+            if joined == n - 1:
+                break
+    return total if joined == n - 1 else -1
+
+
+def _spanning_edges(n, extra, salt):
+    """연결된 무작위 그래프. 사슬로 먼저 잇고 간선을 더한다."""
+    chain_w = randoms(n - 1, 1, 1000, salt=salt)
+    a = randoms(extra, 0, n - 1, salt=salt + 1)
+    b = randoms(extra, 0, n - 1, salt=salt + 2)
+    w = randoms(extra, 1, 1000, salt=salt + 3)
+    flat = []
+    for i in range(n - 1):
+        flat += [i, i + 1, chain_w[i]]
+    for i in range(extra):
+        flat += [a[i], b[i], w[i]]
+    return flat
+
+
+PROBLEMS.append(Problem(
+    id="min-spanning-cost",
+    title="모두 잇는 최소 비용",
+    summary="""
+정점이 `0` 부터 `n-1` 까지 있는 무방향 가중 그래프가 주어진다. `edges` 는
+`[a1, b1, w1, a2, b2, w2, ...]` 이며 `w` 는 그 간선을 쓰는 비용이다.
+
+**모든 정점이 서로 이어지도록** 간선을 고를 때의 최소 총비용을 반환한다. 이을 수 없으면
+`-1` 이다. 정점이 하나면 `0` 이다.
+""",
+    notes="""
+싼 간선부터 보되, **이미 이어진 두 정점을 또 잇는 간선은 버린다.** 그 판단을 빠르게 하는
+구조가 유니온 파인드다. 간선 n-1 개를 골랐으면 끝이고, 다 보고도 모자라면 이을 수 없는
+것이다.
+""",
+    drill_doc="""
+Drill.edge("v3", "v7")        // 간선을 골랐다
+Drill.match(a, b)             // 두 묶음을 합쳤다 (대표 정점)
+Drill.write(0, total)         // 지금까지의 비용
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `edges.size` 는 3 의 배수이며 `0 <= edges.size <= 600_000`
+- `1 <= w <= 1000`, 총비용은 `Int` 범위 안
+- 같은 두 정점 사이에 간선이 여럿일 수 있고, 자기 자신을 잇는 간선도 있을 수 있다
+""",
+    signature=dict(
+        name="minSpanningCost",
+        parameters=[("n", "INT"), ("edges", "INT_ARRAY")],
+        returns="INT",
+    ),
+    groups=perf_groups(),
+    reference=_min_spanning_cost,
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 1, 1, 2, 2, 2, 3, 3, 0, 3, 10, 0, 2, 5]]),
+            ("02", [3, [0, 1, 4]]),
+        ],
+        "boundary": [
+            ("01-single", [1, []]),
+            ("02-two-no-edge", [2, []]),
+            # 같은 두 정점 사이의 간선이 여럿. 싼 것 하나만 쓴다.
+            ("03-parallel", [2, [0, 1, 7, 0, 1, 3, 0, 1, 9]]),
+            # 자기 자신을 잇는 간선. 아무것도 잇지 않는다.
+            ("04-self-loop", [2, [0, 0, 1, 0, 1, 5]]),
+            # 싼 간선이 순환을 만든다. 순환을 막지 않으면 비용이 는다.
+            ("05-cheap-cycle", [3, [0, 1, 1, 1, 2, 1, 2, 0, 1, 0, 2, 100]]),
+            # 두 덩어리가 이어지지 않는다.
+            ("06-disconnected", [4, [0, 1, 1, 2, 3, 1]]),
+            # 가장 싼 간선 n-1 개가 답이 아니다 — 그것들이 순환을 만든다.
+            ("07-cheapest-cycle", [4, [0, 1, 1, 1, 2, 1, 2, 0, 1, 2, 3, 10]]),
+        ],
+        "hidden": [
+            ("01-random-small", [10, _spanning_edges(10, 15, salt=3901)]),
+            ("02-random-medium", [500, _spanning_edges(500, 2000, salt=3905)]),
+            ("03-star", [6, [0, 1, 5, 0, 2, 4, 0, 3, 3, 0, 4, 2, 0, 5, 1]]),
+            ("04-disconnected-big", [50, _spanning_edges(25, 30, salt=3909) + [30, 31, 1]]),
+        ],
+        "performance": [
+            ("01-small", [5000, _spanning_edges(5000, 10000, salt=3913)]),
+            ("02-medium", [30000, _spanning_edges(30000, 60000, salt=3917)]),
+            ("03-large", [100000, _spanning_edges(100000, 100000, salt=3921)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 크루스칼 — 싼 간선부터, 유니온 파인드로 순환을 막는다.
+fun minSpanningCost(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var v = x
+        while (parent[v] != v) { parent[v] = parent[parent[v]]; v = parent[v] }
+        return v
+    }
+    var total = 0
+    var joined = 0
+    for (i in order) {
+        if (joined == n - 1) break
+        val a = edges[3 * i]
+        val b = edges[3 * i + 1]
+        val ra = find(a)
+        val rb = find(b)
+        if (ra == rb) continue
+        parent[ra] = rb
+        Drill.match(ra, rb)
+        Drill.edge("v$a", "v$b")
+        total += edges[3 * i + 2]
+        joined += 1
+        Drill.write(0, total)
+    }
+    return if (joined == n - 1) total else -1
+}
+""",
+    mutants=[
+        ("cheapest-n-minus-one", "WRONG_ALGORITHM",
+         "가장 싼 간선 n-1 개의 비용을 더한다. 그것들이 순환을 만들면 정점을 잇지 못한다.",
+         """
+fun minSpanningCost(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    if (m < n - 1) return -1
+    val weights = (0 until m).map { edges[3 * it + 2] }.sorted()
+    return weights.take(n - 1).sum()
+}
+"""),
+        ("ignores-disconnected", "MISSING_EDGE_CASE",
+         "간선을 다 보고도 n-1 개를 못 골랐는데 비용을 돌려준다. 이을 수 없으면 -1 이다.",
+         """
+fun minSpanningCost(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var v = x; while (parent[v] != v) v = parent[v]; return v }
+    var total = 0
+    for (i in order) {
+        val ra = find(edges[3 * i]); val rb = find(edges[3 * i + 1])
+        if (ra == rb) continue
+        parent[ra] = rb
+        total += edges[3 * i + 2]
+    }
+    return total
+}
+"""),
+        ("no-union--never-merges", "WRONG_BRANCH",
+         "두 정점이 같은 묶음인지 보지만 합치지는 않는다. 자기 자신을 잇는 간선 말고는 전부 고른다.",
+         """
+fun minSpanningCost(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val parent = IntArray(n) { it }
+    var total = 0
+    var joined = 0
+    for (i in order) {
+        if (joined == n - 1) break
+        if (parent[edges[3 * i]] == parent[edges[3 * i + 1]] && edges[3 * i] == edges[3 * i + 1]) continue
+        total += edges[3 * i + 2]
+        joined += 1
+    }
+    return if (joined == n - 1) total else -1
+}
+"""),
+        ("dfs-cycle-check--per-edge", "PERFORMANCE",
+         "간선을 고를 때마다 지금까지 고른 간선으로 DFS 해 이미 이어졌는지 본다. O(E · V).",
+         """
+fun minSpanningCost(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val adj = Array(n) { mutableListOf<Int>() }
+    val seen = BooleanArray(n)
+    fun connected(a: Int, b: Int): Boolean {
+        java.util.Arrays.fill(seen, false)
+        val stack = ArrayDeque<Int>(); stack.addLast(a); seen[a] = true
+        while (stack.isNotEmpty()) {
+            val v = stack.removeLast()
+            Drill.visit(v, 0)
+            if (v == b) return true
+            for (u in adj[v]) if (!seen[u]) { seen[u] = true; stack.addLast(u) }
+        }
+        return false
+    }
+    var total = 0
+    var joined = 0
+    for (i in order) {
+        if (joined == n - 1) break
+        val a = edges[3 * i]; val b = edges[3 * i + 1]
+        if (connected(a, b)) continue
+        adj[a].add(b); adj[b].add(a)
+        total += edges[3 * i + 2]
+        joined += 1
+    }
+    return if (joined == n - 1) total else -1
+}
+"""),
+    ],
+))

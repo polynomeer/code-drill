@@ -1,0 +1,17 @@
+# kth-in-sorted-matrix 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - matrix
+  - binary-search
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - min-ship-capacity
+  - kth-largest
+complexity:
+  time: LINEARITHMIC
+  space: CONSTANT
+  note: "값의 범위에 대한 이분 탐색 × 행마다 계단 세기 O(n). 전부 꺼내 정렬하면 O(n² log n)"

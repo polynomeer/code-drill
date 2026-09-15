@@ -1,0 +1,15 @@
+# asteroid-collision 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - stack
+  - simulation
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - bracket-balance
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "소행성마다 한 번 쌓이고 한 번 사라진다"

@@ -1,0 +1,19 @@
+# min-spanning-cost 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - union-find
+  - greedy
+  - sorting
+competencies:
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - redundant-connection
+  - connected-components
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "간선 정렬 O(E log E) + 유니온 파인드. 간선마다 DFS 로 순환을 보면 O(E·V)"

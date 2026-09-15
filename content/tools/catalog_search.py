@@ -506,3 +506,169 @@ fun isqrt(n: Int): Int = Math.sqrt(n.toFloat().toDouble()).toInt()
 """),
     ],
 ))
+
+
+# --- 77. 정렬된 격자에서 k 번째로 작은 값 (답에 대한 이분 탐색) --------------------------------
+
+def _kth_in_sorted_matrix(grid, k):
+    n = len(grid)
+    lo, hi = grid[0][0], grid[n - 1][n - 1]
+    while lo < hi:
+        mid = (lo + hi) // 2
+        count = 0
+        col = n - 1
+        for row in grid:
+            while col >= 0 and row[col] > mid:
+                col -= 1
+            count += col + 1
+        if count < k:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+def _sorted_grid(n, salt):
+    values = sorted(randoms(n * n, -100000, 100000, salt=salt))
+    grid = [[0] * n for _ in range(n)]
+    # 행과 열이 각각 오름차순이 되도록 대각선 순으로 채운다.
+    cells = sorted(((r + c, r, c) for r in range(n) for c in range(n)))
+    for value, (_, r, c) in zip(values, cells):
+        grid[r][c] = value
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="kth-in-sorted-matrix",
+    title="정렬된 격자에서 k 번째로 작은 값",
+    summary="""
+`n × n` 정수 격자 `grid` 가 주어진다. **모든 행이 오름차순이고 모든 열도 오름차순**이다.
+격자 전체의 값 중 `k` 번째로 작은 값을 반환한다 (1 부터 센다). 같은 값은 각각 센다.
+
+예: `[[1, 5, 9], [10, 11, 13], [12, 13, 15]]` 에서 `k = 8` 이면 `13` 이다.
+""",
+    notes="""
+전부 꺼내 정렬해도 답은 나오지만 격자가 정렬돼 있다는 사실을 쓰지 않은 것이다. "값 x 이하가
+몇 개인가"는 행마다 오른쪽 위에서 시작해 계단처럼 내려가면 O(n) 에 센다. 그 개수가 k 이상이
+되는 가장 작은 x 가 답이고, x 는 이분 탐색으로 찾는다 — 격자에 있는 값이어야 하지만, 그
+탐색은 저절로 격자의 값에 멈춘다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 답의 후보 구간
+Drill.visit(mid, count)       // mid 이하의 개수를 셌다
+""",
+    constraints="""
+- `1 <= n <= 1_000`
+- `-10^5 <= grid[i][j] <= 10^5`
+- `1 <= k <= n²`
+""",
+    signature=dict(name="kthSmallest", parameters=[("grid", "INT_MATRIX"), ("k", "INT")],
+                   returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_kth_in_sorted_matrix,
+    cases={
+        "sample": [
+            ("01", [[[1, 5, 9], [10, 11, 13], [12, 13, 15]], 8]),
+            ("02", [[[-5]], 1]),
+        ],
+        "boundary": [
+            ("01-first", [[[1, 2], [3, 4]], 1]),
+            ("02-last", [[[1, 2], [3, 4]], 4]),
+            # 같은 값이 여럿. 각각 센다.
+            ("03-duplicates", [[[1, 1, 1], [1, 1, 1], [1, 1, 2]], 8]),
+            ("04-all-same", [[[7, 7], [7, 7]], 3]),
+            # 음수와 양수가 섞였다. 가운데 값의 계산이 음수를 지난다.
+            ("05-negatives", [[[-10, -3], [-2, 5]], 2]),
+            # 격자에 없는 값이 답이 되면 안 된다. 2 와 8 사이의 값을 답하면 틀린다.
+            ("06-gap", [[[1, 2], [8, 9]], 2]),
+            ("07-gap-upper", [[[1, 2], [8, 9]], 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [_sorted_grid(5, salt=4001), 13]),
+            ("02-random-medium", [_sorted_grid(40, salt=4002), 777]),
+            ("03-random-medium-first", [_sorted_grid(40, salt=4003), 1]),
+            ("04-random-medium-last", [_sorted_grid(40, salt=4004), 1600]),
+            ("05-many-duplicates", [[[v // 3 for v in range(r * 6, r * 6 + 6)] for r in range(6)], 20]),
+        ],
+        "performance": [
+            ("01-small", [_sorted_grid(200, salt=4005), 20000]),
+            ("02-medium", [_sorted_grid(500, salt=4006), 125000]),
+            ("03-large", [_sorted_grid(1000, salt=4007), 700000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 값에 대한 이분 탐색 + 계단 세기.
+fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
+    val n = grid.size
+    var lo = grid[0][0]
+    var hi = grid[n - 1][n - 1]
+    while (lo < hi) {
+        val mid = Math.floorDiv(lo + hi, 2)
+        Drill.compare(lo, hi)
+        var count = 0
+        var col = n - 1
+        for (row in grid) {
+            while (col >= 0 && row[col] > mid) col -= 1
+            count += col + 1
+        }
+        Drill.visit(mid, count)
+        if (count < k) lo = mid + 1 else hi = mid
+    }
+    return lo
+}
+""",
+    mutants=[
+        ("count-from-scratch--per-row", "PERFORMANCE",
+         "행마다 처음부터 끝까지 세고, 값의 범위 전체를 하나씩 시험한다. 격자의 정렬을 쓰지 않는다.",
+         """
+fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
+    val n = grid.size
+    var candidate = grid[0][0]
+    while (true) {
+        var count = 0
+        for (row in grid) for (v in row) { Drill.compare(v, candidate); if (v <= candidate) count += 1 }
+        if (count >= k) return candidate
+        candidate += 1
+    }
+}
+"""),
+        ("upper-bound--off-by-one", "OFF_BY_ONE",
+         "개수가 k 를 넘는 가장 작은 값을 찾는다. k 이상이어야 한다.",
+         """
+fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
+    val n = grid.size
+    var lo = grid[0][0]; var hi = grid[n - 1][n - 1]
+    while (lo < hi) {
+        val mid = Math.floorDiv(lo + hi, 2)
+        var count = 0; var col = n - 1
+        for (row in grid) { while (col >= 0 && row[col] > mid) col -= 1; count += col + 1 }
+        if (count <= k) lo = mid + 1 else hi = mid
+    }
+    return lo
+}
+"""),
+        ("row-scan-resets--wrong-count", "WRONG_BRANCH",
+         "행마다 열 포인터를 되돌려 왼쪽부터 다시 센다 — 개수는 맞지만, 되돌린 뒤 mid 보다 큰 값을 세는 조건이 뒤집혔다.",
+         """
+fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
+    val n = grid.size
+    var lo = grid[0][0]; var hi = grid[n - 1][n - 1]
+    while (lo < hi) {
+        val mid = Math.floorDiv(lo + hi, 2)
+        var count = 0
+        for (row in grid) { var col = 0; while (col < n && row[col] < mid) col += 1; count += col }
+        if (count < k) lo = mid + 1 else hi = mid
+    }
+    return lo
+}
+"""),
+        ("first-row-only", "WRONG_ALGORITHM",
+         "첫 행만 정렬된 것으로 보고 k 번째 원소를 답한다.",
+         """
+fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
+    val flat = grid[0]
+    return flat[minOf(k - 1, flat.size - 1)]
+}
+"""),
+    ],
+))

@@ -750,3 +750,90 @@ fun longestUnique(text: String): Int {
 """),
     ],
 ))
+
+
+# --- 78. 애너그램 묶음의 수 ----------------------------------------------------------
+
+def _anagram_groups(words):
+    return len({"".join(sorted(word)) for word in words})
+
+
+PROBLEMS.append(Problem(
+    id="anagram-groups",
+    title="애너그램 묶음의 수",
+    summary="""
+단어 배열 `words` 가 주어진다. 글자를 재배열해 서로 같아지는 단어들은 **한 묶음**이다.
+묶음의 수를 반환한다. 대소문자는 구분하고, 같은 단어가 여러 번 나와도 한 묶음이다. 빈
+배열의 답은 `0` 이다.
+
+예: `["eat", "tea", "tan", "ate", "nat", "bat"]` 은 `{eat, tea, ate}`, `{tan, nat}`, `{bat}` 으로 `3` 이다.
+""",
+    notes="""
+묶음의 이름표가 필요하다 — 글자를 정렬한 문자열이 그것이다. 같은 묶음이면 이름표가 같고
+다른 묶음이면 다르다. 이름표를 집합에 넣으면 그 크기가 답이다.
+""",
+    drill_doc="""
+Drill.visit(i, 0)             // 단어를 봤다
+Drill.write(0, groups)        // 새 묶음이 생겼다
+""",
+    constraints="""
+- `0 <= words.size <= 20_000`
+- 각 단어의 길이는 `0` 이상 `100` 이하, 임의의 유니코드 문자
+""",
+    signature=dict(name="anagramGroups", parameters=[("words", "STRING_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_anagram_groups,
+    cases={
+        "sample": [
+            ("01", [["eat", "tea", "tan", "ate", "nat", "bat"]]),
+            ("02", [["a"]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            # 빈 단어끼리는 한 묶음이다.
+            ("02-empty-words", [["", ""]]),
+            ("03-duplicates", [["abc", "abc", "cab"]]),
+            # 대소문자는 다르다.
+            ("04-case", [["Abc", "abc"]]),
+            # 글자 수가 다르면 다른 묶음이다 — 글자 집합만 보면 틀린다.
+            ("05-multiset", [["aab", "abb", "aba"]]),
+            ("06-non-ascii", [["한글", "글한", "한글글"]]),
+            ("07-separators", [["a,b", "b,a", "a\tb"]]),
+        ],
+        "hidden": [
+            ("01-all-same-group", [["abc", "acb", "bac", "bca", "cab", "cba"]]),
+            ("02-all-different", [["a", "b", "c", "d"]]),
+            ("03-random", [[chr(97 + (v % 3)) + chr(97 + (v // 3 % 3)) + chr(97 + (v // 9 % 3)) for v in randoms(500, 0, 26, salt=4101)]]),
+            ("04-long-words", [["x" * 100, "x" * 99 + "y", "y" + "x" * 99]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 글자를 정렬한 문자열이 묶음의 이름표다.
+fun anagramGroups(words: Array<String>): Int {
+    val labels = HashSet<String>()
+    for ((i, word) in words.withIndex()) {
+        Drill.visit(i, 0)
+        if (labels.add(String(word.toCharArray().sortedArray()))) Drill.write(0, labels.size)
+    }
+    return labels.size
+}
+""",
+    mutants=[
+        ("char-set--ignores-counts", "WRONG_ALGORITHM",
+         "글자의 집합을 이름표로 쓴다. 같은 글자가 몇 번인지 잊는다.",
+         """
+fun anagramGroups(words: Array<String>): Int = words.map { it.toSet() }.toSet().size
+"""),
+        ("case-insensitive", "MISSING_EDGE_CASE",
+         "대소문자를 같게 본다.",
+         """
+fun anagramGroups(words: Array<String>): Int =
+    words.map { String(it.lowercase().toCharArray().sortedArray()) }.toSet().size
+"""),
+        ("counts-words--not-groups", "WRONG_BRANCH",
+         "서로 다른 단어의 수를 답한다. 재배열해 같아지는 것을 묶지 않는다.",
+         """
+fun anagramGroups(words: Array<String>): Int = words.toSet().size
+"""),
+    ],
+))

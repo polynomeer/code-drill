@@ -544,3 +544,322 @@ fun gcdOfArray(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 73. 요세푸스 — 마지막에 남는 사람 (큐 시뮬레이션) --------------------------------------
+
+def _josephus(n, k):
+    survivor = 0
+    for size in range(2, n + 1):
+        survivor = (survivor + k) % size
+    return survivor + 1
+
+
+PROBLEMS.append(Problem(
+    id="josephus-survivor",
+    title="원탁에서 마지막에 남는 사람",
+    summary="""
+`1` 번부터 `n` 번까지 `n` 명이 원을 이루고 앉아 있다. `1` 번부터 세기 시작해 **k 번째
+사람**을 내보내고, 그 다음 사람부터 다시 `1` 로 세어 다시 k 번째를 내보낸다. 마지막까지
+남는 한 사람의 번호를 반환한다.
+
+예: `n = 5, k = 2` 이면 `2, 4, 1, 5` 순으로 나가고 `3` 이 남는다.
+""",
+    notes="""
+큐로 그대로 흉내 낼 수 있다 — 앞에서 k-1 명을 뒤로 보내고 k 번째를 내보낸다. 그것은 O(n·k)
+다. n 이 크면 다른 관찰이 필요하다: n-1 명일 때의 답을 알면 n 명일 때의 답은 거기에 k 를
+더해 n 으로 나눈 나머지다. 사람이 하나 나간 뒤의 원은 "번호를 k 만큼 돌린 n-1 명의 원"이다.
+""",
+    drill_doc="""
+Drill.enqueue(person)         // 뒤로 보냈다
+Drill.dequeue(person)         // 내보냈다
+Drill.write(size, survivor)   // size 명일 때의 답
+""",
+    constraints="""
+- `1 <= n <= 1_000_000`
+- `1 <= k <= 1_000_000`
+""",
+    signature=dict(name="survivor", parameters=[("n", "INT"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_josephus,
+    cases={
+        "sample": [
+            ("01", [5, 2]),
+            ("02", [7, 3]),
+        ],
+        "boundary": [
+            ("01-single", [1, 1]),
+            ("02-single-big-k", [1, 1000]),
+            # k = 1 이면 차례로 나가고 마지막 사람이 남는다.
+            ("03-k-one", [6, 1]),
+            # k 가 n 보다 크다. 원을 여러 바퀴 돈다.
+            ("04-k-larger-than-n", [3, 7]),
+            ("05-k-equals-n", [4, 4]),
+            ("06-two", [2, 2]),
+        ],
+        "hidden": [
+            ("01-small", [10, 4]),
+            ("02-medium", [100, 13]),
+            ("03-big-k", [50, 999983]),
+            ("04-classic", [41, 3]),
+        ],
+        "performance": [
+            ("01-small", [20000, 3]),
+            ("02-medium", [200000, 777]),
+            ("03-large", [1000000, 1000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). n-1 명의 답에서 n 명의 답으로.
+fun survivor(n: Int, k: Int): Int {
+    var result = 0
+    for (size in 2..n) {
+        result = (result + k) % size
+        Drill.write(size, result)
+    }
+    return result + 1
+}
+""",
+    mutants=[
+        ("zero-indexed-answer", "OFF_BY_ONE",
+         "0 부터 센 자리를 그대로 답한다. 사람의 번호는 1 부터다.",
+         """
+fun survivor(n: Int, k: Int): Int {
+    var result = 0
+    for (size in 2..n) result = (result + k) % size
+    return result
+}
+"""),
+        ("recurrence-off-by-one", "WRONG_BRANCH",
+         "점화식에 k 가 아니라 k-1 을 더한다. 내보낸 사람 다음부터 다시 센다는 것을 잊었다.",
+         """
+fun survivor(n: Int, k: Int): Int {
+    var result = 0
+    for (size in 2..n) result = (result + k - 1) % size
+    return result + 1
+}
+"""),
+        ("queue-simulation--n-times-k", "PERFORMANCE",
+         "큐로 k-1 명씩 뒤로 보내며 흉내 낸다. O(n·k).",
+         """
+fun survivor(n: Int, k: Int): Int {
+    val queue = ArrayDeque<Int>()
+    for (i in 1..n) queue.addLast(i)
+    while (queue.size > 1) {
+        repeat(k - 1) { val p = queue.removeFirst(); Drill.enqueue(p); queue.addLast(p) }
+        Drill.dequeue(queue.removeFirst())
+    }
+    return queue.first()
+}
+"""),
+    ],
+))
+
+
+# --- 74. n! 의 끝에 붙는 0 의 개수 --------------------------------------------------------
+
+def _trailing_zeros(n):
+    count = 0
+    power = 5
+    while power <= n:
+        count += n // power
+        power *= 5
+    return count
+
+
+PROBLEMS.append(Problem(
+    id="factorial-trailing-zeros",
+    title="n! 의 끝에 붙는 0 의 개수",
+    summary="""
+0 이상의 정수 `n` 이 주어진다. `n!` (n 의 계승)을 십진수로 적었을 때 **끝에 연달아 붙는 0 의
+개수**를 반환한다. `n!` 자체를 계산해서는 안 된다 — 20! 만 해도 64비트를 넘는다.
+
+예: `5! = 120` 이므로 `1`, `10! = 3628800` 이므로 `2`, `3! = 6` 이므로 `0` 이다.
+""",
+    notes="""
+끝의 0 하나는 인수 10 하나이고, 10 은 2 × 5 다. 1 부터 n 까지 곱하면 2 는 5 보다 훨씬 많으므로
+답은 **5 가 몇 번 곱해졌나**다. 5 의 배수는 n/5 개인데, 25 는 5 를 두 번, 125 는 세 번 갖고
+있다 — 그래서 n/5 + n/25 + n/125 + … 이다.
+""",
+    drill_doc="""
+Drill.visit(power, count)     // 5 의 거듭제곱 하나를 셌다
+""",
+    constraints="""
+- `0 <= n <= 2^31 - 1`
+""",
+    signature=dict(name="trailingZeros", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_trailing_zeros,
+    cases={
+        "sample": [
+            ("01", [5]),
+            ("02", [10]),
+        ],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-one", [1]),
+            ("03-four", [4]),
+            # 25 는 5 를 두 번 갖는다. n/5 만 세면 하나 모자란다.
+            ("04-twenty-five", [25]),
+            ("05-twenty-four", [24]),
+            # 125 는 세 번.
+            ("06-one-twenty-five", [125]),
+            # 5 의 거듭제곱을 곱해 가다 Int 를 넘길 수 있는 자리.
+            ("07-max-int", [2147483647]),
+        ],
+        "hidden": [
+            ("01-hundred", [100]),
+            ("02-thousand", [1000]),
+            ("03-random", [randoms(1, 0, 1000000, salt=3501)[0]]),
+            ("04-large", [1000000000]),
+            ("05-just-below-power", [3124]),
+            ("06-power", [3125]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 5 의 거듭제곱마다 배수의 수를 더한다.
+fun trailingZeros(n: Int): Int {
+    var count = 0
+    var power = 5L
+    while (power <= n) {
+        count += (n / power).toInt()
+        Drill.visit(power.toInt(), count)
+        power *= 5
+    }
+    return count
+}
+""",
+    mutants=[
+        ("fives-only--once", "WRONG_ALGORITHM",
+         "5 의 배수만 센다. 25 가 5 를 두 번 갖는다는 것을 잊었다.",
+         """
+fun trailingZeros(n: Int): Int = n / 5
+"""),
+        ("counts-tens", "WRONG_BRANCH",
+         "10 의 배수를 센다. 2 × 5 처럼 따로 떨어진 인수를 놓친다.",
+         """
+fun trailingZeros(n: Int): Int {
+    var count = 0
+    var power = 10L
+    while (power <= n) { count += (n / power).toInt(); power *= 10 }
+    return count
+}
+"""),
+        ("int-power--overflows", "MISSING_EDGE_CASE",
+         "5 의 거듭제곱을 Int 로 곱한다. 큰 n 에서 넘친 값이 양수로 돌아와 엉뚱한 몫을 더한다.",
+         """
+fun trailingZeros(n: Int): Int {
+    var count = 0
+    var power = 5
+    while (power <= n && power > 0) { count += n / power; power *= 5 }
+    return count
+}
+"""),
+    ],
+))
+
+
+# --- 75. 정수 뒤집기 --------------------------------------------------------------------
+
+def _reverse_integer(n):
+    sign = -1 if n < 0 else 1
+    digits = int(str(abs(n))[::-1])
+    result = sign * digits
+    return result if -2 ** 31 <= result <= 2 ** 31 - 1 else 0
+
+
+PROBLEMS.append(Problem(
+    id="reverse-integer",
+    title="정수 뒤집기",
+    summary="""
+32비트 정수 `n` 이 주어진다. 십진 자릿수를 **뒤집은** 정수를 반환한다. 부호는 그대로다.
+뒤집은 수가 32비트 정수 범위(`-2^31 .. 2^31 - 1`)를 벗어나면 `0` 을 반환한다.
+
+예: `123` → `321`, `-120` → `-21`, `1534236469` → `0` (뒤집으면 9646324351 로 범위 밖).
+""",
+    notes="""
+마지막 자리를 떼어 결과의 뒤에 붙이는 일을 되풀이하면 된다. 문제는 **넘침**이다 — 결과에
+자리를 하나 더 붙이기 전에 넘칠지 확인하거나, 더 넓은 정수형으로 계산한 뒤 범위를 본다.
+뒤집은 결과가 `Int` 안에 들어가는지를 `Int` 로만 계산해서는 알 수 없다.
+""",
+    drill_doc="""
+Drill.visit(digit, result)    // 자리 하나를 떼어 붙였다
+""",
+    constraints="""
+- `-2^31 <= n <= 2^31 - 1`
+""",
+    signature=dict(name="reverseInteger", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_reverse_integer,
+    cases={
+        "sample": [
+            ("01", [123]),
+            ("02", [-120]),
+        ],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-single-digit", [7]),
+            ("03-negative-single", [-3]),
+            # 끝의 0 은 사라진다.
+            ("04-trailing-zeros", [1000]),
+            # 뒤집으면 딱 범위 밖.
+            ("05-overflow-positive", [1534236469]),
+            ("06-overflow-negative", [-1563847412]),
+            # 뒤집으면 범위 안에 아슬아슬하게 든다.
+            ("07-fits-barely", [1463847412]),
+            ("08-max-int", [2147483647]),
+            ("09-min-int", [-2147483648]),
+        ],
+        "hidden": [
+            ("01-palindrome", [12321]),
+            ("02-negative-palindrome", [-4554]),
+            ("03-random", [randoms(1, -1000000000, 1000000000, salt=3601)[0]]),
+            ("04-nine-digits", [987654321]),
+            ("05-ten-digits-fit", [1000000003]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). Long 으로 뒤집고 범위를 본다.
+fun reverseInteger(n: Int): Int {
+    var rest = n.toLong()
+    var result = 0L
+    while (rest != 0L) {
+        val digit = rest % 10
+        result = result * 10 + digit
+        Drill.visit(digit.toInt(), result.toInt())
+        rest /= 10
+    }
+    return if (result < Int.MIN_VALUE || result > Int.MAX_VALUE) 0 else result.toInt()
+}
+""",
+    mutants=[
+        ("int-arithmetic--overflows", "MISSING_EDGE_CASE",
+         "Int 로 뒤집고 범위를 보지 않는다. 넘치는 입력에서 엉뚱한 수를 낸다.",
+         """
+fun reverseInteger(n: Int): Int {
+    var rest = n
+    var result = 0
+    while (rest != 0) { result = result * 10 + rest % 10; rest /= 10 }
+    return result
+}
+"""),
+        ("drops-sign", "WRONG_BRANCH",
+         "절댓값을 뒤집고 부호를 잊는다.",
+         """
+fun reverseInteger(n: Int): Int {
+    var rest = Math.abs(n.toLong())
+    var result = 0L
+    while (rest != 0L) { result = result * 10 + rest % 10; rest /= 10 }
+    return if (result > Int.MAX_VALUE) 0 else result.toInt()
+}
+"""),
+        ("string-reverse--keeps-zeros", "WRONG_ALGORITHM",
+         "문자열로 뒤집어 그대로 둔다. 앞에 온 0 을 지우지 못하는 것이 아니라, 부호 문자가 끝으로 간다.",
+         """
+fun reverseInteger(n: Int): Int {
+    val reversed = n.toString().reversed()
+    return reversed.toLongOrNull()?.let { if (it < Int.MIN_VALUE || it > Int.MAX_VALUE) 0 else it.toInt() } ?: 0
+}
+"""),
+    ],
+))

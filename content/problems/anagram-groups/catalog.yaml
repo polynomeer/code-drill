@@ -1,0 +1,18 @@
+# anagram-groups 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - hash-map
+  - sorting
+  - counting
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - count-letters
+  - top-k-frequent
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "단어마다 글자 정렬 O(L log L). 단어 쌍마다 비교하면 O(n² L)"

@@ -1,0 +1,15 @@
+# subtree-sizes 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - tree
+  - dfs
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - level-sums
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "깊이 순 정렬 O(n log n) 이거나, 자식 목록으로 O(n)"
