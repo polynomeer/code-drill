@@ -49,6 +49,10 @@ import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.admin.ArenaModeration
 import dev.codedrill.controlplane.admin.DiscussionModeration
 import dev.codedrill.controlplane.admin.IntegrityModeration
+import dev.codedrill.controlplane.admin.SanctionModeration
+import dev.codedrill.controlplane.identity.SanctionKind
+import dev.codedrill.controlplane.identity.SanctionRepository
+import dev.codedrill.controlplane.identity.SanctionService
 import dev.codedrill.controlplane.integrity.IntegrityRepository
 import dev.codedrill.controlplane.integrity.IntegrityService
 import dev.codedrill.controlplane.integrity.SubmissionSources
@@ -599,6 +603,36 @@ class ControlPlaneConfig {
             val source = anchor.excerpt ?: return@mapNotNull null
             val language = submissions.findById(anchor.submissionId)?.language ?: return@mapNotNull null
             SharedApproach("${post.title} (${post.id.toString().take(8)})", language, source)
+        }
+    }
+
+    // --- 제재 (§8.5, §10.4) ---
+
+    /** 제재도 그 사람의 기록이다 (§11.3). 운영 기록이라 남기되 이름은 지우고, 이의의 글은 지운다. */
+    @Bean
+    fun sanctionPersonalArea(repository: SanctionRepository) = object : PersonalData {
+        override val area = "sanctions"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = mapOf("sanctions" to repository.erase(userId))
+    }
+
+    /** 계정에 닿는 결정은 Admin 이 넘기고 Identity 가 적는다 (§3.1). */
+    @Bean
+    fun sanctionModeration(service: SanctionService) = object : SanctionModeration {
+        override fun issue(userId: String, kind: String, reason: String, evidence: String, days: Int?, issuedBy: String): ArenaModeration.Decision {
+            val parsed = SanctionKind.entries.firstOrNull { it.name == kind }
+                ?: return ArenaModeration.Decision.rejected("제재 종류가 아니다: $kind (${SanctionKind.entries.joinToString { it.name }})")
+            return service.issue(userId, parsed, reason, evidence, days, issuedBy).asDecision()
+        }
+
+        override fun lift(id: java.util.UUID, by: String) = service.lift(id, by).asDecision()
+        override fun appeals() = service.openAppeals()
+        override fun resolveAppeal(id: java.util.UUID, by: String, uphold: Boolean, note: String?) = service.resolveAppeal(id, by, uphold, note).asDecision()
+        override fun history(userId: String) = service.history(userId)
+
+        private fun SanctionService.Outcome.asDecision() = when (this) {
+            is SanctionService.Outcome.Decided -> ArenaModeration.Decision.ok(sanction)
+            is SanctionService.Outcome.Rejected -> ArenaModeration.Decision.rejected(reason)
         }
     }
 

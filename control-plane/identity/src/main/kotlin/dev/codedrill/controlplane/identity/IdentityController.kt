@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
@@ -28,7 +29,7 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/v1/auth")
-class IdentityController(private val identity: IdentityService) {
+class IdentityController(private val identity: IdentityService, private val sanctions: SanctionService) {
 
     @PostMapping("/register")
     fun register(@Valid @RequestBody request: RegisterRequest): ResponseEntity<Any> =
@@ -106,11 +107,26 @@ class IdentityController(private val identity: IdentityService) {
         return ResponseEntity.noContent().build()
     }
 
+    /** 내 정보. 제재가 있으면 함께 — 무엇이 막혔고 언제 풀리는지는 본인이 먼저 알아야 한다 (§8.5). */
     @GetMapping("/me")
     fun me(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal) = mapOf(
         "id" to principal.id,
         "displayName" to principal.displayName,
+        "sanction" to sanctions.mine(principal.id),
     )
+
+    /** 이의 (§10.4). 제재 하나에 한 번. 제재 중에도 열려 있는 유일한 쓰기다. */
+    @PostMapping("/me/sanction/{id}/appeal")
+    fun appeal(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: java.util.UUID,
+        @Valid @RequestBody request: AppealRequest,
+    ): ResponseEntity<Any> = when (val outcome = sanctions.appeal(principal.id, id, request.text)) {
+        is SanctionService.AppealOutcome.Filed -> ResponseEntity.accepted().body(outcome.view)
+        SanctionService.AppealOutcome.AlreadyAppealed ->
+            ResponseEntity.status(HttpStatus.CONFLICT).body(error(ErrorCode.CONTENT_UNAVAILABLE, "이의는 한 번이다"))
+        is SanctionService.AppealOutcome.Invalid -> ResponseEntity.badRequest().body(error(ErrorCode.INVALID_SIGNATURE, outcome.reason))
+    }
 
     /**
      * 표시 이름 변경 (기획서 부록 A 계정 도메인).
@@ -184,6 +200,8 @@ data class LoginRequest(
 data class RefreshRequest(@field:NotBlank val refreshToken: String)
 
 data class DeleteAccountRequest(@field:NotBlank val password: String)
+
+data class AppealRequest(@field:NotBlank val text: String)
 
 data class RenameRequest(@field:NotBlank val displayName: String)
 

@@ -44,8 +44,9 @@ class IntegrityRepository(private val jdbc: JdbcTemplate) {
 
     fun find(id: UUID): SimilarityFlag? = jdbc.query("SELECT * FROM similarity_flag WHERE id = ?", FLAG, id).firstOrNull()
 
+    /** 열린 신호, 새 것부터. 점수순이 아니다 — 큐가 차면 오래된 1.0 들 뒤에서 새 신호가 영영 안 보인다. */
     fun open(limit: Int): List<SimilarityFlag> =
-        jdbc.query("SELECT * FROM similarity_flag WHERE status = 'OPEN' ORDER BY score DESC, created_at LIMIT ?", FLAG, limit)
+        jdbc.query("SELECT * FROM similarity_flag WHERE status = 'OPEN' ORDER BY created_at DESC LIMIT ?", FLAG, limit)
 
     /** 결정. OPEN 인 것만 바뀐다 — 두 검수자가 동시에 눌러도 한 결정만 남는다. */
     fun resolve(id: UUID, status: FlagStatus, reviewer: String, note: String?): Int = jdbc.update(

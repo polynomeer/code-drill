@@ -1169,6 +1169,65 @@ def main() -> int:
         results.append(check("  감사 로그에 남는다", [e["action"] for e in trail], ["SIMILARITY_DISMISSED"]))
     results.append(check("신호는 판정을 바꾸지 않는다", request("GET", f"/submissions/{accepted['id']}")["verdict"], verdict_before))
 
+    print("\n제재와 이의 (§8.5 단계적 제재, §10.4 이의 절차)")
+    # 위의 신고와 유사도 신호가 근거다. 보안 관리자가 걸고, 발부하지 않은 다른 보안 관리자가 이의를 본다.
+    status, _ = raw_request("POST", "/admin/sanctions",
+                            {"userId": asker.user_id, "kind": "MUTE", "reason": "정답 코드를 통째로 붙였다", "evidence": f"report:{post_report['id']}", "days": 7},
+                            reviewer)
+    results.append(check("제재는 보안 관리자만", status, 403))
+    status, _ = raw_request("POST", "/admin/sanctions",
+                            {"userId": asker.user_id, "kind": "MUTE", "reason": "정답 코드를 통째로 붙였다", "evidence": "느낌", "days": 7}, security)
+    results.append(check("근거 없는 제재는 없다", status, 409))
+    muted = request("POST", "/admin/sanctions",
+                    {"userId": asker.user_id, "kind": "MUTE", "reason": "정답 코드를 통째로 붙였다", "evidence": f"report:{post_report['id']}", "days": 7},
+                    security)
+    results.append(check("글쓰기 정지를 걸었다", muted["kind"], "MUTE"))
+    me = request("GET", "/auth/me", None, asker.headers)
+    results.append(check("  본인에게 보인다", (me["sanction"] or {}).get("kind"), "MUTE"))
+    status, denied = raw_request("POST", "/discussions/two-sum", {"title": "정지 중에 묻기", "body": "이 요청은 문 앞에서 막혀야 합니다"}, asker.headers)
+    results.append(check("  글쓰기가 막힌다", (status, denied.get("errorCode")), (403, "ACCOUNT_SANCTIONED")))
+    status, _ = raw_request("GET", "/discussions/two-sum", None, asker.headers)
+    results.append(check("  읽기는 열려 있다", status, 200))
+    status, _ = raw_request("POST", "/submissions", {"problemId": "two-sum", "problemVersion": version_of("two-sum"), "language": "KOTLIN", "source": ACCEPTED_SOURCE},
+                            {**asker.headers, "Idempotency-Key": str(uuid.uuid4())})
+    results.append(check("  제출은 막히지 않는다", status, 202))
+    status, _ = raw_request("POST", f"/auth/me/sanction/{muted['id']}/appeal", {"text": "짧다"}, asker.headers)
+    results.append(check("이의가 짧으면 거절", status, 400))
+    status, appealed = raw_request("POST", f"/auth/me/sanction/{muted['id']}/appeal",
+                                   {"text": "코드 구간이 아니라 접근을 설명하려던 것이고 풀이 노출로 표시했습니다"}, asker.headers)
+    results.append(check("정지 중에도 이의는 낸다", (status, appealed.get("appealed")), (202, True)))
+    status, _ = raw_request("POST", f"/auth/me/sanction/{muted['id']}/appeal", {"text": "두 번째 이의는 받지 않아야 합니다 — 한 번이다"}, asker.headers)
+    results.append(check("  이의는 한 번", status, 409))
+    appeals = request("GET", "/admin/sanctions/appeals", None, security)
+    results.append(check("이의가 큐에 올라 있다", any(a["id"] == muted["id"] for a in appeals), True))
+    status, _ = raw_request("POST", f"/admin/sanctions/{muted['id']}/appeal/resolve", {"uphold": False, "note": "받아들인다"}, security)
+    results.append(check("발부한 사람은 이의를 판단하지 못한다", status, 409))
+    second_security = operators.with_roles("SECURITY_ADMIN", other_than=security_op).headers
+    lifted = request("POST", f"/admin/sanctions/{muted['id']}/appeal/resolve", {"uphold": False, "note": "풀이 노출로 표시돼 있었다"}, second_security)
+    results.append(check("다른 보안 관리자가 받아들이면 풀린다", (lifted["appealResolution"], lifted["liftedAt"] is not None), ("LIFTED", True)))
+    status, _ = raw_request("POST", "/discussions/two-sum", {"title": "풀린 뒤에 묻기", "body": "이 요청은 이제 통과해야 합니다"}, asker.headers)
+    results.append(check("  글쓰기가 돌아왔다", status, 201))
+    me = request("GET", "/auth/me", None, asker.headers)
+    results.append(check("  본인에게 이의의 답이 보인다", ((me["sanction"] or {}).get("appealNote"), (me["sanction"] or {}).get("active")), ("풀이 노출로 표시돼 있었다", False)))
+
+    evidence = f"similarity:{flagged['flag']['id']}" if flagged else f"report:{post_report['id']}"
+    suspended = request("POST", "/admin/sanctions",
+                        {"userId": asker.user_id, "kind": "SUSPEND", "reason": "같은 소스를 다른 계정으로 냈다", "evidence": evidence, "days": 1}, security)
+    results.append(check("제출 정지를 걸었다", suspended["kind"], "SUSPEND"))
+    status, denied = raw_request("POST", "/submissions", {"problemId": "two-sum", "problemVersion": version_of("two-sum"), "language": "KOTLIN", "source": ACCEPTED_SOURCE},
+                                 {**asker.headers, "Idempotency-Key": str(uuid.uuid4())})
+    results.append(check("  제출이 막힌다", (status, denied.get("errorCode")), (403, "ACCOUNT_SANCTIONED")))
+    status, _ = raw_request("GET", "/submissions?problemId=two-sum", None, asker.headers)
+    results.append(check("  내 기록은 본다", status, 200))
+    released = request("POST", f"/admin/sanctions/{suspended['id']}/lift", None, security)
+    results.append(check("풀었다", released["liftedAt"] is not None, True))
+    status, _ = raw_request("POST", f"/admin/sanctions/{suspended['id']}/lift", None, security)
+    results.append(check("  두 번 풀 수는 없다", status, 409))
+    history = request("GET", f"/admin/sanctions/users/{asker.user_id}", None, security)
+    results.append(check("이력 두 건", len(history), 2))
+    trail = request("GET", f"/admin/audit?subject={asker.user_id}", None, security)
+    results.append(check("  감사 로그에 발부가 남는다", [e["action"] for e in trail].count("SANCTION_ISSUED"), 2))
+
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
     events = read_events(pending["id"])

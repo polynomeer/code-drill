@@ -18,6 +18,8 @@ enum class ErrorCode(val category: Category, val retry: Retry) {
 
     LANGUAGE_NOT_ALLOWED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
     QUOTA_EXCEEDED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
+    /** 제재 중인 계정의 쓰기 요청 (§8.5 단계적 제재). 기간이 끝나거나 이의가 받아들여지면 풀린다. */
+    ACCOUNT_SANCTIONED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
 
     DRAFT_VERSION_CONFLICT(Category.CONFLICT, Retry.AFTER_REFRESH),
     PROBLEM_VERSION_STALE(Category.CONFLICT, Retry.AFTER_REFRESH),

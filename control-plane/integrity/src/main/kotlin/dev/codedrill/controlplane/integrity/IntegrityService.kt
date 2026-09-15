@@ -48,7 +48,7 @@ class IntegrityService(
 
     // --- 검수자 -----------------------------------------------------------------
 
-    /** 열린 신호와 두 소스. 소스는 볼 때만 제출 도메인에 묻는다. */
+    /** 열린 신호와 두 소스, 새 것부터. 소스는 볼 때만 제출 도메인에 묻는다. */
     fun queue(): List<FlaggedPair> = repository.open(QUEUE_LIMIT).map {
         FlaggedPair(it, sources.source(it.submissionId), sources.source(it.otherSubmissionId))
     }

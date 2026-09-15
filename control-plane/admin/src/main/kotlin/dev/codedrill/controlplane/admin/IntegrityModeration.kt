@@ -11,7 +11,7 @@ import java.util.UUID
  */
 interface IntegrityModeration {
 
-    /** 열린 신호와 두 소스. 점수가 높은 것부터. */
+    /** 열린 신호와 두 소스. 새 것부터. */
     fun queue(): Any
 
     fun resolve(id: UUID, reviewer: String, confirmed: Boolean, note: String?): ArenaModeration.Decision

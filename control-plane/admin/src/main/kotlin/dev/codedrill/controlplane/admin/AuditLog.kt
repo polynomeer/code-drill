@@ -107,6 +107,16 @@ enum class AuditAction {
     SIMILARITY_DISMISSED,
 
     /**
+     * 계정에 제재를 걸었거나 풀었다 (§8.5 단계적 제재). 신호와 신고가 계정에 닿는 유일한 길이라,
+     * 누가 무슨 근거로 걸었는지가 이의 절차(§10.4)의 바닥이다.
+     */
+    SANCTION_ISSUED,
+    SANCTION_LIFTED,
+    /** 이의를 판단했다. 발부한 사람이 아닌 다른 보안 관리자다. */
+    APPEAL_UPHELD,
+    APPEAL_LIFTED,
+
+    /**
      * 관리자 역할 부여를 요청했다 (§11.2).
      *
      * 아직 권한은 늘지 않았다. 부여와 갈라 남기는 이유는, 승인되지 않고 남은 요청과

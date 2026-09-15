@@ -36,6 +36,8 @@ import java.util.UUID
 class AuthInterceptor(
     private val identity: IdentityService,
     private val json: ObjectMapper,
+    /** 제재 (§8.5). null 이면 이 인터셉터는 제재를 보지 않는다 — 공개 경로 쪽이 그렇다. */
+    private val sanctions: SanctionService? = null,
     /**
      * 토큰이 없거나 못 쓰면 막을지.
      *
@@ -60,6 +62,7 @@ class AuthInterceptor(
         return when (resolution) {
             is IdentityService.Resolution.Active -> {
                 request.setAttribute(Principal.ATTRIBUTE, resolution.user)
+                sanctioned(request, resolution.user.id)?.let { return blocked(response, it) }
                 true
             }
 
@@ -89,6 +92,41 @@ class AuthInterceptor(
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
 
+    /**
+     * 제재 중인 계정의 쓰기 요청을 문 앞에서 거른다 (§8.5 단계적 제재).
+     *
+     * 엔드포인트마다 묻지 않고 여기서 경로로 거는 이유는 인증과 같다 — 새 쓰기 경로를 만든
+     * 사람이 제재를 잊어도 열리지 않아야 한다. 읽기는 전부 열린다: 제재 중에도 자기 판정과
+     * 남의 글은 볼 수 있어야 하고, 이의는 낼 수 있어야 한다.
+     */
+    private fun sanctioned(request: HttpServletRequest, userId: String): Sanction? {
+        val gate = sanctions ?: return null
+        if (request.method !in WRITE_METHODS) return null
+        val path = request.requestURI
+        if (path.startsWith(APPEAL_PATH)) return null
+        val active = gate.active(userId) ?: return null
+        val writing = WRITING_PATHS.any { path.startsWith(it) }
+        val executing = EXECUTION_PATHS.any { path.startsWith(it) }
+        return when {
+            executing && active.kind.blocksExecution -> active
+            writing && active.kind.blocksWriting -> active
+            else -> null
+        }
+    }
+
+    private fun blocked(response: HttpServletResponse, sanction: Sanction): Boolean {
+        response.status = HttpStatus.FORBIDDEN.value()
+        response.contentType = "application/json;charset=UTF-8"
+        val what = if (sanction.kind == SanctionKind.SUSPEND) "제출과 실행이 정지" else "글쓰기가 정지"
+        val until = sanction.endsAt?.let { " ($it 까지)" } ?: ""
+        response.writer.write(
+            json.writeValueAsString(
+                ApiError(ErrorCode.ACCOUNT_SANCTIONED, "${what}됐다$until: ${sanction.reason}. 이의는 계정 설정에서 낼 수 있다", UUID.randomUUID().toString()),
+            ),
+        )
+        return false
+    }
+
     private fun reject(response: HttpServletResponse, code: ErrorCode, message: String): Boolean {
         response.status = HttpStatus.UNAUTHORIZED.value()
         response.contentType = "application/json;charset=UTF-8"
@@ -100,6 +138,12 @@ class AuthInterceptor(
 
     private companion object {
         const val BEARER = "Bearer "
+        val WRITE_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
+        const val APPEAL_PATH = "/api/v1/auth/me/sanction"
+        /** 커뮤니티의 쓰기 — 질문·답·풀이·도움됐다·신고, 그리고 아레나의 기부·신고. */
+        val WRITING_PATHS = listOf("/api/v1/discussions", "/api/v1/arena")
+        /** 실행 — 제출, 테스트 실행, 실험실, 변이 평가, 아레나 시도. */
+        val EXECUTION_PATHS = listOf("/api/v1/submissions", "/api/v1/trials", "/api/v1/labs", "/api/v1/mutations", "/api/v1/arena")
     }
 }
 
@@ -108,10 +152,11 @@ class AuthInterceptor(
 class IdentitySecurityConfig(
     private val identity: IdentityService,
     private val json: ObjectMapper,
+    private val sanctions: SanctionService,
 ) : WebMvcConfigurer {
 
     override fun addInterceptors(registry: InterceptorRegistry) {
-        registry.addInterceptor(AuthInterceptor(identity, json))
+        registry.addInterceptor(AuthInterceptor(identity, json, sanctions))
             // 사용자의 것: 제출·초안·자기 정보. 소유자만 열 수 있어야 한다.
             .addPathPatterns(
                 "/api/v1/submissions/**", "/api/v1/workspaces/**", "/api/v1/trials/**",

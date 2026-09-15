@@ -31,6 +31,7 @@ class AdminController(
     private val arena: ArenaModeration,
     private val discussion: DiscussionModeration,
     private val integrity: IntegrityModeration,
+    private val sanctions: SanctionModeration,
 ) {
 
     // --- 아레나 검수 (§8.3 익명화된 오답, §8.5 신고·검수) ---
@@ -117,6 +118,48 @@ class AdminController(
             id.toString(), actor, mapOf("note" to (request.note ?: "")),
         )
     }
+
+    // --- 제재와 이의 (§8.5 단계적 제재, §10.4 이의 절차) ---
+
+    /** 계정에 닿는 결정은 SECURITY_ADMIN 이다. 근거 없는 제재는 없다 — evidence 가 신호나 신고를 가리킨다. */
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @PostMapping("/sanctions")
+    fun issueSanction(
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: IssueSanctionRequest,
+    ): ResponseEntity<Any> = decided(sanctions.issue(request.userId, request.kind, request.reason, request.evidence, request.days, actor)) {
+        audit.record(AuditAction.SANCTION_ISSUED, request.userId, actor, mapOf("kind" to request.kind, "evidence" to request.evidence, "days" to (request.days ?: 0)))
+    }
+
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @PostMapping("/sanctions/{id}/lift")
+    fun liftSanction(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+    ): ResponseEntity<Any> = decided(sanctions.lift(id, actor)) {
+        audit.record(AuditAction.SANCTION_LIFTED, id.toString(), actor, emptyMap())
+    }
+
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @GetMapping("/sanctions/appeals")
+    fun appeals(): Any = sanctions.appeals()
+
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @PostMapping("/sanctions/{id}/appeal/resolve")
+    fun resolveAppeal(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ResolveAppealRequest,
+    ): ResponseEntity<Any> = decided(sanctions.resolveAppeal(id, actor, request.uphold, request.note)) {
+        audit.record(
+            if (request.uphold) AuditAction.APPEAL_UPHELD else AuditAction.APPEAL_LIFTED,
+            id.toString(), actor, mapOf("note" to (request.note ?: "")),
+        )
+    }
+
+    @RequiresRole(AdminRole.SECURITY_ADMIN)
+    @GetMapping("/sanctions/users/{userId}")
+    fun sanctionHistory(@PathVariable userId: String): Any = sanctions.history(userId)
 
     private inline fun decided(decision: ArenaModeration.Decision, onDecided: () -> Unit): ResponseEntity<Any> {
         if (decision.rejected != null) {
@@ -409,6 +452,16 @@ data class ResolveReportRequest(val retire: Boolean, @field:NotBlank val resolut
 data class ResolvePostReportRequest(val hide: Boolean, @field:NotBlank val resolution: String)
 
 data class ResolveFlagRequest(val confirmed: Boolean, val note: String? = null)
+
+data class IssueSanctionRequest(
+    @field:NotBlank val userId: String,
+    @field:NotBlank val kind: String,
+    @field:NotBlank val reason: String,
+    @field:NotBlank val evidence: String,
+    val days: Int? = null,
+)
+
+data class ResolveAppealRequest(val uphold: Boolean, val note: String? = null)
 
 /**
  * 역할 부여 요청 (§11.2).
