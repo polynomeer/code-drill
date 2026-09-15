@@ -47,7 +47,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 경로 | 배포 단위 | 경계 |
 |---|---|---|
 | `platform/` | 라이브러리 | 세 영역이 공유하는 기반(오류 코드·아웃박스·상관관계 ID) |
-| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 9개를 조립하는 모듈형 모놀리스 |
+| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 10개를 조립하는 모듈형 모놀리스 |
 | `judge/orchestrator`, `judge/runner-agent` | 각각 별도 앱 | Control DB·인터넷에 직접 접근하지 않는 실행 영역 |
 | `judge/protocol` | 라이브러리 | 제어 영역 ↔ 실행 영역 메시지 계약 |
 | `content/` | 데이터 | 문제 패키지. 실행 영역의 read-only 아티팩트 자리 |
@@ -75,6 +75,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Learning | problem state, collection, activity | 채점 원본 로그 의존 |
 | Admin | review, publish, rejudge, audit | 감사 로그 우회 |
 | Integrity | submission fingerprint, similarity flag | 소스 보관, 판정·계정 변경 |
+| Contest | contest, entry, score | 제출·판정 변경, 문제 공개 상태 변경 |
 
 ## 문제 패키지 값 타입
 
@@ -109,6 +110,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 도움됐다 (helpful) | 맞힌 사람이 남의 글(풀이·답·질문)에 한 번 남기는 표시. 받은 수와 세워진 기부가 기여 점수이고, 남에게는 등급만 나간다 (§8.5 기여자 평판) |
 | 유사도 신호 (similarity flag) | 맞힌 제출의 구조 지문이 같은 문제·언어의 다른 사람 제출과 겹칠 때 서는 검수 후보 쌍. 판정을 바꾸지 않고, 사람이 두 소스를 보고 확인·기각한다 (§11.4, §10.4) |
 | 제재 (sanction) | 경고·글쓰기 정지·제출 정지. 근거(신호나 신고)를 가리키고 기간이 있으며, 문 앞에서 쓰기를 거른다. 이의는 한 번, 발부하지 않은 보안 관리자가 본다 (§8.5, §10.4) |
+| 미니 대결 (duel) | 사용자가 문제 하나로 여는 둘의 대회. 코드로 붙는 순간 시작하고 끝난 뒤 순위표를 본다. 참가가 곧 이름 공개 동의 (§8.4) |
 | 검증 보고서 | §6.3 파이프라인의 산출물. 이 digest 가 맞는 버전만 공개할 수 있다 |
 | Trace Event | 코드 줄이 아니라 의미 단위(compare, swap, push, enqueue…)로 기록하는 실행 이벤트 |
 | Trace manifest | 트레이스 목차. 청크 범위와 요약을 담고 이벤트 본문은 담지 않는다 (§7.4) |
