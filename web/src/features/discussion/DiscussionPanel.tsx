@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { answerQuestion, askQuestion, getThread, listQuestions, reportPost } from '../../api/client'
+import { answerQuestion, askQuestion, getThread, listQuestions, markHelpful, reportPost } from '../../api/client'
 import type {
   DiscussionAnchorRequest,
   DiscussionPost,
@@ -173,7 +173,10 @@ function ThreadView({
   )
 }
 
-function PostView({
+const KIND_LABEL: Record<DiscussionPost['kind'], string> = { QUESTION: '질문', ANSWER: '답', SOLUTION: '풀이' }
+const TIER_LABEL = { NEW: '', ACTIVE: ' · 기여자', TRUSTED: ' · 믿을 만한 기여자' }
+
+export function PostView({
   post,
   onOpenReplay,
   onChanged,
@@ -185,7 +188,19 @@ function PostView({
   const [reporting, setReporting] = useState(false)
   const [reason, setReason] = useState('')
   const [reported, setReported] = useState(false)
+  const [marked, setMarked] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const helpful = async () => {
+    setError(null)
+    try {
+      await markHelpful(post.id)
+      setMarked(true)
+      onChanged()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '남기지 못했습니다')
+    }
+  }
 
   const report = async () => {
     setError(null)
@@ -203,10 +218,12 @@ function PostView({
     <article className={`discussion-post${post.parentId ? ' discussion-answer' : ''}`}>
       {post.title && <h4>{post.title}</h4>}
       <p className="muted small">
-        {post.parentId ? '답' : '질문'}
+        {KIND_LABEL[post.kind]}
         {post.mine && ' · 내 글'}
         {post.erased && ' · 지운 계정'}
-        {post.spoiler && ' · 풀이 노출'}
+        {!post.mine && post.contributor && TIER_LABEL[post.contributor]}
+        {post.spoiler && post.kind !== 'SOLUTION' && ' · 풀이 노출'}
+        {post.helpful > 0 && ` · 도움됐다 ${post.helpful}`}
         {' · '}
         {new Date(post.createdAt).toLocaleString()}
       </p>
@@ -220,8 +237,14 @@ function PostView({
               {post.anchor.excerpt !== null && (
                 <>
                   <p className="muted small">
-                    코드 {post.anchor.lineFrom}
-                    {post.anchor.lineTo !== post.anchor.lineFrom && `–${post.anchor.lineTo}`}줄
+                    {post.kind === 'SOLUTION' ? (
+                      '코드 전체'
+                    ) : (
+                      <>
+                        코드 {post.anchor.lineFrom}
+                        {post.anchor.lineTo !== post.anchor.lineFrom && `–${post.anchor.lineTo}`}줄
+                      </>
+                    )}
                   </p>
                   <pre className="code">{post.anchor.excerpt}</pre>
                 </>
@@ -236,6 +259,18 @@ function PostView({
             </div>
           )}
         </>
+      )}
+      {/* 도움됐다는 맞힌 사람이 남의 글에 한 번. 잠긴 글에는 남길 것이 없다 (§8.5). */}
+      {!post.mine && !post.locked && (
+        <p className="small">
+          {post.markedHelpful || marked ? (
+            <span className="muted">도움됐다고 남겼습니다</span>
+          ) : (
+            <button type="button" className="linklike" onClick={() => void helpful()}>
+              도움됐다
+            </button>
+          )}
+        </p>
       )}
       {!post.mine && !reported && (
         <div className="discussion-report">

@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { changePassword, deleteAccount, exportAccount, rename } from '../../api/client'
+import { useEffect, useState } from 'react'
+import { getContributions, changePassword, deleteAccount, exportAccount, rename } from '../../api/client'
 import type { Session } from '../../api/session'
+import type { Contributions } from '../../shared/types'
 
 /**
  * 계정 설정 (기획서 부록 A 계정 도메인, 기술 설계서 §11.3).
@@ -12,6 +13,8 @@ import type { Session } from '../../api/session'
  * 되돌릴 수 없는 것과 그렇지 않은 것을 화면에서도 나눈다. 아래 위험 구역은 따로 떼어 두고,
  * 삭제는 비밀번호를 다시 받는다.
  */
+const TIER_NAME = { NEW: '새 기여자', ACTIVE: '기여자', TRUSTED: '믿을 만한 기여자' }
+
 export function AccountSettings({
   session,
   onClose,
@@ -20,6 +23,10 @@ export function AccountSettings({
   onClose: () => void
 }) {
   const [name, setName] = useState(session.displayName)
+  const [contributions, setContributions] = useState<Contributions | null>(null)
+  useEffect(() => {
+    getContributions().then(setContributions).catch(() => setContributions(null))
+  }, [])
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -66,6 +73,14 @@ export function AccountSettings({
 
       {error && <p className="warn">{error}</p>}
       {note && <p className="muted">{note}</p>}
+
+      {/* 기여 (§8.5 기여자 평판). 수치는 본인에게만 — 남에게는 글에 실리는 등급뿐이다. */}
+      {contributions && (
+        <p className="small">
+          기여 {contributions.score}점 · {TIER_NAME[contributions.tier]} — 도움됐다 {contributions.helpfulReceived}
+          {' · '}풀이 {contributions.solutionsShared} · 답 {contributions.answers} · 세워진 오답 {contributions.donationsApproved}
+        </p>
+      )}
 
       <form
         className="settings-block"

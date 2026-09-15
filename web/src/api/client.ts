@@ -2,6 +2,7 @@ import { getSession, refreshSession, setSession, type Session } from './session'
 import type { TraceChunk, TraceManifest } from '../features/replay/traceTypes'
 import type {
   ApiError,
+  Contributions,
   DiscussionAnchorRequest,
   DiscussionPost,
   DiscussionThread,
@@ -630,4 +631,30 @@ export async function reportPost(postId: string, reason: string): Promise<void> 
   if (!response.ok && response.status !== 204) {
     throw new ApiFailure(response.status, (await response.json()) as ApiError)
   }
+}
+
+// --- 풀이 공유와 기여 (§8.5) ---
+
+export async function listSolutions(problemId: string): Promise<DiscussionPost[]> {
+  return json<DiscussionPost[]>(await authed(`/discussions/${problemId}/solutions`))
+}
+
+export async function shareSolution(problemId: string, submissionId: string, title: string, body: string): Promise<DiscussionPost> {
+  const response = await authed(`/discussions/${problemId}/solutions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ submissionId, title, body }),
+  })
+  return json<DiscussionPost>(response)
+}
+
+export async function markHelpful(postId: string): Promise<void> {
+  const response = await authed(`/discussions/posts/${postId}/helpful`, { method: 'POST' })
+  if (!response.ok && response.status !== 204) {
+    throw new ApiFailure(response.status, (await response.json()) as ApiError)
+  }
+}
+
+export async function getContributions(): Promise<Contributions> {
+  return json<Contributions>(await authed('/discussions/me/contributions'))
 }

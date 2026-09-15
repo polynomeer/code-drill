@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getEditorial, unlockEditorial } from '../../api/client'
 import type { Editorial } from '../../shared/types'
 import { ArenaPanel } from '../arena/ArenaPanel'
+import { SolutionsPanel } from '../discussion/SolutionsPanel'
 import { LabPanel } from './LabPanel'
 
 /**
@@ -80,6 +81,8 @@ export function EditorialPanel({ problemId, problemSignature, sampleArgs }: {
       {/* 실험실 아래에 아레나. 둘 다 맞힌 뒤의 놀이이고, 실험실이 "왜 맞나"라면 아레나는
           "왜 틀리나"다 (§8.3). */}
       {editorial.solved && <ArenaPanel problemId={problemId} problemSignature={problemSignature} />}
+      {/* 남의 접근은 저작자의 해설 다음이다. 맞힌 사람에게만 — 코드가 실린다 (§8.5). */}
+      {editorial.solved && <SolutionsPanel problemId={problemId} />}
     </section>
   )
 }

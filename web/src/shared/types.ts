@@ -646,9 +646,13 @@ export interface EvidenceView {
  * 글쓴이의 id 는 오지 않는다 — 내 것인가만 온다. 풀이를 드러내는 글은 맞힌 사람이 아니면
  * 본문과 붙인 자리가 비고 `locked` 가 선다.
  */
+export type PostKind = 'QUESTION' | 'ANSWER' | 'SOLUTION'
+export type ContributorTier = 'NEW' | 'ACTIVE' | 'TRUSTED'
+
 export interface DiscussionPost {
   id: string
   problemId: string
+  kind: PostKind
   parentId: string | null
   title: string | null
   body: string
@@ -658,7 +662,22 @@ export interface DiscussionPost {
   mine: boolean
   erased: boolean
   answerCount: number
+  /** 남이 남긴 도움됐다의 수와 내가 남겼는지 (§8.5 평판). */
+  helpful: number
+  markedHelpful: boolean
+  /** 글쓴이의 등급 — 이름 대신 나가는 유일한 것. 지운 계정이면 null. */
+  contributor: ContributorTier | null
   createdAt: string
+}
+
+/** 내 기여 (§8.5 기여자 평판). 수치는 본인에게만 보인다. */
+export interface Contributions {
+  helpfulReceived: number
+  solutionsShared: number
+  answers: number
+  donationsApproved: number
+  score: number
+  tier: ContributorTier
 }
 
 /** 글에 붙인 자기 제출의 한 자리 — 코드 구간(줄 범위와 그 줄들)이거나 리플레이의 걸음이거나 둘 다. */

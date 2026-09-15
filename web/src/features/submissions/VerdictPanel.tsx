@@ -1,5 +1,6 @@
 import { CounterexamplePanel } from './CounterexamplePanel'
 import { DonatePanel } from '../arena/DonatePanel'
+import { SharePanel } from '../discussion/SharePanel'
 import { IN_FLIGHT, VERDICT_LABEL } from '../../shared/types'
 import type { Submission } from '../../shared/types'
 
@@ -85,6 +86,8 @@ export function VerdictPanel({ submission }: { submission: Submission }) {
       )}
       {/* 틀린 제출은 남에게 과녁이 될 수 있다 (§8.3). 내놓는 것은 본인만 한다. */}
       {!inFlight && submission.mine !== false && <DonatePanel submission={submission} />}
+      {/* 맞힌 제출은 풀이가 될 수 있다 (§8.5). 오답의 내놓기와 같은 자리, 반대 방향이다. */}
+      {!inFlight && <SharePanel submission={submission} />}
     </section>
   )
 }
