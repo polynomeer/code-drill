@@ -30,6 +30,7 @@ class AdminController(
     private val roles: AdminRoles,
     private val arena: ArenaModeration,
     private val discussion: DiscussionModeration,
+    private val integrity: IntegrityModeration,
 ) {
 
     // --- 아레나 검수 (§8.3 익명화된 오답, §8.5 신고·검수) ---
@@ -94,6 +95,26 @@ class AdminController(
         audit.record(
             if (request.hide) AuditAction.DISCUSSION_POST_HIDDEN else AuditAction.DISCUSSION_REPORT_DISMISSED,
             id.toString(), actor, mapOf("resolution" to request.resolution),
+        )
+    }
+
+    // --- 유사도 신호 검수 (§11.4 부정행위 방어, §10.4 정책) ---
+
+    /** 열린 신호. 두 소스가 실린다 — 결정은 사람이 나란히 보고 한다. 판정은 바뀌지 않는다. */
+    @RequiresRole(AdminRole.REVIEWER)
+    @GetMapping("/integrity/queue")
+    fun integrityQueue(): Any = integrity.queue()
+
+    @RequiresRole(AdminRole.REVIEWER)
+    @PostMapping("/integrity/flags/{id}/resolve")
+    fun resolveFlag(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ResolveFlagRequest,
+    ): ResponseEntity<Any> = decided(integrity.resolve(id, actor, request.confirmed, request.note)) {
+        audit.record(
+            if (request.confirmed) AuditAction.SIMILARITY_CONFIRMED else AuditAction.SIMILARITY_DISMISSED,
+            id.toString(), actor, mapOf("note" to (request.note ?: "")),
         )
     }
 
@@ -386,6 +407,8 @@ data class ApproveDonationRequest(@field:NotBlank val kind: String, val note: St
 data class ResolveReportRequest(val retire: Boolean, @field:NotBlank val resolution: String)
 
 data class ResolvePostReportRequest(val hide: Boolean, @field:NotBlank val resolution: String)
+
+data class ResolveFlagRequest(val confirmed: Boolean, val note: String? = null)
 
 /**
  * 역할 부여 요청 (§11.2).

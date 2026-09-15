@@ -157,6 +157,22 @@ fun twoSum(nums: IntArray, target: Int): IntArray {
 }
 """
 
+# 같은 답, 다른 구조. 유사도 신호가 "같은 소스"와 "다른 접근"을 가르는지 보는 데 쓴다 (§11.4).
+ACCEPTED_QUADRATIC = """
+fun twoSum(nums: IntArray, target: Int): IntArray {
+    for (i in nums.indices) {
+        for (j in i + 1 until nums.size) {
+            Drill.compare(i, j)
+            if (nums[i] + nums[j] == target) {
+                Drill.match(i, j)
+                return intArrayOf(i, j)
+            }
+        }
+    }
+    error("정답은 항상 존재한다")
+}
+"""
+
 JAVA_ACCEPTED = """
 import java.util.HashMap;
 import java.util.Map;
@@ -1019,7 +1035,8 @@ def main() -> int:
     results.append(check("질문에 붙은 제출의 리플레이는 남에게 열린다", status in (200, 204), True))
     status, _ = raw_request("GET", f"/submissions/{asked_wrong['id']}/source")
     results.append(check("  소스는 열리지 않는다", status, 404))
-    await_verdict(submit(ACCEPTED_SOURCE, headers=asker.headers)["id"], headers=asker.headers)
+    asker_accepted = submit(ACCEPTED_SOURCE, headers=asker.headers)
+    await_verdict(asker_accepted["id"], headers=asker.headers)
     thread = request("GET", f"/discussions/threads/{question['id']}", None, asker.headers)
     opened = next(a for a in thread["answers"] if a["id"] == answer["id"])
     results.append(check("맞히고 나면 열린다", opened["locked"], False))
@@ -1099,6 +1116,35 @@ def main() -> int:
                          (1, 1, 1)))
     # 위에서 기부자의 과녁은 신고로 내려졌다. 내려진 기부는 기여가 아니다.
     results.append(check("  내려진 기부는 세지 않는다", request("GET", "/discussions/me/contributions", None, donor.headers)["donationsApproved"], 0))
+
+    print("\n제출 유사도 신호 (§11.4 부정행위 방어, §10.4 정책)")
+    # 위에서 기본 계정과 asker 가 같은 소스로 맞혔다. 구조가 같으면 신호가 서고, 다른 접근이면 서지 않는다.
+    honest = accounts.create("honest")
+    distinct = submit(ACCEPTED_QUADRATIC, headers=honest.headers)
+    final = await_verdict(distinct["id"], headers=honest.headers)
+    results.append(check("다른 접근도 정답이다", final["verdict"], "ACCEPTED"))
+    status, _ = raw_request("GET", "/admin/integrity/queue")
+    results.append(check("신호 큐는 검수자만", status, 403))
+    queue = request("GET", "/admin/integrity/queue", None, reviewer)
+    pair = {accepted["id"], asker_accepted["id"]}
+    flagged = next((f for f in queue if {f["flag"]["submissionId"], f["flag"]["otherSubmissionId"]} == pair), None)
+    results.append(check("같은 소스 둘이 신호로 섰다", flagged is not None, True))
+    if flagged:
+        results.append(check("  점수는 1.0", flagged["flag"]["score"], 1.0))
+        results.append(check("  검수자는 두 소스를 본다", (flagged["source"], flagged["otherSource"]), (ACCEPTED_SOURCE, ACCEPTED_SOURCE)))
+    results.append(check("다른 접근은 신호가 아니다",
+                         any(distinct["id"] in (f["flag"]["submissionId"], f["flag"]["otherSubmissionId"]) for f in queue), False))
+    verdict_before = request("GET", f"/submissions/{accepted['id']}")["verdict"]
+    if flagged:
+        decided = request("POST", f"/admin/integrity/flags/{flagged['flag']['id']}/resolve",
+                          {"confirmed": False, "note": "같은 교재의 풀이다"}, reviewer)
+        results.append(check("검수자가 기각했다", decided["status"], "DISMISSED"))
+        status, _ = raw_request("POST", f"/admin/integrity/flags/{flagged['flag']['id']}/resolve",
+                                {"confirmed": True}, reviewer)
+        results.append(check("  두 번째 결정은 없다", status, 409))
+        trail = request("GET", f"/admin/audit?subject={flagged['flag']['id']}", None, security)
+        results.append(check("  감사 로그에 남는다", [e["action"] for e in trail], ["SIMILARITY_DISMISSED"]))
+    results.append(check("신호는 판정을 바꾸지 않는다", request("GET", f"/submissions/{accepted['id']}")["verdict"], verdict_before))
 
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)

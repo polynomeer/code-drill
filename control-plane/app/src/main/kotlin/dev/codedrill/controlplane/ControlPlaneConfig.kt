@@ -48,6 +48,10 @@ import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.admin.ArenaModeration
 import dev.codedrill.controlplane.admin.DiscussionModeration
+import dev.codedrill.controlplane.admin.IntegrityModeration
+import dev.codedrill.controlplane.integrity.IntegrityRepository
+import dev.codedrill.controlplane.integrity.IntegrityService
+import dev.codedrill.controlplane.integrity.SubmissionSources
 import dev.codedrill.controlplane.submission.SharedSubmissions
 import dev.codedrill.controlplane.workspace.AnchorableSubmissions
 import dev.codedrill.controlplane.workspace.ApprovedDonations
@@ -264,6 +268,8 @@ class ControlPlaneConfig {
         coaching: CoachingService,
         transfers: TransferService,
         lab: LabService,
+        integrity: IntegrityService,
+        submissions: SubmissionRepository,
     ) =
         object : SubmissionLearningSignals {
             override fun judged(
@@ -272,6 +278,13 @@ class ControlPlaneConfig {
                 submissionId: java.util.UUID,
                 accepted: Boolean,
             ) {
+                // 맞힌 제출은 유사도 신호의 재료다 (§11.4). 학습 기록과 같은 자리에서 같은 이유로
+                // 실패를 삼킨다 — 신호가 판정을 막아서는 안 된다.
+                if (accepted) runCatching {
+                    val submission = submissions.findById(submissionId)
+                    val source = submissions.findSource(submissionId)
+                    if (submission != null && source != null) integrity.accepted(userId, problemId, submissionId, submission.language, source)
+                }
                 // 이 문제에서 받은 도움을 여기서 조회해 넘긴다 (FR-806). 제출 모듈은
                 // 코칭을 모르고 Competency 는 세션을 모르며, 둘을 아는 곳은 여기뿐이다.
                 // 정답 전에 해설을 열었으면 방법을 본 것이다 — 힌트 3단계와 같다 (FR-214).
@@ -543,6 +556,31 @@ class ControlPlaneConfig {
             when (val outcome = discussion.resolve(reportId, reviewer, hide, resolution)) {
                 is DiscussionService.ReviewOutcome.Decided -> ArenaModeration.Decision.ok(outcome.post)
                 is DiscussionService.ReviewOutcome.Rejected -> ArenaModeration.Decision.rejected(outcome.reason)
+            }
+    }
+
+    // --- 유사도 신호 (§11.4) ---
+
+    /** 검수자가 두 소스를 나란히 볼 때만 제출 도메인에 묻는다 (§3.1). */
+    @Bean
+    fun submissionSources(submissions: SubmissionRepository) = SubmissionSources { id -> submissions.findSource(id) }
+
+    /** 지문은 소스와 함께 가고, 신호는 상대방의 기록이라 이름만 지운다 (§11.3). */
+    @Bean
+    fun integrityPersonalArea(repository: IntegrityRepository) = object : PersonalData {
+        override val area = "integrity"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = mapOf("fingerprints" to repository.erase(userId))
+    }
+
+    @Bean
+    fun integrityModeration(integrity: IntegrityService) = object : IntegrityModeration {
+        override fun queue() = integrity.queue()
+
+        override fun resolve(id: java.util.UUID, reviewer: String, confirmed: Boolean, note: String?) =
+            when (val outcome = integrity.resolve(id, reviewer, confirmed, note)) {
+                is IntegrityService.ReviewOutcome.Decided -> ArenaModeration.Decision.ok(outcome.flag)
+                is IntegrityService.ReviewOutcome.Rejected -> ArenaModeration.Decision.rejected(outcome.reason)
             }
     }
 

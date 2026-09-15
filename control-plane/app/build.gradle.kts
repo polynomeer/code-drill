@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":control-plane:competency"))
     implementation(project(":control-plane:coaching"))
     implementation(project(":control-plane:learning"))
+    implementation(project(":control-plane:integrity"))
     implementation(project(":control-plane:admin"))
 
     implementation(libs.spring.boot.starter.web)
