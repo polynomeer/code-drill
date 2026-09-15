@@ -14,7 +14,7 @@
 그대로 통과한다. rotate-grid 의 2×3 케이스와 빈 격자·0열 격자가 그 자리를 지킨다.
 """
 
-from author import Problem, perf_groups, randoms, standard_groups
+from author import Problem, perf_groups, randoms, standard_groups, flat
 
 PROBLEMS = []
 
@@ -960,7 +960,7 @@ def _islands_after_each(rows, cols, positions):
 def _fill_positions(rows, cols, count, salt):
     rs = randoms(count, 0, rows - 1, salt=salt)
     cs = randoms(count, 0, cols - 1, salt=salt + 1)
-    return sum(([rs[i], cs[i]] for i in range(count)), [])
+    return flat([rs[i], cs[i]] for i in range(count))
 
 
 PROBLEMS.append(Problem(

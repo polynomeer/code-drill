@@ -4,7 +4,7 @@
 두며, 그것을 읽는 것도 문제의 일부다 — 실무에서 스펙을 읽는 일과 다르지 않다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms
+from author import Problem, standard_groups, perf_groups, randoms, flat
 
 PROBLEMS = []
 

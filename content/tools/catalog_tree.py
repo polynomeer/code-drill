@@ -5,7 +5,7 @@
 있나"가 된다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms, shuffled
+from author import Problem, standard_groups, perf_groups, randoms, shuffled, flat
 
 PROBLEMS = []
 
@@ -338,8 +338,8 @@ fun maxSubtreeSum(parent: IntArray, values: IntArray): Int {
 
 def _deep_chain_then_fan(n):
     half = n // 2
-    chain = sum(([i + 1, i] for i in range(half - 1)), [])
-    fan = sum(([0, half + j] for j in range(n - half)), [])
+    chain = flat([i + 1, i] for i in range(half - 1))
+    fan = flat([0, half + j] for j in range(n - half))
     return chain + fan + [1, 2]
 
 
@@ -401,8 +401,8 @@ Drill.match(a, b)              // 순환을 만드는 간선을 찾았다
             ("05-order-matters", [3, [2, 1, 1, 0, 0, 2]]),
         ],
         "hidden": [
-            ("01-tree-then-cycle", [50, sum(([i, i + 1] for i in range(49)), []) + [49, 0]]),
-            ("02-star", [40, sum(([0, i] for i in range(1, 40)), []) + [5, 7]]),
+            ("01-tree-then-cycle", [50, flat([i, i + 1] for i in range(49)) + [49, 0]]),
+            ("02-star", [40, flat([0, i] for i in range(1, 40)) + [5, 7]]),
         ],
         "performance": [
             # 앞 절반으로 깊은 사슬을 만들고, 뒤 절반의 고립 정점을 사슬의 끝(0)에 하나씩
@@ -697,12 +697,12 @@ Drill.compare(l, r)            // 질의 구간을 봤다
         ],
         "hidden": [
             ("01-random", [randoms(300, -100, 100, salt=961),
-                           sum(([min(a, b), max(a, b)] for a, b in zip(randoms(200, 0, 299, salt=962), randoms(200, 0, 299, salt=963))), [])]),
+                           flat([min(a, b), max(a, b)] for a, b in zip(randoms(200, 0, 299, salt=962), randoms(200, 0, 299, salt=963)))]),
         ],
         "performance": [
-            ("01-small", [randoms(3000, -100, 100, salt=964), sum(([0, 2999] for _ in range(3000)), [])]),
-            ("02-medium", [randoms(30000, -100, 100, salt=965), sum(([0, 29999] for _ in range(30000)), [])]),
-            ("03-large", [randoms(200000, -100, 100, salt=966), sum(([0, 199999] for _ in range(100000)), [])]),
+            ("01-small", [randoms(3000, -100, 100, salt=964), flat([0, 2999] for _ in range(3000))]),
+            ("02-medium", [randoms(30000, -100, 100, salt=965), flat([0, 29999] for _ in range(30000))]),
+            ("03-large", [randoms(200000, -100, 100, salt=966), flat([0, 199999] for _ in range(100000))]),
         ],
     },
     kotlin="""
@@ -959,7 +959,7 @@ def _lca_queries_fast(parent, queries):
 def _random_pairs(n, count, salt):
     a = randoms(count, 0, n - 1, salt=salt)
     b = randoms(count, 0, n - 1, salt=salt + 1)
-    return sum(([a[i], b[i]] for i in range(count)), [])
+    return flat([a[i], b[i]] for i in range(count))
 
 
 PROBLEMS.append(Problem(

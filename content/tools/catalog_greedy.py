@@ -4,7 +4,7 @@
 처리를 빠뜨리거나. 그래서 오답도 그런 모양으로 만든다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms, shuffled
+from author import Problem, standard_groups, perf_groups, randoms, shuffled, flat
 
 PROBLEMS = []
 
@@ -69,13 +69,13 @@ Drill.match(i, count)          // 새 덩어리를 열었다
         ],
         "hidden": [
             ("01-all-same", [[7, 9] * 50]),
-            ("02-chain", [sum(([i, i + 1] for i in range(0, 100)), [])]),
+            ("02-chain", [flat([i, i + 1] for i in range(0, 100))]),
             ("03-large-values", [[0, 1000000000, 5, 6]]),
         ],
         "performance": [
-            ("01-small", [sum(([v, v + 3] for v in randoms(2000, 0, 100000, salt=901)), [])]),
-            ("02-medium", [sum(([v, v + 3] for v in randoms(20000, 0, 1000000, salt=902)), [])]),
-            ("03-large", [sum(([v, v + 3] for v in randoms(100000, 0, 1000000000, salt=903)), [])]),
+            ("01-small", [flat([v, v + 3] for v in randoms(2000, 0, 100000, salt=901))]),
+            ("02-medium", [flat([v, v + 3] for v in randoms(20000, 0, 1000000, salt=902))]),
+            ("03-large", [flat([v, v + 3] for v in randoms(100000, 0, 1000000000, salt=903))]),
         ],
     },
     kotlin="""
@@ -225,14 +225,14 @@ Drill.match(i, rooms)          // 동시에 열린 수가 늘었다
             ("05-unsorted", [[10, 20, 0, 5, 3, 12]]),
         ],
         "hidden": [
-            ("01-staircase", [sum(([i, i + 10] for i in range(0, 50, 2)), [])]),
+            ("01-staircase", [flat([i, i + 10] for i in range(0, 50, 2))]),
             ("02-large-values", [[0, 1000000000, 999999999, 1000000000]]),
             ("03-many-same", [[5, 6] * 40]),
         ],
         "performance": [
-            ("01-small", [sum(([v, v + 50] for v in randoms(2000, 0, 100000, salt=911)), [])]),
-            ("02-medium", [sum(([v, v + 500] for v in randoms(20000, 0, 1000000, salt=912)), [])]),
-            ("03-large", [sum(([v, v + 5000] for v in randoms(100000, 0, 100000000, salt=913)), [])]),
+            ("01-small", [flat([v, v + 50] for v in randoms(2000, 0, 100000, salt=911))]),
+            ("02-medium", [flat([v, v + 500] for v in randoms(20000, 0, 1000000, salt=912))]),
+            ("03-large", [flat([v, v + 5000] for v in randoms(100000, 0, 100000000, salt=913))]),
         ],
     },
     kotlin="""

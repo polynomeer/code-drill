@@ -375,6 +375,14 @@ def randoms(count, low, high, salt=0):
     return [source.randint(low, high) for _ in range(count)]
 
 
+def flat(chunks):
+    """작은 리스트들을 하나로 편다. `sum(..., [])` 은 O(n²) 라 10만 간선에서 분 단위가 걸린다."""
+    out = []
+    for chunk in chunks:
+        out += chunk
+    return out
+
+
 def shuffled(values, salt=0):
     out = list(values)
     random.Random(SEED + salt).shuffle(out)

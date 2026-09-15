@@ -4,7 +4,7 @@
 그래프를 인접 리스트로 옮기는 것부터가 문제의 일부다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms
+from author import Problem, standard_groups, perf_groups, randoms, flat
 
 PROBLEMS = []
 
@@ -815,7 +815,7 @@ def _min_semesters(n, prereqs):
 
 
 def _chain_prereqs(n):
-    return sum(([i, i + 1] for i in range(n - 1)), [])
+    return flat([i, i + 1] for i in range(n - 1))
 
 
 PROBLEMS.append(Problem(
@@ -1044,14 +1044,14 @@ def _cheapest_paths(n, edges, source):
 
 def _weighted_chain(n, salt):
     weights = randoms(n - 1, 1, 100, salt=salt)
-    return sum(([i, i + 1, weights[i]] for i in range(n - 1)), [])
+    return flat([i, i + 1, weights[i]] for i in range(n - 1))
 
 
 def _weighted_random(n, m, salt):
     a = randoms(m, 0, n - 1, salt=salt)
     b = randoms(m, 0, n - 1, salt=salt + 1)
     w = randoms(m, 1, 1000, salt=salt + 2)
-    return sum(([a[i], b[i], w[i]] for i in range(m)), [])
+    return flat([a[i], b[i], w[i]] for i in range(m))
 
 
 PROBLEMS.append(Problem(
