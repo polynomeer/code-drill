@@ -2,6 +2,8 @@ import { getSession, refreshSession, setSession, type Session } from './session'
 import type { TraceChunk, TraceManifest } from '../features/replay/traceTypes'
 import type {
   ApiError,
+  ContestSummary,
+  ContestView,
   Contributions,
   SanctionView,
   DiscussionAnchorRequest,
@@ -674,4 +676,39 @@ export async function appealSanction(id: string, text: string): Promise<Sanction
     body: JSON.stringify({ text }),
   })
   return json<SanctionView>(response)
+}
+
+// --- 대회와 미니 대결 (§8.4) ---
+
+export async function listContests(): Promise<ContestSummary[]> {
+  return json<ContestSummary[]>(await authed('/contests'))
+}
+
+export async function getContest(id: string): Promise<ContestView> {
+  return json<ContestView>(await authed(`/contests/${id}`))
+}
+
+export async function joinContest(id: string): Promise<void> {
+  const response = await authed(`/contests/${id}/join`, { method: 'POST' })
+  if (!response.ok && response.status !== 204) {
+    throw new ApiFailure(response.status, (await response.json()) as ApiError)
+  }
+}
+
+export async function openDuel(problemId: string, minutes: number): Promise<{ contest: ContestSummary; joinCode: string }> {
+  const response = await authed('/contests/duels', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problemId, minutes }),
+  })
+  return json<{ contest: ContestSummary; joinCode: string }>(response)
+}
+
+export async function joinDuel(code: string): Promise<{ contest: ContestSummary }> {
+  const response = await authed('/contests/duels/join', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
+  return json<{ contest: ContestSummary }>(response)
 }

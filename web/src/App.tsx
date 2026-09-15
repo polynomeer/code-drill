@@ -9,6 +9,7 @@ import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CoachingPanel } from './features/coaching/CoachingPanel'
+import { ContestsPanel } from './features/contest/ContestsPanel'
 import { DiscussionPanel } from './features/discussion/DiscussionPanel'
 import { EditorialPanel } from './features/lab/EditorialPanel'
 import { CollectionsPanel } from './features/learning/CollectionsPanel'
@@ -195,6 +196,8 @@ function Drill({ session }: { session: Session }) {
           {/* 목록보다 위다. "무엇을 풀지 모를 때 현재 수준과 약점을 기준으로 고른다"가
               PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
           <TodayPanel onOpenProblem={selectProblem} refreshKey={history.length} />
+          {/* 처방 아래, 목록 위. 대회 중이면 무엇을 풀지는 대회가 정한다 (§8.4). */}
+          <ContestsPanel currentProblem={slug} onOpenProblem={selectProblem} refreshKey={history.length} />
           <ProblemList selected={slug} onSelect={selectProblem} />
           <section className="panel statement">
             <h3>{problem?.title ?? '문제를 고르세요'}</h3>

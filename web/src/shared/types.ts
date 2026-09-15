@@ -714,3 +714,37 @@ export interface SanctionView {
   appealResolution: 'UPHELD' | 'LIFTED' | null
   appealNote: string | null
 }
+
+/** 대회와 미니 대결 (§8.4). 상태는 시각에서 읽는다. */
+export type ContestStatus = 'DRAFT' | 'WAITING' | 'SCHEDULED' | 'RUNNING' | 'FINISHED'
+
+export interface ContestSummary {
+  id: string
+  kind: 'CONTEST' | 'DUEL'
+  title: string
+  status: ContestStatus
+  startsAt: string | null
+  endsAt: string | null
+  minutes: number | null
+  joined: boolean
+  entrants: number
+  problemCount: number
+}
+
+export interface Standing {
+  rank: number
+  displayName: string
+  mine: boolean
+  total: number
+  solved: number
+  lastSolvedAt: string | null
+  perProblem: Record<string, number>
+}
+
+export interface ContestView {
+  contest: ContestSummary
+  problems: string[]
+  standings: Standing[]
+  /** 대결의 코드. 만든 사람에게만 온다. */
+  joinCode: string | null
+}
