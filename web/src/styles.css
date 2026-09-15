@@ -1142,3 +1142,17 @@ table.groups td {
 .discussion-line {
   width: 64px;
 }
+
+/* --- 제재 (§8.5) --- */
+
+.sanction {
+  margin-bottom: 12px;
+}
+
+.sanction-active {
+  border-color: var(--bad);
+}
+
+.sanction p {
+  margin: 0 0 6px;
+}

@@ -3,6 +3,7 @@ import type { TraceChunk, TraceManifest } from '../features/replay/traceTypes'
 import type {
   ApiError,
   Contributions,
+  SanctionView,
   DiscussionAnchorRequest,
   DiscussionPost,
   DiscussionThread,
@@ -657,4 +658,20 @@ export async function markHelpful(postId: string): Promise<void> {
 
 export async function getContributions(): Promise<Contributions> {
   return json<Contributions>(await authed('/discussions/me/contributions'))
+}
+
+// --- 제재와 이의 (§8.5, §10.4) ---
+
+export async function getMySanction(): Promise<SanctionView | null> {
+  const me = await json<{ sanction: SanctionView | null }>(await authed('/auth/me'))
+  return me.sanction
+}
+
+export async function appealSanction(id: string, text: string): Promise<SanctionView> {
+  const response = await authed(`/auth/me/sanction/${id}/appeal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  return json<SanctionView>(response)
 }

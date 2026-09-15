@@ -700,3 +700,17 @@ export interface DiscussionAnchorRequest {
   lineTo?: number
   step?: number
 }
+
+/** 내 계정의 제재 (§8.5 단계적 제재, §10.4 이의 절차). 풀린 것도 온다 — 이의의 답이 여기 실린다. */
+export interface SanctionView {
+  id: string
+  kind: 'WARNING' | 'MUTE' | 'SUSPEND'
+  reason: string
+  startsAt: string
+  endsAt: string | null
+  active: boolean
+  liftedAt: string | null
+  appealed: boolean
+  appealResolution: 'UPHELD' | 'LIFTED' | null
+  appealNote: string | null
+}

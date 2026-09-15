@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createSubmission, getDraft, getProblem, listSubmissions, logout } from './api/client'
 import { getSession, onSessionChange, type Session } from './api/session'
 import { AccountSettings } from './features/auth/AccountSettings'
+import { SanctionBanner } from './features/auth/SanctionBanner'
 import { SignIn } from './features/auth/SignIn'
 import { ProblemList } from './features/problems/ProblemList'
 import { ReplayView } from './features/replay/ReplayView'
@@ -183,6 +184,8 @@ function Drill({ session }: { session: Session }) {
       </header>
 
       {error && <p className="warn">{error}</p>}
+      {/* 제재는 무엇보다 먼저 보여야 한다 (§8.5). 없으면 아무것도 그리지 않는다. */}
+      <SanctionBanner />
 
       <main className="columns">
         <div className="stack">
