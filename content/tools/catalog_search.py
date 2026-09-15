@@ -1,6 +1,6 @@
 """정렬·탐색 (역량: 순서를 이용해 후보를 반으로 줄이기)."""
 
-from author import Problem, standard_groups, perf_groups, randoms, shuffled
+from author import Problem, standard_groups, perf_groups, randoms, shuffled, flat
 
 PROBLEMS = []
 
@@ -668,6 +668,164 @@ fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
 fun kthSmallest(grid: Array<IntArray>, k: Int): Int {
     val flat = grid[0]
     return flat[minOf(k - 1, flat.size - 1)]
+}
+"""),
+    ],
+))
+
+
+# --- 96. 정렬된 목록 k개 합치기 (힙) --------------------------------------------------------
+
+def _merge_k_sorted(sizes, values):
+    import heapq
+    lists = []
+    at = 0
+    for n in sizes:
+        lists.append(values[at:at + n])
+        at += n
+    return list(heapq.merge(*lists))
+
+
+def _sorted_lists(k, each, salt):
+    """길이가 each 근처에서 흔들리는 정렬 목록 k개 → (sizes, values)."""
+    sizes = randoms(k, max(0, each - 3), each + 3, salt=salt)
+    values = []
+    for i, n in enumerate(sizes):
+        values += sorted(randoms(n, -100000, 100000, salt=salt + 1 + i))
+    return [sizes, values]
+
+
+def _lists(*lists):
+    return [[len(l) for l in lists], flat(list(l) for l in lists)]
+
+
+PROBLEMS.append(Problem(
+    id="merge-k-sorted",
+    title="정렬된 목록 k개 합치기",
+    summary="""
+각각 오름차순인 정수 목록 `k` 개가 평탄하게 주어진다 — `sizes[i]` 는 `i` 번 목록의 길이이고,
+`values` 는 목록들을 차례로 이어 붙인 것이다 (길이는 서로 다를 수 있고 `0` 도 있다).
+전부 합쳐 오름차순으로 만든 배열을 반환한다. 같은 값은 각각 남긴다.
+
+예: `sizes = [3, 3, 2]`, `values = [1, 4, 5, 1, 3, 4, 2, 6]` → `[1, 1, 2, 3, 4, 4, 5, 6]`.
+""",
+    notes="""
+전부 정렬하면 O(N log N) 이지만 이미 정렬돼 있다는 것을 버린 것이다. 목록마다 앞 원소
+하나씩만 힙에 두면 가장 작은 것이 O(log k) 에 나오고, 꺼낸 목록의 다음 원소를 넣는다.
+목록을 둘씩 짝지어 합치는 분할 정복도 같은 O(N log k) 다. 하나씩 차례로 합치면 O(N·k).
+""",
+    drill_doc="""
+Drill.push(v)                 // 힙에 넣었다
+Drill.pop(v)                  // 힙에서 꺼내 답에 붙였다
+""",
+    constraints="""
+- `0 <= k <= 200_000`, `values.size = sizes 의 합 <= 200_000`
+- `-10^5 <= 값 <= 10^5`, 각 목록은 오름차순
+""",
+    signature=dict(name="mergeSorted", parameters=[("sizes", "INT_ARRAY"), ("values", "INT_ARRAY")],
+                   returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_merge_k_sorted,
+    cases={
+        "sample": [
+            ("01", _lists([1, 4, 5], [1, 3, 4], [2, 6])),
+            ("02", _lists([7])),
+        ],
+        "boundary": [
+            ("01-no-lists", _lists()),
+            ("02-empty-lists", _lists([], [])),
+            ("03-some-empty", _lists([], [2, 3], [], [1])),
+            ("04-duplicates", _lists([1, 1], [1], [1, 1, 1])),
+            # 한 목록이 다른 것보다 전부 작다.
+            ("05-disjoint-ranges", _lists([10, 11, 12], [1, 2, 3])),
+            ("06-negatives", _lists([-5, -1], [-3, 0], [-100000])),
+            ("07-single-long", _lists(list(range(-5, 6)))),
+        ],
+        "hidden": [
+            ("01-random-small", _sorted_lists(4, 6, salt=5201)),
+            ("02-random-medium", _sorted_lists(20, 50, salt=5210)),
+            ("03-ragged", _lists(*[sorted(randoms(n, -1000, 1000, salt=5240 + n)) for n in [0, 5, 1, 30, 0, 12]])),
+            ("04-many-tiny", _lists(*[[v] for v in randoms(300, -100, 100, salt=5250)])),
+        ],
+        "performance": [
+            ("01-small", _sorted_lists(2000, 10, salt=5300)),
+            ("02-medium", _sorted_lists(50000, 3, salt=8000)),
+            # 목록이 원소 하나씩 20만 개. 하나씩 합치면 N²/2 다.
+            ("03-large", [[1] * 200000, randoms(200000, -100000, 100000, salt=60000)]),
+        ],
+    },
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 목록마다 앞 원소 하나씩만 힙에 둔다. O(N log k).
+fun mergeSorted(sizes: IntArray, values: IntArray): IntArray {
+    val start = IntArray(sizes.size + 1)
+    for (i in sizes.indices) start[i + 1] = start[i] + sizes[i]
+    val out = IntArray(values.size)
+    // (값, 목록 번호, values 안의 자리)
+    val heap = java.util.PriorityQueue<IntArray>(compareBy { it[0] })
+    for (i in sizes.indices) if (sizes[i] > 0) { heap.add(intArrayOf(values[start[i]], i, start[i])); Drill.push(values[start[i]]) }
+    var n = 0
+    while (heap.isNotEmpty()) {
+        val (v, i, j) = heap.poll()
+        Drill.pop(v)
+        out[n++] = v
+        if (j + 1 < start[i + 1]) { heap.add(intArrayOf(values[j + 1], i, j + 1)); Drill.push(values[j + 1]) }
+    }
+    return out
+}
+""",
+    mutants=[
+        ("drops-duplicates", "MISSING_EDGE_CASE",
+         "같은 값을 하나로 합친다. 각각 남겨야 한다.",
+         """
+fun mergeSorted(sizes: IntArray, values: IntArray): IntArray = values.toSortedSet().toIntArray()
+"""),
+        ("forgets-next-of-popped", "WRONG_BRANCH",
+         "꺼낸 목록의 다음 원소를 넣지 않는다. 목록마다 첫 원소만 나온다.",
+         """
+fun mergeSorted(sizes: IntArray, values: IntArray): IntArray {
+    val heap = java.util.PriorityQueue<Int>()
+    var at = 0
+    for (n in sizes) { if (n > 0) heap.add(values[at]); at += n }
+    val out = ArrayList<Int>()
+    while (heap.isNotEmpty()) out.add(heap.poll())
+    return out.toIntArray()
+}
+"""),
+        ("ignores-list-boundary", "OFF_BY_ONE",
+         "목록의 끝을 보지 않고 다음 자리를 넣는다. 다음 목록의 첫 원소가 이 목록 것처럼 들어와 순서가 깨진다.",
+         """
+fun mergeSorted(sizes: IntArray, values: IntArray): IntArray {
+    val out = IntArray(values.size)
+    val heap = java.util.PriorityQueue<Int>(compareBy { values[it] })
+    var at = 0
+    for (n in sizes) { if (n > 0) heap.add(at); at += n }
+    var n = 0
+    while (heap.isNotEmpty()) {
+        val j = heap.poll()
+        out[n++] = values[j]
+        if (j + 1 < values.size) heap.add(j + 1)
+    }
+    return out
+}
+"""),
+        ("merge-one-by-one", "PERFORMANCE",
+         "목록을 하나씩 차례로 합친다. 앞의 결과를 매번 다시 훑어 O(N·k).",
+         """
+fun mergeSorted(sizes: IntArray, values: IntArray): IntArray {
+    var acc = IntArray(0)
+    var at = 0
+    for (size in sizes) {
+        val list = values.copyOfRange(at, at + size); at += size
+        val merged = IntArray(acc.size + list.size)
+        var i = 0; var j = 0; var n = 0
+        while (i < acc.size || j < list.size) {
+            Drill.compare(i, j)
+            merged[n++] = if (j >= list.size || (i < acc.size && acc[i] <= list[j])) acc[i++] else list[j++]
+        }
+        acc = merged
+    }
+    return acc
 }
 """),
     ],

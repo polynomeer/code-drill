@@ -1745,3 +1745,588 @@ fun mergeSorted(first: IntArray, second: IntArray): IntArray = first + second
 """),
     ],
 ))
+
+
+# --- 86. 최근 k개의 평균 (큐) -----------------------------------------------------------
+
+def _moving_average(values, k):
+    from collections import deque
+    out = []
+    window = deque()
+    total = 0
+    for v in values:
+        window.append(v)
+        total += v
+        if len(window) > k:
+            total -= window.popleft()
+        out.append(total // len(window))
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="moving-average",
+    title="최근 k개의 평균",
+    summary="""
+정수가 하나씩 도착한다. 값이 올 때마다 **최근 k개** (아직 k개가 안 됐으면 지금까지 전부)
+의 평균을 내림해 기록한다. 기록한 평균들을 배열로 반환한다.
+
+예: `values = [1, 10, 3, 5]`, `k = 3` 이면 `[1, 5, 4, 6]` 이다 — `1`, `(1+10)/2`, `(1+10+3)/3`,
+`(10+3+5)/3`.
+""",
+    notes="""
+매번 최근 k개를 다시 더하면 O(n·k) 다. 창에 들어오는 값을 더하고 나가는 값을 빼면 값마다
+O(1) 이고, 나가는 값이 무엇인지는 **가장 먼저 들어온 것** — 큐가 기억한다.
+""",
+    drill_doc="""
+Drill.enqueue(v)              // 창에 들어왔다
+Drill.dequeue(v)              // 창에서 나갔다
+Drill.write(i, avg)           // i 번째 평균
+""",
+    constraints="""
+- `1 <= values.size <= 200_000`
+- `1 <= k <= 100_000`
+- `-10^4 <= values[i] <= 10^4` — 합은 `Int` 범위 안
+- 평균은 **내림** (음수는 0 에서 멀어지는 쪽으로: `-7 / 2 = -4`)
+""",
+    signature=dict(name="movingAverage", parameters=[("values", "INT_ARRAY"), ("k", "INT")],
+                   returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_moving_average,
+    cases={
+        "sample": [
+            ("01", [[1, 10, 3, 5], 3]),
+            ("02", [[4], 1]),
+        ],
+        "boundary": [
+            ("01-k-one", [[3, -1, 4], 1]),
+            # k 가 배열보다 크다. 끝까지 "지금까지 전부"다.
+            ("02-k-larger", [[2, 4, 9], 10]),
+            # 음수의 내림. -7 / 2 는 -4 다.
+            ("03-negative-floor", [[-3, -4], 2]),
+            ("04-mixed", [[5, -5, 5, -5], 2]),
+            ("05-zeros", [[0, 0, 0], 2]),
+        ],
+        "hidden": [
+            ("01-random", [randoms(50, -100, 100, salt=4201), 4]),
+            ("02-random-big-k", [randoms(60, -1000, 1000, salt=4202), 7]),
+            ("03-all-negative", [randoms(30, -50, -1, salt=4203), 3]),
+        ],
+        "performance": [
+            ("01-small", [randoms(20000, -10000, 10000, salt=4204), 5000]),
+            ("02-medium", [randoms(100000, -10000, 10000, salt=4205), 50000]),
+            ("03-large", [randoms(200000, -10000, 10000, salt=4206), 100000]),
+        ],
+    },
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 창의 합을 유지하고 큐가 나갈 값을 기억한다.
+fun movingAverage(values: IntArray, k: Int): IntArray {
+    val out = IntArray(values.size)
+    val window = ArrayDeque<Int>()
+    var total = 0
+    for ((i, v) in values.withIndex()) {
+        window.addLast(v)
+        Drill.enqueue(v)
+        total += v
+        if (window.size > k) {
+            val gone = window.removeFirst()
+            Drill.dequeue(gone)
+            total -= gone
+        }
+        out[i] = Math.floorDiv(total, window.size)
+        Drill.write(i, out[i])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("truncates-toward-zero", "MISSING_EDGE_CASE",
+         "정수 나눗셈을 그대로 쓴다. 음수 평균이 0 쪽으로 잘린다.",
+         """
+fun movingAverage(values: IntArray, k: Int): IntArray {
+    val out = IntArray(values.size)
+    val window = ArrayDeque<Int>()
+    var total = 0
+    for ((i, v) in values.withIndex()) {
+        window.addLast(v); total += v
+        if (window.size > k) total -= window.removeFirst()
+        out[i] = total / window.size
+    }
+    return out
+}
+"""),
+        ("divides-by-k--always", "WRONG_BRANCH",
+         "창이 아직 k개가 안 찼는데도 k 로 나눈다.",
+         """
+fun movingAverage(values: IntArray, k: Int): IntArray {
+    val out = IntArray(values.size)
+    val window = ArrayDeque<Int>()
+    var total = 0
+    for ((i, v) in values.withIndex()) {
+        window.addLast(v); total += v
+        if (window.size > k) total -= window.removeFirst()
+        out[i] = Math.floorDiv(total, k)
+    }
+    return out
+}
+"""),
+        ("evicts-at-k", "OFF_BY_ONE",
+         "창이 k 개 이상이면 내보낸다. 정확히 k 개일 때도 내보내 창이 k-1 개다.",
+         """
+fun movingAverage(values: IntArray, k: Int): IntArray {
+    val out = IntArray(values.size)
+    val window = ArrayDeque<Int>()
+    var total = 0
+    for ((i, v) in values.withIndex()) {
+        window.addLast(v); total += v
+        if (window.size >= k) total -= window.removeFirst()
+        out[i] = Math.floorDiv(total, window.size)
+    }
+    return out
+}
+"""),
+        ("resums-window--per-value", "PERFORMANCE",
+         "값마다 최근 k개를 다시 더한다. O(n·k).",
+         """
+fun movingAverage(values: IntArray, k: Int): IntArray {
+    val out = IntArray(values.size)
+    for (i in values.indices) {
+        val from = maxOf(0, i - k + 1)
+        var total = 0
+        for (j in from..i) { Drill.visit(j, values[j]); total += values[j] }
+        out[i] = Math.floorDiv(total, i - from + 1)
+    }
+    return out
+}
+"""),
+    ],
+))
+
+
+# --- 87. 합이 목표 이상인 가장 짧은 구간 (슬라이딩 윈도) ----------------------------------
+
+def _min_subarray_len(nums, target):
+    best = 0
+    left = 0
+    total = 0
+    for right, v in enumerate(nums):
+        total += v
+        while total >= target:
+            length = right - left + 1
+            best = length if best == 0 or length < best else best
+            total -= nums[left]
+            left += 1
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="min-subarray-len",
+    title="합이 목표 이상인 가장 짧은 구간",
+    summary="""
+**양의 정수** 배열 `nums` 와 `target` 이 주어진다. 합이 `target` **이상**인 연속 구간 중
+가장 짧은 것의 길이를 반환한다. 그런 구간이 없으면 `0` 이다.
+
+예: `[2, 3, 1, 2, 4, 3]`, `target = 7` 이면 `[4, 3]` 으로 `2` 다.
+""",
+    notes="""
+값이 전부 양수라 구간을 오른쪽으로 늘리면 합이 늘고 왼쪽을 줄이면 합이 준다. 그래서
+창의 오른쪽 끝을 한 칸씩 밀면서, 합이 목표 이상인 동안 왼쪽을 최대한 줄이면 된다. 양쪽
+끝이 각각 n 번만 움직인다 — O(n).
+""",
+    drill_doc="""
+Drill.pointer("left", i)      // 창의 왼쪽
+Drill.pointer("right", j)     // 창의 오른쪽
+Drill.write(0, best)          // 지금까지의 최소 길이
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `1 <= nums[i] <= 10^4`, `1 <= target <= 10^9`
+""",
+    signature=dict(name="minSubarrayLen", parameters=[("nums", "INT_ARRAY"), ("target", "INT")],
+                   returns="INT"),
+    groups=perf_groups(),
+    reference=_min_subarray_len,
+    cases={
+        "sample": [
+            ("01", [[2, 3, 1, 2, 4, 3], 7]),
+            ("02", [[1, 4, 4], 4]),
+        ],
+        "boundary": [
+            ("01-none", [[1, 1, 1], 10]),
+            ("02-single-enough", [[10], 7]),
+            # 정확히 같은 합. "이상"이다.
+            ("03-exact", [[1, 2, 3, 4], 10]),
+            # 전체가 답이다.
+            ("04-whole", [[1, 1, 1, 1], 4]),
+            # 가장 짧은 구간이 맨 끝에 있다.
+            ("05-at-end", [[1, 1, 1, 1, 9], 9]),
+            ("06-at-start", [[9, 1, 1, 1, 1], 9]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(30, 1, 20, salt=4301), 50]),
+            ("02-random-medium", [randoms(500, 1, 100, salt=4302), 900]),
+            ("03-random-unreachable", [randoms(200, 1, 10, salt=4303), 1000000]),
+            ("04-big-values", [randoms(100, 9000, 10000, salt=4304), 27000]),
+        ],
+        "performance": [
+            ("01-small", [randoms(20000, 1, 100, salt=4305), 300000]),
+            ("02-medium", [randoms(100000, 1, 100, salt=4306), 2000000]),
+            ("03-large", [randoms(200000, 1, 10, salt=4307), 500000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 양쪽 끝이 각각 n 번만 움직이는 창.
+fun minSubarrayLen(nums: IntArray, target: Int): Int {
+    var best = 0
+    var left = 0
+    var total = 0L
+    for (right in nums.indices) {
+        total += nums[right]
+        Drill.pointer("right", right)
+        while (total >= target) {
+            val length = right - left + 1
+            if (best == 0 || length < best) { best = length; Drill.write(0, best) }
+            total -= nums[left]
+            left += 1
+            Drill.pointer("left", left)
+        }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("strictly-greater", "OFF_BY_ONE",
+         "합이 목표보다 커야 한다고 본다. 정확히 같은 합을 놓친다.",
+         """
+fun minSubarrayLen(nums: IntArray, target: Int): Int {
+    var best = 0; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        total += nums[right]
+        while (total > target) {
+            val length = right - left + 1
+            if (best == 0 || length < best) best = length
+            total -= nums[left]; left += 1
+        }
+    }
+    return best
+}
+"""),
+        ("shrinks-once--per-step", "WRONG_BRANCH",
+         "합이 목표 이상이면 왼쪽을 한 칸만 줄인다. 더 줄일 수 있어도 멈춘다.",
+         """
+fun minSubarrayLen(nums: IntArray, target: Int): Int {
+    var best = 0; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        total += nums[right]
+        if (total >= target) {
+            val length = right - left + 1
+            if (best == 0 || length < best) best = length
+            total -= nums[left]; left += 1
+        }
+    }
+    return best
+}
+"""),
+        ("returns-max-length", "WRONG_ALGORITHM",
+         "가장 긴 구간을 답한다.",
+         """
+fun minSubarrayLen(nums: IntArray, target: Int): Int {
+    var best = 0; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        total += nums[right]
+        while (total >= target) {
+            best = maxOf(best, right - left + 1)
+            total -= nums[left]; left += 1
+        }
+    }
+    return best
+}
+"""),
+        ("all-starts--quadratic", "PERFORMANCE",
+         "시작점마다 합이 목표에 닿을 때까지 더한다. 닿지 않으면 끝까지 — O(n²).",
+         """
+fun minSubarrayLen(nums: IntArray, target: Int): Int {
+    var best = 0
+    for (i in nums.indices) {
+        var total = 0L
+        for (j in i until nums.size) {
+            total += nums[j]
+            Drill.compare(i, j)
+            if (total >= target) { if (best == 0 || j - i + 1 < best) best = j - i + 1; break }
+        }
+    }
+    return best
+}
+"""),
+    ],
+))
+
+
+# --- 88. 정렬된 배열에서 중복 없애기 (제자리) -------------------------------------------------
+
+def _remove_duplicates_sorted(nums):
+    out = []
+    for v in nums:
+        if not out or out[-1] != v:
+            out.append(v)
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="remove-duplicates-sorted",
+    title="정렬된 배열에서 중복 없애기",
+    summary="""
+오름차순으로 정렬된 정수 배열 `nums` 가 주어진다. 같은 값이 한 번씩만 남도록 중복을
+지운 배열을 **순서를 유지해** 반환한다.
+
+예: `[1, 1, 2, 2, 2, 3]` → `[1, 2, 3]`.
+""",
+    notes="""
+정렬돼 있으므로 같은 값은 붙어 있다. 바로 앞에 남긴 값과 다를 때만 남기면 된다 — 쓰는
+자리와 읽는 자리를 따로 들고 한 번 훑는 것이 제자리 풀이다. 집합에 넣으면 순서가 흔들릴
+수 있고, 새 배열에 담으면 메모리를 두 배 쓴다.
+""",
+    drill_doc="""
+Drill.pointer("read", i)      // 읽는 자리
+Drill.pointer("write", j)     // 쓰는 자리
+Drill.write(j, v)             // 남겼다
+""",
+    constraints="""
+- `0 <= nums.size <= 200_000`
+- `-10^9 <= nums[i] <= 10^9`, 오름차순
+""",
+    signature=dict(name="removeDuplicates", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_remove_duplicates_sorted,
+    cases={
+        "sample": [
+            ("01", [[1, 1, 2, 2, 2, 3]]),
+            ("02", [[0, 0, 1, 1, 1, 2, 2, 3, 3, 4]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-single", [[7]]),
+            ("03-all-same", [[5, 5, 5, 5]]),
+            ("04-no-duplicates", [[1, 2, 3, 4]]),
+            # 음수와 큰 값. 값의 크기는 상관없다.
+            ("05-negatives", [[-1000000000, -1000000000, -1, 0, 0, 1000000000]]),
+            # 중복이 맨 끝에만 있다.
+            ("06-tail-run", [[1, 2, 3, 3, 3]]),
+        ],
+        "hidden": [
+            ("01-random", [sorted(randoms(60, 0, 20, salt=4401))]),
+            ("02-random-sparse", [sorted(randoms(80, -50, 50, salt=4402))]),
+            ("03-large", [sorted(randoms(200000, -1000, 1000, salt=4403))]),
+        ],
+    },
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 읽는 자리와 쓰는 자리가 따로 간다.
+fun removeDuplicates(nums: IntArray): IntArray {
+    if (nums.isEmpty()) return nums
+    var write = 1
+    for (read in 1 until nums.size) {
+        Drill.pointer("read", read)
+        if (nums[read] != nums[write - 1]) {
+            nums[write] = nums[read]
+            Drill.write(write, nums[read])
+            write += 1
+            Drill.pointer("write", write)
+        }
+    }
+    return nums.copyOf(write)
+}
+""",
+    mutants=[
+        ("skips-first", "OFF_BY_ONE",
+         "1 번부터 앞 값과 비교해 남긴다. 첫 값은 비교 상대가 없어 빠진다.",
+         """
+fun removeDuplicates(nums: IntArray): IntArray {
+    val out = ArrayList<Int>()
+    for (i in 1 until nums.size) if (nums[i] != nums[i - 1]) out.add(nums[i])
+    return out.toIntArray()
+}
+"""),
+        ("adjacent-only--keeps-first-of-run", "OFF_BY_ONE",
+         "다음 값과 다를 때만 남긴다. 마지막 원소가 빠진다.",
+         """
+fun removeDuplicates(nums: IntArray): IntArray {
+    val out = ArrayList<Int>()
+    for (i in 0 until nums.size - 1) if (nums[i] != nums[i + 1]) out.add(nums[i])
+    return out.toIntArray()
+}
+"""),
+        ("hash-set--loses-order", "WRONG_ALGORITHM",
+         "해시 집합에 넣고 꺼낸다. 순서가 값의 해시 순서다.",
+         """
+fun removeDuplicates(nums: IntArray): IntArray = nums.toHashSet().toIntArray()
+"""),
+    ],
+))
+
+
+# --- 99. 가장 긴 연속 수열 (해시 집합) ---------------------------------------------------
+
+def _longest_consecutive(nums):
+    present = set(nums)
+    best = 0
+    for v in present:
+        if v - 1 in present:
+            continue
+        length = 1
+        while v + length in present:
+            length += 1
+        best = max(best, length)
+    return best
+
+
+def _runs(lengths, gap, salt):
+    """서로 떨어진 연속 구간들을 섞어 놓는다."""
+    out = []
+    base = -500000
+    for i, n in enumerate(lengths):
+        out += list(range(base, base + n))
+        base += n + gap + i
+    return shuffled(out, salt=salt)
+
+
+PROBLEMS.append(Problem(
+    id="longest-consecutive",
+    title="가장 긴 연속 수열",
+    summary="""
+정렬되지 않은 정수 배열 `nums` 가 주어진다. 값이 **1 씩 이어지는** 수들의 집합 중 가장 큰
+것의 크기를 반환한다. 순서는 상관없고 같은 값은 한 번으로 센다. 빈 배열은 `0`.
+
+예: `[100, 4, 200, 1, 3, 2]` 는 `1, 2, 3, 4` 로 `4` 다.
+""",
+    notes="""
+정렬하면 O(n log n) 이다. O(n) 으로 하려면 집합에 넣고, **수열의 시작점** — `v-1` 이 없는
+`v` — 에서만 위로 세면 된다. 시작점이 아닌 곳에서도 세면 긴 수열 하나가 길이의 제곱만큼
+비용을 낸다.
+""",
+    drill_doc="""
+Drill.visit(i, v)             // 시작점을 찾았다
+Drill.compare(v, v + 1)       // 다음 수가 있는지 봤다
+Drill.write(0, best)          // 지금까지의 최대
+""",
+    constraints="""
+- `0 <= nums.size <= 200_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="longestConsecutive", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_longest_consecutive,
+    cases={
+        "sample": [
+            ("01", [[100, 4, 200, 1, 3, 2]]),
+            ("02", [[0, 3, 7, 2, 5, 8, 4, 6, 0, 1]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-single", [[5]]),
+            # 같은 값은 한 번이다.
+            ("03-duplicates", [[1, 2, 2, 3, 3, 3]]),
+            # 음수를 지나는 수열.
+            ("04-across-zero", [[-2, 0, -1, 1, 3]]),
+            # 값이 Int 의 끝이다 — v+1 이 넘칠 수 있다.
+            ("05-max-int", [[2147483647, 2147483646]]),
+            ("06-min-int", [[-2147483648, -2147483647]]),
+            ("07-no-runs", [[10, 20, 30]]),
+            # Int 의 양 끝. v+1 이 넘치면 MAX 다음이 MIN 이 되어 이어지는 것처럼 보인다.
+            ("08-wraparound", [[2147483647, -2147483648]]),
+        ],
+        "hidden": [
+            ("01-random", [randoms(200, -50, 50, salt=6301)]),
+            ("02-runs", [_runs([5, 12, 3, 9], 7, salt=6302)]),
+            ("03-two-equal-runs", [_runs([10, 10], 100, salt=6303)]),
+            ("04-sparse", [randoms(300, -1000000000, 1000000000, salt=6304)]),
+        ],
+        "performance": [
+            # 긴 수열 하나. 시작점이 아닌 곳에서도 세면 길이의 제곱이다.
+            ("01-small", [_runs([20000], 1, salt=6305)]),
+            ("02-medium", [_runs([100000], 1, salt=6306)]),
+            ("03-large", [_runs([200000], 1, salt=6307)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 집합에 넣고 시작점에서만 위로 센다.
+fun longestConsecutive(nums: IntArray): Int {
+    val present = HashSet<Int>(nums.size * 2)
+    for (v in nums) present.add(v)
+    var best = 0
+    for ((i, v) in nums.withIndex()) {
+        if (present.contains(v - 1)) continue
+        Drill.visit(i, v)
+        var length = 1
+        var next = v.toLong() + 1
+        while (next <= Int.MAX_VALUE && present.contains(next.toInt())) { length += 1; next += 1 }
+        if (length > best) { best = length; Drill.write(0, best) }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("counts-duplicates", "MISSING_EDGE_CASE",
+         "정렬해 이웃이 같거나 1 차이면 잇는다. 같은 값이 길이에 들어간다.",
+         """
+fun longestConsecutive(nums: IntArray): Int {
+    if (nums.isEmpty()) return 0
+    val sorted = nums.sorted()
+    var best = 1; var length = 1
+    for (i in 1 until sorted.size) {
+        if (sorted[i] - sorted[i - 1] <= 1) length += 1 else length = 1
+        best = maxOf(best, length)
+    }
+    return best
+}
+"""),
+        ("start-check-inverted", "WRONG_BRANCH",
+         "v+1 이 없는 값을 시작점으로 보고 위로 센다. 수열의 끝에서 위로 세니 항상 1 이다.",
+         """
+fun longestConsecutive(nums: IntArray): Int {
+    val present = HashSet<Int>()
+    for (v in nums) present.add(v)
+    var best = 0
+    for (v in nums) {
+        if (present.contains(v + 1)) continue
+        var length = 1
+        while (present.contains(v + length)) length += 1
+        best = maxOf(best, length)
+    }
+    return best
+}
+"""),
+        ("int-overflow-at-max", "MISSING_EDGE_CASE",
+         "v + 1 을 Int 로 계산한다. Int.MAX_VALUE 다음이 Int.MIN_VALUE 가 되어 이어진다.",
+         """
+fun longestConsecutive(nums: IntArray): Int {
+    val present = HashSet<Int>()
+    for (v in nums) present.add(v)
+    var best = 0
+    for (v in nums) {
+        if (present.contains(v - 1)) continue
+        var length = 1
+        while (present.contains(v + length)) length += 1
+        best = maxOf(best, length)
+    }
+    return best
+}
+"""),
+        ("no-start-check", "PERFORMANCE",
+         "모든 값에서 위로 센다. 긴 수열 하나가 길이의 제곱이다.",
+         """
+fun longestConsecutive(nums: IntArray): Int {
+    val present = HashSet<Int>()
+    for (v in nums) present.add(v)
+    var best = 0
+    for (v in nums) {
+        var length = 1
+        var next = v.toLong() + 1
+        while (next <= Int.MAX_VALUE && present.contains(next.toInt())) { Drill.compare(v, next.toInt()); length += 1; next += 1 }
+        best = maxOf(best, length)
+    }
+    return best
+}
+"""),
+    ],
+))

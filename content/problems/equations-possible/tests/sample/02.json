@@ -1,0 +1,1 @@
+{"args": [["b==a", "a==b"]], "expected": 1}

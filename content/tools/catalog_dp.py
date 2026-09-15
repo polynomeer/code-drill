@@ -939,3 +939,337 @@ fun lcsLength(first: String, second: String): Int {
 """),
     ],
 ))
+
+
+# --- 95. 풍선 터뜨리기 (구간 DP) -------------------------------------------------------
+
+def _burst_balloons(nums):
+    vals = [1] + list(nums) + [1]
+    n = len(vals)
+    best = [[0] * n for _ in range(n)]
+    for length in range(2, n):
+        for left in range(0, n - length):
+            right = left + length
+            top = 0
+            for k in range(left + 1, right):
+                top = max(top, best[left][k] + best[k][right] + vals[left] * vals[k] * vals[right])
+            best[left][right] = top
+    return best[0][n - 1]
+
+
+PROBLEMS.append(Problem(
+    id="burst-balloons",
+    title="풍선 터뜨리기",
+    summary="""
+풍선이 한 줄로 있고 `nums[i]` 는 그 풍선의 수다. 풍선 `i` 를 터뜨리면 **양옆에 남아 있는**
+풍선의 수를 곱한 `nums[left] · nums[i] · nums[right]` 만큼 점수를 얻고, 그 풍선은 사라져
+양옆이 이웃이 된다. 줄의 바깥은 수가 `1` 인 풍선이 있는 것으로 본다.
+
+전부 터뜨려 얻을 수 있는 최대 점수를 반환한다.
+
+예: `[3, 1, 5, 8]` → `167` (1, 5, 3, 8 순서: 3·1·5 + 3·5·8 + 1·3·8 + 1·8·1).
+""",
+    notes="""
+"먼저 무엇을 터뜨릴까"로 생각하면 터뜨린 뒤 이웃이 바뀌어 부분 문제가 겹치지 않는다.
+거꾸로 **구간에서 마지막에 터뜨릴 풍선**을 고르면, 그때 양옆은 구간의 바깥 경계라 고정이고
+왼쪽 구간과 오른쪽 구간은 서로 독립이다. 그것이 구간 DP 다 — 짧은 구간부터 채운다.
+""",
+    drill_doc="""
+Drill.visit(left, right)      // 구간을 채우고 있다
+Drill.compare(k, best)        // k 를 마지막으로 골라 봤다
+Drill.write(left, best)       // 그 구간의 최댓값
+""",
+    constraints="""
+- `1 <= nums.size <= 300`
+- `0 <= nums[i] <= 100`
+""",
+    signature=dict(name="burstBalloons", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_burst_balloons,
+    cases={
+        "sample": [
+            ("01", [[3, 1, 5, 8]]),
+            ("02", [[1, 5]]),
+        ],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-zero", [[0]]),
+            # 0 이 사이에 있다. 0 을 먼저 터뜨려야 이웃끼리 곱해진다.
+            ("03-zero-between", [[5, 0, 5]]),
+            ("04-all-ones", [[1, 1, 1, 1]]),
+            # 큰 수를 마지막까지 남겨야 한다.
+            ("05-keep-big-last", [[9, 1, 1, 9]]),
+            ("06-two", [[4, 6]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(8, 0, 20, salt=5101)]),
+            ("02-random-medium", [randoms(30, 0, 100, salt=5102)]),
+            ("03-random-zeros", [[v if v > 30 else 0 for v in randoms(25, 0, 100, salt=5103)]]),
+            ("04-max-values", [[100] * 40]),
+        ],
+        "performance": [
+            ("01-small", [randoms(100, 0, 100, salt=5104)]),
+            ("02-medium", [randoms(200, 0, 100, salt=5105)]),
+            ("03-large", [randoms(300, 0, 100, salt=5106)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 구간의 마지막 풍선을 고르는 구간 DP. O(n³).
+fun burstBalloons(nums: IntArray): Int {
+    val vals = IntArray(nums.size + 2) { 1 }
+    for (i in nums.indices) vals[i + 1] = nums[i]
+    val n = vals.size
+    val best = Array(n) { IntArray(n) }
+    for (length in 2 until n) {
+        for (left in 0 until n - length) {
+            val right = left + length
+            Drill.visit(left, right)
+            var top = 0
+            for (k in left + 1 until right) {
+                val score = best[left][k] + best[k][right] + vals[left] * vals[k] * vals[right]
+                if (score > top) { top = score; Drill.compare(k, top) }
+            }
+            best[left][right] = top
+            Drill.write(left, top)
+        }
+    }
+    return best[0][n - 1]
+}
+""",
+    mutants=[
+        ("greedy-smallest-first", "WRONG_ALGORITHM",
+         "가장 작은 풍선부터 터뜨린다. 국소 선택이 전체 최적이 아니다.",
+         """
+fun burstBalloons(nums: IntArray): Int {
+    val list = ArrayList<Int>().apply { add(1); nums.forEach { add(it) }; add(1) }
+    var total = 0
+    while (list.size > 2) {
+        var at = 1
+        for (i in 1 until list.size - 1) if (list[i] < list[at]) at = i
+        total += list[at - 1] * list[at] * list[at + 1]
+        list.removeAt(at)
+    }
+    return total
+}
+"""),
+        ("uses-original-neighbors", "WRONG_ALGORITHM",
+         "구간의 첫 풍선을 먼저 터뜨리는 것으로 나눈다 — 이웃이 원래 자리의 것이라 부분 문제가 독립이 아니다.",
+         """
+fun burstBalloons(nums: IntArray): Int {
+    val vals = IntArray(nums.size + 2) { 1 }
+    for (i in nums.indices) vals[i + 1] = nums[i]
+    val n = vals.size
+    val best = Array(n) { IntArray(n) }
+    for (length in 2 until n) for (left in 0 until n - length) {
+        val right = left + length
+        var top = 0
+        for (k in left + 1 until right) top = maxOf(top, best[left][k] + best[k][right] + vals[k - 1] * vals[k] * vals[k + 1])
+        best[left][right] = top
+    }
+    return best[0][n - 1]
+}
+"""),
+        ("skips-last-candidate", "OFF_BY_ONE",
+         "마지막 풍선 후보를 right-1 앞까지만 본다. 구간의 끝 풍선을 마지막에 터뜨리는 경우가 빠진다.",
+         """
+fun burstBalloons(nums: IntArray): Int {
+    val vals = IntArray(nums.size + 2) { 1 }
+    for (i in nums.indices) vals[i + 1] = nums[i]
+    val n = vals.size
+    val best = Array(n) { IntArray(n) }
+    for (length in 2 until n) for (left in 0 until n - length) {
+        val right = left + length
+        var top = 0
+        for (k in left + 1 until maxOf(left + 2, right - 1)) top = maxOf(top, best[left][k] + best[k][right] + vals[left] * vals[k] * vals[right])
+        best[left][right] = top
+    }
+    return best[0][n - 1]
+}
+"""),
+        ("recursion-without-memo", "PERFORMANCE",
+         "구간을 재귀로 풀되 기억하지 않는다. 지수적이다.",
+         """
+fun burstBalloons(nums: IntArray): Int {
+    val vals = IntArray(nums.size + 2) { 1 }
+    for (i in nums.indices) vals[i + 1] = nums[i]
+    fun solve(left: Int, right: Int): Int {
+        if (right - left < 2) return 0
+        var top = 0
+        for (k in left + 1 until right) { Drill.compare(k, 0); top = maxOf(top, solve(left, k) + solve(k, right) + vals[left] * vals[k] * vals[right]) }
+        return top
+    }
+    return solve(0, vals.size - 1)
+}
+"""),
+    ],
+))
+
+
+# --- 100. 숫자열 해독 (재귀에서 DP 로) ---------------------------------------------------
+
+def _decode_ways(digits):
+    n = len(digits)
+    if n == 0:
+        return 0
+    MOD = 1_000_000_007
+    prev2, prev1 = 1, 1 if digits[0] != "0" else 0
+    for i in range(1, n):
+        cur = 0
+        if digits[i] != "0":
+            cur += prev1
+        pair = int(digits[i - 1:i + 1])
+        if 10 <= pair <= 26:
+            cur += prev2
+        prev2, prev1 = prev1, cur % MOD
+    return prev1
+
+
+PROBLEMS.append(Problem(
+    id="decode-ways",
+    title="숫자열 해독",
+    summary="""
+`A` 는 `1`, `B` 는 `2`, …, `Z` 는 `26` 으로 부호화한 숫자열 `digits` 가 주어진다. 이것을
+글자열로 되돌리는 **방법의 수**를 `1_000_000_007` 로 나눈 나머지로 반환한다.
+
+`"12"` 는 `AB` (1, 2) 또는 `L` (12) 로 `2`, `"226"` 은 `BZ`, `VF`, `BBF` 로 `3`. `"06"` 은
+`0` — `0` 으로 시작하는 조각은 없다. 빈 문자열의 답은 `0` 이다.
+""",
+    notes="""
+앞에서부터 "여기까지 해독하는 방법의 수"를 세면, 지금 자리는 **한 글자로** (0 이 아니면)
+또는 **앞 자리와 두 글자로** (10~26 이면) 온다. 그래서 `f(i) = f(i-1) [한 글자] + f(i-2)
+[두 글자]` — 계단 오르기와 같은 모양에 조건이 붙은 것이다. 재귀로 하면 두 갈래가 겹쳐
+지수적이다.
+""",
+    drill_doc="""
+Drill.visit(i, ways)          // i 번째 자리까지의 방법 수
+Drill.compare(i - 1, i)       // 두 글자로 묶어 봤다
+""",
+    constraints="""
+- `0 <= digits.length <= 100_000`, 숫자만
+""",
+    signature=dict(name="decodeWays", parameters=[("digits", "STRING")], returns="INT"),
+    groups=perf_groups(),
+    reference=_decode_ways,
+    cases={
+        "sample": [
+            ("01", ["12"]),
+            ("02", ["226"]),
+        ],
+        "boundary": [
+            ("01-empty", [""]),
+            ("02-leading-zero", ["06"]),
+            ("03-zero-alone", ["0"]),
+            # 0 은 앞 자리와 묶여야만 한다: 10, 20.
+            ("04-ten", ["10"]),
+            ("05-twenty-seven", ["27"]),
+            # 30 은 30 도 안 되고 0 도 안 된다.
+            ("06-thirty", ["30"]),
+            ("07-double-zero", ["100"]),
+            ("08-ones", ["1111"]),
+            ("09-single-nine", ["9"]),
+        ],
+        "hidden": [
+            ("01-mixed", ["11106"]),
+            ("02-long-ones", ["1" * 60]),
+            ("03-random", ["".join(str(v) for v in randoms(200, 0, 9, salt=6401))]),
+            ("04-random-no-zero", ["".join(str(v) for v in randoms(500, 1, 9, salt=6402))]),
+            ("05-zeros-inside", ["2020202010"]),
+        ],
+        "performance": [
+            ("01-small", ["1" * 2000]),
+            ("02-medium", ["2" * 20000]),
+            ("03-large", ["1" * 100000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). f(i) = f(i-1)[한 글자] + f(i-2)[두 글자].
+fun decodeWays(digits: String): Int {
+    if (digits.isEmpty()) return 0
+    val mod = 1_000_000_007L
+    var prev2 = 1L
+    var prev1 = if (digits[0] != '0') 1L else 0L
+    for (i in 1 until digits.length) {
+        var cur = 0L
+        if (digits[i] != '0') cur += prev1
+        val pair = (digits[i - 1] - '0') * 10 + (digits[i] - '0')
+        if (pair in 10..26) { cur += prev2; Drill.compare(i - 1, i) }
+        prev2 = prev1
+        prev1 = cur % mod
+        Drill.visit(i, prev1.toInt())
+    }
+    return prev1.toInt()
+}
+""",
+    mutants=[
+        ("zero-as-single", "MISSING_EDGE_CASE",
+         "0 을 한 글자로도 센다. 0 으로 시작하는 조각은 없다.",
+         """
+fun decodeWays(digits: String): Int {
+    if (digits.isEmpty()) return 0
+    val mod = 1_000_000_007L
+    var prev2 = 1L; var prev1 = 1L
+    for (i in 1 until digits.length) {
+        var cur = prev1
+        val pair = (digits[i - 1] - '0') * 10 + (digits[i] - '0')
+        if (pair in 10..26) cur += prev2
+        prev2 = prev1; prev1 = cur % mod
+    }
+    return prev1.toInt()
+}
+"""),
+        ("pair-upper-bound-27", "OFF_BY_ONE",
+         "두 글자 조각을 27 까지 허용한다.",
+         """
+fun decodeWays(digits: String): Int {
+    if (digits.isEmpty()) return 0
+    val mod = 1_000_000_007L
+    var prev2 = 1L; var prev1 = if (digits[0] != '0') 1L else 0L
+    for (i in 1 until digits.length) {
+        var cur = 0L
+        if (digits[i] != '0') cur += prev1
+        val pair = (digits[i - 1] - '0') * 10 + (digits[i] - '0')
+        if (pair in 10..27) cur += prev2
+        prev2 = prev1; prev1 = cur % mod
+    }
+    return prev1.toInt()
+}
+"""),
+        ("pair-with-leading-zero", "WRONG_BRANCH",
+         "앞 자리가 0 인 두 글자 조각(01~09)도 허용한다.",
+         """
+fun decodeWays(digits: String): Int {
+    if (digits.isEmpty()) return 0
+    val mod = 1_000_000_007L
+    var prev2 = 1L; var prev1 = if (digits[0] != '0') 1L else 0L
+    for (i in 1 until digits.length) {
+        var cur = 0L
+        if (digits[i] != '0') cur += prev1
+        val pair = (digits[i - 1] - '0') * 10 + (digits[i] - '0')
+        if (pair in 1..26) cur += prev2
+        prev2 = prev1; prev1 = cur % mod
+    }
+    return prev1.toInt()
+}
+"""),
+        ("recursion-without-memo", "PERFORMANCE",
+         "앞에서부터 두 갈래로 재귀한다. 기억이 없어 지수적이다.",
+         """
+fun decodeWays(digits: String): Int {
+    if (digits.isEmpty()) return 0
+    val mod = 1_000_000_007L
+    fun ways(i: Int): Long {
+        if (i == digits.length) return 1L
+        if (digits[i] == '0') return 0L
+        Drill.visit(i, 0)
+        var total = ways(i + 1)
+        if (i + 1 < digits.length) {
+            val pair = (digits[i] - '0') * 10 + (digits[i + 1] - '0')
+            if (pair <= 26) total += ways(i + 2)
+        }
+        return total % mod
+    }
+    return ways(0).toInt()
+}
+"""),
+    ],
+))

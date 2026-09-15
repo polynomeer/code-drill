@@ -1,0 +1,19 @@
+# word-search 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - backtracking
+  - dfs
+  - string
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - IMPLEMENTATION
+  - OPTIMIZATION
+prerequisites:
+  - island-count
+  - n-queens-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "칸마다 시작해 최대 3^L 갈래. 글자가 어긋나는 순간 끊어야 한다"

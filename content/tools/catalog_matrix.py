@@ -1360,3 +1360,357 @@ fun lifeStep(grid: Array<IntArray>): Array<IntArray> {
 """),
     ],
 ))
+
+
+# --- 94. 블록 합 (2차원 누적합) ------------------------------------------------------
+
+def _matrix_block_sum(grid, k):
+    rows, cols = len(grid), len(grid[0])
+    pre = [[0] * (cols + 1) for _ in range(rows + 1)]
+    for r in range(rows):
+        acc = 0
+        for c in range(cols):
+            acc += grid[r][c]
+            pre[r + 1][c + 1] = pre[r][c + 1] + acc
+    out = [[0] * cols for _ in range(rows)]
+    for r in range(rows):
+        r1, r2 = max(0, r - k), min(rows, r + k + 1)
+        for c in range(cols):
+            c1, c2 = max(0, c - k), min(cols, c + k + 1)
+            out[r][c] = pre[r2][c2] - pre[r1][c2] - pre[r2][c1] + pre[r1][c1]
+    return out
+
+
+def _grid_of(rows, cols, lo, hi, salt):
+    values = randoms(rows * cols, lo, hi, salt=salt)
+    return [values[r * cols:(r + 1) * cols] for r in range(rows)]
+
+
+PROBLEMS.append(Problem(
+    id="matrix-block-sum",
+    title="칸마다 주변 블록의 합",
+    summary="""
+정수 격자 `grid` 와 `k` 가 주어진다. 각 칸 `(r, c)` 에 대해 **행과 열이 각각 `k` 이내**인
+칸들 — `|r'-r| <= k`, `|c'-c| <= k`, 격자 안 — 의 합을 구한 같은 크기의 격자를 반환한다.
+
+예: `[[1,2,3],[4,5,6],[7,8,9]]`, `k = 1` 이면 `[[12,21,16],[27,45,33],[24,39,28]]` 이다.
+""",
+    notes="""
+칸마다 `(2k+1)²` 개를 더하면 격자가 크고 `k` 가 크면 끝나지 않는다. 2차원 누적합 —
+`pre[r][c]` 를 `(0,0)` 부터 `(r-1,c-1)` 까지의 합으로 두면 어떤 직사각형의 합도 네 값의
+덧셈·뺄셈 하나다. 경계에서 잘리는 블록은 좌표를 격자 안으로 조이면 된다.
+""",
+    drill_doc="""
+Drill.visit(r, c)             // 칸을 봤다
+Drill.write(r * cols + c, v)  // 그 칸의 블록 합
+""",
+    constraints="""
+- `1 <= rows, cols <= 500`, `0 <= k <= 500`
+- `-100 <= grid[r][c] <= 100`
+""",
+    signature=dict(name="blockSum", parameters=[("grid", "INT_MATRIX"), ("k", "INT")], returns="INT_MATRIX"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_matrix_block_sum,
+    cases={
+        "sample": [
+            ("01", [[[1, 2, 3], [4, 5, 6], [7, 8, 9]], 1]),
+            ("02", [[[1, 2, 3], [4, 5, 6], [7, 8, 9]], 2]),
+        ],
+        "boundary": [
+            ("01-k-zero", [[[5, -3], [2, 7]], 0]),
+            ("02-single-cell", [[[9]], 3]),
+            # k 가 격자보다 크다. 모든 칸이 전체 합이다.
+            ("03-k-covers-all", [[[1, 2], [3, 4]], 10]),
+            ("04-single-row", [[[1, 2, 3, 4, 5]], 1]),
+            ("05-single-column", [[[1], [2], [3], [4]], 2]),
+            ("06-negatives", [[[-1, -2], [-3, -4]], 1]),
+        ],
+        "hidden": [
+            ("01-random-small", [_grid_of(5, 7, -10, 10, salt=5001), 1]),
+            ("02-random-medium", [_grid_of(30, 20, -100, 100, salt=5002), 3]),
+            ("03-random-big-k", [_grid_of(40, 40, -100, 100, salt=5003), 25]),
+            ("04-random-k-zero", [_grid_of(10, 10, -100, 100, salt=5004), 0]),
+        ],
+        "performance": [
+            ("01-small", [_grid_of(200, 200, -100, 100, salt=5005), 50]),
+            ("02-medium", [_grid_of(400, 400, -100, 100, salt=5006), 150]),
+            ("03-large", [_grid_of(500, 500, -100, 100, salt=5007), 250]),
+        ],
+    },
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 2차원 누적합. 직사각형 하나가 네 값이다.
+fun blockSum(grid: Array<IntArray>, k: Int): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val pre = Array(rows + 1) { IntArray(cols + 1) }
+    for (r in 0 until rows) {
+        var acc = 0
+        for (c in 0 until cols) {
+            acc += grid[r][c]
+            pre[r + 1][c + 1] = pre[r][c + 1] + acc
+        }
+    }
+    return Array(rows) { r ->
+        val r1 = maxOf(0, r - k); val r2 = minOf(rows, r + k + 1)
+        IntArray(cols) { c ->
+            val c1 = maxOf(0, c - k); val c2 = minOf(cols, c + k + 1)
+            Drill.visit(r, c)
+            val v = pre[r2][c2] - pre[r1][c2] - pre[r2][c1] + pre[r1][c1]
+            Drill.write(r * cols + c, v)
+            v
+        }
+    }
+}
+""",
+    mutants=[
+        ("adds-corner-twice", "WRONG_BRANCH",
+         "포함·배제에서 왼쪽 위 모서리를 빼지 않고 더한다.",
+         """
+fun blockSum(grid: Array<IntArray>, k: Int): Array<IntArray> {
+    val rows = grid.size; val cols = grid[0].size
+    val pre = Array(rows + 1) { IntArray(cols + 1) }
+    for (r in 0 until rows) { var acc = 0; for (c in 0 until cols) { acc += grid[r][c]; pre[r + 1][c + 1] = pre[r][c + 1] + acc } }
+    return Array(rows) { r ->
+        val r1 = maxOf(0, r - k); val r2 = minOf(rows, r + k + 1)
+        IntArray(cols) { c ->
+            val c1 = maxOf(0, c - k); val c2 = minOf(cols, c + k + 1)
+            pre[r2][c2] - pre[r1][c2] - pre[r2][c1] - pre[r1][c1]
+        }
+    }
+}
+"""),
+        ("exclusive-upper-bound", "OFF_BY_ONE",
+         "블록의 아래·오른쪽 경계를 한 칸 덜 잡는다. r+k 행이 빠진다.",
+         """
+fun blockSum(grid: Array<IntArray>, k: Int): Array<IntArray> {
+    val rows = grid.size; val cols = grid[0].size
+    val pre = Array(rows + 1) { IntArray(cols + 1) }
+    for (r in 0 until rows) { var acc = 0; for (c in 0 until cols) { acc += grid[r][c]; pre[r + 1][c + 1] = pre[r][c + 1] + acc } }
+    return Array(rows) { r ->
+        val r1 = maxOf(0, r - k); val r2 = minOf(rows, r + k)
+        IntArray(cols) { c ->
+            val c1 = maxOf(0, c - k); val c2 = minOf(cols, c + k)
+            pre[r2][c2] - pre[r1][c2] - pre[r2][c1] + pre[r1][c1]
+        }
+    }
+}
+"""),
+        ("brute-force--per-cell", "PERFORMANCE",
+         "칸마다 블록을 전부 더한다. O(rows·cols·k²).",
+         """
+fun blockSum(grid: Array<IntArray>, k: Int): Array<IntArray> {
+    val rows = grid.size; val cols = grid[0].size
+    return Array(rows) { r ->
+        IntArray(cols) { c ->
+            var total = 0
+            for (rr in maxOf(0, r - k) until minOf(rows, r + k + 1))
+                for (cc in maxOf(0, c - k) until minOf(cols, c + k + 1)) { Drill.visit(rr, cc); total += grid[rr][cc] }
+            total
+        }
+    }
+}
+"""),
+    ],
+))
+
+
+# --- 97. 격자에서 단어 찾기 (백트래킹) ----------------------------------------------------
+
+def _word_search(board, word):
+    rows, cols = len(board), len(board[0])
+    seen = [[False] * cols for _ in range(rows)]
+
+    def walk(r, c, i):
+        if board[r][c] != word[i]:
+            return False
+        if i == len(word) - 1:
+            return True
+        seen[r][c] = True
+        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols and not seen[nr][nc] and walk(nr, nc, i + 1):
+                seen[r][c] = False
+                return True
+        seen[r][c] = False
+        return False
+
+    return 1 if any(walk(r, c, 0) for r in range(rows) for c in range(cols)) else 0
+
+
+def _letter_grid(rows, cols, alphabet, salt):
+    picks = randoms(rows * cols, 0, len(alphabet) - 1, salt=salt)
+    return ["".join(alphabet[picks[r * cols + c]] for c in range(cols)) for r in range(rows)]
+
+
+PROBLEMS.append(Problem(
+    id="word-search",
+    title="격자에서 단어 찾기",
+    summary="""
+글자 격자 `board` (행 하나가 문자열 하나, 길이는 전부 같다) 와 단어 `word` 가 주어진다.
+격자에서 **상하좌우로 이어진 칸**을 따라 `word` 를 만들 수 있으면 `1`, 없으면 `0` 이다.
+같은 칸을 두 번 쓸 수 없다.
+
+예: `["ABCE", "SFCS", "ADEE"]` 에서 `ABCCED` 는 있고, `ABCB` 는 없다 (B 를 두 번 쓴다).
+""",
+    notes="""
+첫 글자가 맞는 칸마다 시작해 다음 글자로 이웃을 뻗는다. 뻗기 전에 칸을 쓴 것으로 표시하고,
+그 갈래가 실패하면 **표시를 되돌린다** — 되돌리지 않으면 다른 갈래가 그 칸을 못 쓴다.
+그것이 백트래킹이다. 글자가 어긋나는 순간 그 갈래는 끝이다.
+""",
+    drill_doc="""
+Drill.visit(r, c)             // 칸을 밟았다
+Drill.match(r, c)             // 마지막 글자까지 맞았다
+""",
+    constraints="""
+- `1 <= rows, cols <= 15`, `1 <= word.length <= 15`
+- 격자와 단어는 대문자 영문자
+""",
+    signature=dict(name="wordSearch", parameters=[("board", "STRING_ARRAY"), ("word", "STRING")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_word_search,
+    cases={
+        "sample": [
+            ("01", [["ABCE", "SFCS", "ADEE"], "ABCCED"]),
+            ("02", [["ABCE", "SFCS", "ADEE"], "ABCB"]),
+        ],
+        "boundary": [
+            ("01-single-cell-hit", [["A"], "A"]),
+            ("02-single-cell-miss", [["A"], "B"]),
+            # 단어가 격자의 칸 수보다 길다.
+            ("03-word-too-long", [["AB"], "ABA"]),
+            # 대각선은 이웃이 아니다.
+            ("04-diagonal-not-adjacent", [["AB", "CD"], "AD"]),
+            # 같은 칸을 두 번 써야만 만들어진다 — 없는 것이다.
+            ("05-needs-reuse", [["AB"], "ABA"]),
+            # 첫 갈래가 막히고 다른 시작점에서 된다. 표시를 되돌려야 한다.
+            ("06-backtrack-needed", [["AAB", "AAA", "BBA"], "AAAAB"]),
+            ("07-snake", [["ABCE", "SFES", "ADEE"], "ABCESEEEFS"]),
+        ],
+        "hidden": [
+            ("01-random-present", [_letter_grid(6, 6, "AB", salt=6101), "ABAB"]),
+            ("02-random-absent", [_letter_grid(6, 6, "ABC", salt=6102), "ABCABCABCABCABC"]),
+            ("03-spiral-path", [["ABCD", "LMNE", "KPOF", "JIHG"], "ABCDEFGHIJKLMNOP"]),
+            ("04-spiral-wrong-tail", [["ABCD", "LMNE", "KPOF", "JIHG"], "ABCDEFGHIJKLMNOQ"]),
+        ],
+        "performance": [
+            # 글자가 여덟 가지인 무작위 격자에 없는 단어. 글자가 어긋나는 순간 끊으면 갈래가
+            # 거의 없고, 끝에 가서 보면 칸마다 3^14 갈래다.
+            ("01-small", [_letter_grid(10, 10, "ABCDEFGH", salt=6103), "ABCDEFGHABCD"]),
+            ("02-medium", [_letter_grid(13, 13, "ABCDEFGH", salt=6104), "ABCDEFGHABCDEF"]),
+            ("03-large", [_letter_grid(15, 15, "ABCDEFGH", salt=6105), "ABCDEFGHABCDEFG"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 이웃으로 뻗고, 실패하면 표시를 되돌린다.
+fun wordSearch(board: Array<String>, word: String): Int {
+    val rows = board.size
+    val cols = board[0].length
+    val seen = Array(rows) { BooleanArray(cols) }
+    fun walk(r: Int, c: Int, i: Int): Boolean {
+        if (board[r][c] != word[i]) return false
+        Drill.visit(r, c)
+        if (i == word.length - 1) { Drill.match(r, c); return true }
+        seen[r][c] = true
+        val dr = intArrayOf(1, -1, 0, 0)
+        val dc = intArrayOf(0, 0, 1, -1)
+        for (d in 0 until 4) {
+            val nr = r + dr[d]; val nc = c + dc[d]
+            if (nr in 0 until rows && nc in 0 until cols && !seen[nr][nc] && walk(nr, nc, i + 1)) { seen[r][c] = false; return true }
+        }
+        seen[r][c] = false
+        return false
+    }
+    if (word.length > rows * cols) return 0
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+""",
+    mutants=[
+        ("never-unmarks", "WRONG_BRANCH",
+         "실패한 갈래의 표시를 되돌리지 않는다. 다른 갈래가 그 칸을 못 쓴다.",
+         """
+fun wordSearch(board: Array<String>, word: String): Int {
+    val rows = board.size; val cols = board[0].length
+    val seen = Array(rows) { BooleanArray(cols) }
+    fun walk(r: Int, c: Int, i: Int): Boolean {
+        if (board[r][c] != word[i]) return false
+        if (i == word.length - 1) return true
+        seen[r][c] = true
+        val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+        for (d in 0 until 4) {
+            val nr = r + dr[d]; val nc = c + dc[d]
+            if (nr in 0 until rows && nc in 0 until cols && !seen[nr][nc] && walk(nr, nc, i + 1)) return true
+        }
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+"""),
+        ("allows-reuse", "MISSING_EDGE_CASE",
+         "같은 칸을 다시 밟는 것을 막지 않는다.",
+         """
+fun wordSearch(board: Array<String>, word: String): Int {
+    val rows = board.size; val cols = board[0].length
+    fun walk(r: Int, c: Int, i: Int): Boolean {
+        if (board[r][c] != word[i]) return false
+        if (i == word.length - 1) return true
+        val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+        for (d in 0 until 4) {
+            val nr = r + dr[d]; val nc = c + dc[d]
+            if (nr in 0 until rows && nc in 0 until cols && walk(nr, nc, i + 1)) return true
+        }
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+"""),
+        ("diagonals-too", "WRONG_ALGORITHM",
+         "대각선 이웃으로도 뻗는다.",
+         """
+fun wordSearch(board: Array<String>, word: String): Int {
+    val rows = board.size; val cols = board[0].length
+    val seen = Array(rows) { BooleanArray(cols) }
+    fun walk(r: Int, c: Int, i: Int): Boolean {
+        if (board[r][c] != word[i]) return false
+        if (i == word.length - 1) return true
+        seen[r][c] = true
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && !seen[nr][nc] && walk(nr, nc, i + 1)) { seen[r][c] = false; return true }
+        }
+        seen[r][c] = false
+        return false
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+"""),
+        ("checks-letter-late", "PERFORMANCE",
+         "글자가 맞는지 이웃을 다 뻗은 뒤에 본다. 어긋난 갈래를 끝까지 따라간다.",
+         """
+fun wordSearch(board: Array<String>, word: String): Int {
+    val rows = board.size; val cols = board[0].length
+    val seen = Array(rows) { BooleanArray(cols) }
+    fun walk(r: Int, c: Int, i: Int): Boolean {
+        Drill.visit(r, c)
+        if (i == word.length - 1) return board[r][c] == word[i]
+        seen[r][c] = true
+        val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+        var found = false
+        for (d in 0 until 4) {
+            val nr = r + dr[d]; val nc = c + dc[d]
+            if (nr in 0 until rows && nc in 0 until cols && !seen[nr][nc] && walk(nr, nc, i + 1)) { found = true; break }
+        }
+        seen[r][c] = false
+        return found && board[r][c] == word[i]
+    }
+    for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
+    return 0
+}
+"""),
+    ],
+))

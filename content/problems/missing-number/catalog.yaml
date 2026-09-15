@@ -1,0 +1,16 @@
+# missing-number 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - array
+  - bit-manipulation
+  - math
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - CONSTRAINTS
+prerequisites:
+  - single-number
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "XOR 또는 합의 차. 정렬은 O(n log n)"

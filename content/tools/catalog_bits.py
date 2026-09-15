@@ -4,7 +4,7 @@
 느리거나. 둘 다 여기 있다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms
+from author import Problem, standard_groups, perf_groups, randoms, shuffled
 
 PROBLEMS = []
 
@@ -214,6 +214,103 @@ fun totalHamming(nums: IntArray): Int {
         }
     }
     return total
+}
+"""),
+    ],
+))
+
+
+# --- 89. 빠진 수 (XOR) ----------------------------------------------------------------
+
+def _missing_number(nums):
+    n = len(nums)
+    return n * (n + 1) // 2 - sum(nums)
+
+
+PROBLEMS.append(Problem(
+    id="missing-number",
+    title="빠진 수",
+    summary="""
+`0` 부터 `n` 까지의 정수 중 **하나만 빠진** `n` 개가 순서 없이 `nums` 에 있다. 빠진 수를
+반환한다.
+
+예: `[3, 0, 1]` 은 `0..3` 에서 `2` 가 빠졌다.
+""",
+    notes="""
+정렬하면 O(n log n), 집합이면 O(n) 공간이다. `0..n` 의 합에서 배열의 합을 빼면 O(1) 공간
+이고, XOR 로 하면 넘침 걱정도 없다 — `a ^ a = 0` 이라 `0..n` 전부와 배열 전부를 XOR 하면
+짝이 없는 것만 남는다.
+""",
+    drill_doc="""
+Drill.visit(i, nums[i])       // 원소를 봤다
+Drill.write(0, acc)           // 누적 XOR
+""",
+    constraints="""
+- `1 <= n <= 200_000`
+- `nums` 의 값은 서로 다르고 `0 <= nums[i] <= n`
+""",
+    signature=dict(name="missingNumber", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_missing_number,
+    cases={
+        "sample": [
+            ("01", [[3, 0, 1]]),
+            ("02", [[9, 6, 4, 2, 3, 5, 7, 0, 1]]),
+        ],
+        "boundary": [
+            # n = 1. 0 이 빠졌거나 1 이 빠졌거나.
+            ("01-zero-missing", [[1]]),
+            ("02-n-missing", [[0]]),
+            # 빠진 것이 n 이다 — 배열이 0..n-1 이다.
+            ("03-last-missing", [[0, 1, 2, 3]]),
+            ("04-first-missing", [[4, 3, 2, 1]]),
+            ("05-two", [[2, 0]]),
+        ],
+        "hidden": [
+            ("01-random", [shuffled([v for v in range(51) if v != 17], salt=4501)]),
+            ("02-random-big", [shuffled([v for v in range(2001) if v != 1999], salt=4502)]),
+            # 합이 Int 범위를 넘는다 — 200000 · 200001 / 2 > 2^31.
+            ("03-sum-overflows", [shuffled([v for v in range(200001) if v != 123456], salt=4503)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 0..n 과 배열을 전부 XOR 하면 짝 없는 것만 남는다.
+fun missingNumber(nums: IntArray): Int {
+    var acc = nums.size
+    for ((i, v) in nums.withIndex()) {
+        Drill.visit(i, v)
+        acc = acc xor i xor v
+        Drill.write(0, acc)
+    }
+    return acc
+}
+""",
+    mutants=[
+        ("int-sum--overflows", "MISSING_EDGE_CASE",
+         "0..n 의 합을 Int 로 구한다. n 이 20 만이면 넘친다.",
+         """
+fun missingNumber(nums: IntArray): Int {
+    val n = nums.size
+    val expected = n * (n + 1) / 2
+    return expected - nums.sum()
+}
+"""),
+        ("xor-to-n-minus-one", "OFF_BY_ONE",
+         "0..n-1 만 XOR 한다. n 이 빠진 경우를 놓친다.",
+         """
+fun missingNumber(nums: IntArray): Int {
+    var acc = 0
+    for ((i, v) in nums.withIndex()) acc = acc xor i xor v
+    return acc
+}
+"""),
+        ("first-gap-in-sorted--ignores-last", "WRONG_ALGORITHM",
+         "정렬해 첫 빈 자리를 찾는다. 끝까지 빈 자리가 없으면 0 을 답한다.",
+         """
+fun missingNumber(nums: IntArray): Int {
+    val sorted = nums.sorted()
+    for ((i, v) in sorted.withIndex()) if (v != i) return i
+    return 0
 }
 """),
     ],

@@ -1,0 +1,18 @@
+# cheapest-with-stops 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - shortest-path
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - cheapest-paths
+  - shortest-hops
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(k · E). 다익스트라는 편 수 제한을 못 지킨다"

@@ -1,0 +1,17 @@
+# matrix-block-sum 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - prefix-sum
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - range-sum-queries
+  - island-perimeter
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "2차원 누적합. 칸마다 블록을 더하면 O(rows·cols·k²)"

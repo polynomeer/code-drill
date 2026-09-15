@@ -1,0 +1,17 @@
+# longest-consecutive 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - hash-map
+competencies:
+  - ALGORITHM_CHOICE
+  - OPTIMIZATION
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - two-sum
+  - longest-increasing-run
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "집합 + 시작점에서만 세기. 정렬은 O(n log n), 시작점 검사가 없으면 O(n²)"

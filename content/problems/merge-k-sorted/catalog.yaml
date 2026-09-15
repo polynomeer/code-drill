@@ -1,0 +1,19 @@
+# merge-k-sorted 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - heap
+  - divide-conquer
+  - sorting
+competencies:
+  - ALGORITHM_CHOICE
+  - IMPLEMENTATION
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - merge-sorted-arrays
+  - kth-largest
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "힙 O(N log k) 또는 둘씩 합치는 분할 정복. 하나씩 차례로 합치면 O(N·k)"

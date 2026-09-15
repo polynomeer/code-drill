@@ -1,0 +1,18 @@
+# decode-ways 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - dynamic-programming
+  - recursion
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - climb-stairs
+  - house-robber
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "f(i) = f(i-1) + f(i-2), 조건 붙음. 기억 없는 재귀는 지수적"

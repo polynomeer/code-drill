@@ -1,0 +1,16 @@
+# moving-average 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - array
+  - queue
+  - sliding-window
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "창의 합을 유지하고 큐가 나갈 값을 기억한다. 매번 다시 더하면 O(n·k)"

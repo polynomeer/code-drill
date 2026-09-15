@@ -863,3 +863,181 @@ fun reverseInteger(n: Int): Int {
 """),
     ],
 ))
+
+
+# --- 90. 소인수의 합 (제약을 읽는 문제) ----------------------------------------------------
+
+def _prime_factor_sum(n):
+    total = 0
+    p = 2
+    while p * p <= n:
+        if n % p == 0:
+            total += p
+            while n % p == 0:
+                n //= p
+        p += 1
+    if n > 1:
+        total += n
+    return total
+
+
+def _prime_factor_sums(nums):
+    return [_prime_factor_sum(n) for n in nums]
+
+
+def _near_primes(count, salt):
+    """큰 소수 근처의 수들. 나누어 떨어지는 작은 인수가 없어 시험 나눗셈이 끝까지 간다."""
+    big = [999999937, 999999929, 999999893, 999999883, 999999797, 999999761, 999999757, 999999751]
+    picks = randoms(count, 0, len(big) - 1, salt=salt)
+    return [big[i] for i in picks]
+
+
+PROBLEMS.append(Problem(
+    id="prime-factor-sums",
+    title="소인수의 합",
+    summary="""
+정수 배열 `nums` 가 주어진다. 각 수에 대해 **서로 다른 소인수의 합**을 구해 같은 순서로
+반환한다. `1` 의 답은 `0` 이다.
+
+예: `12 = 2² · 3` 이라 `5`, `7` 은 `7`, `1` 은 `0`.
+""",
+    notes="""
+`2` 부터 `n` 까지 나눠 보면 수 하나에 10⁹ 번이다. **제약을 읽는다** — `p · p > n` 이면
+남은 `n` 은 소수거나 1 이다. 그래서 √n 까지만 나누면 되고, 소인수를 찾을 때마다 그것으로
+`n` 을 다 나누면 다음 나누어떨어지는 수는 저절로 소수다.
+""",
+    drill_doc="""
+Drill.visit(i, n)             // i 번째 수
+Drill.compare(p, n)           // p 로 나눠 봤다
+Drill.write(i, total)         // 지금까지의 합
+""",
+    constraints="""
+- `1 <= nums.size <= 2_000`
+- `1 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="primeFactorSums", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_prime_factor_sums,
+    cases={
+        "sample": [
+            ("01", [[12, 7, 1]]),
+            ("02", [[30]]),
+        ],
+        "boundary": [
+            ("01-one", [[1]]),
+            ("02-two", [[2]]),
+            # 소수의 거듭제곱. 소인수는 하나뿐이고 한 번만 더한다.
+            ("03-prime-power", [[1024, 243]]),
+            # 큰 소수. √n 까지 가도 인수가 없다 — 남은 n 이 답이다.
+            ("04-big-prime", [[999999937]]),
+            # 두 소수의 곱. √n 바로 아래에서 첫 인수가 나오고, 남은 것이 둘째다.
+            ("05-product-of-two-primes", [[31607 * 31627]]),
+            # 2 의 거듭제곱 곱하기 큰 소수. 2 로 다 나누고 남은 것이 소수다.
+            ("06-two-times-big-prime", [[2 * 499999993]]),
+            # 소수의 제곱. √n 에서 정확히 나누어떨어진다 — 경계를 "미만"으로 잡으면 놓친다.
+            ("07-prime-square", [[49, 961, 31607 * 31607]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(50, 1, 1000, salt=4601)]),
+            ("02-random-medium", [randoms(100, 1, 1000000, salt=4602)]),
+            ("03-random-big", [randoms(60, 1, 1000000000, salt=4603)]),
+        ],
+        "performance": [
+            ("01-small", [_near_primes(200, salt=4604)]),
+            ("02-medium", [_near_primes(800, salt=4605)]),
+            ("03-large", [_near_primes(2000, salt=4606)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). √n 까지의 시험 나눗셈.
+fun primeFactorSums(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for ((i, value) in nums.withIndex()) {
+        Drill.visit(i, value)
+        var n = value
+        var total = 0L
+        var p = 2L
+        while (p * p <= n) {
+            if (n % p == 0L) {
+                total += p
+                while (n % p == 0L) n = (n / p).toInt()
+            }
+            p += 1
+        }
+        if (n > 1) total += n
+        out[i] = total.toInt()
+        Drill.write(i, out[i])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("counts-multiplicity", "WRONG_BRANCH",
+         "같은 소인수를 나올 때마다 더한다. 서로 다른 소인수만 더해야 한다.",
+         """
+fun primeFactorSums(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for ((i, value) in nums.withIndex()) {
+        var n = value; var total = 0L; var p = 2L
+        while (p * p <= n) {
+            while (n % p == 0L) { total += p; n = (n / p).toInt() }
+            p += 1
+        }
+        if (n > 1) total += n
+        out[i] = total.toInt()
+    }
+    return out
+}
+"""),
+        ("drops-remaining-prime", "MISSING_EDGE_CASE",
+         "√n 까지 나눈 뒤 남은 n 을 더하지 않는다. 큰 소인수가 빠진다.",
+         """
+fun primeFactorSums(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for ((i, value) in nums.withIndex()) {
+        var n = value; var total = 0L; var p = 2L
+        while (p * p <= n) {
+            if (n % p == 0L) { total += p; while (n % p == 0L) n = (n / p).toInt() }
+            p += 1
+        }
+        out[i] = total.toInt()
+    }
+    return out
+}
+"""),
+        ("strict-sqrt-bound", "OFF_BY_ONE",
+         "p · p < n 인 동안만 나눈다. n 이 소수의 제곱이면 그 소수를 못 보고 n 자체를 더한다.",
+         """
+fun primeFactorSums(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for ((i, value) in nums.withIndex()) {
+        var n = value; var total = 0L; var p = 2L
+        while (p * p < n) {
+            if (n % p == 0L) { total += p; while (n % p == 0L) n = (n / p).toInt() }
+            p += 1
+        }
+        if (n > 1) total += n
+        out[i] = total.toInt()
+    }
+    return out
+}
+"""),
+        ("divides-up-to-n", "PERFORMANCE",
+         "2 부터 n 까지 전부 나눠 본다. 수 하나에 10⁹ 번.",
+         """
+fun primeFactorSums(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for ((i, value) in nums.withIndex()) {
+        var n = value; var total = 0L
+        var p = 2
+        while (p <= n) {
+            if (n % p == 0) { total += p; while (n % p == 0) n /= p; Drill.compare(p, n) }
+            p += 1
+        }
+        out[i] = total.toInt()
+    }
+    return out
+}
+"""),
+    ],
+))

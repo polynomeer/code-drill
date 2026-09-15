@@ -1,0 +1,18 @@
+# equations-possible 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - union-find
+  - string
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - redundant-connection
+  - connected-components
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "글자가 26개라 묶음 표는 상수. 식 수에 선형"

@@ -1,0 +1,18 @@
+# burst-balloons 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - array
+  - dynamic-programming
+  - divide-conquer
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - longest-palindrome-substring
+  - knapsack-01
+complexity:
+  time: CUBIC
+  space: QUADRATIC
+  note: "구간 DP O(n³). 기억 없는 재귀는 지수적"

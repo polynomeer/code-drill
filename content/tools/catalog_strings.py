@@ -837,3 +837,135 @@ fun anagramGroups(words: Array<String>): Int = words.toSet().size
 """),
     ],
 ))
+
+
+# --- 91. 버전 비교 (독해 문제) -------------------------------------------------------------
+
+def _compare_versions(a, b):
+    xs = [int(part) for part in a.split(".")]
+    ys = [int(part) for part in b.split(".")]
+    n = max(len(xs), len(ys))
+    xs += [0] * (n - len(xs))
+    ys += [0] * (n - len(ys))
+    for x, y in zip(xs, ys):
+        if x != y:
+            return -1 if x < y else 1
+    return 0
+
+
+PROBLEMS.append(Problem(
+    id="compare-versions",
+    title="버전 비교",
+    summary="""
+버전 문자열 `a`, `b` 가 주어진다. 버전은 점으로 나뉜 **십진 정수**들이다 — `1.0`, `1.2.10`,
+`0.1` 처럼. 각 자리를 **숫자로** 앞에서부터 비교하고, 짧은 쪽의 빠진 자리는 `0` 으로 본다.
+
+`a < b` 면 `-1`, `a > b` 면 `1`, 같으면 `0` 을 반환한다.
+
+예: `1.0` 과 `1.0.0` 은 같다. `1.2.10` 은 `1.2.9` 보다 크다. `1.01` 과 `1.1` 은 같다.
+""",
+    notes="""
+문자열로 비교하면 `10 < 9` 가 되고, 길이로 비교하면 `1.0 < 1.0.0` 이 된다. 자리마다 정수로
+바꾼 뒤 비교하고, 한쪽이 먼저 끝나면 남은 자리를 0 으로 채운다 — 남은 자리가 `0.0` 이면
+같은 것이고 `0.1` 이면 큰 것이다. 앞의 0 은 정수로 바꾸는 순간 사라진다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // i 번째 자리를 비교했다
+""",
+    constraints="""
+- `1 <= a.length, b.length <= 500`
+- 자리는 `1` 개 이상이고, 각 자리는 `0` 이상 `2^31 - 1` 이하의 십진수 (앞에 0 이 붙을 수 있다)
+""",
+    signature=dict(name="compareVersions", parameters=[("a", "STRING"), ("b", "STRING")], returns="INT"),
+    groups=standard_groups(),
+    reference=_compare_versions,
+    cases={
+        "sample": [
+            ("01", ["1.2.10", "1.2.9"]),
+            ("02", ["1.0", "1.0.0"]),
+        ],
+        "boundary": [
+            # 앞의 0. 숫자로는 같다.
+            ("01-leading-zeros", ["1.01", "1.1"]),
+            # 빠진 자리가 0 이 아니면 긴 쪽이 크다.
+            ("02-longer-is-greater", ["1.0", "1.0.1"]),
+            ("03-shorter-is-greater", ["2", "1.9.9.9"]),
+            # 문자열로 비교하면 "10" < "9" 다.
+            ("04-numeric-not-lexical", ["1.10", "1.9"]),
+            ("05-equal-single", ["7", "7"]),
+            # 자리가 Int 의 끝까지 간다.
+            ("06-max-int-part", ["2147483647.0", "2147483646.999"]),
+            ("07-many-zeros", ["1.0.0.0.0", "1"]),
+            ("08-zero-vs-zero", ["0.0", "0"]),
+        ],
+        "hidden": [
+            ("01-deep-equal", [".".join(str(v) for v in randoms(40, 0, 99, salt=4701)),
+                               ".".join(str(v) for v in randoms(40, 0, 99, salt=4701))]),
+            ("02-deep-differ-late", [".".join(str(v) for v in randoms(40, 0, 99, salt=4702)) + ".5",
+                                     ".".join(str(v) for v in randoms(40, 0, 99, salt=4702)) + ".12"]),
+            ("03-padded", ["03.0007.10", "3.7.10"]),
+            ("04-long-tail-zero", ["4.2", "4.2.0.0.0.0.0.0.0.0.0.0"]),
+            ("05-long-tail-nonzero", ["4.2", "4.2.0.0.0.0.0.0.0.0.0.1"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 자리마다 정수로, 빠진 자리는 0.
+fun compareVersions(a: String, b: String): Int {
+    val xs = a.split('.')
+    val ys = b.split('.')
+    val n = maxOf(xs.size, ys.size)
+    for (i in 0 until n) {
+        val x = if (i < xs.size) xs[i].toLong() else 0L
+        val y = if (i < ys.size) ys[i].toLong() else 0L
+        Drill.compare(i, i)
+        if (x != y) return if (x < y) -1 else 1
+    }
+    return 0
+}
+""",
+    mutants=[
+        ("lexical-parts", "WRONG_ALGORITHM",
+         "자리를 문자열로 비교한다. 10 이 9 보다 작다.",
+         """
+fun compareVersions(a: String, b: String): Int {
+    val xs = a.split('.'); val ys = b.split('.')
+    val n = maxOf(xs.size, ys.size)
+    for (i in 0 until n) {
+        val x = if (i < xs.size) xs[i] else "0"
+        val y = if (i < ys.size) ys[i] else "0"
+        val c = x.compareTo(y)
+        if (c != 0) return if (c < 0) -1 else 1
+    }
+    return 0
+}
+"""),
+        ("longer-wins", "MISSING_EDGE_CASE",
+         "공통 자리가 같으면 자리가 많은 쪽이 크다고 본다. 1.0 과 1.0.0 이 달라진다.",
+         """
+fun compareVersions(a: String, b: String): Int {
+    val xs = a.split('.').map { it.toLong() }; val ys = b.split('.').map { it.toLong() }
+    for (i in 0 until minOf(xs.size, ys.size)) if (xs[i] != ys[i]) return if (xs[i] < ys[i]) -1 else 1
+    return xs.size.compareTo(ys.size).coerceIn(-1, 1)
+}
+"""),
+        ("common-prefix-only", "MISSING_EDGE_CASE",
+         "공통 자리만 비교하고 나머지는 무시한다. 1.0 과 1.0.1 이 같아진다.",
+         """
+fun compareVersions(a: String, b: String): Int {
+    val xs = a.split('.').map { it.toLong() }; val ys = b.split('.').map { it.toLong() }
+    for (i in 0 until minOf(xs.size, ys.size)) if (xs[i] != ys[i]) return if (xs[i] < ys[i]) -1 else 1
+    return 0
+}
+"""),
+        ("strips-one-trailing-zero", "MISSING_EDGE_CASE",
+         "끝의 .0 을 한 번만 떼고 길이를 비교한다. 1.0.0 과 1 이 달라진다.",
+         """
+fun compareVersions(a: String, b: String): Int {
+    val xs = a.removeSuffix(".0").split('.').map { it.toLong() }
+    val ys = b.removeSuffix(".0").split('.').map { it.toLong() }
+    for (i in 0 until minOf(xs.size, ys.size)) if (xs[i] != ys[i]) return if (xs[i] < ys[i]) -1 else 1
+    return xs.size.compareTo(ys.size).coerceIn(-1, 1)
+}
+"""),
+    ],
+))

@@ -1,0 +1,17 @@
+# prime-factor-sums 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - math
+  - number-theory
+competencies:
+  - CONSTRAINTS
+  - CORRECTNESS
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - count-primes
+  - gcd-of-array
+complexity:
+  time: LINEARITHMIC
+  space: CONSTANT
+  note: "수마다 √n 까지의 시험 나눗셈. n 까지 나누면 수 하나에 10⁹ 번"
