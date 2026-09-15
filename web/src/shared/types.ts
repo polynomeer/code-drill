@@ -157,6 +157,8 @@ export interface Submission {
   score: number | null
   compileLog: string | null
   groups: GroupResult[] | null
+  /** 내 제출인가. 게시판에 붙어 공유된 남의 제출을 열면 false 다 (§8.5). 목록에서는 오지 않는다 — 전부 내 것이다. */
+  mine?: boolean
 }
 
 /* 트레이스 타입은 features/replay/traceTypes.ts 에 있다. 렌더러와 함께 두어야
@@ -636,4 +638,46 @@ export interface EvidenceView {
   reference: string | null
   detail: string | null
   occurredAt: string
+}
+
+/**
+ * 문제별 질문 게시판 (기획서 §8.5 "질문 게시판과 코드 구간 링크", "리플레이 시점을 공유하는 주석").
+ *
+ * 글쓴이의 id 는 오지 않는다 — 내 것인가만 온다. 풀이를 드러내는 글은 맞힌 사람이 아니면
+ * 본문과 붙인 자리가 비고 `locked` 가 선다.
+ */
+export interface DiscussionPost {
+  id: string
+  problemId: string
+  parentId: string | null
+  title: string | null
+  body: string
+  anchor: DiscussionAnchor | null
+  spoiler: boolean
+  locked: boolean
+  mine: boolean
+  erased: boolean
+  answerCount: number
+  createdAt: string
+}
+
+/** 글에 붙인 자기 제출의 한 자리 — 코드 구간(줄 범위와 그 줄들)이거나 리플레이의 걸음이거나 둘 다. */
+export interface DiscussionAnchor {
+  submissionId: string
+  lineFrom: number | null
+  lineTo: number | null
+  step: number | null
+  excerpt: string | null
+}
+
+export interface DiscussionThread {
+  question: DiscussionPost
+  answers: DiscussionPost[]
+}
+
+export interface DiscussionAnchorRequest {
+  submissionId: string
+  lineFrom?: number
+  lineTo?: number
+  step?: number
 }

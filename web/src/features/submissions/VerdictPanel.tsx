@@ -79,11 +79,12 @@ export function VerdictPanel({ submission }: { submission: Submission }) {
         ))}
 
       {/* 떨어진 제출에만 나온다. 통과한 제출에는 줄일 반례가 없다 (§6.3). */}
-      {!inFlight && submission.verdict && submission.verdict !== 'ACCEPTED' && (
+      {/* 반례 줄이기와 내놓기는 소유자의 일이다. 게시판에서 연 남의 제출에는 없다 (§8.5). */}
+      {!inFlight && submission.mine !== false && submission.verdict && submission.verdict !== 'ACCEPTED' && (
         <CounterexamplePanel submissionId={submission.id} />
       )}
       {/* 틀린 제출은 남에게 과녁이 될 수 있다 (§8.3). 내놓는 것은 본인만 한다. */}
-      {!inFlight && <DonatePanel submission={submission} />}
+      {!inFlight && submission.mine !== false && <DonatePanel submission={submission} />}
     </section>
   )
 }

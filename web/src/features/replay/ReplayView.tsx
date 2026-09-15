@@ -36,10 +36,18 @@ export function ReplayView({
   submissionId,
   manifest,
   input,
+  initialStep = null,
+  onStepChange,
+  mine = true,
 }: {
   submissionId: string
   manifest: TraceManifest
   input: number[]
+  /** 처음 설 걸음. 게시판에 붙은 리플레이 시점으로 열 때 온다 (§8.5). */
+  initialStep?: number | null
+  onStepChange?: (step: number) => void
+  /** 내 제출인가. 남의 것이면 분기 진단과 예측은 없다 — 그것은 푸는 사람의 증거다 (§8.5). */
+  mine?: boolean
 }) {
   const [step, setStep] = useState(0)
   const { events, error, ensureLoaded } = useTrace(submissionId, manifest)
@@ -49,7 +57,11 @@ export function ReplayView({
     void ensureLoaded(step)
   }, [step, ensureLoaded])
 
-  useEffect(() => setStep(0), [manifest.traceId])
+  useEffect(
+    () => setStep(initialStep === null ? 0 : Math.max(0, Math.min(manifest.eventCount, initialStep))),
+    [manifest.traceId, manifest.eventCount, initialStep],
+  )
+  useEffect(() => onStepChange?.(step), [step, onStepChange])
 
   const state = useMemo(() => applyAll(events, step), [events, step])
   const kinds = useMemo(() => kindsIn(events, manifest), [events, manifest])
@@ -116,7 +128,7 @@ export function ReplayView({
 
       {/* 분기를 맨 위에 둔다. 리플레이를 여는 이유가 대개 "어디서 틀렸나"이고,
           그 답이 스크롤 아래 있으면 찾기 전에 재생 버튼을 누른다 (FR-805). */}
-      <DivergenceCard submissionId={submissionId} onSeek={(seq) => setStep(clamp(seq))} />
+      {mine && <DivergenceCard submissionId={submissionId} onSeek={(seq) => setStep(clamp(seq))} />}
 
       {error && <p className="warn">{error}</p>}
 
@@ -156,12 +168,14 @@ export function ReplayView({
 
       {/* 재생 위치 바로 아래에 둔다. 다음을 누르기 전에 눈에 들어와야 예측이지,
           지나간 뒤에 물으면 회상이다 (FR-805). */}
-      <PredictNext
-        submissionId={submissionId}
-        next={events[step] ?? null}
-        choices={choiceTypes}
-        labelOf={(type) => TYPE_LABEL[type] ?? type}
-      />
+      {mine && (
+        <PredictNext
+          submissionId={submissionId}
+          next={events[step] ?? null}
+          choices={choiceTypes}
+          labelOf={(type) => TYPE_LABEL[type] ?? type}
+        />
+      )}
 
       <p className="event-line">
         {current

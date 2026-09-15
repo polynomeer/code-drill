@@ -8,6 +8,7 @@ import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CoachingPanel } from './features/coaching/CoachingPanel'
+import { DiscussionPanel } from './features/discussion/DiscussionPanel'
 import { EditorialPanel } from './features/lab/EditorialPanel'
 import { CollectionsPanel } from './features/learning/CollectionsPanel'
 import { TodayPanel } from './features/learning/TodayPanel'
@@ -62,6 +63,12 @@ function Drill({ session }: { session: Session }) {
   const [submissionId, setSubmissionId] = useState<string | null>(
     () => new URLSearchParams(window.location.search).get('submission'),
   )
+  // ?step=<n> 은 게시판에 붙은 리플레이 시점이다 (§8.5). 리플레이가 그 걸음에서 선다.
+  const [initialStep, setInitialStep] = useState<number | null>(() => {
+    const raw = new URLSearchParams(window.location.search).get('step')
+    return raw === null || Number.isNaN(Number(raw)) ? null : Number(raw)
+  })
+  const [replayStep, setReplayStep] = useState<number | null>(null)
 
   const { submission, trace } = useSubmissionEvents(submissionId)
   const autoSave = useAutoSave(slug, language, source, touched)
@@ -134,17 +141,22 @@ function Drill({ session }: { session: Session }) {
     }
   }
 
-  const openSubmission = (id: string) => {
+  const openSubmission = (id: string, step: number | null = null) => {
     setSubmissionId(id)
+    setInitialStep(step)
+    setReplayStep(null)
     setParam('submission', id)
+    setParam('step', step === null ? null : String(step))
   }
 
   const selectProblem = (next: string) => {
     setSlug(next)
     setTouched(false)
     setSubmissionId(null)
+    setReplayStep(null)
     // 필터는 지우지 않는다. 문제를 바꿨다고 사용자가 걸어 둔 조건까지 풀 이유가 없다.
     setParam('submission', null)
+    setParam('step', null)
   }
 
   const replayInput = numberArray(problem?.samples[0]?.args[0])
@@ -212,6 +224,15 @@ function Drill({ session }: { session: Session }) {
               sampleArgs={problem.samples[0]?.args ?? null}
             />
           )}
+          {/* 해설 아래. 묻는 것은 막힌 뒤의 일이고, 붙일 제출과 리플레이는 오른쪽에 있다 (§8.5). */}
+          {problem && (
+            <DiscussionPanel
+              problemId={problem.id}
+              submission={submission}
+              replayStep={trace ? replayStep : null}
+              onOpenReplay={openSubmission}
+            />
+          )}
         </div>
 
         <div className="stack">
@@ -249,7 +270,14 @@ function Drill({ session }: { session: Session }) {
           {problem && <CoachingPanel problemId={problem.id} onOpenProblem={selectProblem} />}
           {submission && <VerdictPanel submission={submission} />}
           {trace && submissionId && (
-            <ReplayView submissionId={submissionId} manifest={trace} input={replayInput} />
+            <ReplayView
+              submissionId={submissionId}
+              manifest={trace}
+              input={replayInput}
+              initialStep={initialStep}
+              onStepChange={setReplayStep}
+              mine={submission?.mine !== false}
+            />
           )}
           {viewed && (
             <CodeView

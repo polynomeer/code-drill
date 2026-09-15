@@ -2,6 +2,9 @@ import { getSession, refreshSession, setSession, type Session } from './session'
 import type { TraceChunk, TraceManifest } from '../features/replay/traceTypes'
 import type {
   ApiError,
+  DiscussionAnchorRequest,
+  DiscussionPost,
+  DiscussionThread,
   Draft,
   DraftConflict,
   Page,
@@ -577,4 +580,54 @@ export function createSubmission(
     },
     body: JSON.stringify({ problemId, problemVersion, language, source }),
   }).then(json<Submission>)
+}
+
+// --- 문제별 질문 게시판 (§8.5) ---
+
+export async function listQuestions(problemId: string): Promise<DiscussionPost[]> {
+  return json<DiscussionPost[]>(await authed(`/discussions/${problemId}`))
+}
+
+export async function getThread(questionId: string): Promise<DiscussionThread> {
+  return json<DiscussionThread>(await authed(`/discussions/threads/${questionId}`))
+}
+
+export async function askQuestion(
+  problemId: string,
+  title: string,
+  body: string,
+  anchor: DiscussionAnchorRequest | null,
+  spoiler: boolean,
+): Promise<DiscussionPost> {
+  const response = await authed(`/discussions/${problemId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, body, anchor, spoiler }),
+  })
+  return json<DiscussionPost>(response)
+}
+
+export async function answerQuestion(
+  questionId: string,
+  body: string,
+  anchor: DiscussionAnchorRequest | null,
+  spoiler: boolean,
+): Promise<DiscussionPost> {
+  const response = await authed(`/discussions/threads/${questionId}/answers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body, anchor, spoiler }),
+  })
+  return json<DiscussionPost>(response)
+}
+
+export async function reportPost(postId: string, reason: string): Promise<void> {
+  const response = await authed(`/discussions/posts/${postId}/reports`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+  if (!response.ok && response.status !== 204) {
+    throw new ApiFailure(response.status, (await response.json()) as ApiError)
+  }
 }
