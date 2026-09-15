@@ -20,6 +20,7 @@ class DiscussionService(
     private val repository: DiscussionRepository,
     private val submissions: AnchorableSubmissions = AnchorableSubmissions.NONE,
     private val gate: ArenaGate = ArenaGate.CLOSED,
+    private val donations: ApprovedDonations = ApprovedDonations.NONE,
 ) {
 
     // --- 읽기 -------------------------------------------------------------------
@@ -27,19 +28,47 @@ class DiscussionService(
     fun questions(readerId: String, problemId: String): List<PostView> {
         val questions = repository.questions(problemId, LIST_LIMIT)
         val counts = repository.answerCounts(questions.map { it.id })
-        val solved = lazy { gate.solved(readerId, problemId) }
-        return questions.map { it.view(readerId, solved, counts[it.id] ?: 0) }
+        return views(readerId, problemId, questions) { counts[it.id] ?: 0 }
     }
 
     fun thread(readerId: String, questionId: UUID): Thread? {
-        val question = repository.find(questionId)?.takeIf { it.parentId == null && it.status == PostStatus.VISIBLE }
+        val question = repository.find(questionId)?.takeIf { it.kind == PostKind.QUESTION && it.status == PostStatus.VISIBLE }
             ?: return null
         val answers = repository.answers(questionId)
-        val solved = lazy { gate.solved(readerId, question.problemId) }
-        return Thread(
-            question = question.view(readerId, solved, answers.size),
-            answers = answers.map { it.view(readerId, solved, 0) },
-        )
+        val all = views(readerId, question.problemId, listOf(question) + answers) { if (it.id == questionId) answers.size else 0 }
+        return Thread(question = all.first(), answers = all.drop(1))
+    }
+
+    /**
+     * 공유된 풀이들 (§8.5 정적 풀이). 풀이는 항상 풀이 노출이라 맞힌 사람이 아니면 제목과
+     * 도움됐다 수만 보인다 — "어떤 접근이 있는지"는 맞히기 전에도 보여도 되지만, 코드는 아니다.
+     */
+    fun solutions(readerId: String, problemId: String): List<PostView> =
+        views(readerId, problemId, repository.solutions(problemId, LIST_LIMIT)) { 0 }
+
+    /** 밖으로 나가는 모양으로 바꾼다. 잠금·도움됐다·등급을 한 번에 채운다 — 글마다 물으면 글 수만큼 질의다. */
+    private fun views(readerId: String, problemId: String, posts: List<DiscussionPost>, answerCount: (DiscussionPost) -> Int): List<PostView> {
+        if (posts.isEmpty()) return emptyList()
+        val solved = lazy { gate.solved(readerId, problemId) }
+        val ids = posts.map { it.id }
+        val helpful = repository.helpfulCounts(ids)
+        val marked = repository.helpfulBy(readerId, ids)
+        val authors = posts.mapNotNull { it.authorId }.toSet()
+        val received = repository.helpfulReceivedBy(authors)
+        return posts.map { post ->
+            post.view(
+                readerId, solved, answerCount(post),
+                helpful = helpful[post.id] ?: 0,
+                markedHelpful = post.id in marked,
+                tier = post.authorId?.let { ContributorTier.of((received[it] ?: 0) + donations.count(it) * Contributions.DONATION_WEIGHT) },
+            )
+        }
+    }
+
+    /** 한 사람의 기여 (§8.5 기여자 평판). 본인에게만 수치로 보인다; 남에게는 등급뿐이다. */
+    fun contributions(userId: String): Contributions {
+        val (helpful, solutions, answers) = repository.contributionsOf(userId)
+        return Contributions(helpful, solutions, answers, donations.count(userId))
     }
 
     /**
@@ -57,18 +86,55 @@ class DiscussionService(
     fun ask(userId: String, problemId: String, title: String, body: String, anchor: AnchorRequest?, spoiler: Boolean): PostOutcome {
         val cleanTitle = title.trim()
         if (cleanTitle.length !in MIN_TITLE..MAX_TITLE) return PostOutcome.Invalid("제목은 ${MIN_TITLE}~${MAX_TITLE}자")
-        return write(userId, problemId, parent = null, title = cleanTitle, body = body, anchor = anchor, spoiler = spoiler)
+        return write(userId, problemId, PostKind.QUESTION, parent = null, title = cleanTitle, body = body, anchor = anchor, spoiler = spoiler)
+    }
+
+    /**
+     * 맞힌 제출을 풀이로 올린다 (§8.5 정적 풀이). 붙이는 것은 소스 전체이고 항상 풀이 노출이다.
+     * 한 제출은 한 번만 올린다.
+     */
+    @Transactional
+    fun share(userId: String, problemId: String, submissionId: UUID, title: String, body: String): PostOutcome {
+        val cleanTitle = title.trim()
+        if (cleanTitle.length !in MIN_TITLE..MAX_TITLE) return PostOutcome.Invalid("접근의 이름은 ${MIN_TITLE}~${MAX_TITLE}자")
+        if (body.trim().length < MIN_SOLUTION_BODY) return PostOutcome.Invalid("접근을 ${MIN_SOLUTION_BODY}자 이상 적는다 — 코드만 올리는 것은 풀이가 아니다")
+        val lines = submissions.lines(userId, problemId, submissionId)
+            ?: return PostOutcome.Invalid("내 것이고 이 문제의 제출만 올릴 수 있다")
+        if (!submissions.accepted(userId, submissionId)) return PostOutcome.Invalid("맞힌 제출만 풀이로 올릴 수 있다")
+        if (lines.isEmpty()) return PostOutcome.Invalid("소스가 없는 제출이다")
+        if (lines.size > MAX_SOLUTION_LINES) return PostOutcome.Invalid("풀이는 ${MAX_SOLUTION_LINES}줄까지")
+        repository.solutionOf(submissionId)?.let { return PostOutcome.Invalid("이미 올린 제출이다") }
+        val post = DiscussionPost(
+            id = UUID.randomUUID(), problemId = problemId, kind = PostKind.SOLUTION, parentId = null, authorId = userId,
+            title = cleanTitle, body = body.trim(),
+            anchor = Anchor(submissionId, 1, lines.size, null, lines.joinToString("\n")), spoiler = true,
+            status = PostStatus.VISIBLE, hiddenBy = null, hiddenAt = null, hiddenReason = null, createdAt = Instant.now(),
+        )
+        repository.insert(post)
+        return PostOutcome.Posted(post.view(userId, lazyOf(true), 0, 0, false, ContributorTier.of(contributions(userId).score)))
+    }
+
+    /**
+     * 도움됐다 (§8.5 평판). 맞힌 사람이 남의 글에 한 번. 자기 글에는 남길 수 없다 — 평판은
+     * 남이 판단한 것이어야 한다. 두 번째는 조용히 무시된다.
+     */
+    @Transactional
+    fun markHelpful(userId: String, postId: UUID): HelpfulOutcome {
+        val post = repository.find(postId)?.takeIf { it.status == PostStatus.VISIBLE } ?: return HelpfulOutcome.Invalid("그런 글이 없다")
+        if (post.authorId == userId) return HelpfulOutcome.Invalid("자기 글에는 남길 수 없다")
+        if (!gate.solved(userId, post.problemId)) return HelpfulOutcome.Locked
+        return if (repository.markHelpful(postId, userId)) HelpfulOutcome.Marked else HelpfulOutcome.AlreadyMarked
     }
 
     @Transactional
     fun answer(userId: String, questionId: UUID, body: String, anchor: AnchorRequest?, spoiler: Boolean): PostOutcome {
-        val question = repository.find(questionId)?.takeIf { it.parentId == null && it.status == PostStatus.VISIBLE }
+        val question = repository.find(questionId)?.takeIf { it.kind == PostKind.QUESTION && it.status == PostStatus.VISIBLE }
             ?: return PostOutcome.Invalid("그런 질문이 없다")
-        return write(userId, question.problemId, parent = question, title = null, body = body, anchor = anchor, spoiler = spoiler)
+        return write(userId, question.problemId, PostKind.ANSWER, parent = question, title = null, body = body, anchor = anchor, spoiler = spoiler)
     }
 
     private fun write(
-        userId: String, problemId: String, parent: DiscussionPost?, title: String?, body: String,
+        userId: String, problemId: String, kind: PostKind, parent: DiscussionPost?, title: String?, body: String,
         anchor: AnchorRequest?, spoiler: Boolean,
     ): PostOutcome {
         val cleanBody = body.trim()
@@ -77,12 +143,12 @@ class DiscussionService(
         val resolved = anchor?.let { resolve(userId, problemId, it) }
         if (resolved is Resolved.Invalid) return PostOutcome.Invalid(resolved.reason)
         val post = DiscussionPost(
-            id = UUID.randomUUID(), problemId = problemId, parentId = parent?.id, authorId = userId,
+            id = UUID.randomUUID(), problemId = problemId, kind = kind, parentId = parent?.id, authorId = userId,
             title = title, body = cleanBody, anchor = (resolved as? Resolved.Ok)?.anchor, spoiler = spoiler,
             status = PostStatus.VISIBLE, hiddenBy = null, hiddenAt = null, hiddenReason = null, createdAt = Instant.now(),
         )
         repository.insert(post)
-        return PostOutcome.Posted(post.view(userId, lazyOf(true), 0))
+        return PostOutcome.Posted(post.view(userId, lazyOf(true), 0, 0, false, ContributorTier.of(contributions(userId).score)))
     }
 
     /**
@@ -150,21 +216,25 @@ class DiscussionService(
      * 밖으로 나가는 모양. 글쓴이의 id 는 나가지 않고 "내 것인가"만 나간다. 풀이 노출인
      * 글은 맞힌 사람이 아니면 본문과 코드 구간이 비고 [PostView.locked] 가 선다.
      */
-    private fun DiscussionPost.view(readerId: String, solved: Lazy<Boolean>, answerCount: Int): PostView {
+    private fun DiscussionPost.view(
+        readerId: String, solved: Lazy<Boolean>, answerCount: Int, helpful: Int, markedHelpful: Boolean, tier: ContributorTier?,
+    ): PostView {
         val mine = authorId == readerId
         val locked = spoiler && !mine && !solved.value
         return PostView(
-            id = id, problemId = problemId, parentId = parentId, title = title,
+            id = id, problemId = problemId, kind = kind, parentId = parentId, title = title,
             body = if (locked) "" else body,
             anchor = anchor?.let { if (locked) null else AnchorView(it.submissionId, it.lineFrom, it.lineTo, it.step, it.excerpt) },
             spoiler = spoiler, locked = locked, mine = mine, erased = authorId == null,
-            answerCount = answerCount, createdAt = createdAt,
+            answerCount = answerCount, helpful = helpful, markedHelpful = markedHelpful, contributor = tier,
+            createdAt = createdAt,
         )
     }
 
     data class PostView(
         val id: UUID,
         val problemId: String,
+        val kind: PostKind,
         val parentId: UUID?,
         val title: String?,
         val body: String,
@@ -174,6 +244,11 @@ class DiscussionService(
         val mine: Boolean,
         val erased: Boolean,
         val answerCount: Int,
+        /** 남이 남긴 도움됐다의 수와, 읽는 사람이 남겼는지. */
+        val helpful: Int,
+        val markedHelpful: Boolean,
+        /** 글쓴이의 등급. 이름 대신 나가는 유일한 것이다. 지운 계정이면 null. */
+        val contributor: ContributorTier?,
         val createdAt: Instant,
     )
 
@@ -198,6 +273,13 @@ class DiscussionService(
         data class Invalid(val reason: String) : ReportOutcome
     }
 
+    sealed interface HelpfulOutcome {
+        data object Marked : HelpfulOutcome
+        data object AlreadyMarked : HelpfulOutcome
+        data object Locked : HelpfulOutcome
+        data class Invalid(val reason: String) : HelpfulOutcome
+    }
+
     sealed interface ReviewOutcome {
         data class Decided(val post: DiscussionPost) : ReviewOutcome
         data class Rejected(val reason: String) : ReviewOutcome
@@ -209,6 +291,8 @@ class DiscussionService(
         const val MIN_BODY = 10
         const val MAX_BODY = 5000
         const val MAX_EXCERPT_LINES = 40
+        const val MIN_SOLUTION_BODY = 30
+        const val MAX_SOLUTION_LINES = 400
         const val LIST_LIMIT = 50
     }
 }

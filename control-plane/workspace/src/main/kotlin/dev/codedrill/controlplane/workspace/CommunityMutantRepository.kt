@@ -37,6 +37,11 @@ class CommunityMutantRepository(private val jdbc: JdbcTemplate) {
         DONATION, userId, problemId,
     )
 
+    /** 이 사람의 기부 중 세워진 것의 수 — 기여 점수의 한 항 (§8.5). */
+    fun approvedCount(userId: String): Int = jdbc.queryForObject(
+        "SELECT count(*) FROM arena_donation WHERE donor_user_id = ? AND status = 'APPROVED'", Int::class.java, userId,
+    ) ?: 0
+
     fun pending(): List<ArenaDonation> =
         jdbc.query("SELECT * FROM arena_donation WHERE status = 'PENDING' ORDER BY created_at", DONATION)
 

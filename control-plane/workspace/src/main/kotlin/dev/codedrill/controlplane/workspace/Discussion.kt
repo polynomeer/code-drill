@@ -20,6 +20,7 @@ import java.util.UUID
 data class DiscussionPost(
     val id: UUID,
     val problemId: String,
+    val kind: PostKind,
     val parentId: UUID?,
     /** 계정을 지우면 null. 글은 남되 누구의 것인지는 남지 않는다 (§11.3). */
     val authorId: String?,
@@ -35,6 +36,53 @@ data class DiscussionPost(
 )
 
 enum class PostStatus { VISIBLE, HIDDEN }
+
+/**
+ * 글의 종류. 풀이([SOLUTION])는 맞힌 제출에 접근을 적어 올리는 글이다 — 새 표가 아니라
+ * 글 한 종류인 이유는, 보이는 것·신고·내림·삭제가 전부 글과 같기 때문이다.
+ */
+enum class PostKind { QUESTION, ANSWER, SOLUTION }
+
+/**
+ * 한 사람의 기여 (§8.5 기여자 평판). 이름은 나가지 않고 등급만 글에 실린다.
+ *
+ * 점수는 남이 남긴 "도움됐다"의 수에 아레나에 세워진 기부를 더한 것이다. 둘 다 **남이
+ * 판단한** 것이다 — 글을 많이 쓰는 것 자체는 점수가 아니다.
+ */
+data class Contributions(
+    val helpfulReceived: Int,
+    val solutionsShared: Int,
+    val answers: Int,
+    val donationsApproved: Int,
+) {
+    val score: Int get() = helpfulReceived + donationsApproved * DONATION_WEIGHT
+    val tier: ContributorTier get() = ContributorTier.of(score)
+
+    companion object {
+        const val DONATION_WEIGHT = 3
+    }
+}
+
+enum class ContributorTier {
+    NEW, ACTIVE, TRUSTED;
+
+    companion object {
+        fun of(score: Int) = when {
+            score >= 20 -> TRUSTED
+            score >= 5 -> ACTIVE
+            else -> NEW
+        }
+    }
+}
+
+/** 아레나에 세워진 기부의 수 — 기여 점수의 한 항. 같은 모듈이지만 서비스가 표를 직접 읽지 않도록 한 줄로 둔다. */
+fun interface ApprovedDonations {
+    fun count(userId: String): Int
+
+    companion object {
+        val NONE = ApprovedDonations { 0 }
+    }
+}
 
 /**
  * 글에 붙인 제출의 한 자리.
@@ -72,12 +120,17 @@ data class DiscussionReport(
  * 워크스페이스는 제출 표를 읽지 않는다. 그 제출이 누구의 것이고 어느 문제이고 소스가
  * 몇 줄인지는 제출 도메인의 것이다.
  */
-fun interface AnchorableSubmissions {
+interface AnchorableSubmissions {
 
     /** 이 사람의 것이고 이 문제의 제출이면 그 소스 줄들, 아니면 null. 소스가 지워진 제출은 빈 목록. */
     fun lines(userId: String, problemId: String, submissionId: UUID): List<String>?
 
+    /** 그 제출이 맞힌 것인가. 풀이로 올릴 수 있는 것은 맞힌 제출뿐이다. */
+    fun accepted(userId: String, submissionId: UUID): Boolean = false
+
     companion object {
-        val NONE = AnchorableSubmissions { _, _, _ -> null }
+        val NONE = object : AnchorableSubmissions {
+            override fun lines(userId: String, problemId: String, submissionId: UUID): List<String>? = null
+        }
     }
 }

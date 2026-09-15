@@ -50,6 +50,7 @@ import dev.codedrill.controlplane.admin.ArenaModeration
 import dev.codedrill.controlplane.admin.DiscussionModeration
 import dev.codedrill.controlplane.submission.SharedSubmissions
 import dev.codedrill.controlplane.workspace.AnchorableSubmissions
+import dev.codedrill.controlplane.workspace.ApprovedDonations
 import dev.codedrill.controlplane.workspace.DiscussionRepository
 import dev.codedrill.controlplane.workspace.DiscussionService
 import dev.codedrill.controlplane.workspace.ArenaGate
@@ -506,11 +507,19 @@ class ControlPlaneConfig {
 
     /** 글에 붙일 수 있는 제출 — 글쓴이 자신의, 그 문제의 것 (§3.1 조립 지점). */
     @Bean
-    fun anchorableSubmissions(submissions: SubmissionRepository) = AnchorableSubmissions { userId, problemId, submissionId ->
-        submissions.findById(submissionId)
-            ?.takeIf { it.userId == userId && it.problemId == problemId }
-            ?.let { submissions.findSource(it.id)?.lines() ?: emptyList() }
+    fun anchorableSubmissions(submissions: SubmissionRepository) = object : AnchorableSubmissions {
+        override fun lines(userId: String, problemId: String, submissionId: java.util.UUID): List<String>? =
+            submissions.findById(submissionId)
+                ?.takeIf { it.userId == userId && it.problemId == problemId }
+                ?.let { submissions.findSource(it.id)?.lines() ?: emptyList() }
+
+        override fun accepted(userId: String, submissionId: java.util.UUID): Boolean =
+            submissions.findById(submissionId)?.let { it.userId == userId && it.verdict == Verdict.ACCEPTED } == true
     }
+
+    /** 기여 점수의 한 항 — 아레나에 세워진 기부 (§8.5 평판). */
+    @Bean
+    fun approvedDonations(repository: CommunityMutantRepository) = ApprovedDonations { userId -> repository.approvedCount(userId) }
 
     /** 글에 붙은 리플레이는 그 글을 볼 수 있는 사람이 연다 — 제출 도메인이 게시판에 묻는다 (§3.1). */
     @Bean

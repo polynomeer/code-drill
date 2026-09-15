@@ -35,6 +35,38 @@ class DiscussionController(private val service: DiscussionService) {
     ): ResponseEntity<Any> =
         posted(service.ask(principal.id, problemId, request.title, request.body, request.anchor?.asRequest(), request.spoiler))
 
+    // --- 풀이 공유와 도움됐다 (§8.5) ---
+
+    @GetMapping("/{problemId}/solutions")
+    fun solutions(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable problemId: String,
+    ): List<DiscussionService.PostView> = service.solutions(principal.id, problemId)
+
+    @PostMapping("/{problemId}/solutions")
+    fun share(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable problemId: String,
+        @Valid @RequestBody request: ShareRequest,
+    ): ResponseEntity<Any> = posted(service.share(principal.id, problemId, request.submissionId, request.title, request.body))
+
+    @PostMapping("/posts/{id}/helpful")
+    fun helpful(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: UUID,
+    ): ResponseEntity<Any> = when (val outcome = service.markHelpful(principal.id, id)) {
+        DiscussionService.HelpfulOutcome.Marked -> ResponseEntity.accepted().build()
+        DiscussionService.HelpfulOutcome.AlreadyMarked -> ResponseEntity.noContent().build()
+        DiscussionService.HelpfulOutcome.Locked ->
+            ResponseEntity.status(HttpStatus.CONFLICT).body(error(ErrorCode.CONTENT_UNAVAILABLE, "이 문제를 맞힌 뒤에 열린다"))
+        is DiscussionService.HelpfulOutcome.Invalid -> ResponseEntity.badRequest().body(error(ErrorCode.INVALID_SIGNATURE, outcome.reason))
+    }
+
+    /** 내 기여 (§8.5 기여자 평판). 수치는 본인에게만 — 남에게는 글에 실리는 등급뿐이다. */
+    @GetMapping("/me/contributions")
+    fun contributions(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): Contributions =
+        service.contributions(principal.id)
+
     @GetMapping("/threads/{id}")
     fun thread(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
@@ -85,3 +117,5 @@ data class AskRequest(
 data class ReplyRequest(@field:NotBlank val body: String, val anchor: AnchorBody? = null, val spoiler: Boolean = false)
 
 data class PostReportRequest(@field:NotBlank val reason: String)
+
+data class ShareRequest(val submissionId: UUID, @field:NotBlank val title: String, @field:NotBlank val body: String)

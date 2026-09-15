@@ -1052,6 +1052,54 @@ def main() -> int:
     trail = request("GET", f"/admin/audit?subject={post_report['id']}", None, security)
     results.append(check("  감사 로그에 남는다", [e["action"] for e in trail], ["DISCUSSION_POST_HIDDEN"]))
 
+    print("\n풀이 공유와 기여자 평판 (§8.5 정적 풀이·도움됐다)")
+    # asker 는 위에서 two-sum 을 맞혔다. 오답은 풀이로 올릴 수 없고, 맞힌 제출은 소스 전체가 실린다.
+    status, _ = raw_request("POST", "/discussions/two-sum/solutions",
+                            {"submissionId": asked_wrong["id"], "title": "해시맵", "body": "값을 인덱스로 기억하고 짝을 먼저 찾는다. 넣기는 나중에"},
+                            asker.headers)
+    results.append(check("오답은 풀이로 못 올린다", status, 400))
+    status, _ = raw_request("POST", "/discussions/two-sum/solutions",
+                            {"submissionId": accepted["id"], "title": "해시맵", "body": "남의 제출을 내 풀이라고 올릴 수는 없다"},
+                            asker.headers)
+    results.append(check("남의 제출은 못 올린다", status, 400))
+    status, _ = raw_request("POST", "/discussions/two-sum/solutions",
+                            {"submissionId": accepted["id"], "title": "해시맵", "body": "코드만"})
+    results.append(check("접근 설명이 짧으면 거절", status, 400))
+    status, solution = raw_request("POST", "/discussions/two-sum/solutions",
+                                   {"submissionId": accepted["id"], "title": "해시맵 한 번 훑기",
+                                    "body": "값을 인덱스로 기억하고 짝을 먼저 찾는다. 넣기는 찾은 뒤에 — 같은 원소를 두 번 쓰지 않으려면"})
+    results.append(check("맞힌 제출을 풀이로 올린다", status, 201))
+    results.append(check("  종류가 풀이다", solution["kind"], "SOLUTION"))
+    results.append(check("  소스 전체가 실린다", solution["anchor"]["excerpt"], ACCEPTED_SOURCE))
+    results.append(check("  항상 풀이 노출", solution["spoiler"], True))
+    status, _ = raw_request("POST", "/discussions/two-sum/solutions",
+                            {"submissionId": accepted["id"], "title": "해시맵 한 번 훑기", "body": "같은 제출을 두 번 올릴 수는 없다 — 한 번만"})
+    results.append(check("  같은 제출은 한 번만", status, 400))
+
+    fresh = accounts.create("fresh")
+    listed = request("GET", "/discussions/two-sum/solutions", None, fresh.headers)
+    mine_view = next(sol for sol in listed if sol["id"] == solution["id"])
+    results.append(check("못 맞힌 사람에게 제목은 보인다", mine_view["title"], "해시맵 한 번 훑기"))
+    results.append(check("  코드는 잠긴다", (mine_view["locked"], mine_view["anchor"]), (True, None)))
+    status, _ = raw_request("POST", f"/discussions/posts/{solution['id']}/helpful", None, fresh.headers)
+    results.append(check("못 맞힌 사람은 도움됐다를 못 남긴다", status, 409))
+    status, _ = raw_request("POST", f"/discussions/posts/{solution['id']}/helpful", None)
+    results.append(check("자기 글에는 못 남긴다", status, 400))
+    status, _ = raw_request("POST", f"/discussions/posts/{solution['id']}/helpful", None, asker.headers)
+    results.append(check("맞힌 사람이 도움됐다를 남긴다", status, 202))
+    status, _ = raw_request("POST", f"/discussions/posts/{solution['id']}/helpful", None, asker.headers)
+    results.append(check("  두 번째는 조용히", status, 204))
+    listed = request("GET", "/discussions/two-sum/solutions", None, asker.headers)
+    opened = next(sol for sol in listed if sol["id"] == solution["id"])
+    results.append(check("  수가 올랐고 내가 남긴 것으로 보인다", (opened["helpful"], opened["markedHelpful"]), (1, True)))
+    results.append(check("  맞힌 사람에게는 코드가 보인다", opened["anchor"]["excerpt"], ACCEPTED_SOURCE))
+    results.append(check("  글쓴이의 이름 대신 등급", opened["contributor"], "NEW"))
+    contributions = request("GET", "/discussions/me/contributions")
+    results.append(check("내 기여에 잡힌다", (contributions["helpfulReceived"], contributions["solutionsShared"], contributions["score"]),
+                         (1, 1, 1)))
+    # 위에서 기부자의 과녁은 신고로 내려졌다. 내려진 기부는 기여가 아니다.
+    results.append(check("  내려진 기부는 세지 않는다", request("GET", "/discussions/me/contributions", None, donor.headers)["donationsApproved"], 0))
+
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
     events = read_events(pending["id"])
