@@ -184,9 +184,15 @@ docker compose -f deploy/docker-compose.yml exec -e PW=<비밀번호> rabbitmq s
 너무 넓다는 뜻이다. 비밀 둘은 밖에서 준다.
 
 ```bash
-STORAGE_ORCHESTRATOR_SECRET=… STORAGE_RUNNER_SECRET=… \
+STORAGE_ORCHESTRATOR_SECRET=… STORAGE_RUNNER_SECRET=… AUTH_ORIGIN_SALT=… \
   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.apps.yml --profile apps up -d
 ```
+
+`AUTH_ORIGIN_SALT` 는 가입·로그인 남용 방어(§10.2)가 출처(IP)를 해시할 때 쓰는 소금이다.
+IP 는 저장하지 않고 해시만 두므로, 소금이 배포마다 달라야 해시로 IP 를 되짚지 못한다.
+제어 영역 앞에 리버스 프록시를 두면 `AUTH_TRUSTED_PROXY=true` 로 `X-Forwarded-For` 를 보게
+한다 — 안 켜면 프록시의 주소가 모두의 주소가 되어 첫 다섯 명 뒤로 아무도 가입하지 못한다.
+프록시가 없는데 켜면 아무나 헤더로 출처를 꾸민다.
 
 Runner 노드에는 `runner` 의 비밀과 스토어 주소를 준다 (`STORAGE_ENDPOINT`,
 `STORAGE_RUNNER_SECRET`). 노드를 잃어도 얻는 것은 읽기뿐이다.
