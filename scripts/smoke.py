@@ -1228,6 +1228,36 @@ def main() -> int:
     trail = request("GET", f"/admin/audit?subject={asker.user_id}", None, security)
     results.append(check("  감사 로그에 발부가 남는다", [e["action"] for e in trail].count("SANCTION_ISSUED"), 2))
 
+    print("\n가입·로그인 남용 방어 (§10.2, A6)")
+    # 개발 스택은 프록시를 믿고 루프백을 세지 않는다 (scripts/up.py). 그래서 X-Forwarded-For 로 남의 출처를 흉내 내 한도를 시험한다.
+    origin = f"203.0.113.{uuid.uuid4().int % 250 + 1}"
+    other_origin = f"198.51.100.{uuid.uuid4().int % 250 + 1}"
+
+    def signup_from(ip: str):
+        return raw_request("POST", "/auth/register",
+                           {"email": f"abuse-{uuid.uuid4().hex[:10]}@example.test", "displayName": "abuse", "password": uuid.uuid4().hex},
+                           {"Authorization": "", "X-Forwarded-For": ip})
+
+    statuses = [signup_from(origin)[0] for _ in range(5)]
+    results.append(check("같은 곳에서 다섯 번까지 가입한다", statuses, [201] * 5))
+    status, refused = signup_from(origin)
+    results.append(check("여섯 번째는 막힌다", (status, refused.get("errorCode")), (429, "QUOTA_EXCEEDED")))
+    results.append(check("  다른 곳은 막히지 않는다", signup_from(other_origin)[0], 201))
+    results.append(check("  루프백(스모크 자신)은 세지 않는다", raw_request("POST", "/auth/register",
+                         {"email": f"abuse-{uuid.uuid4().hex[:10]}@example.test", "displayName": "abuse", "password": uuid.uuid4().hex},
+                         {"Authorization": ""})[0], 201))
+
+    victim = accounts.create("victim")
+    failures = [raw_request("POST", "/auth/login", {"email": victim.email, "password": "wrong-" + uuid.uuid4().hex},
+                            {"Authorization": "", "X-Forwarded-For": other_origin})[0] for _ in range(10)]
+    results.append(check("열 번 틀릴 수 있다", failures, [401] * 10))
+    status, locked = raw_request("POST", "/auth/login", {"email": victim.email, "password": victim.password},
+                                 {"Authorization": "", "X-Forwarded-For": other_origin})
+    results.append(check("열한 번째는 맞는 비밀번호로도 잠긴다", (status, locked.get("errorCode")), (429, "QUOTA_EXCEEDED")))
+    status, _ = raw_request("POST", "/auth/login", {"email": victim.email, "password": victim.password},
+                            {"Authorization": "", "X-Forwarded-For": origin})
+    results.append(check("  다른 곳에서도 잠겨 있다 — 계정 단위다", status, 429))
+
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
     events = read_events(pending["id"])

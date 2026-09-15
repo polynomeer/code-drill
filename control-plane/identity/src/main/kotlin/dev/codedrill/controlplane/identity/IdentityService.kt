@@ -261,6 +261,7 @@ class IdentityService(
     /** 대소문자와 앞뒤 공백만 정규화한다. 그 이상 손대면 남의 주소가 될 수 있다. */
     private fun normalize(email: String): String = email.trim().lowercase()
 
+    /** 가입 한도에 닿았다. 몇 초 뒤에 다시 올 수 있는지 함께 (§10.2). */
     sealed interface Registration {
         data class Created(val session: IssuedSession) : Registration
         data object EmailTaken : Registration
@@ -297,4 +298,17 @@ class IdentityService(
 data class IdentityProperties(
     val accessTtl: Duration = Duration.ofMinutes(30),
     val refreshTtl: Duration = Duration.ofDays(14),
+    // --- 남용 방어 (§10.2, A6). 이유와 함정은 [AbuseGuard] 에. ---
+    /** 같은 출처에서 한 시간에 몇 번 가입할 수 있나. 사람은 한 번이다. */
+    val signupsPerHour: Int = 5,
+    /** 한 계정에 15분 안에 몇 번 틀릴 수 있나. */
+    val loginFailuresPerAccount: Int = 10,
+    /** 같은 출처에서 15분 안에 몇 번 틀릴 수 있나 — 계정을 바꿔 가며 시험하는 것. */
+    val loginFailuresPerOrigin: Int = 30,
+    /** 프록시 뒤인가. 켜면 X-Forwarded-For 의 첫 주소를 출처로 본다. */
+    val trustedProxy: Boolean = false,
+    /** 출처 해시의 소금. 배포마다 다르게 준다 — 같으면 해시로 IP 를 되짚을 수 있다. */
+    val originSalt: String = "dev",
+    /** 세지 않는 출처. 개발 스택의 것이고 배포에서는 비운다. */
+    val exemptOrigins: List<String> = emptyList(),
 )

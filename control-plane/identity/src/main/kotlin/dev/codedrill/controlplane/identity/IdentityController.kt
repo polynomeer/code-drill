@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.identity
 import dev.codedrill.platform.common.ApiError
 import dev.codedrill.platform.common.ErrorCode
 import dev.codedrill.platform.common.Principal
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
@@ -29,19 +30,29 @@ import java.util.UUID
  */
 @RestController
 @RequestMapping("/api/v1/auth")
-class IdentityController(private val identity: IdentityService, private val sanctions: SanctionService) {
+class IdentityController(
+    private val identity: IdentityService,
+    private val sanctions: SanctionService,
+    private val guard: AbuseGuard,
+) {
 
+    /** 가입. 같은 곳에서 한 시간에 다섯 번까지다 (§10.2 남용 방어) — 계정을 여러 개 만들어 쿼터를 늘리는 길을 막는다. */
     @PostMapping("/register")
-    fun register(@Valid @RequestBody request: RegisterRequest): ResponseEntity<Any> =
-        when (val outcome = identity.register(request.email, request.displayName, request.password)) {
-            is IdentityService.Registration.Created ->
+    fun register(@Valid @RequestBody request: RegisterRequest, http: HttpServletRequest): ResponseEntity<Any> {
+        val origin = guard.originOf(http)
+        guard.signupAllowed(origin)?.let { return throttled(it, "이 곳에서의 가입이 잦다. ${it}초 뒤에 다시 시도한다") }
+        return when (val outcome = identity.register(request.email, request.displayName, request.password)) {
+            is IdentityService.Registration.Created -> {
+                guard.recordSignup(origin)
                 ResponseEntity.status(HttpStatus.CREATED).body(SessionResponse.of(outcome.session))
+            }
 
             IdentityService.Registration.EmailTaken ->
                 ResponseEntity.status(HttpStatus.CONFLICT).body(
                     error(ErrorCode.UNAUTHENTICATED, "이미 쓰이고 있는 이메일이다"),
                 )
         }
+    }
 
     /**
      * 로그인.
@@ -50,12 +61,25 @@ class IdentityController(private val identity: IdentityService, private val sanc
      * 그것만으로 어떤 이메일이 가입돼 있는지 확인할 수 있다 (§11.1).
      */
     @PostMapping("/login")
-    fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<Any> =
-        identity.login(request.email, request.password)
-            ?.let { ResponseEntity.ok(SessionResponse.of(it)) }
-            ?: ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+    fun login(@Valid @RequestBody request: LoginRequest, http: HttpServletRequest): ResponseEntity<Any> {
+        val origin = guard.originOf(http)
+        val subject = request.email.trim().lowercase()
+        // 실패가 잦으면 비밀번호를 보기 전에 막는다 (§10.2). 맞는 비밀번호로도 429 다 — 잠긴 동안은 잠긴 것이다.
+        guard.loginAllowed(origin, subject)?.let { return throttled(it, "로그인 실패가 잦다. ${it}초 뒤에 다시 시도한다") }
+        val session = identity.login(request.email, request.password)
+        if (session == null) {
+            guard.recordLoginFailure(origin, subject)
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                 error(ErrorCode.UNAUTHENTICATED, "이메일 또는 비밀번호가 맞지 않는다"),
             )
+        }
+        return ResponseEntity.ok(SessionResponse.of(session))
+    }
+
+    private fun throttled(retryAfterSeconds: Long, message: String): ResponseEntity<Any> =
+        ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header("Retry-After", retryAfterSeconds.toString())
+            .body(error(ErrorCode.QUOTA_EXCEEDED, message))
 
     /** 갱신. 쓰는 순간 이전 refresh 는 무효가 된다 (§11.2 회전). */
     @PostMapping("/refresh")

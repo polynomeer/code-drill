@@ -25,6 +25,17 @@ codedrill:
     tls:
       # cert.pem·key.pem·ca.pem 이 있는 디렉터리. 주면 mTLS 로 붙고 인증서로 로그인한다.
       dir: ${BROKER_TLS_DIR:}
+  auth:
+    # 가입·로그인 남용 방어 (§10.2, A6). 이유와 함정은 AbuseGuard 에.
+    signups-per-hour: ${AUTH_SIGNUPS_PER_HOUR:5}
+    login-failures-per-account: ${AUTH_LOGIN_FAILURES_PER_ACCOUNT:10}
+    login-failures-per-origin: ${AUTH_LOGIN_FAILURES_PER_ORIGIN:30}
+    # 프록시 뒤에서만 켠다. 켜면 X-Forwarded-For 의 첫 주소가 출처다.
+    trusted-proxy: ${AUTH_TRUSTED_PROXY:false}
+    # 출처 해시의 소금. 배포마다 다르게 — 같으면 해시로 IP 를 되짚을 수 있다.
+    origin-salt: ${AUTH_ORIGIN_SALT:dev}
+    # 세지 않는 출처. 개발 스택의 것이고 배포에서는 비운다.
+    exempt-origins: ${AUTH_EXEMPT_ORIGINS:}
   admin:
     # 첫 SECURITY_ADMIN 을 받을 계정의 이메일 (§11.2).
     #

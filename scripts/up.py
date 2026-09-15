@@ -161,6 +161,10 @@ def env_for(ports: dict) -> dict:
         STORAGE_SECRET_KEY="codedrill",
         CONTENT_ROOT=str(ROOT / "content" / "problems"),
         ADMIN_BOOTSTRAP_EMAIL=BOOTSTRAP_EMAIL,
+        # 가입 한도 (§10.2). 스모크가 한 곳에서 계정 열둘을 만들므로 루프백은 세지 않고,
+        # 프록시를 믿게 해 스모크가 X-Forwarded-For 로 남의 출처를 흉내 내 한도를 시험한다.
+        AUTH_TRUSTED_PROXY="true",
+        AUTH_EXEMPT_ORIGINS="127.0.0.1,::1,0:0:0:0:0:0:0:1",
     )
     return env
 

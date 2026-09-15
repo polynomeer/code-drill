@@ -55,6 +55,10 @@ services:
       BROKER_TLS_DIR: /etc/codedrill/broker-tls
       BROKER_DECLARE_TOPOLOGY: "false"
       ADMIN_BOOTSTRAP_EMAIL: ${ADMIN_BOOTSTRAP_EMAIL:-}
+      # 가입·로그인 남용 방어 (§10.2). 소금은 배포마다 다르게 — 같으면 해시로 IP 를 되짚는다.
+      # 프록시 뒤에 두면 AUTH_TRUSTED_PROXY=true 로 X-Forwarded-For 를 본다; 앞에 프록시가 없으면 켜지 않는다.
+      AUTH_ORIGIN_SALT: ${AUTH_ORIGIN_SALT:?출처 해시의 소금이 필요하다}
+      AUTH_TRUSTED_PROXY: ${AUTH_TRUSTED_PROXY:-false}
     volumes: ["./certs/control-plane:/etc/codedrill/broker-tls:ro"]
     ports: ["${CONTROL_PLANE_PORT:-8080}:8080"]
     depends_on:
