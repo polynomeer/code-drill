@@ -93,6 +93,10 @@ enum class AuditAction {
     ARENA_DONATION_RETIRED,
     ARENA_REPORT_DISMISSED,
 
+    /** 신고를 받아 질문 게시판의 글을 내렸거나, 신고를 기각했다 (§8.5). */
+    DISCUSSION_POST_HIDDEN,
+    DISCUSSION_REPORT_DISMISSED,
+
     /**
      * 관리자 역할 부여를 요청했다 (§11.2).
      *

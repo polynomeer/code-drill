@@ -29,6 +29,7 @@ class AdminController(
     private val audit: AuditLog,
     private val roles: AdminRoles,
     private val arena: ArenaModeration,
+    private val discussion: DiscussionModeration,
 ) {
 
     // --- 아레나 검수 (§8.3 익명화된 오답, §8.5 신고·검수) ---
@@ -72,6 +73,26 @@ class AdminController(
     ): ResponseEntity<Any> = decided(arena.resolve(id, actor, request.retire, request.resolution)) {
         audit.record(
             if (request.retire) AuditAction.ARENA_DONATION_RETIRED else AuditAction.ARENA_REPORT_DISMISSED,
+            id.toString(), actor, mapOf("resolution" to request.resolution),
+        )
+    }
+
+    // --- 질문 게시판 검수 (§8.5 신고·제재) ---
+
+    /** 신고된 글. 같은 REVIEWER 다 — "남의 것이 여러 사람에게 보이는" 결정은 한 역할이 본다. */
+    @RequiresRole(AdminRole.REVIEWER)
+    @GetMapping("/discussions/queue")
+    fun discussionQueue(): Any = discussion.queue()
+
+    @RequiresRole(AdminRole.REVIEWER)
+    @PostMapping("/discussions/reports/{id}/resolve")
+    fun resolveDiscussionReport(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: ResolvePostReportRequest,
+    ): ResponseEntity<Any> = decided(discussion.resolve(id, actor, request.hide, request.resolution)) {
+        audit.record(
+            if (request.hide) AuditAction.DISCUSSION_POST_HIDDEN else AuditAction.DISCUSSION_REPORT_DISMISSED,
             id.toString(), actor, mapOf("resolution" to request.resolution),
         )
     }
@@ -363,6 +384,8 @@ data class ArchiveRequest(@field:NotBlank val reason: String)
 data class ApproveDonationRequest(@field:NotBlank val kind: String, val note: String? = null)
 
 data class ResolveReportRequest(val retire: Boolean, @field:NotBlank val resolution: String)
+
+data class ResolvePostReportRequest(val hide: Boolean, @field:NotBlank val resolution: String)
 
 /**
  * 역할 부여 요청 (§11.2).

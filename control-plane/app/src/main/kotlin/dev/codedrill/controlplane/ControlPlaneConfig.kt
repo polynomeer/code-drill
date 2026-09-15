@@ -47,6 +47,11 @@ import dev.codedrill.controlplane.workspace.DraftPersonalData
 import dev.codedrill.controlplane.workspace.PreQuestionRepository
 import dev.codedrill.controlplane.workspace.PreQuestions
 import dev.codedrill.controlplane.admin.ArenaModeration
+import dev.codedrill.controlplane.admin.DiscussionModeration
+import dev.codedrill.controlplane.submission.SharedSubmissions
+import dev.codedrill.controlplane.workspace.AnchorableSubmissions
+import dev.codedrill.controlplane.workspace.DiscussionRepository
+import dev.codedrill.controlplane.workspace.DiscussionService
 import dev.codedrill.controlplane.workspace.ArenaGate
 import dev.codedrill.controlplane.workspace.CommunityMutantRepository
 import dev.codedrill.controlplane.workspace.CommunityMutantService
@@ -495,6 +500,41 @@ class ControlPlaneConfig {
             is CommunityMutantService.ReviewOutcome.Decided -> ArenaModeration.Decision.ok(donation)
             is CommunityMutantService.ReviewOutcome.Rejected -> ArenaModeration.Decision.rejected(reason)
         }
+    }
+
+    // --- 질문 게시판 (§8.5) ---
+
+    /** 글에 붙일 수 있는 제출 — 글쓴이 자신의, 그 문제의 것 (§3.1 조립 지점). */
+    @Bean
+    fun anchorableSubmissions(submissions: SubmissionRepository) = AnchorableSubmissions { userId, problemId, submissionId ->
+        submissions.findById(submissionId)
+            ?.takeIf { it.userId == userId && it.problemId == problemId }
+            ?.let { submissions.findSource(it.id)?.lines() ?: emptyList() }
+    }
+
+    /** 글에 붙은 리플레이는 그 글을 볼 수 있는 사람이 연다 — 제출 도메인이 게시판에 묻는다 (§3.1). */
+    @Bean
+    fun sharedSubmissions(discussion: DiscussionService) =
+        SharedSubmissions { readerId, submissionId -> discussion.sharedWith(readerId, submissionId) }
+
+    /** 쓴 글과 신고도 그 사람의 것이다 (§11.3). 본문과 코드 구간을 비우고 글은 남긴다. */
+    @Bean
+    fun discussionPersonalArea(repository: DiscussionRepository) = object : PersonalData {
+        override val area = "discussions"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = mapOf("posts" to repository.erase(userId))
+    }
+
+    /** 검수는 Admin 의 결정, 내리는 것은 게시판의 일 (§3.1). */
+    @Bean
+    fun discussionModeration(discussion: DiscussionService) = object : DiscussionModeration {
+        override fun queue() = discussion.queue()
+
+        override fun resolve(reportId: java.util.UUID, reviewer: String, hide: Boolean, resolution: String) =
+            when (val outcome = discussion.resolve(reportId, reviewer, hide, resolution)) {
+                is DiscussionService.ReviewOutcome.Decided -> ArenaModeration.Decision.ok(outcome.post)
+                is DiscussionService.ReviewOutcome.Rejected -> ArenaModeration.Decision.rejected(outcome.reason)
+            }
     }
 
     /** 역량 증거도 사용자의 기록이다 (§11.3). */

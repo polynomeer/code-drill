@@ -971,6 +971,87 @@ def main() -> int:
     mine = request("GET", "/arena/two-sum/donations/mine", None, donor.headers)
     results.append(check("  기부자에게 사유가 보인다", mine[0]["reason"], "확인. 내린다"))
 
+    print("\n문제별 질문 게시판 (§8.5 질문·코드 구간 링크·리플레이 시점)")
+    # 막힌 사람이 묻고, 맞힌 사람이 답한다. 기본 계정은 위에서 two-sum 을 맞혔고, asker 는 아직이다.
+    asker = accounts.create("asker")
+    asked_wrong = submit(WRONG_SOURCE, headers=asker.headers)
+    await_verdict(asked_wrong["id"], headers=asker.headers)
+    # 토큰 없는 요청이 401 인지 먼저 본다. 인터셉터 경로에 빠져 있으면 principal 이 없어
+    # 모든 요청이 400 이고, 그러면 아래의 "거절" 검사들이 엉뚱한 이유로 초록이 된다.
+    status, _ = raw_request("GET", "/discussions/two-sum", None, {"Authorization": ""})
+    results.append(check("토큰 없는 요청 거부", status, 401))
+    status, _ = raw_request("POST", "/discussions/two-sum", {"title": "왜", "body": "왜 0, 0 이 나오나요 이해가 안 됩니다"}, asker.headers)
+    results.append(check("제목이 짧으면 거절", status, 400))
+    status, _ = raw_request("POST", "/discussions/two-sum",
+                            {"title": "왜 0, 0 이 나오나요", "body": "본문이 열 자 이상이어야 합니다",
+                             "anchor": {"submissionId": wrong["id"], "lineFrom": 1, "lineTo": 1}}, asker.headers)
+    results.append(check("남의 제출은 붙이지 못한다", status, 400))
+    status, _ = raw_request("POST", "/discussions/two-sum",
+                            {"title": "왜 0, 0 이 나오나요", "body": "본문이 열 자 이상이어야 합니다",
+                             "anchor": {"submissionId": asked_wrong["id"], "lineFrom": 1, "lineTo": 999}}, asker.headers)
+    results.append(check("줄 범위 밖은 거절", status, 400))
+    status, question = raw_request("POST", "/discussions/two-sum",
+                                   {"title": "왜 0, 0 이 나오나요", "body": "두 번째 줄에서 무엇을 돌려주는지 모르겠습니다",
+                                    "anchor": {"submissionId": asked_wrong["id"], "lineFrom": 1, "lineTo": 1, "step": 0}},
+                                   asker.headers)
+    results.append(check("코드 구간을 붙여 묻는다", status, 201))
+    results.append(check("  구간의 코드가 실린다", question["anchor"]["excerpt"], WRONG_SOURCE.strip()))
+    results.append(check("  글쓴이의 id 는 나가지 않는다", "authorId" in question, False))
+    listed = request("GET", "/discussions/two-sum")
+    results.append(check("목록에 올랐다", any(q["id"] == question["id"] for q in listed), True))
+    results.append(check("  남에게는 내 것이 아니다", next(q["mine"] for q in listed if q["id"] == question["id"]), False))
+
+    # 맞힌 사람이 풀이를 드러내는 답을 단다. 붙인 리플레이 시점은 맞힌 사람에게만 열린다.
+    accepted = submit(ACCEPTED_SOURCE)
+    await_verdict(accepted["id"])
+    status, answer = raw_request("POST", f"/discussions/threads/{question['id']}/answers",
+                                 {"body": "해시맵에 넣기 전에 먼저 찾아야 합니다. 이 걸음을 보세요",
+                                  "anchor": {"submissionId": accepted["id"], "step": 3}, "spoiler": True})
+    results.append(check("풀이를 드러내는 답을 단다", status, 201))
+    thread = request("GET", f"/discussions/threads/{question['id']}", None, asker.headers)
+    locked = next(a for a in thread["answers"] if a["id"] == answer["id"])
+    results.append(check("못 맞힌 사람에게는 잠긴다", locked["locked"], True))
+    results.append(check("  본문이 비어 있다", locked["body"], ""))
+    results.append(check("  리플레이 시점도 없다", locked["anchor"], None))
+    status, _ = raw_request("GET", f"/submissions/{accepted['id']}", None, asker.headers)
+    results.append(check("  잠긴 글의 제출은 열리지 않는다", status, 404))
+    status, _ = raw_request("GET", f"/submissions/{asked_wrong['id']}/trace")
+    results.append(check("질문에 붙은 제출의 리플레이는 남에게 열린다", status in (200, 204), True))
+    status, _ = raw_request("GET", f"/submissions/{asked_wrong['id']}/source")
+    results.append(check("  소스는 열리지 않는다", status, 404))
+    await_verdict(submit(ACCEPTED_SOURCE, headers=asker.headers)["id"], headers=asker.headers)
+    thread = request("GET", f"/discussions/threads/{question['id']}", None, asker.headers)
+    opened = next(a for a in thread["answers"] if a["id"] == answer["id"])
+    results.append(check("맞히고 나면 열린다", opened["locked"], False))
+    results.append(check("  리플레이 시점이 보인다", opened["anchor"]["step"], 3))
+    status, _ = raw_request("GET", f"/submissions/{accepted['id']}/trace", None, asker.headers)
+    results.append(check("  그 제출의 리플레이도 열린다", status in (200, 204), True))
+
+    status, _ = raw_request("POST", f"/discussions/posts/{answer['id']}/reports", {"reason": "내 글은 내가 신고 못 한다"})
+    results.append(check("자기 글은 신고하지 못한다", status, 400))
+    status, post_report = raw_request("POST", f"/discussions/posts/{answer['id']}/reports",
+                                      {"reason": "정답 코드를 통째로 붙였습니다"}, asker.headers)
+    results.append(check("남의 글을 신고한다", status, 202))
+    status, _ = raw_request("POST", f"/discussions/posts/{answer['id']}/reports",
+                            {"reason": "정답 코드를 통째로 붙였습니다"}, asker.headers)
+    results.append(check("  두 번째 신고는 조용히", status, 204))
+    status, _ = raw_request("GET", "/admin/discussions/queue")
+    results.append(check("검수 큐는 검수자만", status, 403))
+    queue = request("GET", "/admin/discussions/queue", None, reviewer)
+    reported = next((r for r in queue if r["report"]["id"] == post_report["id"]), None)
+    results.append(check("신고가 큐에 올라 있다", reported is not None, True))
+    if reported:
+        results.append(check("  검수자는 글 전체를 본다", reported["post"]["body"].startswith("해시맵에"), True))
+    hidden = request("POST", f"/admin/discussions/reports/{post_report['id']}/resolve",
+                     {"hide": True, "resolution": "정답 노출. 내린다"}, reviewer)
+    results.append(check("신고를 받아 내렸다", hidden["status"], "HIDDEN"))
+    thread = request("GET", f"/discussions/threads/{question['id']}")
+    results.append(check("  답이 사라졌다", any(a["id"] == answer["id"] for a in thread["answers"]), False))
+    status, _ = raw_request("GET", f"/submissions/{accepted['id']}", None, asker.headers)
+    results.append(check("  붙었던 제출도 닫혔다", status, 404))
+    trail = request("GET", f"/admin/audit?subject={post_report['id']}", None, security)
+    results.append(check("  감사 로그에 남는다", [e["action"] for e in trail], ["DISCUSSION_POST_HIDDEN"]))
+
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
     events = read_events(pending["id"])

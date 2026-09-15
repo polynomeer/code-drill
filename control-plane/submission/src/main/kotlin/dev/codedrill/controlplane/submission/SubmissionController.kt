@@ -54,6 +54,7 @@ class SubmissionController(
     private val counterexamples: CounterexampleService,
     private val json: ObjectMapper,
     private val metrics: SubmissionMetrics,
+    private val shared: SharedSubmissions = SharedSubmissions.NONE,
 ) {
 
     @PostMapping
@@ -85,8 +86,8 @@ class SubmissionController(
         @PathVariable id: UUID,
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
     ): ResponseEntity<SubmissionResponse> {
-        val submission = ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(SubmissionResponse.of(submission, json))
+        val submission = readableBy(principal, id) ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(SubmissionResponse.of(submission, json, mine = submission.userId == principal.id))
     }
 
     /**
@@ -139,7 +140,7 @@ class SubmissionController(
         @PathVariable id: UUID,
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
     ): ResponseEntity<TraceManifest> {
-        ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
+        readableBy(principal, id) ?: return ResponseEntity.notFound().build()
         val manifest = traces.findManifest(id) ?: return ResponseEntity.noContent().build()
         return ResponseEntity.ok(manifest)
     }
@@ -151,7 +152,7 @@ class SubmissionController(
         @PathVariable index: Int,
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
     ): ResponseEntity<TraceChunk> {
-        ownedBy(principal, id) ?: return ResponseEntity.notFound().build()
+        readableBy(principal, id) ?: return ResponseEntity.notFound().build()
         val chunk = traces.findChunk(id, index) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(chunk)
     }
@@ -298,6 +299,13 @@ class SubmissionController(
         service.find(id)?.takeIf { it.userId == principal.id }
 
     /**
+     * 소유자이거나, 게시판에 붙어 공유된 제출이면 돌려준다 (§8.5 리플레이 시점 공유).
+     * 판정과 트레이스만 이 길로 열린다. 소스는 [ownedBy] 다.
+     */
+    private fun readableBy(principal: Principal, id: UUID): Submission? =
+        service.find(id)?.takeIf { it.userId == principal.id || shared.sharedWith(principal.id, id) }
+
+    /**
      * 쿼터 초과는 429 다 (§9.4).
      *
      * 400 이 아닌 이유는 **요청이 잘못된 것이 아니기 때문**이다. 같은 요청을 조금 뒤에
@@ -358,9 +366,11 @@ data class SubmissionResponse(
     val groups: Any?,
     /** 몇 번째 판정인지. 1 보다 크면 재채점을 거쳤다는 뜻이다 (§4.2). */
     val revision: Int,
+    /** 내 제출인가. 게시판에 붙어 공유된 남의 제출을 열면 false 다 (§8.5) — 화면이 내놓기 같은 소유자의 일을 숨긴다. */
+    val mine: Boolean = true,
 ) {
     companion object {
-        fun of(submission: Submission, json: ObjectMapper) = SubmissionResponse(
+        fun of(submission: Submission, json: ObjectMapper, mine: Boolean = true) = SubmissionResponse(
             id = submission.id.toString(),
             problemId = submission.problemId,
             problemVersion = submission.problemVersion,
@@ -373,6 +383,7 @@ data class SubmissionResponse(
             // 채우지 않는다 (§9.1 DTO 단계에서 제거).
             groups = submission.groupsJson?.let { json.readTree(it) },
             revision = submission.revision,
+            mine = mine,
         )
     }
 }
