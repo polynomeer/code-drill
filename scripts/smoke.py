@@ -1117,6 +1117,25 @@ def main() -> int:
     # 위에서 기부자의 과녁은 신고로 내려졌다. 내려진 기부는 기여가 아니다.
     results.append(check("  내려진 기부는 세지 않는다", request("GET", "/discussions/me/contributions", None, donor.headers)["donationsApproved"], 0))
 
+    print("\n실험실에 남의 풀이 세우기 (§8.5 실행 가능한 인터랙티브 해설)")
+    # 위에서 기본 계정이 풀이를 올렸다. 맞힌 asker 에게는 실험실 후보로 보이고, 못 맞힌 fresh 에게는 해설을 열어도 안 보인다.
+    shared_label = f"공유 풀이: 해시맵 한 번 훑기 ({solution['id'][:8]})"
+    editorial = request("GET", "/labs/two-sum/editorial", None, asker.headers)
+    results.append(check("맞힌 사람의 실험실에 공유 풀이가 선다", shared_label in editorial["approaches"], True))
+    request("POST", "/labs/two-sum/editorial/unlock", None, fresh.headers)
+    editorial = request("GET", "/labs/two-sum/editorial", None, fresh.headers)
+    results.append(check("해설을 미리 연 사람에게는 참조 풀이까지만", ("참조 풀이" in editorial["approaches"], shared_label in editorial["approaches"]), (True, False)))
+    status, run = raw_request("POST", "/labs/two-sum/runs", {"args": [[2, 7, 11, 15], 9], "labels": ["참조 풀이", shared_label]}, asker.headers)
+    results.append(check("참조 풀이와 나란히 돌린다", status, 202))
+    if status == 202:
+        deadline = time.time() + TIMEOUT
+        while run["status"] == "PENDING" and time.time() < deadline:
+            time.sleep(1)
+            run = request("GET", f"/labs/runs/{run['id']}", None, asker.headers)
+        actuals = [r["actual"] for r in run["results"]]
+        results.append(check("  두 풀이가 같은 답을 냈다", (len(actuals), len(set(actuals)), actuals[0] is not None), (2, 1, True)))
+        results.append(check("  공유 풀이의 이벤트가 있다", next(r for r in run["results"] if r["label"] == shared_label)["events"] != [], True))
+
     print("\n제출 유사도 신호 (§11.4 부정행위 방어, §10.4 정책)")
     # 위에서 기본 계정과 asker 가 같은 소스로 맞혔다. 구조가 같으면 신호가 서고, 다른 접근이면 서지 않는다.
     honest = accounts.create("honest")
@@ -1132,8 +1151,12 @@ def main() -> int:
     if flagged:
         results.append(check("  점수는 1.0", flagged["flag"]["score"], 1.0))
         results.append(check("  검수자는 두 소스를 본다", (flagged["source"], flagged["otherSource"]), (ACCEPTED_SOURCE, ACCEPTED_SOURCE)))
+    # 스모크를 여러 번 돌리면 이전 실행의 같은 소스와는 신호가 선다 — 그것은 맞는 신호다.
+    # 여기서 보는 것은 해시맵 풀이와는 서지 않는다는 것이다.
+    hashmap_ids = {accepted["id"], asker_accepted["id"]}
     results.append(check("다른 접근은 신호가 아니다",
-                         any(distinct["id"] in (f["flag"]["submissionId"], f["flag"]["otherSubmissionId"]) for f in queue), False))
+                         any(distinct["id"] in (f["flag"]["submissionId"], f["flag"]["otherSubmissionId"])
+                             and hashmap_ids & {f["flag"]["submissionId"], f["flag"]["otherSubmissionId"]} for f in queue), False))
     verdict_before = request("GET", f"/submissions/{accepted['id']}")["verdict"]
     if flagged:
         decided = request("POST", f"/admin/integrity/flags/{flagged['flag']['id']}/resolve",

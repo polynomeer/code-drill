@@ -31,6 +31,7 @@ class LabService(
     private val submissions: SubmissionRepository,
     private val packages: ProblemPackageLoader,
     private val json: ObjectMapper,
+    private val shared: SharedApproaches = SharedApproaches.NONE,
 ) {
 
     /**
@@ -42,13 +43,14 @@ class LabService(
     fun editorial(userId: String, problemId: String): EditorialView {
         val text = packages.editorial(problemId)
         val open = isOpen(userId, problemId)
+        val solved = submissions.latestAccepted(userId, problemId) != null
         return EditorialView(
             problemId = problemId,
             available = text != null,
             locked = !open,
-            solved = submissions.latestAccepted(userId, problemId) != null,
+            solved = solved,
             body = if (open) text else null,
-            approaches = if (open) approaches(problemId).map { it.label } else emptyList(),
+            approaches = if (open) approaches(problemId, solved).map { it.label } else emptyList(),
         )
     }
 
@@ -85,8 +87,9 @@ class LabService(
             return Outcome.Invalid("인자 ${parameters.size}개가 필요한데 ${args.size}개다")
         }
 
-        val available = approaches(problemId).associateBy { it.label }
-        val mine = submissions.latestAccepted(userId, problemId)?.let { accepted ->
+        val accepted = submissions.latestAccepted(userId, problemId)
+        val available = approaches(problemId, solved = accepted != null).associateBy { it.label }
+        val mine = accepted?.let { accepted ->
             submissions.findSource(accepted.id)?.let { source ->
                 Approach(MINE, Language.valueOf(accepted.language), source)
             }
@@ -143,13 +146,19 @@ class LabService(
      * 느릴 뿐이라 완전탐색 그 자체이고 — 기획서 §6.4 의 "완전탐색 → 개선 → 최적 풀이의
      * 발전 과정"의 첫 칸이 저작자 손으로 이미 써져 있는 셈이다.
      */
-    private fun approaches(problemId: String): List<Approach> = buildList {
+    private fun approaches(problemId: String, solved: Boolean): List<Approach> = buildList {
         packages.referenceSolution(problemId)?.let { add(Approach(REFERENCE, Language.KOTLIN, it)) }
         packages.alternativeSolutions(problemId).forEach { (name, source) ->
             add(Approach(name, Language.KOTLIN, source))
         }
         packages.mutants(problemId).filter { it.kind == DefectKind.PERFORMANCE }.forEach { mutant ->
             add(Approach("완전탐색 (${mutant.name})", Language.KOTLIN, mutant.source))
+        }
+        // 남의 풀이는 맞힌 사람에게만 (§8.5). 해설을 미리 연 사람은 참조 풀이까지만 본 것이다.
+        if (solved) shared.forProblem(problemId).forEach { approach ->
+            runCatching { Language.valueOf(approach.language) }.getOrNull()?.let { language ->
+                add(Approach("$SHARED_PREFIX${approach.label}", language, approach.source))
+            }
         }
     }
 
@@ -167,6 +176,8 @@ class LabService(
         const val LAB_EVENT = "LabRequested"
         const val REFERENCE = "참조 풀이"
         const val MINE = "내 풀이"
+        /** 공유된 풀이의 이름 앞에 붙는다. 화면이 이것으로 남의 것임을 표시한다. */
+        const val SHARED_PREFIX = "공유 풀이: "
 
         /** 한 시간에 몇 번까지. 한 건이 풀이 수만큼 계측 실행이다 (§15 실행 횟수를 곱한다). */
         private const val PER_HOUR = 20

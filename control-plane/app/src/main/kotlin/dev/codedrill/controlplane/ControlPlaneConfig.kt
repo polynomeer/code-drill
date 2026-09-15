@@ -52,6 +52,8 @@ import dev.codedrill.controlplane.admin.IntegrityModeration
 import dev.codedrill.controlplane.integrity.IntegrityRepository
 import dev.codedrill.controlplane.integrity.IntegrityService
 import dev.codedrill.controlplane.integrity.SubmissionSources
+import dev.codedrill.controlplane.submission.lab.SharedApproach
+import dev.codedrill.controlplane.submission.lab.SharedApproaches
 import dev.codedrill.controlplane.submission.SharedSubmissions
 import dev.codedrill.controlplane.workspace.AnchorableSubmissions
 import dev.codedrill.controlplane.workspace.ApprovedDonations
@@ -584,6 +586,22 @@ class ControlPlaneConfig {
             }
     }
 
+    /**
+     * 공유된 풀이를 실험실에 세운다 (§8.5 "실행 가능한 인터랙티브 해설", §3.1 조립 지점).
+     *
+     * 게시판은 풀이 글을 알고, 실험실은 이름·언어·소스만 안다. 언어는 붙은 제출의 것이고,
+     * 그것을 아는 곳은 제출 도메인이라 여기서 잇는다. 같은 제목이 둘일 수 있어 id 여덟 자를 붙인다.
+     */
+    @Bean
+    fun sharedApproaches(discussion: DiscussionRepository, submissions: SubmissionRepository) = SharedApproaches { problemId ->
+        discussion.solutions(problemId, SHARED_APPROACH_LIMIT).mapNotNull { post ->
+            val anchor = post.anchor ?: return@mapNotNull null
+            val source = anchor.excerpt ?: return@mapNotNull null
+            val language = submissions.findById(anchor.submissionId)?.language ?: return@mapNotNull null
+            SharedApproach("${post.title} (${post.id.toString().take(8)})", language, source)
+        }
+    }
+
     /** 역량 증거도 사용자의 기록이다 (§11.3). */
     @Bean
     fun competencyPersonalArea(repository: EvidenceRepository) = object : PersonalData {
@@ -696,3 +714,6 @@ private val NEEDS_HELP = listOf(
  * 값을 준다. 더 낮추면 힌트를 세 번 누른 사람보다 해설을 통째로 본 사람이 유리해진다.
  */
 private const val EDITORIAL_HELP = 3
+
+/** 실험실 목록에 올리는 공유 풀이의 수. 도움됐다 순은 아직 없다 — 최근 것부터 (§8.5). */
+private const val SHARED_APPROACH_LIMIT = 10
