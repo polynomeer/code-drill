@@ -50,6 +50,10 @@ import dev.codedrill.controlplane.admin.ArenaModeration
 import dev.codedrill.controlplane.admin.DiscussionModeration
 import dev.codedrill.controlplane.admin.IntegrityModeration
 import dev.codedrill.controlplane.admin.SanctionModeration
+import dev.codedrill.controlplane.admin.ContestAdministration
+import dev.codedrill.controlplane.contest.ContestProblems
+import dev.codedrill.controlplane.contest.ContestRepository
+import dev.codedrill.controlplane.contest.ContestService
 import dev.codedrill.controlplane.identity.SanctionKind
 import dev.codedrill.controlplane.identity.SanctionRepository
 import dev.codedrill.controlplane.identity.SanctionService
@@ -276,6 +280,7 @@ class ControlPlaneConfig {
         lab: LabService,
         integrity: IntegrityService,
         submissions: SubmissionRepository,
+        contests: ContestService,
     ) =
         object : SubmissionLearningSignals {
             override fun judged(
@@ -284,6 +289,10 @@ class ControlPlaneConfig {
                 submissionId: java.util.UUID,
                 accepted: Boolean,
             ) {
+                // 대회 중의 판정은 그 대회의 점수다 (§8.4). 제출 시각으로 창을 본다 — 판정이 늦어도 제출은 대회 안이다.
+                runCatching {
+                    submissions.findById(submissionId)?.let { contests.judged(userId, problemId, it.score ?: 0, accepted, it.createdAt) }
+                }
                 // 맞힌 제출은 유사도 신호의 재료다 (§11.4). 학습 기록과 같은 자리에서 같은 이유로
                 // 실패를 삼킨다 — 신호가 판정을 막아서는 안 된다.
                 if (accepted) runCatching {
@@ -633,6 +642,33 @@ class ControlPlaneConfig {
         private fun SanctionService.Outcome.asDecision() = when (this) {
             is SanctionService.Outcome.Decided -> ArenaModeration.Decision.ok(sanction)
             is SanctionService.Outcome.Rejected -> ArenaModeration.Decision.rejected(reason)
+        }
+    }
+
+    // --- 대회 (§8.4) ---
+
+    /** 대회에는 공개된 문제만 건다 — 문제 도메인에 묻는다 (§3.1). */
+    @Bean
+    fun contestProblems(publish: PublishService) = ContestProblems { problemId -> problemId in publish.publishedProblemIds() }
+
+    /** 순위표의 이름은 그 사람의 것이다 (§11.3). 지우면 이름 없는 줄이 된다. */
+    @Bean
+    fun contestPersonalArea(repository: ContestRepository) = object : PersonalData {
+        override val area = "contests"
+        override fun export(userId: String) = repository.export(userId)
+        override fun erase(userId: String) = mapOf("entries" to repository.erase(userId))
+    }
+
+    @Bean
+    fun contestAdministration(contests: ContestService) = object : ContestAdministration {
+        override fun create(createdBy: String, title: String, problemIds: List<String>, startsAt: java.time.Instant, endsAt: java.time.Instant) =
+            contests.create(createdBy, title, problemIds, startsAt, endsAt).asDecision()
+
+        override fun publish(id: java.util.UUID, actor: String) = contests.publish(id, actor).asDecision()
+
+        private fun ContestService.AdminOutcome.asDecision() = when (this) {
+            is ContestService.AdminOutcome.Decided -> ArenaModeration.Decision.ok(contest)
+            is ContestService.AdminOutcome.Rejected -> ArenaModeration.Decision.rejected(reason)
         }
     }
 

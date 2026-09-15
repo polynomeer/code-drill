@@ -32,6 +32,7 @@ class AdminController(
     private val discussion: DiscussionModeration,
     private val integrity: IntegrityModeration,
     private val sanctions: SanctionModeration,
+    private val contests: ContestAdministration,
 ) {
 
     // --- 아레나 검수 (§8.3 익명화된 오답, §8.5 신고·검수) ---
@@ -160,6 +161,27 @@ class AdminController(
     @RequiresRole(AdminRole.SECURITY_ADMIN)
     @GetMapping("/sanctions/users/{userId}")
     fun sanctionHistory(@PathVariable userId: String): Any = sanctions.history(userId)
+
+    // --- 대회 (§8.4) ---
+
+    /** 만드는 것과 여는 것을 가른다 — 문제 공개와 같은 2인 원칙이다. */
+    @RequiresRole(AdminRole.CONTENT_EDITOR)
+    @PostMapping("/contests")
+    fun createContest(
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+        @Valid @RequestBody request: CreateContestRequest,
+    ): ResponseEntity<Any> = decided(contests.create(actor, request.title, request.problemIds, request.startsAt, request.endsAt)) {
+        audit.record(AuditAction.CONTEST_CREATED, request.title, actor, mapOf("problems" to request.problemIds.joinToString(",")))
+    }
+
+    @RequiresRole(AdminRole.PUBLISHER)
+    @PostMapping("/contests/{id}/publish")
+    fun publishContest(
+        @PathVariable id: UUID,
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+    ): ResponseEntity<Any> = decided(contests.publish(id, actor)) {
+        audit.record(AuditAction.CONTEST_PUBLISHED, id.toString(), actor, emptyMap())
+    }
 
     private inline fun decided(decision: ArenaModeration.Decision, onDecided: () -> Unit): ResponseEntity<Any> {
         if (decision.rejected != null) {
@@ -462,6 +484,13 @@ data class IssueSanctionRequest(
 )
 
 data class ResolveAppealRequest(val uphold: Boolean, val note: String? = null)
+
+data class CreateContestRequest(
+    @field:NotBlank val title: String,
+    val problemIds: List<String>,
+    val startsAt: java.time.Instant,
+    val endsAt: java.time.Instant,
+)
 
 /**
  * 역할 부여 요청 (§11.2).

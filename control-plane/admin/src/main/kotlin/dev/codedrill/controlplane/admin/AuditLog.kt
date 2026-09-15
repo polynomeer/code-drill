@@ -116,6 +116,10 @@ enum class AuditAction {
     APPEAL_UPHELD,
     APPEAL_LIFTED,
 
+    /** 대회를 만들었고, 열었다 (§8.4). 문제 공개와 같은 2인 원칙 — 만든 사람과 연 사람이 다르다. */
+    CONTEST_CREATED,
+    CONTEST_PUBLISHED,
+
     /**
      * 관리자 역할 부여를 요청했다 (§11.2).
      *
