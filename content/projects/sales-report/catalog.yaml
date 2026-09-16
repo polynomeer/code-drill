@@ -1,0 +1,6 @@
+difficulty: EASY
+tags:
+  - string
+  - hash-map
+  - sorting
+summary: 줄 단위 매출 기록을 읽어 잘못된 줄은 줄 번호와 함께 모으고, 지역별로 집계해 정해진 형식의 보고서를 만든다.

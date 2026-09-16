@@ -1,0 +1,11 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다).
+id: sales-report
+version: 1
+title: 매출 집계 보고서
+language: PYTHON
+statement: statement.md
+
+limits:
+  buildSeconds: 60
+  testSeconds: 120
+  memoryMb: 256

@@ -1,0 +1,5 @@
+difficulty: MEDIUM
+tags:
+  - simulation
+  - hash-map
+summary: 키마다 토큰 버킷을 두고, 주입된 시계로 채워지는 속도를 결정적으로 시험하는 요청 제한기를 구현한다.
