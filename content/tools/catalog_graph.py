@@ -2004,3 +2004,187 @@ fun equationsPossible(equations: Array<String>): Int {
 """),
     ],
 ))
+
+
+# --- 109. 단어 사다리 (문자열 위의 BFS) --------------------------------------------------------
+
+def _word_ladder(begin, end, words):
+    from collections import deque
+    pool = set(words)
+    if end not in pool:
+        return 0
+    seen = {begin}
+    queue = deque([(begin, 1)])
+    while queue:
+        word, steps = queue.popleft()
+        if word == end:
+            return steps
+        for i in range(len(word)):
+            for c in "abcdefghijklmnopqrstuvwxyz":
+                if c == word[i]:
+                    continue
+                nxt = word[:i] + c + word[i + 1:]
+                if nxt in pool and nxt not in seen:
+                    seen.add(nxt)
+                    queue.append((nxt, steps + 1))
+    return 0
+
+
+def _word_pool(count, length, salt):
+    letters = "abcdefgh"
+    picks = randoms(count * length, 0, len(letters) - 1, salt=salt)
+    words = {"".join(letters[picks[i * length + j]] for j in range(length)) for i in range(count)}
+    return sorted(words)
+
+
+PROBLEMS.append(Problem(
+    id="word-ladder",
+    title="단어 사다리",
+    summary="""
+같은 길이의 소문자 단어 `begin`, `end` 와 단어 목록 `words` 가 주어진다. `begin` 에서
+시작해 **한 번에 글자 하나만 바꿔** `end` 에 이르되, 중간의 단어는 전부 `words` 에 있어야
+한다. 가장 짧은 변환의 **단어 수** (`begin` 과 `end` 포함) 를 반환한다. 없으면 `0`.
+`end` 가 `words` 에 없으면 `0` 이다.
+
+예: `hit → hot → dot → dog → cog` 이면 `5`.
+""",
+    notes="""
+단어가 정점이고 "글자 하나 차이"가 간선인 그래프의 최단 경로 — BFS 다. 간선을 모든 쌍으로
+만들면 O(n²·L) — 5 만 단어면 12 억 번 — 이고, 단어마다 자리 하나를 26 글자로 바꿔 목록에 있는지 보면 O(n·L·26) 이다.
+방문 표시가 없으면 같은 단어를 몇 번이고 다시 넣어 끝나지 않는다.
+""",
+    drill_doc="""
+Drill.enqueue(i)              // 단어를 큐에 넣었다 (목록의 자리)
+Drill.dequeue(i)              // 꺼냈다
+Drill.match(i, steps)         // end 에 닿았다
+""",
+    constraints="""
+- `1 <= 단어 길이 <= 10`, `0 <= words.size <= 50_000`, 소문자만
+- `begin != end`
+""",
+    signature=dict(name="wordLadder", parameters=[("begin", "STRING"), ("end", "STRING"), ("words", "STRING_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_word_ladder,
+    cases={
+        "sample": [
+            ("01", ["hit", "cog", ["hot", "dot", "dog", "lot", "log", "cog"]]),
+            ("02", ["hit", "cog", ["hot", "dot", "dog", "lot", "log"]]),
+        ],
+        "boundary": [
+            # 한 글자 차이라 바로 간다. begin 이 목록에 없어도 된다.
+            ("01-direct", ["a", "b", ["b"]]),
+            ("02-end-missing", ["a", "b", ["c"]]),
+            ("03-empty-words", ["ab", "cd", []]),
+            # 두 길. 짧은 쪽이 답이다.
+            ("04-two-paths", ["aa", "bb", ["ab", "ba", "bb", "ac", "bc"]]),
+            # 순환이 있다. 방문 표시가 없으면 끝나지 않는다.
+            ("05-cycle", ["aa", "cc", ["ab", "ba", "bb", "aa", "cb", "cc"]]),
+            ("06-begin-in-list", ["hit", "hot", ["hit", "hot"]]),
+            ("07-unreachable-island", ["aaa", "zzz", ["aab", "abb", "bbb", "zzy", "zzz"]]),
+        ],
+        "hidden": [
+            ("01-random-reachable", ["aaaa", "bbbb", sorted(set(_word_pool(300, 4, salt=7601)) | {"aaab", "aabb", "abbb", "bbbb"})]),
+            ("02-random-maybe", ["abcd", "hgfe", _word_pool(800, 4, salt=7602)]),
+            ("03-long-chain", ["a" * 8, "b" * 8, ["a" * (8 - k) + "b" * k for k in range(1, 9)]]),
+        ],
+        "performance": [
+            ("01-small", ["aaaaa", "hhhhh", _word_pool(5000, 5, salt=7603)]),
+            ("02-medium", ["aaaaaa", "hhhhhh", _word_pool(20000, 6, salt=7604)]),
+            # 5 만 단어. 모든 쌍을 견주면 12 억 번이다.
+            ("03-large", ["aaaaaa", "hhhhhh", sorted(set(_word_pool(50000, 6, salt=7605)) | {"hhhhhh"})]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 자리마다 26 글자를 바꿔 목록에 있는지 본다. BFS.
+fun wordLadder(begin: String, end: String, words: Array<String>): Int {
+    val pool = HashSet<String>()
+    val index = HashMap<String, Int>()
+    for ((i, w) in words.withIndex()) { pool.add(w); index[w] = i }
+    if (end !in pool) return 0
+    val seen = HashSet<String>().apply { add(begin) }
+    val queue = ArrayDeque<Pair<String, Int>>()
+    queue.addLast(begin to 1)
+    while (queue.isNotEmpty()) {
+        val (word, steps) = queue.removeFirst()
+        Drill.dequeue(index[word] ?: -1)
+        if (word == end) { Drill.match(index[word] ?: -1, steps); return steps }
+        val chars = word.toCharArray()
+        for (i in chars.indices) {
+            val original = chars[i]
+            for (c in 'a'..'z') {
+                if (c == original) continue
+                chars[i] = c
+                val next = String(chars)
+                if (next in pool && seen.add(next)) { queue.addLast(next to steps + 1); Drill.enqueue(index[next] ?: -1) }
+            }
+            chars[i] = original
+        }
+    }
+    return 0
+}
+""",
+    mutants=[
+        ("counts-edges", "OFF_BY_ONE", "변환의 횟수를 답한다. 단어 수는 하나 더 많다.", """
+fun wordLadder(begin: String, end: String, words: Array<String>): Int {
+    val pool = words.toHashSet()
+    if (end !in pool) return 0
+    val seen = hashSetOf(begin)
+    val queue = ArrayDeque(listOf(begin to 0))
+    while (queue.isNotEmpty()) {
+        val (word, steps) = queue.removeFirst()
+        if (word == end) return steps
+        val chars = word.toCharArray()
+        for (i in chars.indices) { val o = chars[i]; for (c in 'a'..'z') { if (c == o) continue; chars[i] = c; val n = String(chars); if (n in pool && seen.add(n)) queue.addLast(n to steps + 1) }; chars[i] = o }
+    }
+    return 0
+}
+"""),
+        ("ignores-end-missing", "MISSING_EDGE_CASE", "end 가 목록에 없어도 한 글자 차이면 간다.", """
+fun wordLadder(begin: String, end: String, words: Array<String>): Int {
+    val pool = words.toHashSet().apply { add(end) }
+    val seen = hashSetOf(begin)
+    val queue = ArrayDeque(listOf(begin to 1))
+    while (queue.isNotEmpty()) {
+        val (word, steps) = queue.removeFirst()
+        if (word == end) return steps
+        val chars = word.toCharArray()
+        for (i in chars.indices) { val o = chars[i]; for (c in 'a'..'z') { if (c == o) continue; chars[i] = c; val n = String(chars); if (n in pool && seen.add(n)) queue.addLast(n to steps + 1) }; chars[i] = o }
+    }
+    return 0
+}
+"""),
+        ("dfs-first-found", "WRONG_ALGORITHM", "DFS 로 처음 닿은 길의 길이를 답한다. 가장 짧다는 보장이 없다.", """
+fun wordLadder(begin: String, end: String, words: Array<String>): Int {
+    val pool = words.toHashSet()
+    if (end !in pool) return 0
+    val seen = hashSetOf(begin)
+    fun go(word: String, steps: Int): Int {
+        if (word == end) return steps
+        val chars = word.toCharArray()
+        for (i in chars.indices) { val o = chars[i]; for (c in 'a'..'z') { if (c == o) continue; chars[i] = c; val n = String(chars); if (n in pool && seen.add(n)) { val r = go(n, steps + 1); if (r > 0) return r } }; chars[i] = o }
+        return 0
+    }
+    return go(begin, 1)
+}
+"""),
+        ("pairwise-edges--quadratic", "PERFORMANCE", "모든 단어 쌍을 견줘 간선을 만든다. O(n²·L).", """
+fun wordLadder(begin: String, end: String, words: Array<String>): Int {
+    val all = (listOf(begin) + words).distinct()
+    val idx = all.withIndex().associate { it.value to it.index }
+    val target = idx[end] ?: return 0
+    fun adjacent(a: String, b: String): Boolean { var d = 0; for (i in a.indices) { if (a[i] != b[i]) d += 1; if (d > 1) return false }; return d == 1 }
+    val adj = Array(all.size) { ArrayList<Int>() }
+    for (i in all.indices) for (j in i + 1 until all.size) { Drill.compare(i, j); if (adjacent(all[i], all[j])) { adj[i].add(j); adj[j].add(i) } }
+    val dist = IntArray(all.size) { 0 }
+    dist[0] = 1
+    val queue = ArrayDeque(listOf(0))
+    while (queue.isNotEmpty()) {
+        val v = queue.removeFirst()
+        if (v == target) return dist[v]
+        for (u in adj[v]) if (dist[u] == 0) { dist[u] = dist[v] + 1; queue.addLast(u) }
+    }
+    return 0
+}
+"""),
+    ],
+))

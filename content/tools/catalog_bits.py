@@ -315,3 +315,74 @@ fun missingNumber(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 105. 2 의 거듭제곱인가 (입문) --------------------------------------------------------
+
+def _is_power_of_two(n):
+    return 1 if n > 0 and n & (n - 1) == 0 else 0
+
+
+PROBLEMS.append(Problem(
+    id="power-of-two",
+    title="2 의 거듭제곱인가",
+    summary="""
+정수 `n` 이 `2` 의 거듭제곱 (`1, 2, 4, 8, ...`) 이면 `1`, 아니면 `0` 을 반환한다.
+""",
+    notes="""
+2 의 거듭제곱은 이진수로 1 이 하나뿐이다. `n & (n - 1)` 은 가장 낮은 1 을 지우므로, 그 결과가
+0 이면 1 이 하나였던 것이다. `n` 이 0 이거나 음수면 아니다 — 0 은 `0 & -1 = 0` 이라 따로
+막아야 한다.
+""",
+    drill_doc="""
+Drill.compare(n, n - 1)       // 비트를 견줬다
+""",
+    constraints="""
+- `-2^31 <= n <= 2^31 - 1`
+""",
+    signature=dict(name="isPowerOfTwo", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_is_power_of_two,
+    cases={
+        "sample": [("01", [16]), ("02", [12])],
+        "boundary": [
+            ("01-one", [1]),
+            # 0 은 아니다 — n & (n-1) 만 보면 0 이 통과한다.
+            ("02-zero", [0]),
+            ("03-negative-power", [-8]),
+            ("04-max-power", [1073741824]),
+            ("05-max-int", [2147483647]),
+            ("06-min-int", [-2147483648]),
+            ("07-three", [3]),
+        ],
+        "hidden": [
+            ("01-two", [2]),
+            ("02-big-not", [1073741825]),
+            ("03-random-powers", [1 << 20]),
+            ("04-six", [6]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 1 이 하나뿐인가.
+fun isPowerOfTwo(n: Int): Int {
+    Drill.compare(n, n - 1)
+    return if (n > 0 && n and (n - 1) == 0) 1 else 0
+}
+""",
+    mutants=[
+        ("accepts-zero", "MISSING_EDGE_CASE", "0 을 막지 않는다. 0 & -1 = 0 이라 통과한다.", """
+fun isPowerOfTwo(n: Int): Int = if (n and (n - 1) == 0) 1 else 0
+"""),
+        ("accepts-negative", "MISSING_EDGE_CASE", "음수를 막지 않는다. Int.MIN_VALUE 는 1 이 하나라 통과한다.", """
+fun isPowerOfTwo(n: Int): Int = if (n != 0 && n and (n - 1) == 0) 1 else 0
+"""),
+        ("divides-while-even", "OFF_BY_ONE", "2 로 나누어떨어지는 동안 나누고 1 인지 본다 — 시작을 1 로 잡지 않아 1 이 아니라고 본다.", """
+fun isPowerOfTwo(n: Int): Int {
+    if (n <= 1) return 0
+    var v = n
+    while (v % 2 == 0) v /= 2
+    return if (v == 1) 1 else 0
+}
+"""),
+    ],
+))

@@ -969,3 +969,254 @@ fun compareVersions(a: String, b: String): Int {
 """),
     ],
 ))
+
+
+# --- 104. 모음의 수 (입문) ----------------------------------------------------------
+
+def _count_vowels(text):
+    return sum(1 for c in text if c in "aeiouAEIOU")
+
+
+PROBLEMS.append(Problem(
+    id="count-vowels",
+    title="모음의 수",
+    summary="""
+문자열 `text` 에서 영문 모음 (`a, e, i, o, u` 와 대문자) 의 수를 반환한다. 다른 글자는
+세지 않는다.
+
+예: `"Hello, World"` → `3`.
+""",
+    notes="""
+글자마다 모음인지 보면 된다. 대문자를 잊거나, `y` 를 세거나, 비영문 글자를 모음으로 착각하는
+것이 갈림길이다.
+""",
+    drill_doc="""
+Drill.visit(i, 0)             // 글자를 봤다
+Drill.write(0, count)         // 지금까지의 수
+""",
+    constraints="""
+- `0 <= text.length <= 200_000`, 임의의 유니코드 문자
+""",
+    signature=dict(name="countVowels", parameters=[("text", "STRING")], returns="INT"),
+    groups=standard_groups(),
+    reference=_count_vowels,
+    cases={
+        "sample": [("01", ["Hello, World"]), ("02", ["xyz"])],
+        "boundary": [
+            ("01-empty", [""]),
+            ("02-all-vowels", ["aeiouAEIOU"]),
+            # y 는 모음이 아니다.
+            ("03-y", ["yyy"]),
+            # 비영문 모음처럼 보이는 글자. 세지 않는다.
+            ("04-accented", ["éàü"]),
+            ("05-korean", ["아에이오우"]),
+            ("06-separators", ["a,e\ti"]),
+        ],
+        "hidden": [
+            ("01-long", ["ab" * 50000]),
+            ("02-mixed", ["The quick brown fox jumps over the lazy dog"]),
+            ("03-upper", ["AEIOU" * 1000 + "BCD" * 1000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/).
+fun countVowels(text: String): Int {
+    var count = 0
+    for ((i, c) in text.withIndex()) {
+        Drill.visit(i, 0)
+        if (c in "aeiouAEIOU") { count += 1; Drill.write(0, count) }
+    }
+    return count
+}
+""",
+    mutants=[
+        ("lowercase-only", "MISSING_EDGE_CASE", "소문자 모음만 센다.", """
+fun countVowels(text: String): Int = text.count { it in "aeiou" }
+"""),
+        ("counts-y", "WRONG_BRANCH", "y 를 모음으로 센다.", """
+fun countVowels(text: String): Int = text.count { it in "aeiouyAEIOUY" }
+"""),
+        ("counts-letters", "WRONG_ALGORITHM", "영문자 전부를 센다.", """
+fun countVowels(text: String): Int = text.count { it in 'a'..'z' || it in 'A'..'Z' }
+"""),
+    ],
+))
+
+
+# --- 110. 가장 짧은 덮는 창 (글자 수 슬라이딩 윈도) ------------------------------------------------
+
+def _min_window_length(s, t):
+    from collections import Counter
+    if not t or len(t) > len(s):
+        return 0
+    need = Counter(t)
+    missing = len(t)
+    best = 0
+    left = 0
+    for right, c in enumerate(s):
+        if need[c] > 0:
+            missing -= 1
+        need[c] -= 1
+        while missing == 0:
+            length = right - left + 1
+            if best == 0 or length < best:
+                best = length
+            need[s[left]] += 1
+            if need[s[left]] > 0:
+                missing += 1
+            left += 1
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="min-window-substring",
+    title="가장 짧은 덮는 창",
+    summary="""
+문자열 `s` 와 `t` 가 주어진다. `t` 의 **모든 글자를 개수까지** 포함하는 `s` 의 가장 짧은
+연속 부분 문자열의 길이를 반환한다. 없으면 `0`. `t` 가 비면 `0` 이다.
+
+예: `s = "ADOBECODEBANC"`, `t = "ABC"` → `"BANC"` 로 `4`. `t = "AA"` 면 `A` 가 둘 있어야 한다.
+""",
+    notes="""
+글자별로 "아직 모자란 수"를 들고 창을 민다. 오른쪽을 늘려 모자란 것이 0 이 되면, 왼쪽을 줄여
+가며 여전히 0 인 동안 길이를 잰다 — 왼쪽 글자를 빼서 모자라지면 멈춘다. 양쪽 끝이 각각 n
+번만 움직인다. 글자마다 개수를 세지 않고 "있는가"만 보면 `AA` 를 놓친다.
+""",
+    drill_doc="""
+Drill.pointer("left", i)      // 창의 왼쪽
+Drill.pointer("right", j)     // 창의 오른쪽
+Drill.write(0, best)          // 지금까지의 최소
+""",
+    constraints="""
+- `0 <= s.length <= 200_000`, `0 <= t.length <= 200_000`, 임의의 유니코드 문자
+""",
+    signature=dict(name="minWindow", parameters=[("s", "STRING"), ("t", "STRING")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_min_window_length,
+    cases={
+        "sample": [("01", ["ADOBECODEBANC", "ABC"]), ("02", ["a", "a"])],
+        "boundary": [
+            ("01-empty-t", ["abc", ""]),
+            ("02-t-longer", ["ab", "abc"]),
+            # 개수까지 맞아야 한다.
+            ("03-needs-two", ["aab", "aa"]),
+            ("04-needs-two-missing", ["abcb", "aa"]),
+            ("05-whole", ["abc", "cab"]),
+            ("06-none", ["abc", "d"]),
+            # 대소문자는 다르다.
+            ("07-case", ["aA", "AA"]),
+            ("08-non-ascii", ["가나다라나가", "가라"]),
+        ],
+        "hidden": [
+            ("01-random", ["".join(chr(97 + v) for v in randoms(300, 0, 5, salt=7701)), "abc"]),
+            ("02-random-counts", ["".join(chr(97 + v) for v in randoms(500, 0, 3, salt=7702)), "aabbc"]),
+            ("03-answer-at-end", ["x" * 200 + "abc", "cba"]),
+            ("04-answer-at-start", ["abc" + "x" * 200, "cab"]),
+        ],
+        "performance": [
+            # z 가 맨 끝에만 있다. 시작점마다 세면 어디서 시작하든 끝까지 간다 — O(n²).
+            ("01-small", ["".join(chr(97 + v) for v in randoms(20000, 0, 24, salt=7703)) + "z", "abcz"]),
+            ("02-medium", ["".join(chr(97 + v) for v in randoms(100000, 0, 24, salt=7704)) + "z", "abcz"]),
+            ("03-large", ["".join(chr(97 + v) for v in randoms(200000, 0, 24, salt=7705)) + "z", "abcz"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 글자별 모자란 수를 들고 창을 민다.
+fun minWindow(s: String, t: String): Int {
+    if (t.isEmpty() || t.length > s.length) return 0
+    val need = HashMap<Char, Int>()
+    for (c in t) need[c] = (need[c] ?: 0) + 1
+    var missing = t.length
+    var best = 0
+    var left = 0
+    for (right in s.indices) {
+        val c = s[right]
+        val n = need[c] ?: 0
+        if (n > 0) missing -= 1
+        need[c] = n - 1
+        Drill.pointer("right", right)
+        while (missing == 0) {
+            val length = right - left + 1
+            if (best == 0 || length < best) { best = length; Drill.write(0, best) }
+            val l = s[left]
+            need[l] = (need[l] ?: 0) + 1
+            if (need[l]!! > 0) missing += 1
+            left += 1
+            Drill.pointer("left", left)
+        }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("presence-only", "WRONG_ALGORITHM", "글자가 있는지만 본다. 개수를 잊는다.", """
+fun minWindow(s: String, t: String): Int {
+    if (t.isEmpty()) return 0
+    val need = t.toSet()
+    var best = 0
+    for (i in s.indices) {
+        val seen = HashSet<Char>()
+        for (j in i until s.length) { if (s[j] in need) seen.add(s[j]); if (seen.size == need.size) { if (best == 0 || j - i + 1 < best) best = j - i + 1; break } }
+    }
+    return best
+}
+"""),
+        ("shrinks-once", "WRONG_BRANCH", "창이 덮으면 왼쪽을 한 칸만 줄인다.", """
+fun minWindow(s: String, t: String): Int {
+    if (t.isEmpty() || t.length > s.length) return 0
+    val need = HashMap<Char, Int>()
+    for (c in t) need[c] = (need[c] ?: 0) + 1
+    var missing = t.length; var best = 0; var left = 0
+    for (right in s.indices) {
+        val c = s[right]; val n = need[c] ?: 0
+        if (n > 0) missing -= 1
+        need[c] = n - 1
+        if (missing == 0) {
+            val length = right - left + 1
+            if (best == 0 || length < best) best = length
+            val l = s[left]; need[l] = (need[l] ?: 0) + 1; if (need[l]!! > 0) missing += 1; left += 1
+        }
+    }
+    return best
+}
+"""),
+        ("case-insensitive", "MISSING_EDGE_CASE", "대소문자를 같게 본다.", """
+fun minWindow(s: String, t: String): Int {
+    val ls = s.lowercase(); val lt = t.lowercase()
+    if (lt.isEmpty() || lt.length > ls.length) return 0
+    val need = HashMap<Char, Int>()
+    for (c in lt) need[c] = (need[c] ?: 0) + 1
+    var missing = lt.length; var best = 0; var left = 0
+    for (right in ls.indices) {
+        val c = ls[right]; val n = need[c] ?: 0
+        if (n > 0) missing -= 1
+        need[c] = n - 1
+        while (missing == 0) {
+            val length = right - left + 1
+            if (best == 0 || length < best) best = length
+            val l = ls[left]; need[l] = (need[l] ?: 0) + 1; if (need[l]!! > 0) missing += 1; left += 1
+        }
+    }
+    return best
+}
+"""),
+        ("recount-per-window--quadratic", "PERFORMANCE", "시작점마다 개수를 처음부터 세며 늘린다. O(n²).", """
+fun minWindow(s: String, t: String): Int {
+    if (t.isEmpty() || t.length > s.length) return 0
+    val need = HashMap<Char, Int>()
+    for (c in t) need[c] = (need[c] ?: 0) + 1
+    var best = 0
+    for (i in s.indices) {
+        val have = HashMap<Char, Int>(); var covered = 0
+        for (j in i until s.length) {
+            Drill.compare(i, j)
+            val c = s[j]; val h = (have[c] ?: 0) + 1; have[c] = h
+            if (h <= (need[c] ?: 0)) covered += 1
+            if (covered == t.length) { if (best == 0 || j - i + 1 < best) best = j - i + 1; break }
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

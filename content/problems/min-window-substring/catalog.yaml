@@ -1,0 +1,19 @@
+# min-window-substring 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - string
+  - sliding-window
+  - hash-map
+  - two-pointers
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - min-subarray-len
+  - longest-unique-substring
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "글자별 모자란 수와 창. 시작점마다 세면 O(n²)"

@@ -1,0 +1,18 @@
+# regex-match 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - string
+  - dynamic-programming
+  - recursion
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - edit-distance
+  - decode-ways
+complexity:
+  time: QUADRATIC
+  space: QUADRATIC
+  note: "dp[i][j]. 기억 없는 재귀는 a*a*…b 에서 지수적"

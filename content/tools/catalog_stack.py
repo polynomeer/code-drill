@@ -960,3 +960,147 @@ fun maximalRectangle(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 108. 가장 긴 올바른 괄호 부분 문자열 ------------------------------------------------------
+
+def _longest_valid_parentheses(s):
+    best = 0
+    stack = [-1]
+    for i, c in enumerate(s):
+        if c == "(":
+            stack.append(i)
+        else:
+            stack.pop()
+            if not stack:
+                stack.append(i)
+            else:
+                best = max(best, i - stack[-1])
+    return best
+
+
+def _paren_string(n, salt, bias=0):
+    picks = randoms(n, 0, 1 + bias, salt=salt)
+    return "".join("(" if p == 0 else ")" for p in picks)
+
+
+PROBLEMS.append(Problem(
+    id="longest-valid-parentheses",
+    title="가장 긴 올바른 괄호 부분 문자열",
+    summary="""
+`(` 와 `)` 로만 된 문자열 `s` 에서 **올바르게 짝지어진 가장 긴 연속 부분 문자열**의 길이를
+반환한다.
+
+예: `"(()"` → `2`. `")()())"` → `4`. `""` → `0`.
+""",
+    notes="""
+스택에 **인덱스**를 둔다. 여는 괄호의 자리를 넣고, 닫는 괄호를 만나면 하나 꺼낸 뒤 "지금
+자리 − 스택 꼭대기"가 여기서 끝나는 올바른 구간의 길이다. 스택이 비면 지금 자리를 넣는다 —
+그것이 다음 구간의 왼쪽 경계다. 처음의 `-1` 이 그 경계의 첫 값이다.
+""",
+    drill_doc="""
+Drill.push(i)                 // 여는 괄호의 자리
+Drill.pop(i)                  // 짝을 지었다
+Drill.write(0, best)          // 지금까지의 최대
+""",
+    constraints="""
+- `0 <= s.length <= 200_000`
+""",
+    signature=dict(name="longestValidParentheses", parameters=[("s", "STRING")], returns="INT"),
+    groups=perf_groups(),
+    reference=_longest_valid_parentheses,
+    cases={
+        "sample": [("01", ["(()"]), ("02", [")()())"])],
+        "boundary": [
+            ("01-empty", [""]),
+            ("02-single-open", ["("]),
+            ("03-single-close", [")"]),
+            ("04-all-valid", ["(())()"]),
+            # 두 구간이 이어진다. 합쳐서 세야 한다.
+            ("05-adjacent-joins", ["()(())"]),
+            # 앞의 닫는 괄호가 경계가 된다.
+            ("06-leading-close", [")))()()"]),
+            ("07-nested-then-broken", ["((()))("]),
+            ("08-alternating-broken", [")(" * 5]),
+        ],
+        "hidden": [
+            ("01-random", [_paren_string(200, salt=7501)]),
+            ("02-random-open-heavy", [_paren_string(300, salt=7502, bias=1).replace(")", "(", 50)]),
+            ("03-long-valid", ["()" * 1000 + "(" + "()" * 500]),
+            ("04-deep", ["(" * 500 + ")" * 500]),
+        ],
+        "performance": [
+            ("01-small", [_paren_string(20000, salt=7503)]),
+            ("02-medium", [_paren_string(100000, salt=7504)]),
+            ("03-large", ["(" * 100000 + ")" * 100000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 스택에 인덱스를 둔다. -1 이 첫 경계다.
+fun longestValidParentheses(s: String): Int {
+    var best = 0
+    val stack = ArrayDeque<Int>()
+    stack.addLast(-1)
+    for (i in s.indices) {
+        if (s[i] == '(') { stack.addLast(i); Drill.push(i) }
+        else {
+            stack.removeLast()
+            Drill.pop(i)
+            if (stack.isEmpty()) stack.addLast(i)
+            else { val length = i - stack.last(); if (length > best) { best = length; Drill.write(0, best) } }
+        }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("no-sentinel", "MISSING_EDGE_CASE", "처음의 -1 경계가 없다. 문자열 시작에서 끝나는 구간을 못 잰다.", """
+fun longestValidParentheses(s: String): Int {
+    var best = 0
+    val stack = ArrayDeque<Int>()
+    for (i in s.indices) {
+        if (s[i] == '(') stack.addLast(i)
+        else {
+            if (stack.isEmpty()) continue
+            stack.removeLast()
+            if (stack.isNotEmpty()) best = maxOf(best, i - stack.last())
+        }
+    }
+    return best
+}
+"""),
+        ("counts-pairs--not-contiguous", "WRONG_ALGORITHM", "짝지어진 괄호의 수를 두 배 한다. 연속이 아니어도 센다.", """
+fun longestValidParentheses(s: String): Int {
+    var open = 0; var pairs = 0
+    for (c in s) if (c == '(') open += 1 else if (open > 0) { open -= 1; pairs += 1 }
+    return pairs * 2
+}
+"""),
+        ("resets-on-close-only", "WRONG_BRANCH", "짝이 맞을 때마다 2 를 더하고 어긋나면 0 으로 되돌린다 — 안긴 괄호를 못 센다.", """
+fun longestValidParentheses(s: String): Int {
+    var best = 0; var current = 0; var open = 0
+    for (c in s) {
+        if (c == '(') open += 1
+        else if (open > 0) { open -= 1; current += 2; best = maxOf(best, current) }
+        else { current = 0; open = 0 }
+    }
+    return best
+}
+"""),
+        ("all-substrings--quadratic", "PERFORMANCE", "시작점마다 균형을 세며 끝까지 간다. O(n²).", """
+fun longestValidParentheses(s: String): Int {
+    var best = 0
+    for (i in s.indices) {
+        var balance = 0
+        for (j in i until s.length) {
+            Drill.compare(i, j)
+            if (s[j] == '(') balance += 1 else balance -= 1
+            if (balance < 0) break
+            if (balance == 0) best = maxOf(best, j - i + 1)
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

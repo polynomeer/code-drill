@@ -1,0 +1,18 @@
+# longest-valid-parentheses 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - string
+  - stack
+  - dynamic-programming
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - bracket-balance
+  - histogram-rectangle
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "스택에 인덱스. 시작점마다 세면 O(n²)"

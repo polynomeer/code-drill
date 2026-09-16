@@ -1,0 +1,18 @@
+# median-two-sorted 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - binary-search
+  - divide-conquer
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - merge-sorted-arrays
+  - kth-in-sorted-matrix
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT
+  note: "짧은 배열에서 자르는 자리를 이분 탐색. 합쳐 정렬해도 답은 맞다"

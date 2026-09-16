@@ -1,0 +1,13 @@
+# count-vowels 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - string
+  - counting
+competencies:
+  - READING
+  - EDGE_CASES
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "글자마다 모음인지"

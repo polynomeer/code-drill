@@ -2330,3 +2330,307 @@ fun longestConsecutive(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 101. 둘째로 큰 값 (입문) ---------------------------------------------------------
+
+def _second_largest(nums):
+    distinct = sorted(set(nums))
+    return distinct[-2] if len(distinct) >= 2 else -1
+
+
+PROBLEMS.append(Problem(
+    id="second-largest",
+    title="둘째로 큰 값",
+    summary="""
+정수 배열 `nums` 에서 **서로 다른 값 중** 둘째로 큰 값을 반환한다. 서로 다른 값이 둘
+미만이면 `-1` 이다.
+
+예: `[3, 5, 5, 1]` → `3`. `[7, 7]` → `-1`.
+""",
+    notes="""
+가장 큰 값과 그 다음을 한 번 훑으며 들고 간다. 가장 큰 값과 **같은** 값은 둘째가 아니다 —
+그 한 줄이 이 문제의 전부다. 정렬하면 O(n log n) 이지만 틀리지는 않는다.
+""",
+    drill_doc="""
+Drill.visit(i, v)             // 원소를 봤다
+Drill.write(0, first)         // 지금까지의 최댓값
+Drill.write(1, second)        // 지금까지의 둘째
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="secondLargest", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_second_largest,
+    cases={
+        "sample": [("01", [[3, 5, 5, 1]]), ("02", [[7, 7]])],
+        "boundary": [
+            ("01-single", [[4]]),
+            ("02-two-distinct", [[1, 2]]),
+            # 최댓값이 여럿. 같은 값은 둘째가 아니다.
+            ("03-max-repeated", [[9, 9, 9, 2]]),
+            # 음수만. "둘째"의 초기값을 0 으로 두면 틀린다.
+            ("04-all-negative", [[-3, -1, -2]]),
+            # 둘째가 Int 의 끝.
+            ("05-extremes", [[-1000000000, 1000000000]]),
+            ("06-descending", [[5, 4, 3, 2, 1]]),
+            ("07-ascending", [[1, 2, 3, 4, 5]]),
+            # 최댓값이 맨 앞이고 나머지가 음수. 둘째의 초기값이 0 이면 아무것도 둘째가 못 된다.
+            ("08-max-first-then-negative", [[-1, -3, -2]]),
+        ],
+        "hidden": [
+            ("01-random", [randoms(100, -50, 50, salt=7101)]),
+            ("02-random-big", [randoms(200000, -1000000000, 1000000000, salt=7102)]),
+            ("03-mostly-same", [[5] * 50 + [4]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최댓값과 둘째를 한 번에 들고 간다.
+fun secondLargest(nums: IntArray): Int {
+    var first: Long = Long.MIN_VALUE
+    var second: Long = Long.MIN_VALUE
+    for ((i, v) in nums.withIndex()) {
+        Drill.visit(i, v)
+        if (v > first) { second = first; first = v.toLong(); Drill.write(0, v) }
+        else if (v < first && v > second) { second = v.toLong(); Drill.write(1, v) }
+    }
+    return if (second == Long.MIN_VALUE) -1 else second.toInt()
+}
+""",
+    mutants=[
+        ("counts-duplicate-max", "MISSING_EDGE_CASE", "최댓값과 같은 값을 둘째로 센다.", """
+fun secondLargest(nums: IntArray): Int {
+    var first = Long.MIN_VALUE; var second = Long.MIN_VALUE
+    for (v in nums) {
+        if (v > first) { second = first; first = v.toLong() }
+        else if (v > second) second = v.toLong()
+    }
+    return if (second == Long.MIN_VALUE) -1 else second.toInt()
+}
+"""),
+        ("zero-initial", "MISSING_EDGE_CASE", "둘째의 초기값을 0 으로 둔다. 최댓값이 맨 앞이고 나머지가 음수면 아무것도 둘째가 못 된다.", """
+fun secondLargest(nums: IntArray): Int {
+    var first = nums[0]; var second = 0
+    for (v in nums) {
+        if (v > first) { second = first; first = v }
+        else if (v < first && v > second) second = v
+    }
+    return if (second != first && nums.contains(second)) second else -1
+}
+"""),
+        ("sorted-second-index", "WRONG_ALGORITHM", "정렬해 끝에서 둘째를 답한다. 같은 값을 거르지 않는다.", """
+fun secondLargest(nums: IntArray): Int {
+    if (nums.size < 2) return -1
+    val sorted = nums.sorted()
+    return sorted[sorted.size - 2]
+}
+"""),
+    ],
+))
+
+
+# --- 102. 하나 더하기 (입문, 자리 올림) --------------------------------------------------
+
+def _plus_one(digits):
+    out = list(digits)
+    i = len(out) - 1
+    while i >= 0:
+        if out[i] < 9:
+            out[i] += 1
+            return out
+        out[i] = 0
+        i -= 1
+    return [1] + out
+
+
+PROBLEMS.append(Problem(
+    id="plus-one",
+    title="하나 더하기",
+    summary="""
+큰 정수의 십진 자릿수가 `digits` 에 앞자리부터 담겨 있다 (`[1, 2, 3]` 은 123). 이 수에
+`1` 을 더한 자릿수 배열을 반환한다. 앞에 0 이 붙지 않는다.
+
+예: `[1, 2, 9]` → `[1, 3, 0]`. `[9, 9]` → `[1, 0, 0]`.
+""",
+    notes="""
+정수로 바꾸면 자릿수가 많을 때 넘친다. 끝자리부터 보며 9 는 0 으로 바꾸고 올림을 넘기고,
+9 가 아닌 자리를 만나면 하나 더하고 끝낸다. 끝까지 올림이 남으면 앞에 1 을 붙인다.
+""",
+    drill_doc="""
+Drill.visit(i, d)             // 자리를 봤다
+Drill.write(i, v)             // 자리를 바꿨다
+""",
+    constraints="""
+- `1 <= digits.size <= 100_000`, 각 자리는 `0..9`, 첫 자리는 `0` 이 아니다 (수가 0 이면 `[0]`)
+""",
+    signature=dict(name="plusOne", parameters=[("digits", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_plus_one,
+    cases={
+        "sample": [("01", [[1, 2, 9]]), ("02", [[9, 9]])],
+        "boundary": [
+            ("01-zero", [[0]]),
+            ("02-nine", [[9]]),
+            ("03-no-carry", [[1, 2, 3]]),
+            # 가운데서 올림이 멈춘다.
+            ("04-carry-stops", [[1, 9, 9]]),
+            # 자릿수가 Long 을 넘는다. 정수로 바꾸면 넘친다.
+            ("05-too-long-for-long", [[9] * 25]),
+            ("06-long-no-carry", [[1] + [0] * 30]),
+        ],
+        "hidden": [
+            ("01-random", [[1] + randoms(60, 0, 9, salt=7201)]),
+            ("02-random-trailing-nines", [[1] + randoms(40, 0, 9, salt=7202) + [9] * 20]),
+            ("03-all-nines-big", [[9] * 100000]),
+        ],
+    },
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 끝자리부터 올림을 넘긴다.
+fun plusOne(digits: IntArray): IntArray {
+    val out = digits.copyOf()
+    for (i in out.indices.reversed()) {
+        Drill.visit(i, out[i])
+        if (out[i] < 9) { out[i] += 1; Drill.write(i, out[i]); return out }
+        out[i] = 0
+        Drill.write(i, 0)
+    }
+    val grown = IntArray(out.size + 1)
+    grown[0] = 1
+    return grown
+}
+""",
+    mutants=[
+        ("no-growth", "MISSING_EDGE_CASE", "전부 9 일 때 자릿수를 늘리지 않는다. 0 들만 남는다.", """
+fun plusOne(digits: IntArray): IntArray {
+    val out = digits.copyOf()
+    for (i in out.indices.reversed()) {
+        if (out[i] < 9) { out[i] += 1; return out }
+        out[i] = 0
+    }
+    return out
+}
+"""),
+        ("long-conversion--overflows", "MISSING_EDGE_CASE", "Long 으로 바꿔 더한다. 자릿수가 19 를 넘으면 넘친다.", """
+fun plusOne(digits: IntArray): IntArray {
+    var n = 0L
+    for (d in digits) n = n * 10 + d
+    n += 1
+    val s = n.toString()
+    return IntArray(s.length) { s[it] - '0' }
+}
+"""),
+        ("carries-without-stopping", "WRONG_BRANCH", "올림이 끝난 뒤에도 앞자리에 계속 1 을 더한다.", """
+fun plusOne(digits: IntArray): IntArray {
+    val out = digits.copyOf()
+    var carry = 1
+    for (i in out.indices.reversed()) {
+        out[i] += carry
+        if (out[i] == 10) out[i] = 0 else carry = 1
+    }
+    return if (out[0] == 0 && carry == 1 && digits.all { it == 9 }) intArrayOf(1) + out else out
+}
+"""),
+    ],
+))
+
+
+# --- 103. 누적 합 (입문) ------------------------------------------------------------
+
+def _running_sum(nums):
+    out = []
+    total = 0
+    for v in nums:
+        total += v
+        out.append(total)
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="running-sum",
+    title="누적 합",
+    summary="""
+정수 배열 `nums` 에 대해 `out[i] = nums[0] + ... + nums[i]` 인 배열을 반환한다.
+
+예: `[1, 2, 3, 4]` → `[1, 3, 6, 10]`.
+""",
+    notes="""
+앞의 누적 합에 지금 값을 더하면 된다 — `out[i] = out[i-1] + nums[i]`. 매번 처음부터 다시
+더하면 O(n²) 이고, 이 문제의 크기에서는 그것도 잡힌다.
+""",
+    drill_doc="""
+Drill.visit(i, v)             // 원소를 봤다
+Drill.write(i, total)         // 누적 합을 적었다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `-10^4 <= nums[i] <= 10^4` — 합은 `Int` 범위 안
+""",
+    signature=dict(name="runningSum", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_running_sum,
+    cases={
+        "sample": [("01", [[1, 2, 3, 4]]), ("02", [[3, -1, 4]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-negatives", [[-1, -2, -3]]),
+            ("03-zeros", [[0, 0, 0]]),
+            # 합이 0 을 지나 음수가 됐다 돌아온다.
+            ("04-crosses-zero", [[5, -10, 5, 5]]),
+        ],
+        "hidden": [
+            ("01-random", [randoms(100, -100, 100, salt=7301)]),
+            ("02-random-big-values", [randoms(500, -10000, 10000, salt=7302)]),
+        ],
+        "performance": [
+            ("01-small", [randoms(20000, -10000, 10000, salt=7303)]),
+            ("02-medium", [randoms(100000, -10000, 10000, salt=7304)]),
+            ("03-large", [randoms(200000, -10000, 10000, salt=7305)]),
+        ],
+    },
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/).
+fun runningSum(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    var total = 0
+    for ((i, v) in nums.withIndex()) {
+        Drill.visit(i, v)
+        total += v
+        out[i] = total
+        Drill.write(i, total)
+    }
+    return out
+}
+""",
+    mutants=[
+        ("skips-first", "OFF_BY_ONE", "1 번부터 시작해 첫 원소를 누적에 넣지 않는다.", """
+fun runningSum(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for (i in 1 until nums.size) out[i] = out[i - 1] + nums[i]
+    return out
+}
+"""),
+        ("resums--quadratic", "PERFORMANCE", "원소마다 처음부터 다시 더한다. O(n²).", """
+fun runningSum(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    for (i in nums.indices) {
+        var total = 0
+        for (j in 0..i) { Drill.visit(j, nums[j]); total += nums[j] }
+        out[i] = total
+    }
+    return out
+}
+"""),
+        ("prefix-excludes-self", "OFF_BY_ONE", "자기 앞까지의 합을 적는다. 한 칸 밀린다.", """
+fun runningSum(nums: IntArray): IntArray {
+    val out = IntArray(nums.size)
+    var total = 0
+    for (i in nums.indices) { out[i] = total; total += nums[i] }
+    return out
+}
+"""),
+    ],
+))

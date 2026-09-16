@@ -1273,3 +1273,151 @@ fun decodeWays(digits: String): Int {
 """),
     ],
 ))
+
+
+# --- 111. 정규식 맞추기 ('.' 과 '*') ----------------------------------------------------------
+
+def _regex_match(s, p):
+    m, n = len(s), len(p)
+    dp = [[False] * (n + 1) for _ in range(m + 1)]
+    dp[0][0] = True
+    for j in range(2, n + 1):
+        if p[j - 1] == "*":
+            dp[0][j] = dp[0][j - 2]
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if p[j - 1] == "*":
+                dp[i][j] = dp[i][j - 2] or ((p[j - 2] == "." or p[j - 2] == s[i - 1]) and dp[i - 1][j])
+            else:
+                dp[i][j] = (p[j - 1] == "." or p[j - 1] == s[i - 1]) and dp[i - 1][j - 1]
+    return 1 if dp[m][n] else 0
+
+
+PROBLEMS.append(Problem(
+    id="regex-match",
+    title="정규식 맞추기",
+    summary="""
+문자열 `s` 와 패턴 `p` 가 주어진다. `p` 는 소문자, `.` (아무 글자 하나), `*` (바로 앞
+원소의 0 번 이상 반복) 으로 되어 있다. 패턴이 `s` **전체**에 맞으면 `1`, 아니면 `0` 이다.
+
+예: `"aa"`, `"a*"` → `1`. `"ab"`, `".*"` → `1`. `"aab"`, `"c*a*b"` → `1`. `"aa"`, `"a"` → `0`.
+""",
+    notes="""
+`dp[i][j]` = `s` 의 앞 `i` 글자가 `p` 의 앞 `j` 글자에 맞는가. `p[j-1]` 이 `*` 면 두 갈래다:
+그 원소를 0 번 쓰거나 (`dp[i][j-2]`), 한 번 더 써서 `s[i-1]` 을 먹거나 (`dp[i-1][j]`, 앞
+원소가 `s[i-1]` 과 맞을 때). 빈 `s` 에 `a*b*` 가 맞는 것이 첫 행이고, 그것을 잊으면
+`x*` 로 시작하는 패턴이 전부 틀린다. 재귀로 하면 `a*a*a*…b` 에서 지수적이다.
+""",
+    drill_doc="""
+Drill.visit(i, j)             // dp 칸을 채웠다
+Drill.match(i, j)             // 맞았다
+""",
+    constraints="""
+- `0 <= s.length <= 1_000`, `0 <= p.length <= 1_000`
+- `*` 앞에는 항상 원소가 있다
+""",
+    signature=dict(name="regexMatch", parameters=[("s", "STRING"), ("p", "STRING")], returns="INT"),
+    groups=perf_groups(),
+    reference=_regex_match,
+    cases={
+        "sample": [("01", ["aa", "a*"]), ("02", ["aa", "a"])],
+        "boundary": [
+            ("01-both-empty", ["", ""]),
+            # 빈 s 에 x* 는 맞는다. 첫 행을 잊으면 틀린다.
+            ("02-empty-s-star", ["", "a*b*"]),
+            ("03-empty-p", ["a", ""]),
+            ("04-dot-star", ["ab", ".*"]),
+            ("05-star-zero-times", ["aab", "c*a*b"]),
+            # .* 가 앞을 먹고 나머지가 맞아야 한다.
+            ("06-dot-star-then-literal", ["abcd", ".*d"]),
+            ("07-dot-star-then-wrong", ["abcd", ".*e"]),
+            # 부분이 아니라 전체가 맞아야 한다.
+            ("08-prefix-only", ["abc", "ab"]),
+            ("09-star-must-match-same", ["aab", "a*b*"]),
+            ("10-mississippi", ["mississippi", "mis*is*p*."]),
+        ],
+        "hidden": [
+            ("01-mixed", ["mississippi", "mis*is*ip*."]),
+            ("02-many-stars", ["aaaaaaaab", "a*a*a*a*b"]),
+            ("03-dots", ["abcde", "a.c.e"]),
+            ("04-dots-wrong-length", ["abcde", "a.c."]),
+            ("05-long-literal", ["ab" * 200, "ab" * 200]),
+        ],
+        "performance": [
+            # 재귀는 a*a*…b 에서 지수적이다.
+            ("01-small", ["a" * 25, "a*" * 12 + "b"]),
+            ("02-medium", ["a" * 30, "a*" * 15 + "b"]),
+            ("03-large", ["a" * 1000, "a*" * 500 + "b"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). dp[i][j] = s 의 앞 i 글자가 p 의 앞 j 글자에 맞는가.
+fun regexMatch(s: String, p: String): Int {
+    val m = s.length; val n = p.length
+    val dp = Array(m + 1) { BooleanArray(n + 1) }
+    dp[0][0] = true
+    for (j in 2..n) if (p[j - 1] == '*') dp[0][j] = dp[0][j - 2]
+    for (i in 1..m) for (j in 1..n) {
+        dp[i][j] = if (p[j - 1] == '*') {
+            dp[i][j - 2] || ((p[j - 2] == '.' || p[j - 2] == s[i - 1]) && dp[i - 1][j])
+        } else {
+            (p[j - 1] == '.' || p[j - 1] == s[i - 1]) && dp[i - 1][j - 1]
+        }
+        if (dp[i][j]) Drill.visit(i, j)
+    }
+    if (dp[m][n]) Drill.match(m, n)
+    return if (dp[m][n]) 1 else 0
+}
+""",
+    mutants=[
+        ("no-empty-row", "MISSING_EDGE_CASE", "빈 s 에 a*b* 가 맞는 첫 행을 채우지 않는다.", """
+fun regexMatch(s: String, p: String): Int {
+    val m = s.length; val n = p.length
+    val dp = Array(m + 1) { BooleanArray(n + 1) }
+    dp[0][0] = true
+    for (i in 1..m) for (j in 1..n) {
+        dp[i][j] = if (p[j - 1] == '*') dp[i][j - 2] || ((p[j - 2] == '.' || p[j - 2] == s[i - 1]) && dp[i - 1][j])
+        else (p[j - 1] == '.' || p[j - 1] == s[i - 1]) && dp[i - 1][j - 1]
+    }
+    return if (dp[m][n]) 1 else 0
+}
+"""),
+        ("star-at-least-once", "WRONG_BRANCH", "* 를 1 번 이상으로 본다. 0 번 갈래가 없다.", """
+fun regexMatch(s: String, p: String): Int {
+    val m = s.length; val n = p.length
+    val dp = Array(m + 1) { BooleanArray(n + 1) }
+    dp[0][0] = true
+    for (i in 1..m) for (j in 1..n) {
+        dp[i][j] = if (p[j - 1] == '*') (p[j - 2] == '.' || p[j - 2] == s[i - 1]) && (dp[i - 1][j] || dp[i - 1][j - 2])
+        else (p[j - 1] == '.' || p[j - 1] == s[i - 1]) && dp[i - 1][j - 1]
+    }
+    return if (dp[m][n]) 1 else 0
+}
+"""),
+        ("prefix-match", "WRONG_ALGORITHM", "패턴이 앞부분에 맞으면 맞다고 본다. 전체여야 한다.", """
+fun regexMatch(s: String, p: String): Int {
+    val m = s.length; val n = p.length
+    val dp = Array(m + 1) { BooleanArray(n + 1) }
+    dp[0][0] = true
+    for (j in 2..n) if (p[j - 1] == '*') dp[0][j] = dp[0][j - 2]
+    for (i in 1..m) for (j in 1..n) {
+        dp[i][j] = if (p[j - 1] == '*') dp[i][j - 2] || ((p[j - 2] == '.' || p[j - 2] == s[i - 1]) && dp[i - 1][j])
+        else (p[j - 1] == '.' || p[j - 1] == s[i - 1]) && dp[i - 1][j - 1]
+    }
+    return if ((0..m).any { dp[it][n] }) 1 else 0
+}
+"""),
+        ("recursion-without-memo", "PERFORMANCE", "재귀로 두 갈래를 뻗는다. a*a*…b 에서 지수적이다.", """
+fun regexMatch(s: String, p: String): Int {
+    fun go(i: Int, j: Int): Boolean {
+        if (j == p.length) return i == s.length
+        Drill.visit(i, j)
+        val first = i < s.length && (p[j] == '.' || p[j] == s[i])
+        return if (j + 1 < p.length && p[j + 1] == '*') go(i, j + 2) || (first && go(i + 1, j))
+        else first && go(i + 1, j + 1)
+    }
+    return if (go(0, 0)) 1 else 0
+}
+"""),
+    ],
+))

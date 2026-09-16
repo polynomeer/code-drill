@@ -830,3 +830,146 @@ fun mergeSorted(sizes: IntArray, values: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 107. 두 정렬 배열의 중앙값 (분할 이분 탐색) ------------------------------------------------
+
+def _median_doubled(a, b):
+    merged = sorted(a + b)
+    n = len(merged)
+    if n % 2 == 1:
+        return 2 * merged[n // 2]
+    return merged[n // 2 - 1] + merged[n // 2]
+
+
+PROBLEMS.append(Problem(
+    id="median-two-sorted",
+    title="두 정렬 배열의 중앙값",
+    summary="""
+오름차순 정수 배열 `a`, `b` 가 주어진다 (합쳐서 원소가 하나 이상). 둘을 합친 전체의
+**중앙값의 두 배**를 반환한다 — 원소 수가 홀수면 가운데 값의 두 배, 짝수면 가운데 두 값의 합.
+
+예: `a = [1, 3]`, `b = [2]` → 중앙값 2, 답 `4`. `a = [1, 2]`, `b = [3, 4]` → 중앙값 2.5, 답 `5`.
+""",
+    notes="""
+합쳐 정렬하면 O((m+n) log) 이고 반쯤 합치면 O(m+n) 인데, 둘 다 맞는다 — 이 문제는 성능이
+아니라 **경계**의 문제다. 짧은 배열에서 자르는 자리를 이분 탐색하면 O(log min(m, n)) 이다:
+왼쪽 절반의 최댓값이 오른쪽 절반의 최솟값보다 크지 않은 자리를 찾는다. 한쪽이 비는 경우,
+짝수·홀수, 두 배열 중 하나가 통째로 왼쪽에 들어가는 경우가 갈림길이다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 자르는 자리를 견줬다
+Drill.pointer("cut", i)       // 짧은 배열의 자르는 자리
+""",
+    constraints="""
+- `0 <= a.size, b.size <= 100_000`, `a.size + b.size >= 1`
+- `-10^6 <= 값 <= 10^6`
+""",
+    signature=dict(name="medianDoubled", parameters=[("a", "INT_ARRAY"), ("b", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_median_doubled,
+    cases={
+        "sample": [("01", [[1, 3], [2]]), ("02", [[1, 2], [3, 4]])],
+        "boundary": [
+            ("01-one-empty", [[], [5]]),
+            ("02-other-empty", [[2, 4, 6], []]),
+            ("03-single-each", [[1], [2]]),
+            # 한 배열이 통째로 왼쪽에 들어간다.
+            ("04-disjoint", [[1, 2, 3], [10, 20, 30, 40]]),
+            ("05-disjoint-reversed", [[10, 20, 30, 40], [1, 2, 3]]),
+            # 같은 값이 양쪽에.
+            ("06-duplicates", [[1, 1, 1], [1, 1]]),
+            ("07-negatives", [[-5, -3], [-4, -2, -1]]),
+            ("08-interleaved-even", [[1, 3, 5, 7], [2, 4, 6, 8]]),
+        ],
+        "hidden": [
+            ("01-random", [sorted(randoms(30, -100, 100, salt=7401)), sorted(randoms(45, -100, 100, salt=7402))]),
+            ("02-random-uneven", [sorted(randoms(3, -100, 100, salt=7403)), sorted(randoms(400, -100, 100, salt=7404))]),
+            ("03-large", [sorted(randoms(100000, -1000000, 1000000, salt=7405)), sorted(randoms(99999, -1000000, 1000000, salt=7406))]),
+            ("04-all-same", [[7] * 100, [7] * 101]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 짧은 배열에서 자르는 자리를 이분 탐색한다.
+fun medianDoubled(a: IntArray, b: IntArray): Int {
+    val (x, y) = if (a.size <= b.size) a to b else b to a
+    val m = x.size; val n = y.size
+    var lo = 0; var hi = m
+    val half = (m + n + 1) / 2
+    while (lo <= hi) {
+        val i = (lo + hi) / 2
+        val j = half - i
+        Drill.pointer("cut", i)
+        val leftX = if (i == 0) Int.MIN_VALUE else x[i - 1]
+        val rightX = if (i == m) Int.MAX_VALUE else x[i]
+        val leftY = if (j == 0) Int.MIN_VALUE else y[j - 1]
+        val rightY = if (j == n) Int.MAX_VALUE else y[j]
+        Drill.compare(i, j)
+        if (leftX <= rightY && leftY <= rightX) {
+            val leftMax = maxOf(leftX, leftY)
+            if ((m + n) % 2 == 1) return 2 * leftMax
+            return leftMax + minOf(rightX, rightY)
+        } else if (leftX > rightY) hi = i - 1 else lo = i + 1
+    }
+    error("정렬된 입력이면 여기 오지 않는다")
+}
+""",
+    mutants=[
+        ("even-uses-left-max-twice", "WRONG_BRANCH", "짝수 개일 때 왼쪽 최댓값을 두 배 한다. 오른쪽 최솟값을 잊었다.", """
+fun medianDoubled(a: IntArray, b: IntArray): Int {
+    val (x, y) = if (a.size <= b.size) a to b else b to a
+    val m = x.size; val n = y.size
+    var lo = 0; var hi = m
+    val half = (m + n + 1) / 2
+    while (lo <= hi) {
+        val i = (lo + hi) / 2; val j = half - i
+        val leftX = if (i == 0) Int.MIN_VALUE else x[i - 1]; val rightX = if (i == m) Int.MAX_VALUE else x[i]
+        val leftY = if (j == 0) Int.MIN_VALUE else y[j - 1]; val rightY = if (j == n) Int.MAX_VALUE else y[j]
+        if (leftX <= rightY && leftY <= rightX) return 2 * maxOf(leftX, leftY)
+        else if (leftX > rightY) hi = i - 1 else lo = i + 1
+    }
+    error("")
+}
+"""),
+        ("no-swap--long-first", "MISSING_EDGE_CASE", "짧은 배열을 고르지 않는다. j 가 음수가 되어 범위 밖을 읽거나 틀린다.", """
+fun medianDoubled(a: IntArray, b: IntArray): Int {
+    val x = a; val y = b
+    val m = x.size; val n = y.size
+    var lo = 0; var hi = m
+    val half = (m + n + 1) / 2
+    while (lo <= hi) {
+        val i = (lo + hi) / 2; val j = half - i
+        val leftX = if (i == 0) Int.MIN_VALUE else x[i - 1]; val rightX = if (i == m) Int.MAX_VALUE else x[i]
+        val leftY = if (j <= 0) Int.MIN_VALUE else y[j - 1]; val rightY = if (j >= n) Int.MAX_VALUE else y[j]
+        if (leftX <= rightY && leftY <= rightX) {
+            val leftMax = maxOf(leftX, leftY)
+            if ((m + n) % 2 == 1) return 2 * leftMax
+            return leftMax + minOf(rightX, rightY)
+        } else if (leftX > rightY) hi = i - 1 else lo = i + 1
+    }
+    error("")
+}
+"""),
+        ("floor-half", "OFF_BY_ONE", "왼쪽 절반의 크기를 (m+n)/2 로 잡는다. 홀수 개일 때 가운데가 오른쪽으로 간다.", """
+fun medianDoubled(a: IntArray, b: IntArray): Int {
+    val (x, y) = if (a.size <= b.size) a to b else b to a
+    val m = x.size; val n = y.size
+    var lo = 0; var hi = m
+    val half = (m + n) / 2
+    while (lo <= hi) {
+        val i = (lo + hi) / 2; val j = half - i
+        if (j < 0) { hi = i - 1; continue }
+        if (j > n) { lo = i + 1; continue }
+        val leftX = if (i == 0) Int.MIN_VALUE else x[i - 1]; val rightX = if (i == m) Int.MAX_VALUE else x[i]
+        val leftY = if (j == 0) Int.MIN_VALUE else y[j - 1]; val rightY = if (j == n) Int.MAX_VALUE else y[j]
+        if (leftX <= rightY && leftY <= rightX) {
+            val leftMax = maxOf(leftX, leftY)
+            if ((m + n) % 2 == 1) return 2 * leftMax
+            return leftMax + minOf(rightX, rightY)
+        } else if (leftX > rightY) hi = i - 1 else lo = i + 1
+    }
+    error("")
+}
+"""),
+    ],
+))

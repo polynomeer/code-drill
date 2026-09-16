@@ -1,0 +1,15 @@
+# plus-one 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - array
+  - math
+  - simulation
+competencies:
+  - READING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "끝자리부터 올림. 정수로 바꾸면 넘친다"

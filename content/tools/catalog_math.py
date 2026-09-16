@@ -1041,3 +1041,99 @@ fun primeFactorSums(nums: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 106. 회문 수 (입문) ------------------------------------------------------------
+
+def _palindrome_number(n):
+    if n < 0:
+        return 0
+    s = str(n)
+    return 1 if s == s[::-1] else 0
+
+
+PROBLEMS.append(Problem(
+    id="palindrome-number",
+    title="회문 수",
+    summary="""
+정수 `n` 이 십진수로 앞뒤가 같으면 `1`, 아니면 `0` 을 반환한다. 음수는 회문이 아니다
+(`-121` 은 `121-` 이다).
+""",
+    notes="""
+문자열로 바꿔 뒤집어 견줘도 되고, 수로 뒤집어도 된다. 수로 뒤집으면 Int 를 넘을 수 있으니
+Long 으로 한다 — 다만 넘치는 수는 어차피 회문이 아니라 답은 우연히 맞는다. 끝이 0 인 수는 0
+자신 말고는 회문이 아니다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 두 자리를 견줬다
+""",
+    constraints="""
+- `-2^31 <= n <= 2^31 - 1`
+""",
+    signature=dict(name="isPalindromeNumber", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_palindrome_number,
+    cases={
+        "sample": [("01", [121]), ("02", [-121])],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-single-digit", [7]),
+            # 끝이 0. 뒤집으면 앞이 0 이라 회문이 아니다.
+            ("03-trailing-zero", [10]),
+            ("04-even-length", [1221]),
+            ("05-almost", [1231]),
+            # 뒤집으면 Int 를 넘는다.
+            ("06-reverse-overflows", [1999999999]),
+            ("07-max-int", [2147483647]),
+            ("08-min-int", [-2147483648]),
+        ],
+        "hidden": [
+            ("01-long-palindrome", [123454321]),
+            ("02-long-not", [123456789]),
+            ("03-negative-palindrome-shape", [-1]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 수를 뒤집어 견준다. Long 으로.
+fun isPalindromeNumber(n: Int): Int {
+    if (n < 0) return 0
+    var rest = n.toLong()
+    var reversed = 0L
+    var i = 0
+    while (rest > 0) {
+        reversed = reversed * 10 + rest % 10
+        rest /= 10
+        Drill.compare(i, 0)
+        i += 1
+    }
+    return if (reversed == n.toLong()) 1 else 0
+}
+""",
+    mutants=[
+        ("negative-by-digits", "MISSING_EDGE_CASE", "음수의 절댓값으로 본다. -121 이 회문이 된다.", """
+fun isPalindromeNumber(n: Int): Int {
+    val s = Math.abs(n.toLong()).toString()
+    return if (s == s.reversed()) 1 else 0
+}
+"""),
+        ("half-reverse--odd-wrong", "OFF_BY_ONE", "뒤 절반만 뒤집어 앞 절반과 견주되, 홀수 자리의 가운데를 떼지 않는다.", """
+fun isPalindromeNumber(n: Int): Int {
+    if (n < 0) return 0
+    if (n % 10 == 0 && n != 0) return 0
+    var rest = n; var reversed = 0
+    while (rest > reversed) { reversed = reversed * 10 + rest % 10; rest /= 10 }
+    return if (rest == reversed) 1 else 0
+}
+"""),
+        ("compares-half--odd-off", "OFF_BY_ONE", "앞 절반과 뒤 절반을 견주되 가운데 자리를 뒤 절반에 넣는다. 홀수 자리에서 틀린다.", """
+fun isPalindromeNumber(n: Int): Int {
+    if (n < 0) return 0
+    val s = n.toString()
+    val half = s.length / 2
+    val front = s.substring(0, half)
+    val back = s.substring(half).reversed()
+    return if (front == back) 1 else 0
+}
+"""),
+    ],
+))

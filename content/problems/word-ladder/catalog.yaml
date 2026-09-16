@@ -1,0 +1,19 @@
+# word-ladder 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - bfs
+  - string
+  - hash-map
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+  - EDGE_CASES
+prerequisites:
+  - shortest-hops
+  - rotting-oranges
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "단어마다 자리 × 26. 모든 쌍을 견주면 O(n²·L)"

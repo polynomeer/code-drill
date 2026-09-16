@@ -1,0 +1,13 @@
+# power-of-two 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - bit-manipulation
+  - math
+competencies:
+  - MODELING
+  - EDGE_CASES
+prerequisites: []
+complexity:
+  time: CONSTANT
+  space: CONSTANT
+  note: "n & (n-1) 이 0 인가. 0 과 음수를 따로 막는다"
