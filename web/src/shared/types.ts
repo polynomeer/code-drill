@@ -827,3 +827,11 @@ export interface ProjectSubmission {
   completedAt: string | null
   files: Record<string, string> | null
 }
+
+/** 프로젝트형 초안 — 파일 여럿 (§8.1). 버전은 CAS 의 것이다. */
+export interface ProjectDraft {
+  projectId: string
+  files: Record<string, string>
+  version: number
+  updatedAt: string
+}

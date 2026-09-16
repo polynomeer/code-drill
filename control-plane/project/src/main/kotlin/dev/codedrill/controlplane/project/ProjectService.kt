@@ -170,6 +170,43 @@ class ProjectService(
         return SubmitOutcome.Accepted(submission)
     }
 
+    // --- 초안 (§8.1) ---
+
+    sealed interface DraftOutcome {
+        data class Saved(val version: Long) : DraftOutcome
+        data class Conflict(val current: ProjectDraft) : DraftOutcome
+        data class Invalid(val reason: String) : DraftOutcome
+    }
+
+    fun draft(userId: String, projectId: String): ProjectDraft? = repository.findDraft(userId, projectId)
+
+    /**
+     * 초안 저장 (CAS). [expectedVersion] 이 null 이면 "아직 초안이 없다"는 주장이고, 그 주장이
+     * 틀렸으면 새로 만들지 않고 충돌로 알린다 — Workspace 의 초안과 같은 규칙이다.
+     *
+     * 파일은 제출과 같은 검사를 지난다. 제출할 수 없는 것을 초안으로 받아 두면 제출하는
+     * 순간에야 거절되고, 그때는 이미 시간을 쓴 뒤다.
+     */
+    @Transactional
+    fun saveDraft(userId: String, projectId: String, files: Map<String, String>, expectedVersion: Long?): DraftOutcome {
+        if (load(projectId) == null) return DraftOutcome.Invalid("없는 프로젝트다")
+        val clean = try {
+            Workspaces.validate(files)
+        } catch (e: IllegalArgumentException) {
+            return DraftOutcome.Invalid(e.message ?: "파일이 올바르지 않다")
+        }
+        if (expectedVersion == null) {
+            if (repository.insertDraft(userId, projectId, clean) > 0) return DraftOutcome.Saved(1)
+        } else if (repository.compareAndSetDraft(userId, projectId, clean, expectedVersion) > 0) {
+            return DraftOutcome.Saved(expectedVersion + 1)
+        }
+        // 충돌 응답에는 현재 서버 상태를 함께 싣는다. 무엇과 충돌했는지 그 자리에서 보여야 고를 수 있다.
+        val current = repository.findDraft(userId, projectId) ?: error("충돌인데 현재 초안을 찾지 못했다")
+        return DraftOutcome.Conflict(current)
+    }
+
+    fun discardDraft(userId: String, projectId: String) = repository.deleteDraft(userId, projectId)
+
     fun find(id: UUID): ProjectSubmission? = repository.findById(id)
 
     fun files(id: UUID): Map<String, String> = repository.files(id)

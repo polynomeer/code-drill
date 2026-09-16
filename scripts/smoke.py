@@ -1488,6 +1488,27 @@ def main() -> int:
         each = await_project(request("POST", f"/projects/{summary['id']}/submissions", {"files": each_ref}, {"Idempotency-Key": f"p-{summary['id']}-{uuid.uuid4()}"})["id"])
         results.append(check(f"{summary['id']} 의 참조는 ACCEPTED", (each["verdict"], each["hiddenPassed"] == each["hiddenTotal"], each["hiddenTotal"] > 0), ("ACCEPTED", True, True)))
 
+    # 프로젝트 초안 (§8.1) — 파일 여럿의 CAS. 알고리즘 초안과 같은 규칙이다.
+    status, _ = raw_request("GET", "/projects/inventory-ledger/draft")
+    results.append(check("초안이 없으면 204", status, 204))
+    status, _ = raw_request("PUT", "/projects/inventory-ledger/draft", {"files": {"../x.py": ""}, "version": None})
+    results.append(check("밖을 가리키는 초안은 거절", status, 400))
+    draft_files = {**starter, "ledger/inventory.py": "# 작업 중\n"}
+    status, saved = raw_request("PUT", "/projects/inventory-ledger/draft", {"files": draft_files, "version": None})
+    results.append(check("첫 초안 저장", (status, saved["version"]), (200, 1)))
+    status, again = raw_request("PUT", "/projects/inventory-ledger/draft", {"files": draft_files, "version": None})
+    results.append(check("  '초안이 없다'는 주장이 틀리면 충돌", (status, again["current"]["version"]), (409, 1)))
+    status, saved = raw_request("PUT", "/projects/inventory-ledger/draft", {"files": {**draft_files, "notes.md": "x"}, "version": 1})
+    results.append(check("  본 버전이면 덮어쓴다", (status, saved["version"]), (200, 2)))
+    status, stale = raw_request("PUT", "/projects/inventory-ledger/draft", {"files": draft_files, "version": 1})
+    results.append(check("  낡은 버전은 충돌이고 현재 초안이 함께 온다", (status, stale["current"]["version"], "notes.md" in stale["current"]["files"]), (409, 2, True)))
+    status, mine = raw_request("GET", "/projects/inventory-ledger/draft")
+    results.append(check("  초안 조회", (status, mine["version"], mine["files"]["ledger/inventory.py"]), (200, 2, "# 작업 중\n")))
+    status, _ = raw_request("GET", "/projects/inventory-ledger/draft", None, honest.headers)
+    results.append(check("  남의 초안은 없다", status, 204))
+    status, _ = raw_request("DELETE", "/projects/inventory-ledger/draft")
+    results.append(check("  초안 버리기", (status, raw_request("GET", "/projects/inventory-ledger/draft")[0]), (204, 204)))
+
     history = request("GET", "/projects/submissions?projectId=inventory-ledger")
     results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))
     # 필터 없이도. `? IS NULL` 하나만 있는 자리에 Postgres 가 타입을 못 정해 500 이 났었다.

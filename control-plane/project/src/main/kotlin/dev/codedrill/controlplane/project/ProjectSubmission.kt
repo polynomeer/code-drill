@@ -75,3 +75,15 @@ data class ProjectSubmissionResponse(
         )
     }
 }
+
+/**
+ * 작업 중인 초안 (§8.1). [version] 은 저장할 때마다 1 씩 오르고, 클라이언트가 마지막으로
+ * 본 버전일 때만 덮어쓴다 — 두 탭에서 같은 프로젝트를 열어 둔 사용자가 파일을 잃지 않게.
+ */
+data class ProjectDraft(
+    val userId: String,
+    val projectId: String,
+    val files: Map<String, String>,
+    val version: Long,
+    val updatedAt: Instant,
+)

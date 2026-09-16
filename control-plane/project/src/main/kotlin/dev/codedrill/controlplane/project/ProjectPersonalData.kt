@@ -10,12 +10,14 @@ import org.springframework.stereotype.Component
 @Component
 class ProjectPersonalData(private val repository: ProjectRepository, private val workspaces: WorkspaceStore) {
 
-    fun export(userId: String): Map<String, Any> = mapOf("submissions" to repository.export(userId))
+    fun export(userId: String): Map<String, Any> =
+        mapOf("submissions" to repository.export(userId), "drafts" to repository.exportDrafts(userId))
 
     fun erase(userId: String): Map<String, Int> {
         var stored = 0
         for (id in repository.submissionIds(userId)) runCatching { workspaces.delete(id) }.onSuccess { stored += 1 }
         val files = repository.eraseContent(userId)
-        return mapOf("files" to files, "storedWorkspaces" to stored)
+        val drafts = repository.eraseDrafts(userId)
+        return mapOf("files" to files, "storedWorkspaces" to stored, "drafts" to drafts)
     }
 }

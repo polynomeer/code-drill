@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react'
 import { EDITOR_LANGUAGE, LANGUAGE_LABEL } from '../../shared/types'
 import type { SubmissionLanguage } from '../../shared/types'
 import type { SaveState } from './useAutoSave'
+import type { DraftSyncState } from './useDraftSync'
 
 /**
  * 코칭 Workspace (디자인 설계서 §2.1).
@@ -58,7 +59,7 @@ export function Workspace({
           </button>
         </div>
       </div>
-      <SaveIndicator state={saveState} onResolve={onResolveConflict} />
+      <SaveIndicator state={saveState} onResolve={(current, version) => onResolveConflict(current?.code ?? null, version)} />
       <div className="editor">
         <Suspense fallback={<p className="muted editor-loading">에디터를 불러오는 중…</p>}>
           <MonacoWorkspace
@@ -78,12 +79,13 @@ export function Workspace({
  * 충돌은 배너로 남긴다. 토스트처럼 사라지면 사용자가 선택하기 전에 놓친다 —
  * 그 순간 잃는 것이 작성 중이던 코드다.
  */
-function SaveIndicator({
+export function SaveIndicator<C extends { version: number }>({
   state,
   onResolve,
 }: {
-  state: SaveState
-  onResolve: (code: string | null, version: number) => void
+  state: DraftSyncState<C>
+  /** 서버 것을 가져오면 [current] 가 오고, 내 것을 유지하면 null 이 온다. */
+  onResolve: (current: C | null, version: number) => void
 }) {
   if (state.status === 'conflict') {
     return (
@@ -93,7 +95,7 @@ function SaveIndicator({
           <span className="muted"> (서버 버전 {state.current.version})</span>
         </p>
         <div className="conflict-actions">
-          <button onClick={() => onResolve(state.current.code, state.current.version)}>
+          <button onClick={() => onResolve(state.current, state.current.version)}>
             서버 것 가져오기
           </button>
           <button className="primary" onClick={() => onResolve(null, state.current.version)}>

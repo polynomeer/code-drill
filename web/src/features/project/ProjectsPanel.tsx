@@ -1,13 +1,18 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import {
+  discardProjectDraft,
   getProject,
+  getProjectDraft,
   getProjectSubmission,
   listProjectSubmissions,
   listProjects,
+  saveProjectDraft,
   submitProject,
 } from '../../api/client'
 import { DIFFICULTY_LABEL, VERDICT_LABEL } from '../../shared/types'
-import type { ProjectSubmission, ProjectSummary, ProjectView } from '../../shared/types'
+import type { ProjectDraft, ProjectSubmission, ProjectSummary, ProjectView } from '../../shared/types'
+import { SaveIndicator } from '../workspace/Workspace'
+import { useDraftSync } from '../workspace/useDraftSync'
 
 const MonacoWorkspace = lazy(() => import('../workspace/MonacoWorkspace'))
 
@@ -23,6 +28,10 @@ const EDITOR_LANGUAGE: Record<string, string> = { PYTHON: 'python', KOTLIN: 'kot
  *
  * 파일 트리는 편집기의 탭이다. 파일을 더하고 지울 수 있되 `tests/` 아래의 것은 채점 때
  * 숨은 스위트로 덮인다고 문제 본문이 말한다.
+ *
+ * 파일들은 초안으로 자동 저장된다 (§8.1) — 알고리즘 문제의 소스와 같은 규칙, 같은 뼈대
+ * ([useDraftSync]). 다시 열면 시작 저장소가 아니라 초안이 열리고, "시작 저장소로 되돌리기"가
+ * 초안을 버린다.
  */
 export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
@@ -34,7 +43,18 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
   const [history, setHistory] = useState<ProjectSubmission[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fromDraft, setFromDraft] = useState(false)
+  const [touched, setTouched] = useState(false)
   const poll = useRef<number | null>(null)
+
+  // 초안 자동 저장. 손대기 전에는 보내지 않는다 — 시작 저장소를 초안으로 적어 두면 아무것도 안 한 사람에게 초안이 생긴다.
+  const draftSync = useDraftSync<Record<string, string>, ProjectDraft>({
+    key: open?.id ?? null,
+    value: files,
+    enabled: open !== null && touched,
+    load: () => (open ? getProjectDraft(open.id) : Promise.resolve(null)),
+    save: (next, version) => saveProjectDraft(open!.id, next, version),
+  })
 
   const refresh = useCallback(() => {
     listProjects()
@@ -47,12 +67,15 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
   const show = useCallback((id: string) => {
     setError(null)
     setPending(null)
-    getProject(id)
-      .then((view) => {
+    setTouched(false)
+    // 초안이 있으면 그것을, 없으면 시작 저장소를 연다. 초안을 못 읽어도 시작 저장소는 열린다.
+    Promise.all([getProject(id), getProjectDraft(id).catch(() => null)])
+      .then(([view, draft]) => {
         setOpen(view)
-        setFiles(view.files)
+        setFiles(draft?.files ?? view.files)
+        setFromDraft(draft !== null)
         // 고칠 파일이 먼저 열려야 한다. 패키지 선언과 테스트는 대개 그 파일이 아니다.
-        const paths = Object.keys(view.files).sort()
+        const paths = Object.keys(draft?.files ?? view.files).sort()
         setCurrent(paths.find((path) => !path.startsWith('tests/') && !path.endsWith('__init__.py')) ?? paths[0] ?? null)
       })
       .catch((e: Error) => setError(e.message))
@@ -100,13 +123,28 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
     setFiles({ ...files, [path]: '' })
     setCurrent(path)
     setNewPath('')
+    setTouched(true)
   }
 
   const removeFile = (path: string) => {
     const next = { ...files }
     delete next[path]
     setFiles(next)
+    setTouched(true)
     if (current === path) setCurrent(Object.keys(next)[0] ?? null)
+  }
+
+  const startOver = async () => {
+    if (!open) return
+    try {
+      await discardProjectDraft(open.id)
+    } catch {
+      // 초안을 못 버려도 화면은 시작 저장소로 간다. 다음 저장이 충돌로 알려 줄 것이다.
+    }
+    setFiles(open.files)
+    setFromDraft(false)
+    setTouched(false)
+    draftSync.reset()
   }
 
   return (
@@ -124,6 +162,14 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
             {open.limits.testSeconds}초 · {open.limits.memoryMb}MB · 파일 {Object.keys(files).length}/{open.limits.maxFiles}
           </p>
           <pre className="statement-body project-statement">{open.statement}</pre>
+          {fromDraft && (
+            <p className="muted small">
+              저장해 둔 초안을 열었습니다.{' '}
+              <button type="button" className="linklike" onClick={() => void startOver()}>
+                시작 저장소로 되돌리기
+              </button>
+            </p>
+          )}
 
           <div className="project-files" role="tablist">
             {Object.keys(files).sort().map((path) => (
@@ -153,6 +199,18 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
               </button>
             </span>
           </div>
+          <SaveIndicator
+            state={draftSync.state}
+            onResolve={(server, version) => {
+              if (server) {
+                // 서버 것 가져오기: 편집기를 서버 초안으로 맞추고 저장은 하지 않는다.
+                setFiles(server.files)
+                draftSync.resolveConflict(version)
+              } else {
+                draftSync.resolveConflict(version, files)
+              }
+            }}
+          />
           <div className="editor project-editor">
             {current !== null && (
               <Suspense fallback={<p className="muted editor-loading">에디터를 불러오는 중…</p>}>
@@ -160,7 +218,10 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
                   key={current}
                   source={files[current] ?? ''}
                   language={EDITOR_LANGUAGE[open.language] ?? 'plaintext'}
-                  onChange={(next) => setFiles((prev) => ({ ...prev, [current]: next }))}
+                  onChange={(next) => {
+                    setTouched(true)
+                    setFiles((prev) => ({ ...prev, [current]: next }))
+                  }}
                 />
               </Suspense>
             )}

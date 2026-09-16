@@ -111,6 +111,44 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, executionId, id,
     ) == 1
 
+    // --- 초안 (§8.1) ---
+
+    fun findDraft(userId: String, projectId: String): ProjectDraft? = jdbc.query(
+        "SELECT * FROM project_draft WHERE user_id = ? AND project_id = ?",
+        { rs, _ ->
+            ProjectDraft(
+                userId = rs.getString("user_id"),
+                projectId = rs.getString("project_id"),
+                files = json.readValue<Map<String, String>>(rs.getString("files")),
+                version = rs.getLong("version"),
+                updatedAt = rs.getTimestamp("updated_at").toInstant(),
+            )
+        },
+        userId, projectId,
+    ).firstOrNull()
+
+    /** 첫 저장. 이미 있으면 0 을 돌려주고, 호출부는 CAS 경로로 넘어간다. */
+    fun insertDraft(userId: String, projectId: String, files: Map<String, String>): Int = jdbc.update(
+        """
+        INSERT INTO project_draft (user_id, project_id, files, version)
+        VALUES (?, ?, ?::jsonb, 1)
+        ON CONFLICT (user_id, project_id) DO NOTHING
+        """.trimIndent(),
+        userId, projectId, json.writeValueAsString(files),
+    )
+
+    /** 기대 버전일 때만 덮어쓴다. 0 이면 그 사이에 다른 곳에서 저장된 것이다. */
+    fun compareAndSetDraft(userId: String, projectId: String, files: Map<String, String>, expectedVersion: Long): Int = jdbc.update(
+        """
+        UPDATE project_draft SET files = ?::jsonb, version = version + 1, updated_at = now()
+         WHERE user_id = ? AND project_id = ? AND version = ?
+        """.trimIndent(),
+        json.writeValueAsString(files), userId, projectId, expectedVersion,
+    )
+
+    fun deleteDraft(userId: String, projectId: String): Int =
+        jdbc.update("DELETE FROM project_draft WHERE user_id = ? AND project_id = ?", userId, projectId)
+
     // --- 개인 데이터 (§11.3) ---
 
     fun export(userId: String): List<Map<String, Any?>> {
@@ -123,6 +161,21 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         )
         return rows.map { row -> row + ("files" to files(row["id"] as UUID)) }
     }
+
+    fun exportDrafts(userId: String): List<Map<String, Any?>> = jdbc.query(
+        "SELECT project_id, files, version, updated_at FROM project_draft WHERE user_id = ? ORDER BY updated_at",
+        { rs, _ ->
+            mapOf(
+                "projectId" to rs.getString("project_id"),
+                "files" to json.readValue<Map<String, String>>(rs.getString("files")),
+                "version" to rs.getLong("version"),
+                "updatedAt" to rs.getTimestamp("updated_at").toInstant(),
+            )
+        },
+        userId,
+    )
+
+    fun eraseDrafts(userId: String): Int = jdbc.update("DELETE FROM project_draft WHERE user_id = ?", userId)
 
     fun submissionIds(userId: String): List<String> =
         jdbc.queryForList("SELECT id FROM project_submission WHERE user_id = ?", String::class.java, userId)

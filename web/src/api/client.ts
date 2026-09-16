@@ -40,6 +40,7 @@ import type {
   TransferTask,
   Trial,
   TrialCaseInput,
+  ProjectDraft,
   ProjectSubmission,
   ProjectSummary,
   ProjectView,
@@ -751,4 +752,32 @@ export async function getProjectSubmission(id: string): Promise<ProjectSubmissio
 
 export async function listProjectSubmissions(projectId: string): Promise<ProjectSubmission[]> {
   return json<ProjectSubmission[]>(await authed(`/projects/submissions?projectId=${encodeURIComponent(projectId)}`))
+}
+
+export async function getProjectDraft(projectId: string): Promise<ProjectDraft | null> {
+  const response = await authed(`/projects/${projectId}/draft`)
+  if (response.status === 204) return null
+  return json<ProjectDraft>(response)
+}
+
+/** 409 는 오류가 아니라 결과의 한 종류다 — 서버의 현재 초안이 함께 온다 (saveDraft 와 같다). */
+export async function saveProjectDraft(
+  projectId: string,
+  files: Record<string, string>,
+  version: number | null,
+): Promise<{ saved: true; version: number } | { saved: false; current: ProjectDraft }> {
+  const response = await authed(`/projects/${projectId}/draft`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files, version }),
+  })
+  if (response.status === 409) {
+    return { saved: false, current: ((await response.json()) as { current: ProjectDraft }).current }
+  }
+  const body = await json<{ version: number }>(response)
+  return { saved: true, version: body.version }
+}
+
+export async function discardProjectDraft(projectId: string): Promise<void> {
+  await authed(`/projects/${projectId}/draft`, { method: 'DELETE' })
 }
