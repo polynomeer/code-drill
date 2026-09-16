@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - hash-map
+  - queue
+summary: 용량과 만료 시간이 있는 LRU 캐시를 주입된 시계로 결정적으로 시험하며 구현한다. 첫 Kotlin 프로젝트.
+competencies:
+  - SPECIFICATION

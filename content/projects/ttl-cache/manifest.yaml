@@ -1,0 +1,12 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다). 첫 Kotlin 프로젝트.
+id: ttl-cache
+version: 1
+title: 만료가 있는 LRU 캐시
+language: KOTLIN
+statement: statement.md
+
+# Kotlin 은 컴파일이 한 번에 몇 초다. 빌드 한도를 넉넉히 둔다.
+limits:
+  buildSeconds: 120
+  testSeconds: 120
+  memoryMb: 256
