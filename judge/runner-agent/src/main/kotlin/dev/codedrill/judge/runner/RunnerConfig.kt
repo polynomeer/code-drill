@@ -13,6 +13,9 @@ import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
 import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
+import dev.codedrill.judge.runner.execution.project.ProjectAdapter
+import dev.codedrill.judge.runner.execution.project.ProjectEngine
+import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
 import dev.codedrill.judge.runner.execution.sandbox.SandboxSelector
 import dev.codedrill.platform.observability.Metrics
 import dev.codedrill.platform.storage.BlobStore
@@ -151,6 +154,29 @@ class RunnerConfig {
     /** 반례 아레나 (§8.3). 같은 엔진, 같은 축소기. */
     @Bean
     fun arenaRunner(engine: ExecutionEngine) = ArenaRunner(engine)
+
+    /**
+     * 두 번째 판정기 (feature-roadmap 11단계). 격리는 같은 샌드박스, 봉투와 규칙은 따로.
+     *
+     * 언어는 Python 하나로 시작한다 — 표준 라이브러리의 unittest 가 곧 테스트 기반이라
+     * 이미지에 더 넣을 것이 없다.
+     */
+    @Bean
+    fun projectEngine(selector: SandboxSelector, registry: MeterRegistry, properties: SandboxProperties, store: BlobStore) =
+        ProjectEngine(
+            adapters = listOf<ProjectAdapter>(PythonProjectAdapter()).associateBy { it.language },
+            sandboxes = selector::forLanguage,
+            store = store,
+            workRoot = workRoot(properties),
+            onPhase = { phase, language, outcome, nanos ->
+                Timer.builder(if (phase == "build") Metrics.COMPILE else Metrics.EXECUTE)
+                    .tag(Metrics.Tag.LANGUAGE, language.name)
+                    .tag(if (phase == "build") Metrics.Tag.OUTCOME else Metrics.Tag.MODE, if (phase == "build") outcome else "PROJECT")
+                    .publishPercentileHistogram()
+                    .register(registry)
+                    .record(nanos, TimeUnit.NANOSECONDS)
+            },
+        )
 }
 
 @ConfigurationProperties(prefix = "codedrill.sandbox")

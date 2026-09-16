@@ -9,10 +9,10 @@ package dev.codedrill.judge.protocol
  */
 data class ExecutionResult(
     val schemaVersion: String = SCHEMA_VERSION,
-    val executionId: String,
-    val submissionId: String,
-    val attempt: Int,
-    val fencingToken: FencingToken,
+    override val executionId: String,
+    override val submissionId: String,
+    override val attempt: Int,
+    override val fencingToken: FencingToken,
     /**
      * 무엇을 채점했는지. 집계는 이 버전의 그룹 정책으로 해야 한다.
      *
@@ -24,14 +24,28 @@ data class ExecutionResult(
     val terminalVerdict: Verdict?,
     val compileLog: String?,
     val cases: List<TestCaseResult>,
-    val resultDigest: String,
+    override val resultDigest: String,
     val mode: ExecutionMode = ExecutionMode.JUDGE,
     /** TRACE 모드에서만 채워진다. 트레이스 실패가 판정을 흔들면 안 된다 (§12.2). */
     val trace: TraceCapture? = null,
-) {
+) : LeasedResult {
     companion object {
         const val SCHEMA_VERSION = "1.0"
     }
+}
+
+/**
+ * 임대가 받아들일지 판단하는 데 필요한 것 (§4.3).
+ *
+ * 결과 봉투가 둘이다 — [ExecutionResult] 와 [ProjectResult]. 임대는 어느 쪽이든 같은 네
+ * 값으로 판단하므로, 봉투가 아니라 이 넷을 받는다.
+ */
+interface LeasedResult {
+    val executionId: String
+    val submissionId: String
+    val attempt: Int
+    val fencingToken: FencingToken
+    val resultDigest: String
 }
 
 /** 케이스 하나의 판정과 측정치. */

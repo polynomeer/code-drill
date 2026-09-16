@@ -1,8 +1,11 @@
 package dev.codedrill.judge.orchestrator.messaging
 
 import dev.codedrill.judge.orchestrator.JudgeCoordinator
+import dev.codedrill.judge.orchestrator.ProjectCoordinator
 import dev.codedrill.judge.protocol.ExecutionHeartbeat
 import dev.codedrill.judge.protocol.ExecutionResult
+import dev.codedrill.judge.protocol.ProjectQueued
+import dev.codedrill.judge.protocol.ProjectResult
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.platform.messaging.JudgeQueues
 import org.slf4j.LoggerFactory
@@ -21,7 +24,7 @@ import org.springframework.stereotype.Component
  * 무한히 돌며 뒤의 멀쩡한 작업을 전부 막는다 — 실제로 그렇게 채점이 섰다.
  */
 @Component
-class JudgeListeners(private val coordinator: JudgeCoordinator) {
+class JudgeListeners(private val coordinator: JudgeCoordinator, private val projects: ProjectCoordinator) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -35,8 +38,20 @@ class JudgeListeners(private val coordinator: JudgeCoordinator) {
         coordinator.onExecutionResult(result, correlationId = result.executionId)
     }
 
+    /** 심장 박동은 두 판정기가 같은 큐로 보낸다. 임대 표가 하나이기 때문이다. */
     @RabbitListener(queues = [JudgeQueues.HEARTBEATS])
     fun onHeartbeat(heartbeat: ExecutionHeartbeat) = coordinator.onHeartbeat(heartbeat)
+
+    // 프로젝트형 (11단계). 큐는 따로, 임대는 같이.
+    @RabbitListener(queues = [JudgeQueues.PROJECT_SUBMISSIONS])
+    fun onProjectSubmission(message: ProjectQueued) = unlessMalformed(message.submissionId) {
+        projects.onProjectQueued(message)
+    }
+
+    @RabbitListener(queues = [JudgeQueues.PROJECT_RESULTS])
+    fun onProjectResult(result: ProjectResult) = unlessMalformed(result.submissionId) {
+        projects.onProjectResult(result, correlationId = result.executionId)
+    }
 
     /**
      * 메시지가 잘못된 것이면 다시 넣지 않는다.

@@ -14,6 +14,7 @@ import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.JudgeCompleted
 import dev.codedrill.judge.protocol.JudgeProgressed
 import dev.codedrill.judge.protocol.JudgeStatus
+import dev.codedrill.judge.protocol.ProjectQueued
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.judge.orchestrator.trace.TraceProcessor
 import dev.codedrill.judge.protocol.TraceReady
@@ -48,6 +49,12 @@ class JudgeCoordinator(
      * 사용자에게도 경보에도 드러나게 한다 (§4.4).
      */
     private val maxAttempts: Int = 3,
+    /**
+     * 두 번째 판정기 (11단계). 임대 표는 하나라 만료 회수도 여기서 한 번에 훑고, 원 요청이
+     * 프로젝트형이면 저쪽에 넘긴다. null 이면 프로젝트형 임대는 회수하지 않고 포기한다 —
+     * 프로젝트 판정기가 없는 조립(테스트)에서만 그렇다.
+     */
+    private val projects: ProjectCoordinator? = null,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -132,7 +139,7 @@ class JudgeCoordinator(
         metrics.acceptance(acceptance)
 
         when (acceptance) {
-            is Acceptance.Accepted -> complete(result, correlationId, acceptance.origin)
+            is Acceptance.Accepted -> complete(result, correlationId, acceptance.origin as? SubmissionQueued)
 
             // 임대 기록이 없어도 결과는 넘긴다. 버리면 그 제출은 결과가 멀쩡히 도착했는데도
             // 영영 끝나지 않는다. 임대가 Redis 에 있으므로 이제 재시작만으로는 생기지 않는다 —
@@ -228,32 +235,50 @@ class JudgeCoordinator(
                     .addKeyValue(CorrelationIds.SUBMISSION_ID, submissionId)
                     .addKeyValue(CorrelationIds.ATTEMPT, expired.attempt)
                     .log("재시도 한계를 넘었다. SYSTEM_ERROR 로 끝낸다")
-                gateway.publishCompleted(
-                    JudgeCompleted(
-                        submissionId = submissionId,
-                        executionId = expired.executionId,
-                        correlationId = expired.origin.correlationId,
-                        verdict = Verdict.SYSTEM_ERROR,
-                        score = 0,
-                        compileLog = null,
-                        groups = emptyList(),
-                    ),
-                )
+                systemError(expired)
                 continue
             }
 
             // 다른 인스턴스가 먼저 다시 걸었으면 물러난다. 같은 제출을 두 번 걸지 않는다.
             val lease = registry.reclaim(expired, executionId = UUID.randomUUID().toString()) ?: continue
-            val retry = request(lease, load(lease.origin))
-            metrics.leaseReclaimed(retry.language)
+            dispatch(lease)
+        }
+    }
 
-            log.atWarn()
-                .addKeyValue(CorrelationIds.SUBMISSION_ID, submissionId)
-                .addKeyValue(CorrelationIds.EXECUTION_ID, retry.executionId)
-                .addKeyValue(CorrelationIds.ATTEMPT, retry.attempt)
-                .log("임대가 만료됐다. 실행을 다시 건다")
+    /** 임대가 품은 원 요청의 종류가 어느 판정기로 다시 걸지 정한다. */
+    private fun dispatch(lease: Lease) {
+        when (val origin = lease.origin) {
+            is SubmissionQueued -> {
+                val retry = request(lease, load(origin))
+                metrics.leaseReclaimed(retry.language)
+                log.atWarn()
+                    .addKeyValue(CorrelationIds.SUBMISSION_ID, lease.submissionId)
+                    .addKeyValue(CorrelationIds.EXECUTION_ID, retry.executionId)
+                    .addKeyValue(CorrelationIds.ATTEMPT, retry.attempt)
+                    .log("임대가 만료됐다. 실행을 다시 건다")
+                gateway.requestExecution(retry)
+            }
+            is ProjectQueued -> projects?.dispatch(lease) ?: run {
+                log.error("프로젝트 판정기가 없어 만료된 프로젝트 임대를 다시 걸지 못한다: {}", lease.submissionId)
+                registry.abandon(lease.submissionId)
+            }
+        }
+    }
 
-            gateway.requestExecution(retry)
+    private fun systemError(expired: Lease) {
+        when (expired.origin) {
+            is SubmissionQueued -> gateway.publishCompleted(
+                JudgeCompleted(
+                    submissionId = expired.submissionId,
+                    executionId = expired.executionId,
+                    correlationId = expired.origin.correlationId,
+                    verdict = Verdict.SYSTEM_ERROR,
+                    score = 0,
+                    compileLog = null,
+                    groups = emptyList(),
+                ),
+            )
+            is ProjectQueued -> projects?.systemError(expired)
         }
     }
 
@@ -270,22 +295,25 @@ class JudgeCoordinator(
      *
      * 테스트는 메시지에 싣지 않는다. 번들을 스토어에 올려 두고 참조만 실린다 (§8.3).
      */
-    private fun request(lease: Lease, pkg: ProblemPackage) = ExecutionRequest(
-        executionId = lease.executionId,
-        submissionId = lease.submissionId,
-        attempt = lease.attempt,
-        fencingToken = lease.token,
-        correlationId = lease.origin.correlationId,
-        problemVersionId = pkg.problemVersionId,
-        packageDigest = pkg.packageDigest,
-        language = lease.origin.language,
-        // 소스는 참조로 지나간다 (§8.3). 이전 버전 메시지의 inline 소스도 그대로 넘긴다 (§15.3 N/N-1).
-        source = lease.origin.source,
-        sourceRef = lease.origin.sourceRef,
-        signature = pkg.manifest.signature,
-        limits = pkg.manifest.limits,
-        bundle = bundles.ensure(pkg),
-    )
+    private fun request(lease: Lease, pkg: ProblemPackage): ExecutionRequest {
+        val origin = lease.origin as SubmissionQueued
+        return ExecutionRequest(
+            executionId = lease.executionId,
+            submissionId = lease.submissionId,
+            attempt = lease.attempt,
+            fencingToken = lease.token,
+            correlationId = origin.correlationId,
+            problemVersionId = pkg.problemVersionId,
+            packageDigest = pkg.packageDigest,
+            language = origin.language,
+            // 소스는 참조로 지나간다 (§8.3). 이전 버전 메시지의 inline 소스도 그대로 넘긴다 (§15.3 N/N-1).
+            source = origin.source,
+            sourceRef = origin.sourceRef,
+            signature = pkg.manifest.signature,
+            limits = pkg.manifest.limits,
+            bundle = bundles.ensure(pkg),
+        )
+    }
 
     /**
      * 판정이 끝난 뒤 학습용 트레이스를 별도 작업으로 띄운다 (§7.1).

@@ -5,6 +5,7 @@ import dev.codedrill.judge.orchestrator.lease.LeaseRegistry
 import dev.codedrill.judge.orchestrator.lease.MemoryLeaseRegistry
 import dev.codedrill.judge.orchestrator.lease.RedisLeaseRegistry
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
+import dev.codedrill.platform.problempackage.ProjectPackageLoader
 import dev.codedrill.platform.storage.BlobStore
 import io.micrometer.core.instrument.MeterRegistry
 import org.slf4j.LoggerFactory
@@ -32,6 +33,11 @@ class OrchestratorConfig {
     @Bean
     fun problemPackageLoader(@Value("\${codedrill.content.root}") root: String) =
         ProblemPackageLoader(Path.of(root))
+
+    /** 프로젝트형 문제 (11단계). 알고리즘 문제의 형제 디렉터리다. */
+    @Bean
+    fun projectPackageLoader(@Value("\${codedrill.content.projects-root}") root: String) =
+        ProjectPackageLoader(Path.of(root))
 
     /**
      * 임대 저장소 (§4.3, production-readiness A3).
@@ -72,6 +78,16 @@ class OrchestratorConfig {
     @Bean
     fun bundlePublisher(store: BlobStore) = BundlePublisher(store)
 
+    /** 두 번째 판정기의 조정자 (11단계). 임대 표는 첫 판정기와 같은 것이다. */
+    @Bean
+    fun projectCoordinator(
+        packages: ProjectPackageLoader,
+        registry: LeaseRegistry,
+        gateway: ProjectGateway,
+        bundles: BundlePublisher,
+        metrics: JudgeMetrics,
+    ) = ProjectCoordinator(packages, registry, gateway, bundles, metrics)
+
     @Bean
     fun judgeCoordinator(
         packages: ProblemPackageLoader,
@@ -80,7 +96,8 @@ class OrchestratorConfig {
         bundles: BundlePublisher,
         metrics: JudgeMetrics,
         @Value("\${codedrill.judge.max-attempts:3}") maxAttempts: Int,
-    ) = JudgeCoordinator(packages, registry, gateway, bundles, metrics, maxAttempts)
+        projects: ProjectCoordinator,
+    ) = JudgeCoordinator(packages, registry, gateway, bundles, metrics, maxAttempts, projects)
 }
 
 /**

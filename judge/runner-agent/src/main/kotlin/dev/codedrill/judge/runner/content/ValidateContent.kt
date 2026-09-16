@@ -6,7 +6,10 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
+import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
+import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
+import dev.codedrill.platform.storage.DirectoryBlobStore
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteExisting
@@ -28,6 +31,9 @@ import kotlin.system.exitProcess
  * 셋째 인자는 **저작 중에만** 쓴다. 전체는 문제당 10~30초라, 새 문제 하나를 고치며 매번 전체를
  * 돌리면 손이 멈춘다. 고른 문제의 보고서만 다시 쓰고 나머지는 그대로 둔다 — CI 와 공개 앞에는
  * 언제나 전체다.
+ *
+ * 프로젝트형 문제(`content/projects`, 첫 인자의 형제 디렉터리)도 같은 명령이 검증하고 같은
+ * 디렉터리에 보고서를 남긴다. 공개 흐름은 보고서만 보므로 둘을 가르지 않는다.
  */
 object ValidateContent {
 
@@ -50,13 +56,31 @@ object ValidateContent {
 
         val only = args.getOrNull(2)?.split(',')?.map(String::trim)?.filter(String::isNotEmpty).orEmpty()
 
+        // 프로젝트형 (11단계). 스토어는 검증 동안만 사는 디렉터리다 — 판정기가 스토어를 거치는
+        // 길 그대로 검증해야 같은 코드가 같은 판정을 받는다.
         reportRoot.createDirectories()
+        val store = DirectoryBlobStore(reportRoot.resolve(".store").also { it.createDirectories() })
+        val projects = ProjectValidator(
+            engine = ProjectEngine(
+                adapters = mapOf(Language.PYTHON to PythonProjectAdapter()),
+                sandboxes = { ProcessSandbox() },
+                store = store,
+            ),
+            store = store,
+            projectsRoot = contentRoot.resolveSibling("projects"),
+        )
+
         // 지난 실행이 남긴 보고서를 지우고 시작한다. 문제의 version 을 올리면 옛 버전의
         // 보고서가 그대로 남아, 시딩이 **이미 대체된 버전을 다시 공개**한다. 보고서는
         // 검증의 산출물이지 쌓아 두는 기록이 아니다.
         if (only.isEmpty()) reportRoot.listDirectoryEntries("*.json").forEach { it.deleteExisting() }
 
-        val reports = if (only.isEmpty()) validator.validateAll() else only.map(validator::validate)
+        val projectIds = projects.ids()
+        val reports = if (only.isEmpty()) {
+            validator.validateAll() + projectIds.map(projects::validate)
+        } else {
+            only.map { id -> if (id in projectIds) projects.validate(id) else validator.validate(id) }
+        }
 
         for (report in reports) {
             val marker = if (report.passed) "PASS" else "FAIL"

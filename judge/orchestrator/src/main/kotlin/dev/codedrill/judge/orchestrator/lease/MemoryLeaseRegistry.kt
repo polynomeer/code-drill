@@ -1,8 +1,8 @@
 package dev.codedrill.judge.orchestrator.lease
 
-import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
-import dev.codedrill.judge.protocol.SubmissionQueued
+import dev.codedrill.judge.protocol.JudgeOrigin
+import dev.codedrill.judge.protocol.LeasedResult
 import java.time.Clock
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -24,7 +24,7 @@ class MemoryLeaseRegistry(
     private val completed = ConcurrentHashMap<String, String>()
     private var nextToken = 0L
 
-    override fun lease(origin: SubmissionQueued, executionId: String): Lease {
+    override fun lease(origin: JudgeOrigin, executionId: String): Lease {
         completed.remove(origin.submissionId)
         return checkNotNull(active.compute(origin.submissionId) { _, previous -> next(previous, origin, executionId) })
     }
@@ -38,7 +38,7 @@ class MemoryLeaseRegistry(
     }
 
     @Synchronized
-    private fun next(previous: Lease?, origin: SubmissionQueued, executionId: String) = Lease(
+    private fun next(previous: Lease?, origin: JudgeOrigin, executionId: String) = Lease(
         submissionId = origin.submissionId,
         attempt = (previous?.attempt ?: 0) + 1,
         token = FencingToken(++nextToken),
@@ -66,7 +66,7 @@ class MemoryLeaseRegistry(
         active.remove(submissionId)
     }
 
-    override fun accept(result: ExecutionResult): Acceptance {
+    override fun accept(result: LeasedResult): Acceptance {
         completed[result.submissionId]?.let { digest ->
             return if (digest == result.resultDigest) Acceptance.Duplicate else Acceptance.AlreadyCompleted
         }

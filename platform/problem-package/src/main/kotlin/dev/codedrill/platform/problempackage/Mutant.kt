@@ -63,6 +63,7 @@ enum class DefectKind(val label: String) {
     companion object {
         /**
          * `// kind: <NAME>` 첫 줄에서 읽는다. 별도 색인을 두면 파일과 어긋난다.
+         * 프로젝트형의 Python 오답은 `# kind:` 다 — 주석 기호만 다르고 약속은 같다.
          *
          * 모르는 이름이면 [UNSPECIFIED] 로 떨어뜨린다. 여기서 예외를 올리면 오답 파일
          * 하나의 오타가 **문제 전체를 못 읽게** 만들고, 그러면 채점까지 선다.
@@ -72,6 +73,6 @@ enum class DefectKind(val label: String) {
                 ?.let { name -> entries.firstOrNull { it.name == name } }
                 ?: UNSPECIFIED
 
-        private val KIND_LINE = Regex("""//\s*kind:\s*(\w+)""")
+        private val KIND_LINE = Regex("""(?://|#)\s*kind:\s*(\w+)""")
     }
 }

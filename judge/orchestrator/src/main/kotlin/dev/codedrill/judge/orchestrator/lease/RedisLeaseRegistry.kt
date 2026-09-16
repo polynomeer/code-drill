@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.readValue
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
-import dev.codedrill.judge.protocol.SubmissionQueued
+import dev.codedrill.judge.protocol.JudgeOrigin
+import dev.codedrill.judge.protocol.LeasedResult
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import java.time.Clock
@@ -52,13 +52,13 @@ class RedisLeaseRegistry(
     private val expiryKey = "$prefix:expiry"
     private val fencingKey = "$prefix:fencing"
 
-    override fun lease(origin: SubmissionQueued, executionId: String): Lease =
+    override fun lease(origin: JudgeOrigin, executionId: String): Lease =
         checkNotNull(grant(origin, executionId, expectedToken = null)) { "새 임대는 조건이 없어 실패하지 않는다" }
 
     override fun reclaim(expired: Lease, executionId: String): Lease? =
         grant(expired.origin, executionId, expectedToken = expired.token)
 
-    private fun grant(origin: SubmissionQueued, executionId: String, expectedToken: FencingToken?): Lease? {
+    private fun grant(origin: JudgeOrigin, executionId: String, expectedToken: FencingToken?): Lease? {
         val expiresAt = clock.instant().plus(dispatchTimeout)
         val reply = redis.execute(
             LEASE,
@@ -105,7 +105,7 @@ class RedisLeaseRegistry(
                 expiresAt = Instant.ofEpochMilli(hash.getValue("expiresAt").toLong()),
                 started = hash["started"] == "1",
                 executionId = hash.getValue("executionId"),
-                origin = mapper.readValue(hash.getValue("origin")),
+                origin = mapper.readValue<JudgeOrigin>(hash.getValue("origin")),
             )
         }
     }
@@ -117,7 +117,7 @@ class RedisLeaseRegistry(
         )
     }
 
-    override fun accept(result: ExecutionResult): Acceptance {
+    override fun accept(result: LeasedResult): Acceptance {
         val reply = checkNotNull(
             redis.execute(
                 ACCEPT, listOf(leaseKey(result.submissionId), expiryKey, doneKey(result.submissionId)),
@@ -126,7 +126,7 @@ class RedisLeaseRegistry(
             ),
         )
         return when (reply[0]) {
-            "ACCEPTED" -> Acceptance.Accepted(mapper.readValue(reply[1] as String))
+            "ACCEPTED" -> Acceptance.Accepted(mapper.readValue<JudgeOrigin>(reply[1] as String))
             "DUPLICATE" -> Acceptance.Duplicate
             "COMPLETED" -> Acceptance.AlreadyCompleted
             "UNLEASED" -> Acceptance.Unleased

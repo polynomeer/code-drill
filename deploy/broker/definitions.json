@@ -24,19 +24,19 @@
     "vhost" : "/",
     "configure" : "^(spring\\.gen-.*)$",
     "write" : "^(judge\\.from\\.control-plane|codedrill\\.submission-events|spring\\.gen-.*)$",
-    "read" : "^(judge\\.progress|judge\\.trial-results|judge\\.mutation-results|judge\\.reference-trace-results|judge\\.shrink-results|judge\\.lab-results|judge\\.arena-results|judge\\.submissions\\.dead|codedrill\\.submission-events|spring\\.gen-.*)$"
+    "read" : "^(judge\\.progress|judge\\.trial-results|judge\\.mutation-results|judge\\.reference-trace-results|judge\\.shrink-results|judge\\.lab-results|judge\\.arena-results|judge\\.project-progress|judge\\.submissions\\.dead|codedrill\\.submission-events|spring\\.gen-.*)$"
   }, {
     "user" : "orchestrator",
     "vhost" : "/",
     "configure" : "^$",
     "write" : "^(judge\\.from\\.orchestrator)$",
-    "read" : "^(judge\\.submissions|judge\\.results|judge\\.heartbeats)$"
+    "read" : "^(judge\\.submissions|judge\\.results|judge\\.heartbeats|judge\\.project-submissions|judge\\.project-results)$"
   }, {
     "user" : "runner",
     "vhost" : "/",
     "configure" : "^$",
     "write" : "^(judge\\.from\\.runner)$",
-    "read" : "^(judge\\.executions|judge\\.trials|judge\\.mutations|judge\\.reference-traces|judge\\.shrinks|judge\\.labs|judge\\.arena)$"
+    "read" : "^(judge\\.executions|judge\\.trials|judge\\.mutations|judge\\.reference-traces|judge\\.shrinks|judge\\.labs|judge\\.arena|judge\\.projects)$"
   } ],
   "exchanges" : [ {
     "name" : "judge.dead",
@@ -419,6 +419,86 @@
       "x-queue-type" : "quorum",
       "x-message-ttl" : 604800000
     }
+  }, {
+    "name" : "judge.project-submissions",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.project-submissions"
+    }
+  }, {
+    "name" : "judge.project-submissions.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.projects",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.projects"
+    }
+  }, {
+    "name" : "judge.projects.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.project-results",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.project-results"
+    }
+  }, {
+    "name" : "judge.project-results.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
+  }, {
+    "name" : "judge.project-progress",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-delivery-limit" : 5,
+      "x-dead-letter-exchange" : "judge.dead",
+      "x-dead-letter-routing-key" : "judge.project-progress"
+    }
+  }, {
+    "name" : "judge.project-progress.dead",
+    "vhost" : "/",
+    "durable" : true,
+    "auto_delete" : false,
+    "arguments" : {
+      "x-queue-type" : "quorum",
+      "x-message-ttl" : 604800000
+    }
   } ],
   "bindings" : [ {
     "source" : "judge.from.control-plane",
@@ -657,6 +737,62 @@
     "destination" : "judge.arena-results.dead",
     "destination_type" : "queue",
     "routing_key" : "judge.arena-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.control-plane",
+    "vhost" : "/",
+    "destination" : "judge.project-submissions",
+    "destination_type" : "queue",
+    "routing_key" : "judge.project-submissions",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.project-submissions.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.project-submissions",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.orchestrator",
+    "vhost" : "/",
+    "destination" : "judge.projects",
+    "destination_type" : "queue",
+    "routing_key" : "judge.projects",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.projects.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.projects",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.runner",
+    "vhost" : "/",
+    "destination" : "judge.project-results",
+    "destination_type" : "queue",
+    "routing_key" : "judge.project-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.project-results.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.project-results",
+    "arguments" : { }
+  }, {
+    "source" : "judge.from.orchestrator",
+    "vhost" : "/",
+    "destination" : "judge.project-progress",
+    "destination_type" : "queue",
+    "routing_key" : "judge.project-progress",
+    "arguments" : { }
+  }, {
+    "source" : "judge.dead",
+    "vhost" : "/",
+    "destination" : "judge.project-progress.dead",
+    "destination_type" : "queue",
+    "routing_key" : "judge.project-progress",
     "arguments" : { }
   } ]
 }

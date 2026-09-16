@@ -95,11 +95,25 @@ object JudgeQueues {
     /** 아레나 결과. */
     const val ARENA_RESULTS = "judge.arena-results"
 
+    /**
+     * 프로젝트형 문제 — 두 번째 판정기 (feature-roadmap 11단계).
+     *
+     * 큐 넷이 알고리즘 판정의 넷(제출·실행·결과·진행)과 나란하다. **섞지 않는다.** 한 건이
+     * 빌드 한 번에 스위트 한 번이라 분 단위이고, 그것이 초 단위 채점 앞에 서면 안 된다 —
+     * 시험 실행을 판정과 나눈 것과 같은 이유다. 임대·fencing 은 같은 오케스트레이터가,
+     * 심장 박동은 같은 [HEARTBEATS] 로 간다.
+     */
+    const val PROJECT_SUBMISSIONS = "judge.project-submissions"
+    const val PROJECTS = "judge.projects"
+    const val PROJECT_RESULTS = "judge.project-results"
+    const val PROJECT_PROGRESS = "judge.project-progress"
+
     val all = listOf(
         SUBMISSIONS, EXECUTIONS, RESULTS, PROGRESS, HEARTBEATS,
         TRIALS, TRIAL_RESULTS, MUTATIONS, MUTATION_RESULTS,
         REFERENCE_TRACES, REFERENCE_TRACE_RESULTS, SHRINKS, SHRINK_RESULTS,
         LABS, LAB_RESULTS, ARENA, ARENA_RESULTS,
+        PROJECT_SUBMISSIONS, PROJECTS, PROJECT_RESULTS, PROJECT_PROGRESS,
     )
 
     /**

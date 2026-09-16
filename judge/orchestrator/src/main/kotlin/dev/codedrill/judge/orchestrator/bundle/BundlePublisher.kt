@@ -3,7 +3,9 @@ package dev.codedrill.judge.orchestrator.bundle
 import dev.codedrill.judge.protocol.BundleRef
 import dev.codedrill.judge.protocol.Bundles
 import dev.codedrill.judge.protocol.RequestedGroup
+import dev.codedrill.judge.protocol.Workspaces
 import dev.codedrill.platform.problempackage.ProblemPackage
+import dev.codedrill.platform.problempackage.ProjectPackage
 import dev.codedrill.platform.storage.BlobStore
 import org.slf4j.LoggerFactory
 import java.time.Clock
@@ -32,22 +34,30 @@ class BundlePublisher(
     private val log = LoggerFactory.getLogger(javaClass)
     private val verifiedAt = ConcurrentHashMap<String, Instant>()
 
-    fun ensure(pkg: ProblemPackage): BundleRef {
-        val key = Bundles.key(pkg.packageDigest)
-        val bytes = Bundles.encode(pkg.groups.map { RequestedGroup(it.policy, it.cases) })
+    fun ensure(pkg: ProblemPackage): BundleRef =
+        ensure(Bundles.key(pkg.packageDigest), Bundles.encode(pkg.groups.map { RequestedGroup(it.policy, it.cases) }), "테스트 번들")
+
+    /**
+     * 프로젝트형의 숨은 테스트 스위트 (feature-roadmap 11단계). 번들과 같은 길을 간다 —
+     * 키는 패키지 digest, 모양은 [Workspaces] 의 것이다.
+     */
+    fun ensureSuite(pkg: ProjectPackage): BundleRef =
+        ensure(Workspaces.suiteKey(pkg.packageDigest), Workspaces.encode(pkg.hidden), "숨은 스위트")
+
+    private fun ensure(key: String, bytes: ByteArray, what: String): BundleRef {
         val digest = Bundles.digest(bytes)
         val now = clock.instant()
-        val last = verifiedAt[pkg.packageDigest]
+        val last = verifiedAt[key]
         if (last == null || Duration.between(last, now) >= recheck) {
             val stored = store.digestOf(key)
             if (stored != digest) {
                 store.put(key, bytes, "application/json", digest)
                 log.info(
-                    "테스트 번들을 올렸다: {} ({}KB){}", key, bytes.size / 1024,
+                    "{}을 올렸다: {} ({}KB){}", what, key, bytes.size / 1024,
                     if (stored == null) "" else " — 저장된 것이 요청과 달랐다 (${stored.take(12)})",
                 )
             }
-            verifiedAt[pkg.packageDigest] = now
+            verifiedAt[key] = now
         }
         return BundleRef(key, digest)
     }

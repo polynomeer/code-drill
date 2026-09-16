@@ -65,6 +65,10 @@ object JudgeTopology {
         Lane(JudgeQueues.LAB_RESULTS, from = runner, to = cp),
         Lane(JudgeQueues.ARENA, from = cp, to = runner),
         Lane(JudgeQueues.ARENA_RESULTS, from = runner, to = cp),
+        Lane(JudgeQueues.PROJECT_SUBMISSIONS, from = cp, to = orc),
+        Lane(JudgeQueues.PROJECTS, from = orc, to = runner),
+        Lane(JudgeQueues.PROJECT_RESULTS, from = runner, to = orc),
+        Lane(JudgeQueues.PROJECT_PROGRESS, from = orc, to = cp),
     )
 
     init {

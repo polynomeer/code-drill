@@ -618,16 +618,16 @@ class ContentValidator(
         const val VALIDATOR_VERSION = "4"
 
         /** 해설의 최소 길이. 한 줄짜리 해설은 해설이 아니다. */
-        private const val MIN_EDITORIAL = 200
+        internal const val MIN_EDITORIAL = 200
 
         /** `  - value` 한 줄. 어휘와 선수 목록이 같은 모양이라 하나로 쓴다. */
-        private val TAG_LINE = Regex("""^\s*- (\S+)""", RegexOption.MULTILINE)
+        internal val TAG_LINE = Regex("""^\s*- (\S+)""", RegexOption.MULTILINE)
 
         /** `prerequisites:` 아래 붙은 목록 블록. */
         private val PREREQ_BLOCK = Regex("""prerequisites:\s*\n((?:\s+- \S+\n?)+)""")
 
         /** 정답 풀이가 제한 시간의 이 비율을 넘게 쓰면 공개를 막는다. */
-        private const val MAX_REFERENCE_TIME_RATIO = 0.5
+        internal const val MAX_REFERENCE_TIME_RATIO = 0.5
 
         /**
          * 시간으로 잡는 오답이 한도를 넘겨야 하는 최소 배수.

@@ -6,12 +6,14 @@ import dev.codedrill.judge.protocol.ExecutionMode
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.LabRequest
 import dev.codedrill.judge.protocol.MutationRequest
+import dev.codedrill.judge.protocol.ProjectRequest
 import dev.codedrill.judge.protocol.ShrinkRequest
 import dev.codedrill.judge.runner.execution.ArenaRunner
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.LabRunner
 import dev.codedrill.judge.runner.execution.MutationEvaluator
 import dev.codedrill.judge.runner.execution.Shrinker
+import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.platform.messaging.JudgeQueues
 import dev.codedrill.platform.observability.CorrelationIds
 import org.slf4j.LoggerFactory
@@ -37,6 +39,7 @@ class ExecutionListener(
     private val shrinker: Shrinker,
     private val lab: LabRunner,
     private val arena: ArenaRunner,
+    private val projects: ProjectEngine,
     private val rabbit: RabbitTemplate,
 ) {
 
@@ -71,23 +74,41 @@ class ExecutionListener(
             .addKeyValue(CorrelationIds.ATTEMPT, request.attempt)
             .log("실행을 시작한다")
 
-        val beat = ExecutionHeartbeat(
-            submissionId = request.submissionId,
-            executionId = request.executionId,
-            attempt = request.attempt,
-            fencingToken = request.fencingToken,
-        )
-        // 집어 들자마자 한 번 보낸다. 첫 박동을 주기만큼 미루면 그 사이에 만료될 수 있다.
-        send(beat)
-        val ticking = heartbeats.scheduleAtFixedRate(
-            { send(beat) }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS,
-        )
-
-        try {
+        beating(ExecutionHeartbeat(submissionId = request.submissionId, executionId = request.executionId, attempt = request.attempt, fencingToken = request.fencingToken)) {
             // 엔진은 자기 안에서 일어난 모든 실패를 판정으로 바꿔 돌려준다. 여기서 예외가
             // 새어나가면 브로커가 재전달하고, 같은 실패를 반복하게 된다.
             val result = engine.execute(request)
             rabbit.convertAndSend(JudgeQueues.RESULTS, result)
+        }
+    }
+
+    /**
+     * 프로젝트형 판정 (feature-roadmap 11단계). 두 번째 판정기의 큐다.
+     *
+     * 임대와 심장 박동은 알고리즘 판정과 같다 — 오케스트레이터가 둘을 같은 임대로 본다.
+     * 리스너도 같다: 빌드 한 번에 스위트 한 번이 다른 채점과 동시에 돌면 측정이 오염된다.
+     */
+    @RabbitListener(queues = [JudgeQueues.PROJECTS])
+    fun onProject(request: ProjectRequest) {
+        log.atInfo()
+            .addKeyValue(CorrelationIds.SUBMISSION_ID, request.submissionId)
+            .addKeyValue(CorrelationIds.EXECUTION_ID, request.executionId)
+            .addKeyValue(CorrelationIds.ATTEMPT, request.attempt)
+            .log("프로젝트 판정을 시작한다")
+
+        beating(ExecutionHeartbeat(submissionId = request.submissionId, executionId = request.executionId, attempt = request.attempt, fencingToken = request.fencingToken)) {
+            rabbit.convertAndSend(JudgeQueues.PROJECT_RESULTS, projects.execute(request))
+        }
+    }
+
+    /** 실행하는 동안 심장 박동을 보낸다. 집어 들자마자 한 번 — 첫 박동을 주기만큼 미루면 그 사이에 만료될 수 있다. */
+    private inline fun beating(beat: ExecutionHeartbeat, work: () -> Unit) {
+        send(beat)
+        val ticking = heartbeats.scheduleAtFixedRate(
+            { send(beat) }, HEARTBEAT_INTERVAL_SECONDS, HEARTBEAT_INTERVAL_SECONDS, TimeUnit.SECONDS,
+        )
+        try {
+            work()
         } finally {
             ticking.cancel(false)
         }

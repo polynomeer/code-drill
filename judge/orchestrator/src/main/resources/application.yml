@@ -29,6 +29,8 @@ codedrill:
       dir: ${BROKER_TLS_DIR:}
   content:
     root: ${CONTENT_ROOT:content/problems}
+    # 프로젝트형 문제 (11단계). 형제 디렉터리다.
+    projects-root: ${CONTENT_PROJECTS_ROOT:content/projects}
 
 server:
   port: ${PORT:8081}

@@ -1,8 +1,8 @@
 package dev.codedrill.judge.orchestrator.lease
 
-import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
-import dev.codedrill.judge.protocol.SubmissionQueued
+import dev.codedrill.judge.protocol.JudgeOrigin
+import dev.codedrill.judge.protocol.LeasedResult
 import java.time.Instant
 
 /**
@@ -19,6 +19,10 @@ import java.time.Instant
  *
  * 구현이 둘이다. [RedisLeaseRegistry] 는 재시작과 인스턴스 여럿을 넘기고,
  * [MemoryLeaseRegistry] 는 테스트와 Redis 없는 개발용이다.
+ *
+ * **판정기가 둘이어도 임대는 하나다.** 알고리즘 제출과 프로젝트형 제출은 같은 표에서 같은
+ * 규칙으로 임대된다 — 임대가 품는 원 요청([JudgeOrigin])과 받아들일 결과([LeasedResult])의
+ * 종류만 다르다.
  */
 interface LeaseRegistry {
 
@@ -31,7 +35,7 @@ interface LeaseRegistry {
      * 지난 판정과 내용이 같을 때 — 재채점에서는 흔한 일이다 — 중복으로 오해받아 조용히
      * 버려지고, 결과를 기다리던 재채점은 영영 끝나지 않는다.
      */
-    fun lease(origin: SubmissionQueued, executionId: String): Lease
+    fun lease(origin: JudgeOrigin, executionId: String): Lease
 
     /**
      * 만료된 임대를 새 임대로 바꾼다. **한 인스턴스만 성공한다.**
@@ -74,7 +78,7 @@ interface LeaseRegistry {
      * 순서가 중요하다. 중복 판정을 fencing 검사보다 먼저 해야, 같은 결과의 재전달이
      * 스테일로 잘못 기록되지 않는다.
      */
-    fun accept(result: ExecutionResult): Acceptance
+    fun accept(result: LeasedResult): Acceptance
 }
 
 data class Lease(
@@ -87,12 +91,12 @@ data class Lease(
     /** 이 임대로 띄운 실행. 재시도 한계에서 SYSTEM_ERROR 를 낼 때 그 이름이 필요하다. */
     val executionId: String,
     /** 이 임대가 답하는 제출. 다시 걸 때 실행 요청을 여기서 다시 만든다. */
-    val origin: SubmissionQueued,
+    val origin: JudgeOrigin,
 )
 
 sealed interface Acceptance {
     /** 유효한 결과다. 집계로 넘긴다. [origin] 으로 트레이스를 이어 만든다. */
-    data class Accepted(val origin: SubmissionQueued) : Acceptance
+    data class Accepted(val origin: JudgeOrigin) : Acceptance
 
     /** 같은 결과가 다시 왔다. no-op 이며 오류가 아니다 (§4.3 결과 중복). */
     data object Duplicate : Acceptance

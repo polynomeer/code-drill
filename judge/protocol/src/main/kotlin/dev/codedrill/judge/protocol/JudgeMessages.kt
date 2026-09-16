@@ -1,5 +1,7 @@
 package dev.codedrill.judge.protocol
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import java.time.Instant
 
 /**
@@ -9,11 +11,31 @@ import java.time.Instant
  * 공유하는 전부다. 소비자는 N/N-1 스키마를 함께 지원하고 모르는 필드는 무시한다 (§15.3).
  */
 
+/**
+ * 임대가 품을 수 있는 원 요청 (§4.3).
+ *
+ * 판정기가 둘이다 — 알고리즘 문제의 [SubmissionQueued] 와 프로젝트형의 [ProjectQueued].
+ * 임대·fencing 은 둘이 같이 쓰므로 임대는 어느 쪽이든 품어야 하고, 다시 걸 때 어느 봉투를
+ * 만들지는 품은 것의 종류가 정한다.
+ *
+ * `kind` 가 없는 JSON 은 [SubmissionQueued] 다 — 이 구분이 생기기 전에 Redis 에 적힌
+ * 임대가 그 모양이다 (§15.3 N/N-1).
+ */
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind", defaultImpl = SubmissionQueued::class)
+@JsonSubTypes(
+    JsonSubTypes.Type(SubmissionQueued::class, name = "submission"),
+    JsonSubTypes.Type(ProjectQueued::class, name = "project"),
+)
+sealed interface JudgeOrigin {
+    val submissionId: String
+    val correlationId: String
+}
+
 /** 제출이 큐에 올랐다. 멱등 키는 `submissionId + attempt` 다. */
 data class SubmissionQueued(
     val schemaVersion: String = SCHEMA_VERSION,
-    val submissionId: String,
-    val correlationId: String,
+    override val submissionId: String,
+    override val correlationId: String,
     val problemId: String,
     val problemVersion: Int,
     val language: Language,
@@ -35,7 +57,7 @@ data class SubmissionQueued(
      * 측정을 건너뛴다 (§15.3 N/N-1).
      */
     val queuedAt: Instant? = null,
-) {
+) : JudgeOrigin {
     companion object {
         const val SCHEMA_VERSION = "1.1"
     }
