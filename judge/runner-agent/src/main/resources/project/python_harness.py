@@ -1,6 +1,6 @@
 """프로젝트형 문제의 Python 테스트 하네스 (ProjectEngine 이 샌드박스에 넣는다).
 
-    python3 -B python_harness.py <워크스페이스> <리포트 파일> <메모리 MB>
+    python3 -B python_harness.py <워크스페이스> <리포트 파일> <메모리 MB> <nonce 파일>
 
 워크스페이스의 tests/ 아래 test_*.py 를 unittest 로 찾아 돌리고, 테스트마다 (모듈, 이름,
 통과 여부, 사유) 를 리포트 파일에 JSON 으로 적는다. stdout 이 아니라 **파일**이다 — 사용자
@@ -17,6 +17,9 @@ import 되는 순간 unittest 를 손댈 수 있다 — 단언을 전부 통과�
 
 어느 쪽이든 걸리면 리포트에 `tampered` 를 적고, 채점기는 전부 실패로 판정한다. 이것은
 증명이 아니라 가드다 — 규모에서의 방어는 검토와 유사도 신호다.
+
+리포트에는 nonce 가 실린다 — 사용자 코드를 들이기 전에 읽고 **지운** 파일의 값. 사용자 코드가
+리포트를 꾸며 쓰고 프로세스를 끝내도 그 값을 모른다. 채점기가 대조한다.
 """
 
 import io
@@ -115,11 +118,16 @@ def _canary_name() -> str:
 
 
 def main() -> int:
-    workspace, report_path, memory_mb = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    workspace, report_path, memory_mb, nonce_path = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
     _limit_memory(memory_mb)
     os.environ.setdefault("PYTHONHASHSEED", "0")
 
-    report: dict = {"tests": [], "tampered": None, "loadError": None}
+    # 사용자 코드보다 먼저. 읽고 지운다.
+    with open(nonce_path, encoding="utf-8") as handle:
+        nonce = handle.read().strip()
+    os.remove(nonce_path)
+
+    report: dict = {"nonce": nonce, "tests": [], "tampered": None, "loadError": None}
 
     # 사용자 출력은 파일로 가지 않는다. 화면에 보일 것은 판정이지 print 가 아니다.
     sys.path.insert(0, workspace)

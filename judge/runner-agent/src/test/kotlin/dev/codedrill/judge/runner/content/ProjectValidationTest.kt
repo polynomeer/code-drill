@@ -1,6 +1,8 @@
 package dev.codedrill.judge.runner.content
 
 import dev.codedrill.judge.protocol.Language
+import dev.codedrill.judge.runner.execution.RuntimeClasspath
+import dev.codedrill.judge.runner.execution.project.KotlinProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
@@ -23,7 +25,10 @@ class ProjectValidationTest {
     private val store = DirectoryBlobStore(createTempDirectory("project-validation"))
     private val validator = ProjectValidator(
         engine = ProjectEngine(
-            adapters = mapOf(Language.PYTHON to PythonProjectAdapter()),
+            adapters = mapOf(
+                Language.PYTHON to PythonProjectAdapter(),
+                Language.KOTLIN to KotlinProjectAdapter(RuntimeClasspath.all, RuntimeClasspath.kotlinCompiler),
+            ),
             sandboxes = { ProcessSandbox() },
             store = store,
         ),

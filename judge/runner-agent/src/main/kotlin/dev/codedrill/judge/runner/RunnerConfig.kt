@@ -13,6 +13,7 @@ import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
 import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
+import dev.codedrill.judge.runner.execution.project.KotlinProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
@@ -158,13 +159,23 @@ class RunnerConfig {
     /**
      * 두 번째 판정기 (feature-roadmap 11단계). 격리는 같은 샌드박스, 봉투와 규칙은 따로.
      *
-     * 언어는 Python 하나로 시작한다 — 표준 라이브러리의 unittest 가 곧 테스트 기반이라
-     * 이미지에 더 넣을 것이 없다.
+     * Python 은 표준 라이브러리의 unittest 가 테스트 기반이라 이미지에 더 넣을 것이 없다.
+     * Kotlin 은 알고리즘 판정과 같은 컴파일러·런타임 jar 를 들여보낸다 — 컨테이너 안에서 돌 때의
+     * 경로 규칙도 같다 ([kotlinAdapter] 참고).
      */
     @Bean
-    fun projectEngine(selector: SandboxSelector, registry: MeterRegistry, properties: SandboxProperties, store: BlobStore) =
-        ProjectEngine(
-            adapters = listOf<ProjectAdapter>(PythonProjectAdapter()).associateBy { it.language },
+    fun projectEngine(selector: SandboxSelector, registry: MeterRegistry, properties: SandboxProperties, store: BlobStore): ProjectEngine {
+        val root = workRoot(properties)
+        val kotlin = if (root == null) {
+            KotlinProjectAdapter(runtime = RuntimeClasspath.all, compiler = RuntimeClasspath.kotlinCompiler)
+        } else {
+            KotlinProjectAdapter(
+                runtime = RuntimeClasspath.sharedInto(root),
+                compiler = RuntimeClasspath.sharedInto(root, RuntimeClasspath.kotlinCompiler),
+            )
+        }
+        return ProjectEngine(
+            adapters = listOf<ProjectAdapter>(PythonProjectAdapter(), kotlin).associateBy { it.language },
             sandboxes = selector::forLanguage,
             store = store,
             workRoot = workRoot(properties),
@@ -177,6 +188,7 @@ class RunnerConfig {
                     .record(nanos, TimeUnit.NANOSECONDS)
             },
         )
+    }
 }
 
 @ConfigurationProperties(prefix = "codedrill.sandbox")

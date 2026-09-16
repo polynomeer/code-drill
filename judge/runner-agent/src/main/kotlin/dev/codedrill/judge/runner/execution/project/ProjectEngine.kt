@@ -100,7 +100,7 @@ class ProjectEngine(
         val buildStart = System.nanoTime()
         val buildTimeout = request.limits.buildSeconds * 1000L
         val build = adapter.buildCommand(workspace)?.let { command ->
-            sandbox.exec(spec(command, sandboxDir, out, adapter.env(), request.limits.memoryMb, buildTimeout, ExecutionEngine.COMPILER_PIDS_LIMIT))
+            sandbox.exec(spec(command, sandboxDir, out, adapter, adapter.buildMemoryMb(request.limits.memoryMb), buildTimeout, ExecutionEngine.COMPILER_PIDS_LIMIT))
         }
         val buildMillis = (System.nanoTime() - buildStart) / 1_000_000
         onPhase("build", request.language, if (build == null || build.exitCode == 0) "success" else "failure", System.nanoTime() - buildStart)
@@ -112,12 +112,15 @@ class ProjectEngine(
             return terminal(request, Verdict.COMPILE_ERROR, log.trim(), buildMillis = buildMillis)
         }
 
-        // test
+        // test — 리포트의 진위는 nonce 로 본다. 하네스가 사용자 코드를 들이기 전에 읽고 지우는 값이다.
         val reportFile = out.resolve("report.json")
+        val nonceFile = out.resolve("nonce")
+        val nonce = java.util.UUID.randomUUID().toString()
+        nonceFile.writeText(nonce)
         val testStart = System.nanoTime()
         val testTimeout = request.limits.testSeconds * 1000L
         val test = sandbox.exec(
-            spec(adapter.testCommand(workspace, harness, reportFile, request.limits.memoryMb), sandboxDir, out, adapter.env(), request.limits.memoryMb, testTimeout, TEST_PIDS_LIMIT),
+            spec(adapter.testCommand(workspace, harness, out, reportFile, nonceFile, request.limits.memoryMb), sandboxDir, out, adapter, request.limits.memoryMb, testTimeout, TEST_PIDS_LIMIT),
         )
         val testMillis = (System.nanoTime() - testStart) / 1_000_000
         onPhase("test", request.language, if (test.exitCode == 0) "success" else "failure", System.nanoTime() - testStart)
@@ -130,8 +133,10 @@ class ProjectEngine(
             return terminal(request, verdict, test.output.takeLast(MAX_LOG_CHARS).trim().ifBlank { "스위트가 리포트 없이 코드 ${test.exitCode} 로 끝났다" }, buildMillis, testMillis)
         }
 
-        val report = json.readValue<ProjectReport>(reportFile.readText())
-        report.loadError?.let { return terminal(request, Verdict.RUNTIME_ERROR, it.takeLast(MAX_LOG_CHARS), buildMillis, testMillis) }
+        val parsed = json.readValue<ProjectReport>(reportFile.readText())
+        parsed.loadError?.let { return terminal(request, Verdict.RUNTIME_ERROR, it.takeLast(MAX_LOG_CHARS), buildMillis, testMillis) }
+        // nonce 가 다르면 하네스가 쓴 리포트가 아니다 — 사용자 코드가 꾸며 쓴 것이다.
+        val report = if (parsed.nonce != nonce) parsed.copy(tampered = parsed.tampered ?: "리포트를 하네스가 쓰지 않았다") else parsed
 
         // 테스트 기반이 손댄 것이면 리포트의 통과는 믿을 수 없다. 전부 실패다.
         val tests = report.tests.map { row ->
@@ -166,15 +171,15 @@ class ProjectEngine(
         command: List<String>,
         workDir: Path,
         out: Path,
-        env: Map<String, String>,
+        adapter: ProjectAdapter,
         memoryMb: Int,
         timeoutMillis: Long,
         pidsLimit: Int,
     ) = SandboxSpec(
         command = command,
         workDir = workDir,
-        readOnlyPaths = emptyList(),
-        env = env,
+        readOnlyPaths = adapter.readOnlyPaths(),
+        env = adapter.env(),
         memoryMb = memoryMb,
         perCaseTimeoutMillis = timeoutMillis,
         outputByteLimit = MAX_LOG_CHARS.toLong(),
@@ -226,6 +231,7 @@ class ProjectEngine(
 
     /** 하네스가 적는 리포트의 모양. 언어마다 하네스는 다르지만 리포트는 하나다. */
     data class ProjectReport(
+        val nonce: String? = null,
         val tests: List<ProjectTestOutcome> = emptyList(),
         val tampered: String? = null,
         val loadError: String? = null,

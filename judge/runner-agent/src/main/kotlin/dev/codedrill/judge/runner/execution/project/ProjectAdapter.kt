@@ -28,10 +28,21 @@ interface ProjectAdapter {
      */
     fun buildCommand(workspace: Path): List<String>?
 
-    /** 스위트 실행 명령. 리포트를 [reportFile] 에 적어야 한다 ([ProjectReport] 의 모양). */
-    fun testCommand(workspace: Path, harnessDir: Path, reportFile: Path, memoryMb: Int): List<String>
+    /**
+     * 스위트 실행 명령. 리포트를 [reportFile] 에 적어야 한다 ([ProjectReport] 의 모양).
+     *
+     * [nonceFile] 은 하네스가 사용자 코드를 들이기 전에 읽고 지워야 하는 파일이다. 리포트에 그
+     * 값이 실려야 채점기가 믿는다 — 사용자 코드가 꾸며 쓴 리포트에는 그 값이 없다.
+     */
+    fun testCommand(workspace: Path, harnessDir: Path, outputDir: Path, reportFile: Path, nonceFile: Path, memoryMb: Int): List<String>
 
     fun env(): Map<String, String> = emptyMap()
+
+    /** 샌드박스에 읽기 전용으로 들여보낼 경로 — 런타임·컴파일러 jar. */
+    fun readOnlyPaths(): List<Path> = emptyList()
+
+    /** 빌드 단계의 메모리. 컴파일러가 문제의 한도보다 더 쓸 수 있다 — 그 몫은 사용자의 것이 아니다. */
+    fun buildMemoryMb(limitMb: Int): Int = limitMb
 }
 
 /**
@@ -52,12 +63,13 @@ class PythonProjectAdapter(private val interpreter: String = PythonAdapter.DEFAU
         interpreter, "-B", "-c", SYNTAX_CHECK, workspace.absolutePathString(),
     )
 
-    override fun testCommand(workspace: Path, harnessDir: Path, reportFile: Path, memoryMb: Int): List<String> = listOf(
+    override fun testCommand(workspace: Path, harnessDir: Path, outputDir: Path, reportFile: Path, nonceFile: Path, memoryMb: Int): List<String> = listOf(
         interpreter, "-B",
         harnessDir.resolve(HARNESS).absolutePathString(),
         workspace.absolutePathString(),
         reportFile.absolutePathString(),
         memoryMb.toString(),
+        nonceFile.absolutePathString(),
     )
 
     override fun env() = PythonAdapter.DETERMINISM_ENV
@@ -81,5 +93,76 @@ class PythonProjectAdapter(private val interpreter: String = PythonAdapter.DEFAU
                 "        failed += 1\n" +
                 "        print(f'{path}:{error.lineno}: {error.msg}')\n" +
                 "sys.exit(1 if failed else 0)\n"
+    }
+}
+
+
+/**
+ * Kotlin 프로젝트. 알고리즘 판정의 Kotlin 어댑터와 같은 jar 를 쓴다 — Runner 가 가진 컴파일러와
+ * 런타임을 읽기 전용으로 들여보내고, 컴파일도 샌드박스 안에서 돈다 (§5.5).
+ *
+ * 워크스페이스의 `.kt` 전부(사용자 코드와 테스트)와 하네스를 한 번에 컴파일한다. 숨은 테스트가
+ * 요구사항의 API 를 부르므로 API 를 어기면 컴파일 오류다 — 그것이 맞다. 테스트 기반은
+ * kotlin-test 가 아니라 하네스의 단언 몇 개다; 샌드박스에는 표준 라이브러리뿐이다.
+ */
+class KotlinProjectAdapter(
+    private val runtime: List<Path>,
+    private val compiler: List<Path>,
+) : ProjectAdapter {
+
+    override val language = Language.KOTLIN
+
+    override fun harnessFiles(): Map<String, String> = mapOf(HARNESS to harnessSource)
+
+    override fun buildCommand(workspace: Path): List<String> = listOf(
+        "java",
+        "-Xmx${COMPILER_HEAP_MB}m",
+        "-XX:+UseSerialGC",
+        "-XX:TieredStopAtLevel=1",
+        "-XX:-UsePerfData",
+        "-Dkotlin.colors.enabled=false",
+        "-Dfile.encoding=UTF-8",
+        "-cp", compiler.joinToString(java.io.File.pathSeparator) { it.absolutePathString() },
+        "org.jetbrains.kotlin.cli.jvm.K2JVMCompiler",
+        "-no-stdlib", "-no-reflect", "-nowarn",
+        "-cp", runtime.joinToString(java.io.File.pathSeparator) { it.absolutePathString() },
+        "-d", workspace.resolveSibling("out").resolve(CLASSES).absolutePathString(),
+        workspace.absolutePathString(),
+        workspace.resolveSibling("harness").absolutePathString(),
+    )
+
+    override fun testCommand(workspace: Path, harnessDir: Path, outputDir: Path, reportFile: Path, nonceFile: Path, memoryMb: Int): List<String> = listOf(
+        "java",
+        "-Xmx${memoryMb}m",
+        "-XX:+UseSerialGC",
+        "-XX:-UsePerfData",
+        "-Dfile.encoding=UTF-8",
+        // plusElement 다. Path 는 Iterable<Path> 라 `+` 는 경로를 조각으로 펼친다 — 알고리즘 어댑터와 같은 함정.
+        "-cp", runtime.plusElement(outputDir.resolve(CLASSES)).joinToString(java.io.File.pathSeparator) { it.absolutePathString() },
+        "codedrill.CodedrillHarnessKt",
+        outputDir.resolve(CLASSES).absolutePathString(),
+        reportFile.absolutePathString(),
+        nonceFile.absolutePathString(),
+    )
+
+    override fun env() = mapOf("TZ" to "UTC")
+
+    override fun readOnlyPaths(): List<Path> = (runtime + compiler).distinct()
+
+    override fun buildMemoryMb(limitMb: Int): Int = maxOf(limitMb, COMPILER_HEAP_MB)
+
+    private val harnessSource: String by lazy {
+        KotlinProjectAdapter::class.java.getResourceAsStream("/project/kotlin_harness.kt")
+            ?.bufferedReader()?.readText()
+            ?: error("프로젝트 하네스가 리소스에 없다: /project/kotlin_harness.kt")
+    }
+
+    companion object {
+        /** 하네스 파일 이름. 클래스 `codedrill.CodedrillHarnessKt` 가 여기서 나온다. */
+        const val HARNESS = "CodedrillHarness.kt"
+        const val CLASSES = "classes"
+
+        /** 알고리즘 판정의 컴파일러와 같은 값. 컴파일러는 문제의 한도와 무관하게 이만큼 쓴다. */
+        const val COMPILER_HEAP_MB = 768
     }
 }

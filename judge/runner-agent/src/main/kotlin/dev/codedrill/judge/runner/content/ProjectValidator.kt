@@ -55,6 +55,7 @@ class ProjectValidator(
         val suite = publishSuite(pkg)
         val judged = judge(pkg, suite, "reference", pkg.starter + reference)
         checks += referencePasses(judged)
+        checks += hiddenModulesObserved(pkg, judged)
         checks += timeHeadroom(pkg, judged)
 
         val starter = judge(pkg, suite, "starter", pkg.starter)
@@ -75,7 +76,7 @@ class ProjectValidator(
         if (!projectsRoot.resolve(pkg.manifest.id).resolve(pkg.manifest.statement).exists()) {
             problems += "본문 파일이 없다: ${pkg.manifest.statement}"
         }
-        if (pkg.starter.keys.none { it.matches(PUBLIC_TEST) }) problems += "starter/tests/ 에 공개 테스트가 없다"
+        if (pkg.publicModules.isEmpty()) problems += "starter/tests/ 에 공개 테스트가 없다"
         if (pkg.hiddenModules.isEmpty()) problems += "hidden/ 에 테스트 모듈이 없다"
         runCatching { Language.valueOf(pkg.manifest.language) }.onFailure { problems += "모르는 언어: ${pkg.manifest.language}" }
         runCatching { Workspaces.validate(pkg.starter) }.onFailure { problems += "starter: ${it.message}" }
@@ -122,6 +123,25 @@ class ProjectValidator(
                 judged.verdict == Verdict.ACCEPTED -> Check.pass("reference", "테스트 ${judged.tests.size}개 전부 통과")
                 failed.isNotEmpty() -> Check.fail("reference", "참조가 떨어진 테스트: ${failed.joinToString { "${it.module}.${it.name}" }}")
                 else -> Check.fail("reference", "참조가 ${judged.verdict}: ${judged.log?.take(300)}")
+            },
+        )
+    }
+
+    /**
+     * 숨은 모듈 하나하나가 리포트에 나타나야 한다.
+     *
+     * 오케스트레이터는 파일 경로에서 만든 모듈 이름으로 숨은 것을 자른다. Kotlin 은 파일 이름과
+     * 클래스 이름이 다를 수 있고, 그러면 그 테스트는 "공개"로 새어 나간다 — 이름도 사유도 함께.
+     */
+    private fun hiddenModulesObserved(pkg: ProjectPackage, judged: ProjectResult): List<Check> {
+        val observed = judged.tests.map { it.module }.toSet()
+        val missing = pkg.hiddenModules.filterNot { it in observed }
+        val stray = observed.filter { it.startsWith("tests.") && it !in pkg.hiddenModules && it !in pkg.publicModules }
+        return listOf(
+            when {
+                missing.isNotEmpty() -> Check.fail("hidden-modules", "리포트에 없는 숨은 모듈: ${missing.joinToString()} — 파일 이름과 클래스 이름이 같아야 한다")
+                stray.isNotEmpty() -> Check.fail("hidden-modules", "어느 파일의 것인지 모르는 테스트 모듈: ${stray.joinToString()}")
+                else -> Check.pass("hidden-modules", "숨은 모듈 ${pkg.hiddenModules.size}개가 전부 리포트에 있다")
             },
         )
     }
@@ -233,7 +253,6 @@ class ProjectValidator(
     }
 
     private companion object {
-        val PUBLIC_TEST = Regex("""tests/test_[a-z0-9_]+\.py""")
         // 기준은 알고리즘 문제와 같다. 두 판정기가 해설 길이나 시간 여유를 다르게 재면 안 된다.
         val TAG_LINE = ContentValidator.TAG_LINE
         const val MIN_EDITORIAL = ContentValidator.MIN_EDITORIAL

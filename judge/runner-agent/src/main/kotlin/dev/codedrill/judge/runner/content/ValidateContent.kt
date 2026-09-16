@@ -6,6 +6,8 @@ import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
+import dev.codedrill.judge.runner.execution.RuntimeClasspath
+import dev.codedrill.judge.runner.execution.project.KotlinProjectAdapter
 import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
@@ -62,7 +64,10 @@ object ValidateContent {
         val store = DirectoryBlobStore(reportRoot.resolve(".store").also { it.createDirectories() })
         val projects = ProjectValidator(
             engine = ProjectEngine(
-                adapters = mapOf(Language.PYTHON to PythonProjectAdapter()),
+                adapters = mapOf(
+                    Language.PYTHON to PythonProjectAdapter(),
+                    Language.KOTLIN to KotlinProjectAdapter(RuntimeClasspath.all, RuntimeClasspath.kotlinCompiler),
+                ),
                 sandboxes = { ProcessSandbox() },
                 store = store,
             ),

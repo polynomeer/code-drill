@@ -96,9 +96,7 @@ class ProjectService(
                 pkg.manifest.limits.buildSeconds, pkg.manifest.limits.testSeconds, pkg.manifest.limits.memoryMb,
                 Workspaces.MAX_FILES, Workspaces.MAX_TOTAL_BYTES,
             ),
-            // 공개 테스트의 모듈 이름. 결과 화면이 "공개"와 "숨은"을 가르는 기준이다.
-            publicTests = pkg.starter.keys.filter { it.startsWith("tests/test_") && it.endsWith(".py") }
-                .map { it.removeSuffix(".py").replace('/', '.') },
+            publicTests = pkg.publicModules,
         )
     }
 
@@ -333,9 +331,11 @@ class ProjectService(
         runCatching {
             val submission = repository.findById(id) ?: return
             val pkg = packages.load(submission.projectId)
-            val starterTests = pkg.starter.filterKeys { it.isPublicTest() }.values.sumOf { it.testMethods() }
+            val starterTests = pkg.starter.entries.filter { ProjectPackage.isTestModule(it.key) }.sumOf { ProjectPackage.testMethods(it.key, it.value) }
             // 숨은 테스트와 같은 경로에 쓴 것은 세지 않는다 — 채점 때 덮여 한 번도 돌지 않는다.
-            val submittedTests = repository.files(id).filterKeys { it.isPublicTest() && it !in pkg.hidden }.values.sumOf { it.testMethods() }
+            val submittedTests = repository.files(id).entries
+                .filter { ProjectPackage.isTestModule(it.key) && it.key !in pkg.hidden }
+                .sumOf { ProjectPackage.testMethods(it.key, it.value) }
             val added = (submittedTests - starterTests).coerceAtLeast(0)
             learning.judged(
                 userId = submission.userId,
@@ -348,8 +348,6 @@ class ProjectService(
         }.onFailure { log.warn("프로젝트 판정을 증거로 잇지 못했다: {} ({})", id, it.message) }
     }
 
-    private fun String.isPublicTest() = startsWith("tests/test_") && endsWith(".py")
-    private fun String.testMethods() = TEST_METHOD.findAll(this).count()
 
     private fun available(): List<ProjectPackage> {
         val ids = published.ids()
@@ -363,9 +361,6 @@ class ProjectService(
 
     companion object {
         const val PROJECT_EVENT = "ProjectQueued"
-
-        /** unittest 가 찾는 이름. 들여쓰기 안의 메서드만 — 최상위 함수는 스위트가 돌리지 않는다. */
-        private val TEST_METHOD = Regex("""^\s+def test_\w+\s*\(""", RegexOption.MULTILINE)
 
         /** 한 사람이 동시에 걸어 둘 수 있는 프로젝트 판정. 분 단위 실행이라 알고리즘 제출보다 좁다 (§10.2). */
         const val MAX_IN_FLIGHT = 2
