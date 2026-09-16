@@ -28,7 +28,7 @@ class PythonAdapter(private val interpreter: String = DEFAULT_INTERPRETER) : Run
     override val language = Language.PYTHON
 
     override fun prepare(request: ExecutionRequest, sourceDir: Path) {
-        sourceDir.resolve("solution.py").writeText(request.source)
+        sourceDir.resolve("solution.py").writeText(request.sourceText())
         sourceDir.resolve("drill.py").writeText(drill(request.mode))
         sourceDir.resolve("main.py").writeText(harness(request.signature))
         for (group in request.groups) {

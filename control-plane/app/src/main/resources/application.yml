@@ -57,6 +57,14 @@ codedrill:
     # 이보다 오래된 트레이스를 여는 일은 거의 없다.
     retention-days: ${TRACE_RETENTION_DAYS:30}
     sweep-interval-ms: ${TRACE_SWEEP_INTERVAL_MS:3600000}
+  storage:
+    # 제출 소스가 실행 영역으로 가는 오브젝트 스토어 (§8.3). 메시지에는 참조만 실린다.
+    # 비우면 디렉터리로 내려간다 — Runner 와 같은 머신에서만 통한다.
+    endpoint: ${STORAGE_ENDPOINT:}
+    bucket: ${STORAGE_BUCKET:codedrill}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    directory: ${STORAGE_DIRECTORY:}
   content:
     root: ${CONTENT_ROOT:content/problems}
   outbox:

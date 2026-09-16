@@ -18,10 +18,13 @@ data class SubmissionQueued(
     val problemVersion: Int,
     val language: Language,
     /**
-     * 슬라이스는 소스를 메시지에 그대로 싣는다. 운영에서는 오브젝트 스토어에 올리고
-     * 참조와 digest 만 실어야 한다 (§8.3).
+     * 소스가 있는 곳 (§8.3). 제어 영역이 오브젝트 스토어에 올리고 참조만 싣는다.
+     *
+     * 이전 버전 메시지는 [source] 에 소스를 그대로 실었다. 둘 중 하나는 있어야 하고,
+     * 새 메시지는 [sourceRef] 만 싣는다 (§15.3 N/N-1).
      */
-    val source: String,
+    val sourceRef: SourceRef? = null,
+    val source: String? = null,
     /** 판정이 끝난 뒤 학습용 트레이스를 이어서 만들지 (§9.3 requestTrace). */
     val requestTrace: Boolean = false,
     /**
@@ -34,7 +37,7 @@ data class SubmissionQueued(
     val queuedAt: Instant? = null,
 ) {
     companion object {
-        const val SCHEMA_VERSION = "1.0"
+        const val SCHEMA_VERSION = "1.1"
     }
 }
 

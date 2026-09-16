@@ -31,6 +31,7 @@ services:
       MINIO_ROOT_PASSWORD: codedrill
       STORAGE_ORCHESTRATOR_SECRET: ${STORAGE_ORCHESTRATOR_SECRET:?오케스트레이터의 스토어 비밀이 필요하다}
       STORAGE_RUNNER_SECRET: ${STORAGE_RUNNER_SECRET:?Runner 의 스토어 비밀이 필요하다}
+      STORAGE_CONTROL_PLANE_SECRET: ${STORAGE_CONTROL_PLANE_SECRET:?제어 영역의 스토어 비밀이 필요하다}
     volumes: ["./storage/init.sh:/init.sh:ro"]
     depends_on:
       minio: {condition: service_healthy}
@@ -59,12 +60,17 @@ services:
       # 프록시 뒤에 두면 AUTH_TRUSTED_PROXY=true 로 X-Forwarded-For 를 본다; 앞에 프록시가 없으면 켜지 않는다.
       AUTH_ORIGIN_SALT: ${AUTH_ORIGIN_SALT:?출처 해시의 소금이 필요하다}
       AUTH_TRUSTED_PROXY: ${AUTH_TRUSTED_PROXY:-false}
+      # 제출 소스가 가는 스토어 (§8.3). sources/ 아래만 올리고 지운다.
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: control-plane
+      STORAGE_SECRET_KEY: ${STORAGE_CONTROL_PLANE_SECRET:?}
     volumes: ["./certs/control-plane:/etc/codedrill/broker-tls:ro"]
     ports: ["${CONTROL_PLANE_PORT:-8080}:8080"]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       rabbitmq: {condition: service_healthy}
+      storage-init: {condition: service_completed_successfully}
     healthcheck:
       # curl 을 쓴다. 예전에는 `/dev/tcp` 로 소켓을 열었는데 그것은 bash 기능이고 이
       # 이미지의 `/bin/sh` 는 dash 라, 헬스체크가 **한 번도 통과한 적이 없었다** —

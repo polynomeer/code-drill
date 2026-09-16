@@ -26,7 +26,7 @@ class JavaAdapter : RuntimeAdapter {
     override val language = Language.JAVA
 
     override fun prepare(request: ExecutionRequest, sourceDir: Path) {
-        sourceDir.resolve("Solution.java").writeText(request.source)
+        sourceDir.resolve("Solution.java").writeText(request.sourceText())
         sourceDir.resolve("Drill.java").writeText(drill(request.mode))
         sourceDir.resolve("Main.java").writeText(harness(request.signature))
         for (group in request.groups) {

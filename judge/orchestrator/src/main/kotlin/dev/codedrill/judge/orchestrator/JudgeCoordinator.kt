@@ -279,7 +279,9 @@ class JudgeCoordinator(
         problemVersionId = pkg.problemVersionId,
         packageDigest = pkg.packageDigest,
         language = lease.origin.language,
+        // 소스는 참조로 지나간다 (§8.3). 이전 버전 메시지의 inline 소스도 그대로 넘긴다 (§15.3 N/N-1).
         source = lease.origin.source,
+        sourceRef = lease.origin.sourceRef,
         signature = pkg.manifest.signature,
         limits = pkg.manifest.limits,
         bundle = bundles.ensure(pkg),
@@ -325,6 +327,7 @@ class JudgeCoordinator(
                 packageDigest = pkg.packageDigest,
                 language = origin.language,
                 source = origin.source,
+                sourceRef = origin.sourceRef,
                 signature = pkg.manifest.signature,
                 limits = pkg.manifest.limits,
                 mode = ExecutionMode.TRACE,

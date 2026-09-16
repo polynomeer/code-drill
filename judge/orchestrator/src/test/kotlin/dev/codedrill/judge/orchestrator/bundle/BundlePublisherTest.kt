@@ -35,6 +35,7 @@ class BundlePublisherTest {
         override fun put(key: String, bytes: ByteArray, contentType: String, digest: String?) { puts += 1; backing.put(key, bytes, contentType, digest) }
         override fun get(key: String) = backing.get(key)
         override fun digestOf(key: String): String? { heads += 1; return backing.digestOf(key) }
+        override fun delete(key: String) = backing.delete(key)
     }
 
     @Test

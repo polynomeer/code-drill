@@ -2,6 +2,7 @@ package dev.codedrill.platform.storage
 
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.NoSuchBucketException
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException
@@ -37,6 +38,10 @@ class S3BlobStore(private val client: S3Client, private val bucket: String) : Bl
     } catch (e: S3Exception) {
         // HEAD 는 본문이 없어 404 가 NoSuchKey 로 풀리지 않을 때가 있다.
         if (e.statusCode() == 404) null else throw e
+    }
+
+    override fun delete(key: String) {
+        client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build())
     }
 
     override fun get(key: String): ByteArray? = try {

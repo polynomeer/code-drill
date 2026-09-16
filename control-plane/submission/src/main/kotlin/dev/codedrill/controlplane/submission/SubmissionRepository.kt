@@ -279,7 +279,11 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
  * 데이터인지는 표를 가진 쪽만 안다** — 밖에서 지우게 하면 열이 늘어날 때 조용히 빠진다.
  */
 @org.springframework.stereotype.Repository
-class SubmissionPersonalData(private val jdbc: org.springframework.jdbc.core.JdbcTemplate) {
+class SubmissionPersonalData(
+    private val jdbc: org.springframework.jdbc.core.JdbcTemplate,
+    /** 스토어의 실행용 복제도 함께 지운다 (§8.3, §11.3). */
+    private val sources: SourceStore? = null,
+) {
 
     fun export(userId: String): List<Map<String, Any?>> = jdbc.queryForList(
         """
@@ -304,10 +308,14 @@ class SubmissionPersonalData(private val jdbc: org.springframework.jdbc.core.Jdb
             """.trimIndent(),
             userId,
         )
-        val sources = jdbc.update(
+        // 스토어의 복제를 먼저 지운다 — DB 를 먼저 비우면 어느 것을 지워야 하는지 다시 알 길이 없다.
+        val ids = jdbc.queryForList("SELECT id FROM submission WHERE user_id = ? AND source IS NOT NULL", String::class.java, userId)
+        var stored = 0
+        for (id in ids) runCatching { sources?.delete(id) }.onSuccess { if (sources != null) stored += 1 }
+        val erased = jdbc.update(
             "UPDATE submission SET source = NULL, compile_log = NULL WHERE user_id = ? AND source IS NOT NULL",
             userId,
         )
-        return mapOf("submissionSources" to sources, "traces" to traces)
+        return mapOf("submissionSources" to erased, "storedSources" to stored, "traces" to traces)
     }
 }

@@ -9,6 +9,7 @@ plugins {
 dependencies {
     implementation(project(":platform:common"))
     implementation(project(":platform:messaging"))
+    implementation(project(":platform:storage"))
     implementation(project(":platform:observability"))
     implementation(project(":platform:problem-package"))
     implementation(project(":judge:protocol"))

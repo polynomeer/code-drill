@@ -8,6 +8,8 @@ import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.RequestedGroup
+import dev.codedrill.judge.protocol.SourceRef
+import dev.codedrill.judge.protocol.Sources
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.runner.TestAdapters
 import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
@@ -44,6 +46,37 @@ class BundleResolverTest {
 
         assertEquals(groups, resolved.groups)
         assertNull(resolved.bundle)
+    }
+
+    @Test
+    fun `소스도 참조로 오면 스토어에서 받아 채운다`() {
+        val source = GoldenSources.ACCEPTED.getValue(Language.KOTLIN)
+        val sourceRef = Sources.ref("sub-bundle", source)
+        store.put(sourceRef.key, Sources.bytes(source), Sources.CONTENT_TYPE, sourceRef.digest)
+
+        val resolved = BundleResolver(store).resolve(request(bundle = ref).copy(source = null, sourceRef = sourceRef))
+
+        assertEquals(source, resolved.sourceText())
+        assertNull(resolved.sourceRef)
+    }
+
+    @Test
+    fun `소스의 digest 가 다르면 채점하지 않는다`() {
+        val source = GoldenSources.ACCEPTED.getValue(Language.KOTLIN)
+        val sourceRef = Sources.ref("sub-tampered", source)
+        // 스토어의 것이 바뀌었다 — 누가 소스를 갈아 끼웠다.
+        store.put(sourceRef.key, Sources.bytes(source + "\n// tampered"), Sources.CONTENT_TYPE, null)
+
+        val failure = assertFailsWith<IllegalStateException> {
+            BundleResolver(store).resolve(request(bundle = null).copy(source = null, sourceRef = sourceRef))
+        }
+        assertTrue(failure.message!!.contains("digest"), failure.message)
+    }
+
+    @Test
+    fun `참조가 풀리지 않은 소스는 어댑터가 읽지 못한다`() {
+        val unresolved = request(bundle = null).copy(source = null, sourceRef = SourceRef("sources/x.txt", "0"))
+        assertFailsWith<IllegalStateException> { unresolved.sourceText() }
     }
 
     @Test
@@ -90,6 +123,7 @@ class BundleResolverTest {
             override fun put(key: String, bytes: ByteArray, contentType: String, digest: String?) = error("쓰지 않는다")
             override fun get(key: String): ByteArray? = store.get(key).also { reads += 1 }
             override fun digestOf(key: String) = store.digestOf(key)
+            override fun delete(key: String) = store.delete(key)
         }
         val resolver = BundleResolver(counting)
         repeat(3) { resolver.resolve(request(bundle = ref)) }

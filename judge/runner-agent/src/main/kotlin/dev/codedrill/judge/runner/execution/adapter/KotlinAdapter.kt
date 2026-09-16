@@ -48,7 +48,7 @@ class KotlinAdapter(
     override val language = Language.KOTLIN
 
     override fun prepare(request: ExecutionRequest, sourceDir: Path) {
-        sourceDir.resolve("Solution.kt").writeText(request.source)
+        sourceDir.resolve("Solution.kt").writeText(request.sourceText())
         sourceDir.resolve("Drill.kt").writeText(drill(request.mode))
         sourceDir.resolve("Main.kt").writeText(harness(request.signature, request.groups))
         for (group in request.groups) {

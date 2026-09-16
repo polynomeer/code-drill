@@ -29,6 +29,8 @@ class SubmissionService(
     private val quota: SubmissionQuota,
     private val rejudges: RejudgeContext = RejudgeContext.NONE,
     private val learning: LearningSignals = LearningSignals.NONE,
+    /** 소스가 실행 영역으로 가는 길 (§8.3). null 이면 메시지에 그대로 싣는다 — 스토어 없는 테스트 조립뿐이다. */
+    private val sources: SourceStore? = null,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -63,6 +65,11 @@ class SubmissionService(
             status = SubmissionStatus.CREATED,
         )
 
+        // 소스는 스토어로, 메시지에는 참조만 (§8.3). 올리기가 실패하면 제출도 실패다 — 참조 없는
+        // 메시지를 내보내면 Runner 가 시스템 오류로 끝내고, 그건 사용자에게 우리 탓으로 보여야 한다.
+        // DB 트랜잭션 앞에서 올리므로 DB 가 실패하면 고아 객체가 남는다; 같은 제출 id 는 다시
+        // 오지 않으니 해가 없고, 청소는 스토어의 수명 정책이 한다.
+        val ref = sources?.store(id.toString(), command.source)
         val queued = SubmissionQueued(
             submissionId = id.toString(),
             // 큐 대기 시간의 기준점. 아웃박스 행과 같은 트랜잭션에 들어가므로, 커밋되지
@@ -72,7 +79,8 @@ class SubmissionService(
             problemId = command.problemId,
             problemVersion = command.problemVersion,
             language = command.language,
-            source = command.source,
+            sourceRef = ref,
+            source = if (ref == null) command.source else null,
             requestTrace = command.requestTrace,
         )
 
@@ -257,6 +265,8 @@ class SubmissionService(
     fun requeue(ids: List<UUID>): Int = ids.count { id ->
         val submission = repository.findById(id) ?: return@count false
         val source = repository.findSource(id) ?: return@count false
+        // 재채점도 참조로 간다. 스토어의 복제가 사라졌거나 다르면 DB 의 것으로 다시 올린다 (§8.3).
+        val ref = sources?.ensure(id.toString(), source)
 
         repository.enqueueOutbox(
             OutboxEvent(
@@ -272,7 +282,8 @@ class SubmissionService(
                         problemId = submission.problemId,
                         problemVersion = submission.problemVersion,
                         language = Language.valueOf(submission.language),
-                        source = source,
+                        sourceRef = ref,
+                        source = if (ref == null) source else null,
                         // 재채점은 판정을 다시 내는 일이다. 학습용 트레이스까지 다시
                         // 만들면 Runner 용량의 절반이 거기로 간다 (§7.1).
                         requestTrace = false,

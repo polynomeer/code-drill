@@ -16,6 +16,8 @@ import dev.codedrill.platform.problempackage.TestCase
  * 적은 입력), [bundle] 이 가리키는 오브젝트 스토어의 번들에 있다(판정, §8.3). 판정의
  * 테스트를 메시지에 실으면 큰 문제가 브로커의 메시지 크기 한계에 먼저 걸린다 — 문제 하나의
  * 테스트가 수 MB 다. Runner 는 [bundle] 을 [groups] 로 풀어 낸 뒤 둘을 구분하지 않는다.
+ * **소스도 같다** — 판정의 소스는 [sourceRef] 로 오고, 사용자가 방금 적은 코드(시험 실행·
+ * 실험실)만 [source] 에 그대로 실린다.
  */
 data class ExecutionRequest(
     val schemaVersion: String = SCHEMA_VERSION,
@@ -27,7 +29,14 @@ data class ExecutionRequest(
     val problemVersionId: String,
     val packageDigest: String,
     val language: Language,
-    val source: String,
+    /**
+     * 소스. 판정은 [sourceRef] 로 오고 Runner 가 받아 채운다; 시험 실행·실험실처럼 사용자가
+     * 방금 적은 코드는 그대로 실린다. 어댑터는 [sourceText] 로 읽는다 — 풀리지 않은 참조를
+     * 컴파일하려는 것은 오류다.
+     */
+    val source: String? = null,
+    /** 오브젝트 스토어의 소스 (§8.3). Runner 가 받아 digest 를 대조하고 [source] 로 푼다. */
+    val sourceRef: SourceRef? = null,
     val signature: Signature,
     val limits: Limits,
     /** 메시지에 실린 케이스. [bundle] 이 있으면 비어 있다. */
@@ -44,8 +53,11 @@ data class ExecutionRequest(
      */
     val selection: List<CaseSelection>? = null,
 ) {
+    /** 풀린 소스. 참조가 아직 풀리지 않았으면 오류다 — 어댑터가 빈 소스를 컴파일하면 안 된다. */
+    fun sourceText(): String = source ?: error("소스가 풀리지 않았다: ${sourceRef?.key ?: "참조도 없다"}")
+
     companion object {
-        const val SCHEMA_VERSION = "1.1"
+        const val SCHEMA_VERSION = "1.2"
     }
 }
 

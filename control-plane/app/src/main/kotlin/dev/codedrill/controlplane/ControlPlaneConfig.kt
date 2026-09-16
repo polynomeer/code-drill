@@ -63,6 +63,10 @@ import dev.codedrill.controlplane.integrity.SubmissionSources
 import dev.codedrill.controlplane.submission.lab.SharedApproach
 import dev.codedrill.controlplane.submission.lab.SharedApproaches
 import dev.codedrill.controlplane.submission.SharedSubmissions
+import dev.codedrill.controlplane.submission.SourceStore
+import dev.codedrill.judge.protocol.SourceRef
+import dev.codedrill.judge.protocol.Sources
+import dev.codedrill.platform.storage.BlobStore
 import dev.codedrill.controlplane.workspace.AnchorableSubmissions
 import dev.codedrill.controlplane.workspace.ApprovedDonations
 import dev.codedrill.controlplane.workspace.DiscussionRepository
@@ -181,6 +185,30 @@ class ControlPlaneConfig {
      * **모듈이 개인 데이터를 갖게 되면 이 목록에 넣어야 한다.** 넣지 않으면 반출은
      * 조용히 빠뜨리고 삭제는 조용히 남긴다.
      */
+    /**
+     * 제출 소스가 실행 영역으로 가는 길 (§8.3). 스토어에 올리고 메시지에는 참조만.
+     *
+     * digest 를 함께 저장해 두어, 재채점이 다시 올릴지를 내용을 받지 않고 묻는다 — 번들과 같다.
+     */
+    @Bean
+    fun sourceStore(store: BlobStore) = object : SourceStore {
+        override fun store(submissionId: String, source: String): SourceRef {
+            val bytes = Sources.bytes(source)
+            val ref = SourceRef(Sources.key(submissionId), Sources.digest(bytes))
+            store.put(ref.key, bytes, Sources.CONTENT_TYPE, ref.digest)
+            return ref
+        }
+
+        override fun ensure(submissionId: String, source: String): SourceRef {
+            val bytes = Sources.bytes(source)
+            val ref = SourceRef(Sources.key(submissionId), Sources.digest(bytes))
+            if (store.digestOf(ref.key) != ref.digest) store.put(ref.key, bytes, Sources.CONTENT_TYPE, ref.digest)
+            return ref
+        }
+
+        override fun delete(submissionId: String) = store.delete(Sources.key(submissionId))
+    }
+
     @Bean
     fun submissionPersonalArea(data: SubmissionPersonalData) = object : PersonalData {
         override val area = "submissions"

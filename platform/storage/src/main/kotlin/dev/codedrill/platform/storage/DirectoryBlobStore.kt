@@ -5,6 +5,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
 
@@ -30,6 +31,8 @@ class DirectoryBlobStore(private val root: Path) : BlobStore {
     override fun digestOf(key: String): String? = get(key)?.let { bytes ->
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     }
+
+    override fun delete(key: String) { resolve(key).deleteIfExists() }
 
     private fun resolve(key: String): Path {
         val path = root.resolve(key).normalize()

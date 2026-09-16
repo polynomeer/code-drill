@@ -4,6 +4,8 @@ import dev.codedrill.judge.protocol.BundleRef
 import dev.codedrill.judge.protocol.Bundles
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.RequestedGroup
+import dev.codedrill.judge.protocol.SourceRef
+import dev.codedrill.judge.protocol.Sources
 import dev.codedrill.platform.storage.BlobStore
 import org.slf4j.LoggerFactory
 
@@ -24,16 +26,30 @@ class BundleResolver(private val store: BlobStore, private val cacheSize: Int = 
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<RequestedGroup>>) = size > cacheSize
     }
 
-    /** 번들이 없으면 요청 그대로다. 케이스가 메시지에 실려 온 것이다. */
+    /**
+     * 스토어 참조를 푼다 — 소스와 번들. 참조가 없으면 요청 그대로다: 케이스와 소스가 메시지에
+     * 실려 온 것이다 (시험 실행·실험실).
+     */
     fun resolve(request: ExecutionRequest): ExecutionRequest {
-        val bundle = request.bundle ?: return request
+        val withSource = request.sourceRef?.let { request.copy(source = sourceOf(it), sourceRef = null) } ?: request
+        val bundle = withSource.bundle ?: return withSource
         val groups = groupsOf(bundle)
-        val selected = request.selection?.let { wanted ->
+        val selected = withSource.selection?.let { wanted ->
             val keys = wanted.map { it.groupId to it.caseId }.toSet()
             groups.map { group -> group.copy(cases = group.cases.filter { (group.policy.id to it.id) in keys }) }
                 .filter { it.cases.isNotEmpty() }
         } ?: groups
-        return request.copy(groups = selected, bundle = null, selection = null)
+        return withSource.copy(groups = selected, bundle = null, selection = null)
+    }
+
+    /** 소스는 캐시하지 않는다 — 제출마다 다르고, 한 번 채점하면 끝이다. digest 는 대조한다. */
+    private fun sourceOf(ref: SourceRef): String {
+        val bytes = store.get(ref.key) ?: throw IllegalStateException("소스가 스토어에 없다: ${ref.key}")
+        val actual = Sources.digest(bytes)
+        check(actual == ref.digest) {
+            "소스의 digest 가 요청과 다르다: ${ref.key} — 요청 ${ref.digest.take(12)}, 받은 것 ${actual.take(12)}"
+        }
+        return String(bytes, Charsets.UTF_8)
     }
 
     private fun groupsOf(bundle: BundleRef): List<RequestedGroup> {
@@ -60,6 +76,7 @@ class BundleResolver(private val store: BlobStore, private val cacheSize: Int = 
                 override fun put(key: String, bytes: ByteArray, contentType: String, digest: String?) = error("스토어가 없다")
                 override fun get(key: String): ByteArray? = null
                 override fun digestOf(key: String): String? = null
+                override fun delete(key: String) = Unit
             },
         )
     }

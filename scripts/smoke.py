@@ -500,6 +500,8 @@ def main() -> int:
     status, erased = raw_request("DELETE", "/auth/me", {"password": leaver.password}, leaver_auth)
     results.append(check("계정 삭제", status, 200))
     results.append(check("  제출 소스를 지웠다", erased["erased"]["submissions.submissionSources"] >= 1, True))
+    # 소스는 스토어에도 실행용 복제가 있다 (§8.3). 삭제는 둘을 함께 지운다.
+    results.append(check("  스토어의 복제도 지웠다", erased["erased"]["submissions.storedSources"] >= 1, True))
     results.append(check("  세션을 끊었다", erased["erased"]["sessions"] >= 1, True))
 
     status, _ = raw_request("POST", "/auth/login", {"email": leaver.email, "password": leaver.password},

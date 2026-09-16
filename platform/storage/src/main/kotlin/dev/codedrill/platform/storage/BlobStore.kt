@@ -28,4 +28,7 @@ interface BlobStore {
     fun digestOf(key: String): String?
 
     fun exists(key: String): Boolean = digestOf(key) != null
+
+    /** 지운다. 없어도 조용하다 — 삭제 요청(§11.3)은 두 번 와도 같은 결과여야 한다. */
+    fun delete(key: String)
 }
