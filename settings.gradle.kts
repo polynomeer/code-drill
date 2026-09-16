@@ -22,6 +22,7 @@ include(
     ":control-plane:learning",
     ":control-plane:integrity",
     ":control-plane:contest",
+    ":control-plane:project",
     ":control-plane:admin",
 
     // 실행 영역: 독립 신뢰 경계 (§5.1)

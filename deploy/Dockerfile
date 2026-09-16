@@ -37,9 +37,12 @@ WORKDIR /app
 # 문제 패키지를 이미지에 굽는다. 목록·상세 API 가 이 디렉터리를 읽으므로(§9.2),
 # 볼륨으로 빼면 "어느 콘텐츠로 뜬 서비스인가"를 이미지 태그로 말할 수 없다.
 COPY content/problems /app/content/problems
+# 프로젝트형 문제(11단계)도 같이. 숨은 테스트가 여기 있지만 API 는 시작 저장소만 내보낸다.
+COPY content/projects /app/content/projects
 COPY --from=builder /src/control-plane/app/build/libs/app-*-SNAPSHOT.jar /app/app.jar
 
 ENV CONTENT_ROOT=/app/content/problems
+ENV CONTENT_PROJECTS_ROOT=/app/content/projects
 EXPOSE 8080
 # 비특권 사용자로 돈다. 제어 영역은 사용자 코드를 실행하지 않지만, 실행하지 않는다는
 # 사실이 root 로 도는 이유가 되지는 않는다.
@@ -52,9 +55,11 @@ FROM eclipse-temurin:21-jre AS orchestrator
 WORKDIR /app
 
 COPY content/problems /app/content/problems
+COPY content/projects /app/content/projects
 COPY --from=builder /src/judge/orchestrator/build/libs/orchestrator-*-SNAPSHOT.jar /app/app.jar
 
 ENV CONTENT_ROOT=/app/content/problems
+ENV CONTENT_PROJECTS_ROOT=/app/content/projects
 EXPOSE 8081
 USER 65534:65534
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

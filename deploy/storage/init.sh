@@ -4,9 +4,9 @@
 # docker-compose.apps.yml 의 storage-init 이 스토어가 뜬 뒤 한 번 돌린다. 버킷 하나와
 # 신원 둘을 만든다 — 앱은 버킷을 만들지 않는다. 만들 수 있는 자격증명은 너무 넓다.
 #
-#   control-plane 제출 소스를 올리고 지운다 — sources/ 아래만
-#   orchestrator  번들을 올린다. 이 버킷에 읽고 쓴다
-#   runner        번들과 소스를 받는다. 이 버킷을 읽기만 한다
+#   control-plane 제출 소스와 워크스페이스를 올리고 지운다 — sources/·workspaces/ 아래만
+#   orchestrator  번들과 숨은 스위트를 올린다. 이 버킷에 읽고 쓴다
+#   runner        번들·스위트·소스·워크스페이스를 받는다. 이 버킷을 읽기만 한다
 #
 # Runner 노드를 잃어도 잃는 것은 읽기뿐이다. 번들을 바꿔치기해 다른 테스트로 채점하게
 # 만들 수는 없고, 그 시도는 어차피 Runner 자신의 digest 대조에서 걸린다.
@@ -33,11 +33,12 @@ JSON
 policy codedrill-read '"s3:GetObject", "s3:GetBucketLocation", "s3:ListBucket"'
 policy codedrill-write '"s3:GetObject", "s3:PutObject", "s3:GetBucketLocation", "s3:ListBucket"'
 
-# 제어 영역은 sources/ 아래만 — 올리고, 재채점 때 다시 묻고, 삭제 요청에 지운다. 번들은 못 건드린다.
+# 제어 영역은 sources/·workspaces/ 아래만 — 올리고, 재채점 때 다시 묻고, 삭제 요청에 지운다.
+# 번들과 숨은 스위트는 못 건드린다.
 cat > /tmp/codedrill-sources.json <<JSON
 {"Version": "2012-10-17", "Statement": [
   {"Effect": "Allow", "Action": ["s3:GetBucketLocation", "s3:ListBucket"], "Resource": ["arn:aws:s3:::$BUCKET"]},
-  {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], "Resource": ["arn:aws:s3:::$BUCKET/sources/*"]}
+  {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], "Resource": ["arn:aws:s3:::$BUCKET/sources/*", "arn:aws:s3:::$BUCKET/workspaces/*"]}
 ]}
 JSON
 mc admin policy create store codedrill-sources /tmp/codedrill-sources.json >/dev/null 2>&1 || true
@@ -50,4 +51,4 @@ mc admin policy attach store codedrill-read --user runner >/dev/null 2>&1 || tru
 mc admin user add store control-plane "$STORAGE_CONTROL_PLANE_SECRET"
 mc admin policy attach store codedrill-sources --user control-plane >/dev/null 2>&1 || true
 
-echo "스토어 준비: 버킷 $BUCKET, 신원 control-plane(sources/ 읽기·쓰기·삭제) orchestrator(읽기·쓰기) runner(읽기)"
+echo "스토어 준비: 버킷 $BUCKET, 신원 control-plane(sources/·workspaces/ 읽기·쓰기·삭제) orchestrator(읽기·쓰기) runner(읽기)"

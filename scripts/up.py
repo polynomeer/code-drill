@@ -160,6 +160,7 @@ def env_for(ports: dict) -> dict:
         STORAGE_ACCESS_KEY="codedrill",
         STORAGE_SECRET_KEY="codedrill",
         CONTENT_ROOT=str(ROOT / "content" / "problems"),
+        CONTENT_PROJECTS_ROOT=str(ROOT / "content" / "projects"),
         ADMIN_BOOTSTRAP_EMAIL=BOOTSTRAP_EMAIL,
         # 가입 한도 (§10.2). 스모크가 한 곳에서 계정 열둘을 만들므로 루프백은 세지 않고,
         # 프록시를 믿게 해 스모크가 X-Forwarded-For 로 남의 출처를 흉내 내 한도를 시험한다.
@@ -364,7 +365,7 @@ def emit_env(state: dict) -> None:
     # 앱이 읽는 주소. 인스턴스를 손으로 하나 더 띄울 때 이게 없으면 기본 포트로 붙으려다
     # 연결이 거부된다 — 비켜 간 이유가 그 포트에 남이 있기 때문이다.
     for var, value in env_for(ports).items():
-        if var in ("DB_URL", "REDIS_URL", "BROKER_URL", "CONTENT_ROOT"):
+        if var in ("DB_URL", "REDIS_URL", "BROKER_URL", "CONTENT_ROOT", "CONTENT_PROJECTS_ROOT"):
             print(f"export {var}={value}")
 
     print(f"export CODEDRILL_BASE=http://localhost:{ports['control-plane']}")

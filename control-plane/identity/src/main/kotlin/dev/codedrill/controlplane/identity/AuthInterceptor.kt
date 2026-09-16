@@ -143,7 +143,7 @@ class AuthInterceptor(
         /** 커뮤니티의 쓰기 — 질문·답·풀이·도움됐다·신고, 그리고 아레나의 기부·신고. */
         val WRITING_PATHS = listOf("/api/v1/discussions", "/api/v1/arena", "/api/v1/contests")
         /** 실행 — 제출, 테스트 실행, 실험실, 변이 평가, 아레나 시도. */
-        val EXECUTION_PATHS = listOf("/api/v1/submissions", "/api/v1/trials", "/api/v1/labs", "/api/v1/mutations", "/api/v1/arena")
+        val EXECUTION_PATHS = listOf("/api/v1/submissions", "/api/v1/trials", "/api/v1/labs", "/api/v1/mutations", "/api/v1/arena", "/api/v1/projects")
     }
 }
 
@@ -161,6 +161,8 @@ class IdentitySecurityConfig(
             .addPathPatterns(
                 "/api/v1/submissions/**", "/api/v1/workspaces/**", "/api/v1/trials/**",
                 "/api/v1/prequestions/**", "/api/v1/mutations/**", "/api/v1/coaching/**", "/api/v1/labs/**", "/api/v1/arena/**", "/api/v1/discussions/**", "/api/v1/contests/**",
+                // 프로젝트형: 제출과 그 기록은 사용자의 것. 목록·상세는 아래의 공개 경로다.
+                "/api/v1/projects/*/submissions", "/api/v1/projects/submissions/**",
                 "/api/v1/me/**", "/api/v1/auth/**",
                 // 관리자 API 도 같은 방식으로 로그인한다. 인가는 Admin 모듈이 이어서
                 // 하지만, **누구인지 확인하는 일은 한 곳에서만** 일어나야 한다 (§11.2).
@@ -172,7 +174,7 @@ class IdentitySecurityConfig(
 
         // 공개 경로지만 로그인했다면 알아본다. 목록에 "푼 문제"를 표시하기 위해서다.
         registry.addInterceptor(AuthInterceptor(identity, json, required = false))
-            .addPathPatterns("/api/v1/problems/**", "/api/v1/problems")
+            .addPathPatterns("/api/v1/problems/**", "/api/v1/problems", "/api/v1/projects", "/api/v1/projects/*")
             .order(AUTHENTICATION_ORDER)
     }
 

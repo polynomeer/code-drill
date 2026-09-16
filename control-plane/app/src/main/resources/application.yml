@@ -67,6 +67,8 @@ codedrill:
     directory: ${STORAGE_DIRECTORY:}
   content:
     root: ${CONTENT_ROOT:content/problems}
+    # 프로젝트형 문제 (11단계). 형제 디렉터리다.
+    projects-root: ${CONTENT_PROJECTS_ROOT:content/projects}
   outbox:
     poll-interval-ms: 200
 

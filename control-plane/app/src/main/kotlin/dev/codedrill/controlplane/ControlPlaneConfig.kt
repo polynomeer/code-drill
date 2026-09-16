@@ -67,6 +67,14 @@ import dev.codedrill.controlplane.submission.SourceStore
 import dev.codedrill.judge.protocol.SourceRef
 import dev.codedrill.judge.protocol.Sources
 import dev.codedrill.platform.storage.BlobStore
+import dev.codedrill.controlplane.project.ProjectPersonalData
+import dev.codedrill.controlplane.project.ProjectService
+import dev.codedrill.controlplane.project.PublishedProjects
+import dev.codedrill.controlplane.project.WorkspaceStore
+import dev.codedrill.judge.protocol.ProjectQueued
+import dev.codedrill.judge.protocol.WorkspaceRef
+import dev.codedrill.judge.protocol.Workspaces
+import dev.codedrill.platform.problempackage.ProjectPackageLoader
 import dev.codedrill.controlplane.workspace.AnchorableSubmissions
 import dev.codedrill.controlplane.workspace.ApprovedDonations
 import dev.codedrill.controlplane.workspace.DiscussionRepository
@@ -207,6 +215,40 @@ class ControlPlaneConfig {
         }
 
         override fun delete(submissionId: String) = store.delete(Sources.key(submissionId))
+    }
+
+    // --- 프로젝트형 문제 (feature-roadmap 11단계) ---
+
+    /** 알고리즘 문제의 형제 디렉터리. 오케스트레이터도 같은 곳을 읽는다. */
+    @Bean
+    fun projectPackageLoader(@Value("\${codedrill.content.projects-root}") root: String) =
+        ProjectPackageLoader(Path.of(root))
+
+    /** 프로젝트형 문제도 문제다 — 같은 표에 등록·공개된다 (§3.2). 디렉터리가 다르니 겹치지 않는다. */
+    @Bean
+    fun publishedProjects(publish: PublishService) = PublishedProjects { publish.publishedProblemIds() }
+
+    /**
+     * 워크스페이스가 실행 영역으로 가는 길 (§8.3). 소스 스토어와 같은 분담이다 — DB 의 파일이
+     * 원본, 스토어의 것은 실행용 복제.
+     */
+    @Bean
+    fun workspaceStore(store: BlobStore) = object : WorkspaceStore {
+        override fun store(submissionId: String, files: Map<String, String>): WorkspaceRef {
+            val bytes = Workspaces.encode(files)
+            val ref = WorkspaceRef(Workspaces.workspaceKey(submissionId), Workspaces.digest(bytes))
+            store.put(ref.key, bytes, Workspaces.CONTENT_TYPE, ref.digest)
+            return ref
+        }
+
+        override fun delete(submissionId: String) = store.delete(Workspaces.workspaceKey(submissionId))
+    }
+
+    @Bean
+    fun projectPersonalArea(data: ProjectPersonalData) = object : PersonalData {
+        override val area = "projects"
+        override fun export(userId: String) = data.export(userId)
+        override fun erase(userId: String) = data.erase(userId)
     }
 
     @Bean
@@ -795,6 +837,10 @@ class ControlPlaneConfig {
             // 봉투에 들어 있어, 짝지을 것도 잃어버렸는지 셀 것도 없다.
             MutationService.MUTATION_EVENT -> OutboxRoute(JudgeQueues.MUTATIONS) {
                 mapper.readValue<MutationRequest>(it)
+            }
+            // 프로젝트형 제출 (11단계). 오케스트레이터를 거친다 — 임대와 fencing 이 있는 판정이다.
+            ProjectService.PROJECT_EVENT -> OutboxRoute(JudgeQueues.PROJECT_SUBMISSIONS) {
+                mapper.readValue<ProjectQueued>(it)
             }
             else -> null
         }

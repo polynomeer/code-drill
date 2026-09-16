@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import pathlib
 import os
 import sys
 import time
@@ -1389,6 +1390,85 @@ def main() -> int:
     results.append(check("  진 쪽은 내렸다", request("GET", "/contests/me/rating", None, honest.headers)["rating"], 1468))
     request("GET", f"/contests/{rated['id']}")
     results.append(check("  두 번 적용하지 않는다", request("GET", "/contests/me/rating")["rating"], 1532))
+
+    print("\n프로젝트형 문제 (로드맵 11단계 — 두 번째 판정기)")
+    project_root = pathlib.Path(__file__).resolve().parents[1] / "content" / "projects" / "inventory-ledger"
+
+    def overlay(*dirs: pathlib.Path) -> dict[str, str]:
+        files: dict[str, str] = {}
+        for base in dirs:
+            for path in sorted(base.rglob("*")):
+                if path.is_file():
+                    files[path.relative_to(base).as_posix()] = path.read_text()
+        return files
+
+    def await_project(submission_id: str, headers: dict | None = None) -> dict:
+        deadline = time.time() + TIMEOUT * 3
+        last: dict = {}
+        while time.time() < deadline:
+            last = request("GET", f"/projects/submissions/{submission_id}", None, headers)
+            if last["status"] == "COMPLETED":
+                return last
+            time.sleep(1)
+        raise TimeoutError(f"프로젝트 판정이 끝나지 않았다: {last.get('status')}")
+
+    status, _ = raw_request("POST", "/projects/inventory-ledger/submissions", {"files": {"a.py": ""}}, {"Authorization": "", "Idempotency-Key": "p-noauth"})
+    results.append(check("토큰 없는 프로젝트 제출 거부", status, 401))
+    status, projects = raw_request("GET", "/projects", None, {"Authorization": ""})
+    results.append(check("프로젝트 목록은 공개", (status, [p["id"] for p in projects]), (200, ["inventory-ledger"])))
+    results.append(check("  역량 없이 난이도·태그·요약만", (projects[0]["difficulty"], projects[0]["tags"], projects[0]["solved"]), ("MEDIUM", ["queue", "simulation"], False)))
+    view = request("GET", "/projects/inventory-ledger")
+    results.append(check("상세는 시작 저장소를 준다", sorted(view["files"]), ["ledger/__init__.py", "ledger/inventory.py", "tests/__init__.py", "tests/test_public.py"]))
+    results.append(check("  숨은 테스트는 어디에도 없다", any("hidden" in path or "test_hidden" in content for path, content in view["files"].items()) or "hidden" in view["statement"].lower(), False))
+    results.append(check("  공개 테스트 모듈", view["publicTests"], ["tests.test_public"]))
+    results.append(check("  한도는 분 단위", (view["limits"]["buildSeconds"], view["limits"]["testSeconds"]), (60, 120)))
+    status, _ = raw_request("GET", "/projects/no-such-project")
+    results.append(check("없는 프로젝트는 404", status, 404))
+
+    status, rejected = raw_request("POST", "/projects/inventory-ledger/submissions", {"files": {"../escape.py": "x"}}, {"Idempotency-Key": f"p-escape-{uuid.uuid4()}"})
+    results.append(check("밖을 가리키는 경로는 거절", (status, "상위" in rejected["message"]), (400, True)))
+    status, rejected = raw_request("POST", "/projects/inventory-ledger/submissions", {"files": {"big.py": "x" * (300 * 1024)}}, {"Idempotency-Key": f"p-big-{uuid.uuid4()}"})
+    results.append(check("너무 큰 파일은 거절", status, 400))
+
+    starter = view["files"]
+    reference = {**starter, **overlay(project_root / "reference")}
+    key = f"p-ref-{uuid.uuid4()}"
+    status, accepted = raw_request("POST", "/projects/inventory-ledger/submissions", {"files": reference}, {"Idempotency-Key": key})
+    results.append(check("참조 구현을 제출했다", (status, accepted["status"]), (202, "QUEUED")))
+    status, again = raw_request("POST", "/projects/inventory-ledger/submissions", {"files": reference}, {"Idempotency-Key": key})
+    results.append(check("  같은 키는 같은 제출", again["id"], accepted["id"]))
+    final = await_project(accepted["id"])
+    results.append(check("참조 구현은 ACCEPTED", (final["verdict"], final["score"]), ("ACCEPTED", 100)))
+    results.append(check("  공개 테스트 셋은 이름과 함께", sorted(t["name"] for t in final["tests"]), ["PublicTests.test_receive_then_on_hand", "PublicTests.test_rejects_non_positive_quantity", "PublicTests.test_ship_uses_oldest_lot_first"]))
+    results.append(check("  숨은 테스트는 수로만", (final["hiddenPassed"], final["hiddenTotal"], any(t["module"] == "tests.test_hidden" for t in final["tests"])), (10, 10, False)))
+    results.append(check("  제출한 파일이 함께 온다", sorted(final["files"]) == sorted(reference), True))
+    results.append(check("목록에 완료 표시", request("GET", "/projects")[0]["solved"], True))
+
+    mutant = {**starter, **overlay(project_root / "mutants" / "partial-lot--drops-remainder")}
+    wrong = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": mutant}, {"Idempotency-Key": f"p-mut-{uuid.uuid4()}"})["id"])
+    results.append(check("로트 나머지를 버리는 오답은 WRONG_ANSWER", (wrong["verdict"], wrong["hiddenTotal"] - wrong["hiddenPassed"] >= 1), ("WRONG_ANSWER", True)))
+    failed_public = [t for t in wrong["tests"] if not t["passed"]]
+    results.append(check("  공개 테스트의 실패 사유는 보인다", (len(failed_public), failed_public[0]["message"] is not None), (1, True)))
+    # 공개 3 + 숨은 10 = 13 이 각각 한 표다. 공개·숨은 것을 가리지 않는다.
+    passed_count = len(wrong["tests"]) - len(failed_public) + wrong["hiddenPassed"]
+    results.append(check("  점수는 통과 비율", wrong["score"], passed_count * 100 // (len(wrong["tests"]) + wrong["hiddenTotal"])))
+
+    hijack = {**reference, "tests/test_hidden.py": "import unittest\nclass Nothing(unittest.TestCase):\n    def test_pass(self):\n        pass\n", "ledger/inventory.py": starter["ledger/inventory.py"]}
+    hijacked = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": hijack}, {"Idempotency-Key": f"p-hijack-{uuid.uuid4()}"})["id"])
+    results.append(check("숨은 테스트 파일을 갈아 끼워도 숨은 것이 돈다", (hijacked["verdict"], hijacked["hiddenTotal"], hijacked["hiddenPassed"]), ("WRONG_ANSWER", 10, 0)))
+
+    tamper = {**starter, **overlay(project_root / "mutants" / "tamper--patches-unittest")}
+    tampered = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": tamper}, {"Idempotency-Key": f"p-tamper-{uuid.uuid4()}"})["id"])
+    results.append(check("테스트 기반을 손대면 전부 실패", (tampered["verdict"], tampered["score"], "테스트 기반이 바뀌었다" in (tampered["log"] or "")), ("WRONG_ANSWER", 0, True)))
+
+    broken = {**starter, "ledger/inventory.py": "def broken(:\n"}
+    compile_error = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": broken}, {"Idempotency-Key": f"p-syntax-{uuid.uuid4()}"})["id"])
+    results.append(check("문법 오류는 COMPILE_ERROR", (compile_error["verdict"], "inventory.py" in compile_error["log"]), ("COMPILE_ERROR", True)))
+
+    history = request("GET", "/projects/submissions?projectId=inventory-ledger")
+    results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))
+    status, _ = raw_request("GET", f"/projects/submissions/{accepted['id']}", None, honest.headers)
+    results.append(check("남의 프로젝트 제출은 404", status, 404))
 
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
