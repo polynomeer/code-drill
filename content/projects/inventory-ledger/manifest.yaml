@@ -1,0 +1,14 @@
+# 프로젝트형 문제 manifest (feature-roadmap 11단계, ProjectPackage 에 모양이 있다).
+# 이 파일과 starter/·hidden/ 의 내용이 packageDigest 를 정한다. 공개 후에는 불변이다.
+
+id: inventory-ledger
+version: 1
+title: 재고 원장
+language: PYTHON
+statement: statement.md
+
+# 분 단위다. 빌드 한 번, 숨은 스위트 한 번.
+limits:
+  buildSeconds: 60
+  testSeconds: 120
+  memoryMb: 256
