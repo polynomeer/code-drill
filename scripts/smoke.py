@@ -1465,6 +1465,16 @@ def main() -> int:
     compile_error = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": broken}, {"Idempotency-Key": f"p-syntax-{uuid.uuid4()}"})["id"])
     results.append(check("문법 오류는 COMPILE_ERROR", (compile_error["verdict"], "inventory.py" in compile_error["log"]), ("COMPILE_ERROR", True)))
 
+    # 공개된 프로젝트 전부의 참조가 정답이다 — 하나가 아니라 목록이다. 문제를 더하면 저절로 검사한다.
+    for summary in request("GET", "/projects"):
+        if summary["id"] == "inventory-ledger":
+            continue
+        each_root = project_root.parent / summary["id"]
+        each_view = request("GET", f"/projects/{summary['id']}")
+        each_ref = {**each_view["files"], **overlay(each_root / "reference")}
+        each = await_project(request("POST", f"/projects/{summary['id']}/submissions", {"files": each_ref}, {"Idempotency-Key": f"p-{summary['id']}-{uuid.uuid4()}"})["id"])
+        results.append(check(f"{summary['id']} 의 참조는 ACCEPTED", (each["verdict"], each["hiddenPassed"] == each["hiddenTotal"], each["hiddenTotal"] > 0), ("ACCEPTED", True, True)))
+
     history = request("GET", "/projects/submissions?projectId=inventory-ledger")
     results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))
     # 필터 없이도. `? IS NULL` 하나만 있는 자리에 Postgres 가 타입을 못 정해 500 이 났었다.
