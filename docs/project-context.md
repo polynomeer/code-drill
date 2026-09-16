@@ -47,10 +47,10 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 경로 | 배포 단위 | 경계 |
 |---|---|---|
 | `platform/` | 라이브러리 | 세 영역이 공유하는 기반(오류 코드·아웃박스·상관관계 ID) |
-| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 10개를 조립하는 모듈형 모놀리스 |
+| `control-plane/` | Spring Boot 앱 1개 | 도메인 모듈 11개를 조립하는 모듈형 모놀리스 |
 | `judge/orchestrator`, `judge/runner-agent` | 각각 별도 앱 | Control DB·인터넷에 직접 접근하지 않는 실행 영역 |
 | `judge/protocol` | 라이브러리 | 제어 영역 ↔ 실행 영역 메시지 계약 |
-| `content/` | 데이터 | 문제 패키지. 실행 영역의 read-only 아티팩트 자리 |
+| `content/` | 데이터 | 문제 패키지(`problems/`)와 프로젝트형 문제(`projects/`). 실행 영역의 read-only 아티팩트 자리 |
 | `web/` | 정적 자산 | React + TS + Monaco |
 
 도메인 모듈이 서로를 직접 참조하면 `./gradlew checkModuleBoundaries` 가 빌드를 깬다.
@@ -76,6 +76,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Admin | review, publish, rejudge, audit | 감사 로그 우회 |
 | Integrity | submission fingerprint, similarity flag | 소스 보관, 판정·계정 변경 |
 | Contest | contest, entry, score, rating | 제출·판정 변경, 문제 공개 상태 변경 |
+| Project | project submission, submission file | 다른 도메인 모듈. 공개 여부와 스토어는 조립 지점이 잇는다 |
 
 ## 문제 패키지 값 타입
 
@@ -118,7 +119,9 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Trace Event | 코드 줄이 아니라 의미 단위(compare, swap, push, enqueue…)로 기록하는 실행 이벤트 |
 | Trace manifest | 트레이스 목차. 청크 범위와 요약을 담고 이벤트 본문은 담지 않는다 (§7.4) |
 | Transfer | 힌트 없이 변형 문제를 푸는 것. 역량 증거의 최상위 가중치 |
-| 프로젝트형 문제 | 파일 여럿을 빌드해 숨은 테스트 스위트로 채점하는 문제. 원본의 "저장소형 프로젝트 평가"·"저장소형 실무 과제"와 같은 것. 아직 없다 — [feature-roadmap.md](feature-roadmap.md) 11단계 |
+| 프로젝트형 문제 | 파일 여럿을 빌드해 숨은 테스트 스위트로 채점하는 문제. 원본의 "저장소형 프로젝트 평가"·"저장소형 실무 과제"와 같은 것. 두 번째 판정기가 채점한다 — 봉투(`ProjectRequest`)·큐·채점 규칙이 알고리즘 판정과 따로고 격리·임대·fencing 만 같다. 패키지 모양은 `content/projects/README.md` ([feature-roadmap.md](feature-roadmap.md) 11단계) |
+| 워크스페이스 (workspace) | 프로젝트형 제출의 파일 묶음. 경로 → 내용을 JSON 으로 적어 스토어에 두고 메시지에는 참조와 digest 만 실린다. 채점 때 숨은 스위트가 그 위에 덮인다 |
+| 테스트 기반 가드 (tamper guard) | 프로젝트형 하네스가 사용자 코드를 들이기 전에 unittest 를 기억해 두고, 끝난 뒤 바뀌었는지와 반드시 실패해야 하는 카나리가 통과했는지를 본다. 걸리면 전부 실패다. 증명이 아니라 가드다 |
 
 ## 판정 상태 머신
 

@@ -183,9 +183,11 @@ python3 scripts/publish-content.py
 ```
 
 앞 명령이 §6.3 파이프라인(스키마·공식 해답·결정성·제약 여유·mutant kill rate·시각화
-예산)을 돌려 보고서를 남기고, 뒤 명령이 통과한 버전만 등록·공개한다. 30문제 전체를
-돌리므로 몇 분 걸린다. 문제를 추가하는 방법은 [content/tools/README.md](../content/tools/README.md)
-에 있다. 시딩 스크립트는
+예산)을 돌려 보고서를 남기고, 뒤 명령이 통과한 버전만 등록·공개한다. 전체를 돌리므로
+몇십 분 걸린다. 프로젝트형 문제(`content/projects`)도 같은 두 명령이 검증하고 공개한다 —
+보고서 모양이 같아 공개 흐름은 둘을 가르지 않는다. 문제를 추가하는 방법은
+[content/tools/README.md](../content/tools/README.md), 프로젝트형은
+[content/projects/README.md](../content/projects/README.md) 에 있다. 시딩 스크립트는
 시드 운영자 중 서로 다른 두 계정을 골라 쓰므로 로컬·CI 전용이다 — 사람이 하는
 공개는 등록과 승인을 각각 다른 사람이 해야 2인 승인이 의미를 갖는다.
 
