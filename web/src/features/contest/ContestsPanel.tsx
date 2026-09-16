@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { getContest, joinContest, joinDuel, listContests, openDuel } from '../../api/client'
 import type { ContestSummary, ContestView } from '../../shared/types'
 
+const KIND_LABEL: Record<ContestSummary['kind'], string> = { CONTEST: '대회', DUEL: '미니 대결', HACK: '반례 대전' }
+
 const STATUS_LABEL: Record<ContestSummary['status'], string> = {
   DRAFT: '준비 중',
   WAITING: '상대를 기다림',
@@ -79,10 +81,13 @@ export function ContestsPanel({
           </button>
           <h4>{open.contest.title}</h4>
           <p className="muted small">
-            {STATUS_LABEL[open.contest.status]}
+            {KIND_LABEL[open.contest.kind]} · {STATUS_LABEL[open.contest.status]}
             {open.contest.endsAt && open.contest.status === 'RUNNING' && <> · {new Date(open.contest.endsAt).toLocaleTimeString()} 까지</>}
             {' · '}참가 {open.contest.entrants}
           </p>
+          {open.contest.kind === 'HACK' && (
+            <p className="muted small">문제를 맞힌 뒤 아레나에서 깨뜨린 서로 다른 오답의 수가 점수입니다. 정답 자체는 점수가 아닙니다.</p>
+          )}
           {open.joinCode && (
             <p className="small">
               상대에게 알릴 코드: <code className="mono">{open.joinCode}</code> — 상대가 붙는 순간 시작합니다.
@@ -113,8 +118,8 @@ export function ContestsPanel({
               <tr>
                 <th>#</th>
                 <th>이름</th>
-                <th>총점</th>
-                <th>푼 문제</th>
+                <th>{open.contest.kind === 'HACK' ? '깨뜨린 오답' : '총점'}</th>
+                <th>{open.contest.kind === 'HACK' ? '문제' : '푼 문제'}</th>
               </tr>
             </thead>
             <tbody>
@@ -142,7 +147,7 @@ export function ContestsPanel({
                   </button>
                   <span className="muted small">
                     {' '}
-                    {STATUS_LABEL[c.status]} · 문제 {c.problemCount} · 참가 {c.entrants}
+                    {KIND_LABEL[c.kind]} · {STATUS_LABEL[c.status]} · 문제 {c.problemCount} · 참가 {c.entrants}
                     {c.joined && ' · 참가 중'}
                   </span>
                 </li>

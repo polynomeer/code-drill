@@ -720,7 +720,7 @@ export type ContestStatus = 'DRAFT' | 'WAITING' | 'SCHEDULED' | 'RUNNING' | 'FIN
 
 export interface ContestSummary {
   id: string
-  kind: 'CONTEST' | 'DUEL'
+  kind: 'CONTEST' | 'DUEL' | 'HACK'
   title: string
   status: ContestStatus
   startsAt: string | null
