@@ -177,14 +177,16 @@ docker compose -f deploy/docker-compose.yml exec -e PW=<비밀번호> rabbitmq s
 
 | 신원 | 할 수 있는 것 |
 |---|---|
-| `orchestrator` | 이 버킷에 읽고 쓴다 |
-| `runner` | 이 버킷을 읽는다 |
+| `control-plane` | `sources/` 아래만 올리고 지운다 — 제출 소스 (§8.3) |
+| `orchestrator` | 이 버킷에 읽고 쓴다 — 테스트 번들 |
+| `runner` | 이 버킷을 읽는다 — 번들과 소스 |
 
-둘 다 지우지 못하고 버킷을 만들지 못한다. 앱이 버킷을 만들 수 있다는 것은 곧 그 자격증명이
-너무 넓다는 뜻이다. 비밀 둘은 밖에서 준다.
+지우는 것은 제어 영역만, 그것도 `sources/` 아래만이다 — 삭제 요청(§11.3)이 그 길을 쓴다.
+아무도 버킷을 만들지 못한다. 앱이 버킷을 만들 수 있다는 것은 곧 그 자격증명이 너무 넓다는
+뜻이다. 비밀 셋은 밖에서 준다.
 
 ```bash
-STORAGE_ORCHESTRATOR_SECRET=… STORAGE_RUNNER_SECRET=… AUTH_ORIGIN_SALT=… \
+STORAGE_CONTROL_PLANE_SECRET=… STORAGE_ORCHESTRATOR_SECRET=… STORAGE_RUNNER_SECRET=… AUTH_ORIGIN_SALT=… \
   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.apps.yml --profile apps up -d
 ```
 
