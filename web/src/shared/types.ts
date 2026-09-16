@@ -729,6 +729,9 @@ export interface ContestSummary {
   joined: boolean
   entrants: number
   problemCount: number
+  /** 레이팅 대회인가, 끝난 뒤 적용됐는가 (§8.4). */
+  rated: boolean
+  ratedAt: string | null
 }
 
 export interface Standing {
@@ -742,6 +745,15 @@ export interface Standing {
   lastSolvedAt: string | null
   elapsedSeconds: number | null
   perProblem: Record<string, number>
+  /** 레이팅이 적용됐으면 변화. */
+  ratingChange: number | null
+}
+
+/** 내 레이팅 (§8.4). 변화의 합이라 언제든 다시 셀 수 있다. */
+export interface Rating {
+  rating: number
+  contests: number
+  history: { contestId: string; title: string; rank: number; before: number; after: number; appliedAt: string }[]
 }
 
 export interface ContestView {

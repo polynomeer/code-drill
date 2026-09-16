@@ -81,7 +81,9 @@ export function ContestsPanel({
           </button>
           <h4>{open.contest.title}</h4>
           <p className="muted small">
-            {KIND_LABEL[open.contest.kind]} · {STATUS_LABEL[open.contest.status]}
+            {KIND_LABEL[open.contest.kind]}
+            {open.contest.rated && ' · 레이팅'}
+            {' · '}{STATUS_LABEL[open.contest.status]}
             {open.contest.endsAt && open.contest.status === 'RUNNING' && <> · {new Date(open.contest.endsAt).toLocaleTimeString()} 까지</>}
             {' · '}참가 {open.contest.entrants}
           </p>
@@ -137,6 +139,7 @@ export function ContestsPanel({
                 <th>이름</th>
                 <th>{open.contest.kind === 'HACK' ? '깨뜨린 오답' : '총점'}</th>
                 <th>{open.contest.kind === 'HACK' ? '문제' : '푼 문제'}</th>
+                {open.contest.ratedAt && <th>Δ</th>}
               </tr>
             </thead>
             <tbody>
@@ -150,6 +153,11 @@ export function ContestsPanel({
                   </td>
                   <td>{s.total}</td>
                   <td>{s.solved}</td>
+                  {open.contest.ratedAt && (
+                    <td className={s.ratingChange !== null && s.ratingChange < 0 ? 'warn' : undefined}>
+                      {s.ratingChange !== null && s.ratingChange > 0 ? `+${s.ratingChange}` : s.ratingChange ?? ''}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -168,7 +176,8 @@ export function ContestsPanel({
                   </button>
                   <span className="muted small">
                     {' '}
-                    {KIND_LABEL[c.kind]} · {STATUS_LABEL[c.status]} · 문제 {c.problemCount} · 참가 {c.entrants}
+                    {KIND_LABEL[c.kind]}
+                    {c.rated && ' · 레이팅'} · {STATUS_LABEL[c.status]} · 문제 {c.problemCount} · 참가 {c.entrants}
                     {c.joined && ' · 참가 중'}
                   </span>
                 </li>

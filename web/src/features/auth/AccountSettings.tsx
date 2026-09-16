@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getContributions, changePassword, deleteAccount, exportAccount, rename } from '../../api/client'
+import { getContributions, getMyRating, changePassword, deleteAccount, exportAccount, rename } from '../../api/client'
 import type { Session } from '../../api/session'
-import type { Contributions } from '../../shared/types'
+import type { Contributions, Rating } from '../../shared/types'
 
 /**
  * 계정 설정 (기획서 부록 A 계정 도메인, 기술 설계서 §11.3).
@@ -24,8 +24,10 @@ export function AccountSettings({
 }) {
   const [name, setName] = useState(session.displayName)
   const [contributions, setContributions] = useState<Contributions | null>(null)
+  const [rating, setRating] = useState<Rating | null>(null)
   useEffect(() => {
     getContributions().then(setContributions).catch(() => setContributions(null))
+    getMyRating().then(setRating).catch(() => setRating(null))
   }, [])
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -74,6 +76,13 @@ export function AccountSettings({
       {error && <p className="warn">{error}</p>}
       {note && <p className="muted">{note}</p>}
 
+      {/* 레이팅 (§8.4). 레이팅 대회가 끝날 때마다 움직인다. 첫 몇 대회는 잠정이다. */}
+      {rating && (
+        <p className="small">
+          레이팅 <strong>{rating.rating}</strong> · 레이팅 대회 {rating.contests}
+          {rating.contests > 0 && rating.contests < 5 && <span className="muted"> · 잠정</span>}
+        </p>
+      )}
       {/* 기여 (§8.5 기여자 평판). 수치는 본인에게만 — 남에게는 글에 실리는 등급뿐이다. */}
       {contributions && (
         <p className="small">
