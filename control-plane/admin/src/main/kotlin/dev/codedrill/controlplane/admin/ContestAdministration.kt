@@ -11,7 +11,8 @@ import java.util.UUID
  */
 interface ContestAdministration {
 
-    fun create(createdBy: String, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant): ArenaModeration.Decision
+    /** [kind] 는 CONTEST 나 HACK. 대결은 사용자가 연다. */
+    fun create(createdBy: String, kind: String, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant): ArenaModeration.Decision
 
     /** 만든 사람은 못 연다 — 2인 원칙. */
     fun publish(id: UUID, actor: String): ArenaModeration.Decision

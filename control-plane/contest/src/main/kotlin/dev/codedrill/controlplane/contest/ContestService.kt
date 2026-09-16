@@ -32,7 +32,7 @@ class ContestService(
         val contest = repository.find(id) ?: return null
         val entry = repository.entry(id, userId)
         // 공개 전 대회는 없는 것이다. 대결은 코드를 아는 사람에게만 열리므로, 참가하지 않았으면 없는 것이다.
-        if (contest.kind == Contest.Kind.CONTEST && !contest.published) return null
+        if (contest.kind != Contest.Kind.DUEL && !contest.published) return null
         if (contest.kind == Contest.Kind.DUEL && entry == null) return null
         return ContestView(
             contest = contest.summary(entry != null, repository.entryCount(id)),
@@ -67,7 +67,7 @@ class ContestService(
      */
     @Transactional
     fun join(userId: String, displayName: String, id: UUID): JoinOutcome {
-        val contest = repository.find(id)?.takeIf { it.kind == Contest.Kind.CONTEST && it.published } ?: return JoinOutcome.Invalid("그런 대회가 없다")
+        val contest = repository.find(id)?.takeIf { it.kind != Contest.Kind.DUEL && it.published } ?: return JoinOutcome.Invalid("그런 대회가 없다")
         if (contest.status() == Contest.Status.FINISHED) return JoinOutcome.Invalid("끝난 대회다")
         return if (repository.join(id, userId, displayName)) JoinOutcome.Joined(contest.summary(true, repository.entryCount(id))) else JoinOutcome.AlreadyJoined
     }
@@ -100,14 +100,15 @@ class ContestService(
 
     // --- 운영자 -----------------------------------------------------------------
 
-    fun create(createdBy: String, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant): AdminOutcome {
+    fun create(createdBy: String, kind: Contest.Kind, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant): AdminOutcome {
+        if (kind == Contest.Kind.DUEL) return AdminOutcome.Rejected("대결은 사용자가 연다")
         if (title.isBlank()) return AdminOutcome.Rejected("제목이 필요하다")
         if (problemIds.isEmpty() || problemIds.size > MAX_PROBLEMS) return AdminOutcome.Rejected("문제는 1~${MAX_PROBLEMS}개")
         if (problemIds.toSet().size != problemIds.size) return AdminOutcome.Rejected("같은 문제가 두 번 있다")
         problemIds.firstOrNull { !problems.published(it) }?.let { return AdminOutcome.Rejected("공개된 문제가 아니다: $it") }
         if (!endsAt.isAfter(startsAt)) return AdminOutcome.Rejected("끝이 시작보다 뒤여야 한다")
         val contest = Contest(
-            id = UUID.randomUUID(), kind = Contest.Kind.CONTEST, title = title.trim(), createdBy = createdBy,
+            id = UUID.randomUUID(), kind = kind, title = title.trim(), createdBy = createdBy,
             startsAt = startsAt, endsAt = endsAt, minutes = null, published = false, joinCode = null, createdAt = Instant.now(),
         )
         repository.insert(contest, problemIds)
@@ -116,7 +117,7 @@ class ContestService(
 
     /** 연다. 만든 사람은 못 연다 — 문제 공개와 같은 2인 원칙이다 (§11.2). */
     fun publish(id: UUID, actor: String): AdminOutcome {
-        val contest = repository.find(id)?.takeIf { it.kind == Contest.Kind.CONTEST } ?: return AdminOutcome.Rejected("그런 대회가 없다")
+        val contest = repository.find(id)?.takeIf { it.kind != Contest.Kind.DUEL } ?: return AdminOutcome.Rejected("그런 대회가 없다")
         if (contest.createdBy == actor) return AdminOutcome.Rejected("만든 사람은 열지 못한다 — 다른 사람이 연다 (2인 승인)")
         if (repository.publish(id) == 0) return AdminOutcome.Rejected("이미 공개된 대회다")
         return AdminOutcome.Decided(repository.find(id)!!)
@@ -127,8 +128,18 @@ class ContestService(
     /** 판정이 확정됐다. 참가 중이고 돌고 있으며 이 문제를 건 대회에만 점수를 적는다. */
     @Transactional
     fun judged(userId: String, problemId: String, score: Int, full: Boolean, submittedAt: Instant) {
-        for (contest in repository.runningFor(userId, problemId, submittedAt)) {
+        for (contest in repository.runningFor(userId, problemId, submittedAt, SOLVING)) {
             repository.score(contest.id, userId, problemId, score, full, submittedAt)
+        }
+    }
+
+    /** 반례 대전 중에 과녁을 깨뜨렸다 (§8.4). 서로 다른 과녁의 수가 점수다. */
+    @Transactional
+    fun hacked(userId: String, problemId: String, targets: List<String>, at: Instant) {
+        if (targets.isEmpty()) return
+        for (contest in repository.runningFor(userId, problemId, at, setOf(Contest.Kind.HACK))) {
+            val fresh = targets.count { repository.hack(contest.id, userId, problemId, it, at) }
+            if (fresh > 0) repository.scoreHack(contest.id, userId, problemId, repository.hackCount(contest.id, userId, problemId), at)
         }
     }
 
@@ -164,6 +175,8 @@ class ContestService(
     }
 
     companion object {
+        /** 판정이 점수인 종류. 반례 대전은 판정이 아니라 깨뜨린 과녁이 점수다. */
+        val SOLVING = setOf(Contest.Kind.CONTEST, Contest.Kind.DUEL)
         const val LIST_LIMIT = 50
         const val MAX_PROBLEMS = 10
         const val MIN_DUEL_MINUTES = 5

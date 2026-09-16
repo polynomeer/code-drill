@@ -4,7 +4,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * 대회 (기획서 §8.4). 비레이팅 연습 대회([Kind.CONTEST])와 미니 대결([Kind.DUEL]).
+ * 대회 (기획서 §8.4). 비레이팅 연습 대회([Kind.CONTEST]), 미니 대결([Kind.DUEL]), 반례 대전([Kind.HACK]).
  *
  * 상태는 저장하지 않고 시각에서 읽는다 — 저장하면 시계와 어긋난다. 대회는 공개 전이면
  * [Status.DRAFT], 시작 전이면 [Status.SCHEDULED], 중이면 [Status.RUNNING], 끝나면
@@ -35,7 +35,8 @@ data class Contest(
 
     fun running(now: Instant = Instant.now()) = status(now) == Status.RUNNING
 
-    enum class Kind { CONTEST, DUEL }
+    /** 대회(문제를 푼다), 대결(둘이 문제 하나를 푼다), 반례 대전(맞힌 뒤 과녁을 깨뜨린다). */
+    enum class Kind { CONTEST, DUEL, HACK }
     enum class Status { DRAFT, WAITING, SCHEDULED, RUNNING, FINISHED }
 }
 

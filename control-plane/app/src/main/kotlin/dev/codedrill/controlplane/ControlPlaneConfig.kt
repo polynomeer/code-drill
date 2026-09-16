@@ -437,7 +437,7 @@ class ControlPlaneConfig {
     }
 
     @Bean
-    fun workspaceLearningSignals(service: CompetencyService) = object : WorkspaceLearningSignals {
+    fun workspaceLearningSignals(service: CompetencyService, contests: ContestService) = object : WorkspaceLearningSignals {
         override fun answered(
             userId: String,
             problemId: String,
@@ -464,7 +464,13 @@ class ControlPlaneConfig {
             broken: Int,
             total: Int,
             kinds: List<DefectKind>,
-        ) = service.brokeMutants(userId, problemId, attemptId, broken, total)
+            targets: List<String>,
+            at: java.time.Instant,
+        ) {
+            service.brokeMutants(userId, problemId, attemptId, broken, total)
+            // 반례 대전 중에 깨뜨린 과녁은 그 대회의 점수다 (§8.4). 학습 기록을 막지 않는다.
+            runCatching { contests.hacked(userId, problemId, targets, at) }
+        }
     }
 
     /** 아레나의 잠금 — 이 문제를 맞혔나 (§3.1 조립 지점, §8.3). */
@@ -661,8 +667,11 @@ class ControlPlaneConfig {
 
     @Bean
     fun contestAdministration(contests: ContestService) = object : ContestAdministration {
-        override fun create(createdBy: String, title: String, problemIds: List<String>, startsAt: java.time.Instant, endsAt: java.time.Instant) =
-            contests.create(createdBy, title, problemIds, startsAt, endsAt).asDecision()
+        override fun create(createdBy: String, kind: String, title: String, problemIds: List<String>, startsAt: java.time.Instant, endsAt: java.time.Instant): ArenaModeration.Decision {
+            val parsed = dev.codedrill.controlplane.contest.Contest.Kind.entries.firstOrNull { it.name == kind }
+                ?: return ArenaModeration.Decision.rejected("대회 종류가 아니다: $kind (CONTEST, HACK)")
+            return contests.create(createdBy, parsed, title, problemIds, startsAt, endsAt).asDecision()
+        }
 
         override fun publish(id: java.util.UUID, actor: String) = contests.publish(id, actor).asDecision()
 

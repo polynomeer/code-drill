@@ -32,7 +32,7 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
     fun visible(userId: String, limit: Int): List<Contest> = jdbc.query(
         """
         SELECT c.* FROM contest c
-         WHERE (c.kind = 'CONTEST' AND c.published)
+         WHERE (c.kind IN ('CONTEST', 'HACK') AND c.published)
             OR (c.kind = 'DUEL' AND EXISTS (SELECT 1 FROM contest_entry e WHERE e.contest_id = c.id AND e.user_id = ?))
          ORDER BY c.starts_at DESC NULLS FIRST, c.created_at DESC LIMIT ?
         """.trimIndent(),
@@ -63,15 +63,38 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
         jdbc.queryForObject("SELECT count(*) FROM contest_entry WHERE contest_id = ?", Int::class.java, contestId) ?: 0
 
     /** 이 사람이 참가 중이고 지금 돌고 있으며 이 문제를 건 대회들. 판정 하나가 여러 대회의 점수일 수 있다. */
-    fun runningFor(userId: String, problemId: String, now: Instant): List<Contest> = jdbc.query(
+    fun runningFor(userId: String, problemId: String, now: Instant, kinds: Set<Contest.Kind>): List<Contest> = jdbc.query(
         """
         SELECT c.* FROM contest c
           JOIN contest_entry e ON e.contest_id = c.id AND e.user_id = ?
           JOIN contest_problem p ON p.contest_id = c.id AND p.problem_id = ?
-         WHERE c.starts_at <= ? AND c.ends_at > ?
+         WHERE c.starts_at <= ? AND c.ends_at > ? AND c.kind IN (${kinds.joinToString { "'${it.name}'" }})
         """.trimIndent(),
         CONTEST, userId, problemId, Timestamp.from(now), Timestamp.from(now),
     )
+
+    /** 반례 대전에서 과녁을 깨뜨렸다. 처음이면 true — 같은 과녁은 한 번이다. */
+    fun hack(contestId: UUID, userId: String, problemId: String, target: String, at: Instant): Boolean = jdbc.update(
+        "INSERT INTO contest_hack (contest_id, user_id, problem_id, target_name, at) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+        contestId, userId, problemId, target, Timestamp.from(at),
+    ) == 1
+
+    fun hackCount(contestId: UUID, userId: String, problemId: String): Int = jdbc.queryForObject(
+        "SELECT count(*) FROM contest_hack WHERE contest_id = ? AND user_id = ? AND problem_id = ?", Int::class.java, contestId, userId, problemId,
+    ) ?: 0
+
+    /** 반례 대전의 점수: 깨뜨린 과녁의 수. 그 수에 이른 시각이 동점의 순서다. */
+    fun scoreHack(contestId: UUID, userId: String, problemId: String, count: Int, at: Instant) {
+        jdbc.update(
+            """
+            INSERT INTO contest_score (contest_id, user_id, problem_id, best_score, attempts, solved_at)
+            VALUES (?, ?, ?, ?, 1, ?)
+            ON CONFLICT (contest_id, user_id, problem_id) DO UPDATE SET
+              best_score = EXCLUDED.best_score, attempts = contest_score.attempts + 1, solved_at = EXCLUDED.solved_at
+            """.trimIndent(),
+            contestId, userId, problemId, count, Timestamp.from(at),
+        )
+    }
 
     /** 점수를 올린다. 최고 점수만 남고, 처음 만점의 시각이 남는다. */
     fun score(contestId: UUID, userId: String, problemId: String, score: Int, full: Boolean, at: Instant) {
@@ -112,6 +135,7 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
 
     /** 삭제 (§11.3). 순위표의 이름을 지운다. 점수는 남의 순위에 얽혀 있어 남긴다 — 이름 없는 줄이 된다. */
     fun erase(userId: String): Int {
+        jdbc.update("DELETE FROM contest_hack WHERE user_id = ?", userId)
         jdbc.update("UPDATE contest_score SET user_id = 'erased:' || contest_id::text || ':' || problem_id WHERE user_id = ?", userId)
         return jdbc.update("UPDATE contest_entry SET display_name = '(지운 계정)', user_id = 'erased:' || contest_id::text WHERE user_id = ?", userId)
     }

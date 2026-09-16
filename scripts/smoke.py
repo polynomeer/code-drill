@@ -1304,6 +1304,29 @@ def main() -> int:
     results.append(check("상대의 정답이 순위표에 올랐다", [(r["rank"], r["total"], r["mine"]) for r in view["standings"]], [(1, 100, False), (2, 0, True)]))
     results.append(check("  코드는 만든 사람에게만", (view["joinCode"], request("GET", f"/contests/{duel['contest']['id']}", None, honest.headers)["joinCode"]), (code, None)))
 
+    # 반례 대전: 맞힌 뒤 아레나의 과녁을 깨뜨린 수가 점수다. 기본 계정은 위에서 맞혔고 과녁을 깨뜨려 봤다.
+    hack = request("POST", "/admin/contests", {"kind": "HACK", "title": "스모크 반례 대전", "problemIds": ["two-sum"], "startsAt": starts, "endsAt": ends}, registrar)
+    request("POST", f"/admin/contests/{hack['id']}/publish", None, publisher)
+    request("POST", f"/contests/{hack['id']}/join")
+    await_verdict(submit(ACCEPTED_SOURCE)["id"])
+    view = request("GET", f"/contests/{hack['id']}")
+    results.append(check("반례 대전에서 정답은 점수가 아니다", next(r for r in view["standings"] if r["mine"])["total"], 0))
+    attempt = request("POST", "/arena/two-sum/attempts", {"args": [[2, 7, 11, 15], 9]})
+    deadline = time.time() + TIMEOUT
+    while attempt["status"] == "PENDING" and time.time() < deadline:
+        time.sleep(1)
+        attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+    broken = sum(1 for r in attempt["results"] if r["broken"])
+    view = request("GET", f"/contests/{hack['id']}")
+    results.append(check("깨뜨린 과녁의 수가 점수다", (broken > 0, next(r for r in view["standings"] if r["mine"])["total"]), (True, broken)))
+    attempt = request("POST", "/arena/two-sum/attempts", {"args": [[2, 7, 11, 15], 9]})
+    deadline = time.time() + TIMEOUT
+    while attempt["status"] == "PENDING" and time.time() < deadline:
+        time.sleep(1)
+        attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+    view = request("GET", f"/contests/{hack['id']}")
+    results.append(check("  같은 과녁을 다시 깨뜨려도 한 번이다", next(r for r in view["standings"] if r["mine"])["total"], broken))
+
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
     events = read_events(pending["id"])

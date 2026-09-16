@@ -62,6 +62,9 @@ interface LearningSignals {
         broken: Int,
         total: Int,
         kinds: List<DefectKind>,
+        /** 깨뜨린 과녁의 이름과 시도 시각. 반례 대전(§8.4)이 "무엇을 언제 깨뜨렸나"로 점수를 센다. */
+        targets: List<String>,
+        at: java.time.Instant,
     )
 
     companion object {
@@ -91,6 +94,8 @@ interface LearningSignals {
                 broken: Int,
                 total: Int,
                 kinds: List<DefectKind>,
+                targets: List<String>,
+                at: java.time.Instant,
             ) = Unit
         }
     }

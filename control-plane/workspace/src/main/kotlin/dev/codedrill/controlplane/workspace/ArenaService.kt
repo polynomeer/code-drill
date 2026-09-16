@@ -124,6 +124,8 @@ class ArenaService(
                 broken = broken.size,
                 total = report.results.size,
                 kinds = broken.map { it.kind }.distinct(),
+                targets = broken.map { it.name },
+                at = attempt.createdAt,
             )
         }.onFailure { log.warn("아레나 결과를 학습 기록에 남기지 못했다: {} ({})", id, it.message) }
     }

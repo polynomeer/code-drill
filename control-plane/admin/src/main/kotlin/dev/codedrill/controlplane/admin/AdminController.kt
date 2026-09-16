@@ -170,8 +170,8 @@ class AdminController(
     fun createContest(
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @Valid @RequestBody request: CreateContestRequest,
-    ): ResponseEntity<Any> = decided(contests.create(actor, request.title, request.problemIds, request.startsAt, request.endsAt)) {
-        audit.record(AuditAction.CONTEST_CREATED, request.title, actor, mapOf("problems" to request.problemIds.joinToString(",")))
+    ): ResponseEntity<Any> = decided(contests.create(actor, request.kind, request.title, request.problemIds, request.startsAt, request.endsAt)) {
+        audit.record(AuditAction.CONTEST_CREATED, request.title, actor, mapOf("kind" to request.kind, "problems" to request.problemIds.joinToString(",")))
     }
 
     @RequiresRole(AdminRole.PUBLISHER)
@@ -487,6 +487,7 @@ data class ResolveAppealRequest(val uphold: Boolean, val note: String? = null)
 
 data class CreateContestRequest(
     @field:NotBlank val title: String,
+    val kind: String = "CONTEST",
     val problemIds: List<String>,
     val startsAt: java.time.Instant,
     val endsAt: java.time.Instant,
