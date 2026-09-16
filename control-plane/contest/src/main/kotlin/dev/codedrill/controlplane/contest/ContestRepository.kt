@@ -13,11 +13,11 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
     fun insert(c: Contest, problemIds: List<String>) {
         jdbc.update(
             """
-            INSERT INTO contest (id, kind, title, created_by, starts_at, ends_at, minutes, published, join_code, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO contest (id, kind, title, created_by, starts_at, ends_at, minutes, published, join_code, parent_id, rated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             c.id, c.kind.name, c.title, c.createdBy, c.startsAt?.let { Timestamp.from(it) }, c.endsAt?.let { Timestamp.from(it) },
-            c.minutes, c.published, c.joinCode, c.parentId,
+            c.minutes, c.published, c.joinCode, c.parentId, c.rated,
         )
         problemIds.forEachIndexed { i, pid ->
             jdbc.update("INSERT INTO contest_problem (contest_id, problem_id, ord) VALUES (?, ?, ?)", c.id, pid, i)
@@ -123,7 +123,64 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
         contestId,
     )
 
+    // --- 레이팅 (§8.4) ---
+
+    /** 끝났는데 아직 레이팅을 적용하지 않은 레이팅 대회들. */
+    fun finishedUnrated(now: Instant): List<Contest> = jdbc.query(
+        "SELECT * FROM contest WHERE rated AND published AND rated_at IS NULL AND ends_at <= ? ORDER BY ends_at",
+        CONTEST, Timestamp.from(now),
+    )
+
+    /** 적용 표시. 한 번만 — 두 스레드가 동시에 와도 하나만 1 을 받는다. */
+    fun markRated(id: UUID): Int = jdbc.update("UPDATE contest SET rated_at = now() WHERE id = ? AND rated_at IS NULL", id)
+
+    fun ratingOf(userId: String): Int = jdbc.query(
+        "SELECT rating FROM user_rating WHERE user_id = ?", { rs, _ -> rs.getInt(1) }, userId,
+    ).firstOrNull() ?: Elo.INITIAL
+
+    fun ratingsOf(userIds: Collection<String>): Map<String, Int> {
+        if (userIds.isEmpty()) return emptyMap()
+        val marks = userIds.joinToString { "?" }
+        return jdbc.query(
+            "SELECT user_id, rating FROM user_rating WHERE user_id IN ($marks)",
+            { rs, _ -> rs.getString(1) to rs.getInt(2) }, *userIds.toTypedArray(),
+        ).toMap()
+    }
+
+    fun applyChange(contestId: UUID, userId: String, rank: Int, before: Int, after: Int) {
+        jdbc.update(
+            "INSERT INTO rating_change (contest_id, user_id, rank, before, after) VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+            contestId, userId, rank, before, after,
+        )
+        jdbc.update(
+            """
+            INSERT INTO user_rating (user_id, rating, contests) VALUES (?, ?, 1)
+            ON CONFLICT (user_id) DO UPDATE SET rating = EXCLUDED.rating, contests = user_rating.contests + 1
+            """.trimIndent(),
+            userId, after,
+        )
+    }
+
+    fun changesOf(contestId: UUID): Map<String, Int> = jdbc.query(
+        "SELECT user_id, after - before FROM rating_change WHERE contest_id = ?",
+        { rs, _ -> rs.getString(1) to rs.getInt(2) }, contestId,
+    ).toMap()
+
+    fun rating(userId: String): Rating {
+        val history = jdbc.query(
+            """
+            SELECT r.contest_id, c.title, r.rank, r.before, r.after, r.applied_at FROM rating_change r JOIN contest c ON c.id = r.contest_id
+             WHERE r.user_id = ? ORDER BY r.applied_at DESC LIMIT 50
+            """.trimIndent(),
+            { rs, _ -> RatingChange(rs.getObject(1, UUID::class.java), rs.getString(2), rs.getInt(3), rs.getInt(4), rs.getInt(5), rs.getTimestamp(6).toInstant()) },
+            userId,
+        )
+        val contests = jdbc.query("SELECT contests FROM user_rating WHERE user_id = ?", { rs, _ -> rs.getInt(1) }, userId).firstOrNull() ?: 0
+        return Rating(ratingOf(userId), contests, history)
+    }
+
     fun export(userId: String): Map<String, Any?> = mapOf(
+        "rating" to rating(userId),
         "entries" to jdbc.query(
             "SELECT contest_id, display_name, joined_at FROM contest_entry WHERE user_id = ? ORDER BY joined_at",
             { rs, _ -> mapOf("contestId" to rs.getString(1), "displayName" to rs.getString(2), "joinedAt" to rs.getTimestamp(3).toInstant()) },
@@ -142,6 +199,9 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
     /** 삭제 (§11.3). 순위표의 이름을 지운다. 점수는 남의 순위에 얽혀 있어 남긴다 — 이름 없는 줄이 된다. */
     fun erase(userId: String): Int {
         jdbc.update("DELETE FROM contest_hack WHERE user_id = ?", userId)
+        // 레이팅 변화는 남의 변화와 얽혀 있어 남기되 이름을 지운다. 지금의 레이팅은 지운다.
+        jdbc.update("UPDATE rating_change SET user_id = 'erased:' || contest_id::text WHERE user_id = ?", userId)
+        jdbc.update("DELETE FROM user_rating WHERE user_id = ?", userId)
         jdbc.update("UPDATE contest_score SET user_id = 'erased:' || contest_id::text || ':' || problem_id WHERE user_id = ?", userId)
         return jdbc.update("UPDATE contest_entry SET display_name = '(지운 계정)', user_id = 'erased:' || contest_id::text WHERE user_id = ?", userId)
     }
@@ -159,6 +219,8 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
                 published = rs.getBoolean("published"),
                 joinCode = rs.getString("join_code"),
                 parentId = rs.getObject("parent_id", UUID::class.java),
+                rated = rs.getBoolean("rated"),
+                ratedAt = rs.getTimestamp("rated_at")?.toInstant(),
                 createdAt = rs.getTimestamp("created_at").toInstant(),
             )
         }

@@ -667,10 +667,10 @@ class ControlPlaneConfig {
 
     @Bean
     fun contestAdministration(contests: ContestService) = object : ContestAdministration {
-        override fun create(createdBy: String, kind: String, title: String, problemIds: List<String>, startsAt: java.time.Instant, endsAt: java.time.Instant): ArenaModeration.Decision {
+        override fun create(createdBy: String, kind: String, title: String, problemIds: List<String>, startsAt: java.time.Instant, endsAt: java.time.Instant, rated: Boolean): ArenaModeration.Decision {
             val parsed = dev.codedrill.controlplane.contest.Contest.Kind.entries.firstOrNull { it.name == kind }
                 ?: return ArenaModeration.Decision.rejected("대회 종류가 아니다: $kind (CONTEST, HACK)")
-            return contests.create(createdBy, parsed, title, problemIds, startsAt, endsAt).asDecision()
+            return contests.create(createdBy, parsed, title, problemIds, startsAt, endsAt, rated).asDecision()
         }
 
         override fun publish(id: java.util.UUID, actor: String) = contests.publish(id, actor).asDecision()

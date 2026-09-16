@@ -170,8 +170,8 @@ class AdminController(
     fun createContest(
         @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
         @Valid @RequestBody request: CreateContestRequest,
-    ): ResponseEntity<Any> = decided(contests.create(actor, request.kind, request.title, request.problemIds, request.startsAt, request.endsAt)) {
-        audit.record(AuditAction.CONTEST_CREATED, request.title, actor, mapOf("kind" to request.kind, "problems" to request.problemIds.joinToString(",")))
+    ): ResponseEntity<Any> = decided(contests.create(actor, request.kind, request.title, request.problemIds, request.startsAt, request.endsAt, request.rated)) {
+        audit.record(AuditAction.CONTEST_CREATED, request.title, actor, mapOf("kind" to request.kind, "rated" to request.rated, "problems" to request.problemIds.joinToString(",")))
     }
 
     @RequiresRole(AdminRole.PUBLISHER)
@@ -488,6 +488,8 @@ data class ResolveAppealRequest(val uphold: Boolean, val note: String? = null)
 data class CreateContestRequest(
     @field:NotBlank val title: String,
     val kind: String = "CONTEST",
+    /** 레이팅 대회 (§8.4). 대회(CONTEST)만 — 끝나면 순위표에서 레이팅을 한 번 적용한다. */
+    val rated: Boolean = false,
     val problemIds: List<String>,
     val startsAt: java.time.Instant,
     val endsAt: java.time.Instant,

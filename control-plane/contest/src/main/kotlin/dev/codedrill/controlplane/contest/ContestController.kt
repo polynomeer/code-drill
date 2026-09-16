@@ -24,6 +24,10 @@ class ContestController(private val service: ContestService) {
     @GetMapping
     fun list(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): List<ContestService.ContestSummary> = service.list(principal.id)
 
+    /** 내 레이팅 (§8.4). 변화의 이력까지. */
+    @GetMapping("/me/rating")
+    fun rating(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): Rating = service.rating(principal.id)
+
     @GetMapping("/{id}")
     fun view(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,

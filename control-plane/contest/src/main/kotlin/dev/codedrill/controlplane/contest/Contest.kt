@@ -25,6 +25,9 @@ data class Contest(
     val joinCode: String?,
     /** 가상 참가면 원래 대회. 아니면 null. */
     val parentId: UUID?,
+    /** 레이팅 대회인가, 그리고 끝난 뒤 레이팅을 적용했는가 (§8.4). */
+    val rated: Boolean,
+    val ratedAt: Instant?,
     val createdAt: Instant,
 ) {
     fun status(now: Instant = Instant.now()): Status = when {
@@ -64,7 +67,14 @@ data class Standing(
     /** 시작부터 마지막 만점까지의 초. 만점이 없으면 null. */
     val elapsedSeconds: Long?,
     val perProblem: Map<String, Int>,
+    /** 레이팅 대회가 끝나 적용됐으면 변화. 아니면 null. */
+    val ratingChange: Int? = null,
 )
+
+/** 내 레이팅 (§8.4). 변화의 합이라 언제든 다시 셀 수 있다. */
+data class Rating(val rating: Int, val contests: Int, val history: List<RatingChange>)
+
+data class RatingChange(val contestId: UUID, val title: String, val rank: Int, val before: Int, val after: Int, val appliedAt: Instant)
 
 /** 공개된 문제인가 — 문제 도메인에 묻는다 (§3.1 조립 지점). 대회에는 공개된 문제만 건다. */
 fun interface ContestProblems {

@@ -29,6 +29,7 @@ class ContestService(
         repository.visible(userId, LIST_LIMIT).map { it.summary(repository.entry(it.id, userId) != null, repository.entryCount(it.id)) }
 
     fun view(userId: String, id: UUID): ContestView? {
+        repository.find(id)?.let { if (it.rated && it.ratedAt == null && it.status() == Contest.Status.FINISHED) applyRating(it) }
         val contest = repository.find(id) ?: return null
         val entry = repository.entry(id, userId)
         // 공개 전 대회는 없는 것이다. 대결과 가상 참가는 참가한 사람에게만 있다.
@@ -48,7 +49,48 @@ class ContestService(
     }
 
     /** 순위표. 총점 높은 순, 같으면 마지막 만점까지 걸린 시간이 짧은 순. 참가했지만 점수가 없는 사람도 줄에 있다. */
-    fun standings(readerId: String, contest: Contest): List<Standing> = rank(rows(readerId, contest, virtual = false))
+    fun standings(readerId: String, contest: Contest): List<Standing> {
+        val ranked = rank(rows(readerId, contest, virtual = false))
+        if (contest.ratedAt == null) return ranked
+        val changes = repository.changesOf(contest.id)
+        val entries = repository.entries(contest.id).associate { it.displayName to it.userId }
+        return ranked.map { row -> row.copy(ratingChange = changes[entries[row.displayName]]) }
+    }
+
+    // --- 레이팅 (§8.4) -----------------------------------------------------------
+
+    fun rating(userId: String): Rating = repository.rating(userId)
+
+    /** 끝난 레이팅 대회에 레이팅을 적용한다. 한 번만 — 두 번째 호출은 아무것도 하지 않는다. */
+    @Transactional
+    fun applyRating(contest: Contest) {
+        if (!contest.rated || contest.status() != Contest.Status.FINISHED) return
+        if (repository.markRated(contest.id) == 0) return
+        val entries = repository.entries(contest.id)
+        val ratings = repository.ratingsOf(entries.map { it.userId })
+        val byUser = repository.scores(contest.id).groupBy { it.userId }
+        val players = entries.map { entry ->
+            val scores = byUser[entry.userId].orEmpty()
+            val last = scores.mapNotNull { it.solvedAt }.maxOrNull()
+            Elo.Player(
+                entry.userId, ratings[entry.userId] ?: Elo.INITIAL, scores.sumOf { it.bestScore },
+                if (last != null && contest.startsAt != null) java.time.Duration.between(contest.startsAt, last).seconds else null,
+            )
+        }
+        val changes = Elo.changes(players)
+        val ranked = rank(rows("", contest, virtual = false)).associate { it.displayName to it.rank }
+        for (player in players) {
+            val delta = changes[player.userId] ?: 0
+            val rank = ranked[entries.first { it.userId == player.userId }.displayName] ?: 0
+            repository.applyChange(contest.id, player.userId, rank, player.rating, player.rating + delta)
+        }
+    }
+
+    /** 끝났는데 아직 적용하지 않은 레이팅 대회를 훑는다. 아무도 순위표를 열지 않아도 레이팅은 움직여야 한다. */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelayString = "60000")
+    fun sweepRatings() {
+        for (contest in repository.finishedUnrated(Instant.now())) runCatching { applyRating(contest) }
+    }
 
     /**
      * 가상 참가의 순위표: 원래 대회의 순위표 사이에 내 가상 줄을 끼운다 — "그때 참가했다면
@@ -105,7 +147,7 @@ class ContestService(
         val virtual = Contest(
             id = UUID.randomUUID(), kind = Contest.Kind.VIRTUAL, title = "가상 참가: ${parent.title}", createdBy = userId,
             startsAt = now, endsAt = now.plus(length), minutes = length.toMinutes().toInt(), published = true, joinCode = null,
-            parentId = parentId, createdAt = now,
+            parentId = parentId, rated = false, ratedAt = null, createdAt = now,
         )
         repository.insert(virtual, repository.problems(parentId))
         repository.join(virtual.id, userId, displayName)
@@ -119,7 +161,8 @@ class ContestService(
         if (minutes !in MIN_DUEL_MINUTES..MAX_DUEL_MINUTES) return DuelOutcome.Invalid("대결은 ${MIN_DUEL_MINUTES}~${MAX_DUEL_MINUTES}분")
         val duel = Contest(
             id = UUID.randomUUID(), kind = Contest.Kind.DUEL, title = "미니 대결: $problemId", createdBy = userId,
-            startsAt = null, endsAt = null, minutes = minutes, published = true, joinCode = code(), parentId = null, createdAt = Instant.now(),
+            startsAt = null, endsAt = null, minutes = minutes, published = true, joinCode = code(), parentId = null,
+            rated = false, ratedAt = null, createdAt = Instant.now(),
         )
         repository.insert(duel, listOf(problemId))
         repository.join(duel.id, userId, displayName)
@@ -140,7 +183,7 @@ class ContestService(
 
     // --- 운영자 -----------------------------------------------------------------
 
-    fun create(createdBy: String, kind: Contest.Kind, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant): AdminOutcome {
+    fun create(createdBy: String, kind: Contest.Kind, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant, rated: Boolean = false): AdminOutcome {
         if (kind !in PUBLIC) return AdminOutcome.Rejected("운영자가 여는 것은 대회와 반례 대전이다")
         if (title.isBlank()) return AdminOutcome.Rejected("제목이 필요하다")
         if (problemIds.isEmpty() || problemIds.size > MAX_PROBLEMS) return AdminOutcome.Rejected("문제는 1~${MAX_PROBLEMS}개")
@@ -149,7 +192,8 @@ class ContestService(
         if (!endsAt.isAfter(startsAt)) return AdminOutcome.Rejected("끝이 시작보다 뒤여야 한다")
         val contest = Contest(
             id = UUID.randomUUID(), kind = kind, title = title.trim(), createdBy = createdBy,
-            startsAt = startsAt, endsAt = endsAt, minutes = null, published = false, joinCode = null, parentId = null, createdAt = Instant.now(),
+            startsAt = startsAt, endsAt = endsAt, minutes = null, published = false, joinCode = null, parentId = null,
+            rated = rated && kind == Contest.Kind.CONTEST, ratedAt = null, createdAt = Instant.now(),
         )
         repository.insert(contest, problemIds)
         return AdminOutcome.Decided(contest)
@@ -185,7 +229,7 @@ class ContestService(
 
     private fun Contest.summary(joined: Boolean, entrants: Int) = ContestSummary(
         id = id, kind = kind, title = title, status = status(), startsAt = startsAt, endsAt = endsAt, minutes = minutes,
-        joined = joined, entrants = entrants, problemCount = repository.problems(id).size,
+        joined = joined, entrants = entrants, problemCount = repository.problems(id).size, rated = rated, ratedAt = ratedAt,
     )
 
     private fun code(): String = buildString { repeat(CODE_LENGTH) { append(CODE_ALPHABET[RANDOM.nextInt(CODE_ALPHABET.length)]) } }
@@ -194,6 +238,7 @@ class ContestService(
         val id: UUID, val kind: Contest.Kind, val title: String, val status: Contest.Status,
         val startsAt: Instant?, val endsAt: Instant?, val minutes: Int?,
         val joined: Boolean, val entrants: Int, val problemCount: Int,
+        val rated: Boolean, val ratedAt: Instant?,
     )
 
     data class ContestView(

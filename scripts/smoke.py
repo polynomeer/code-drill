@@ -302,6 +302,18 @@ def submit(
     )
 
 
+def all_problems() -> list[dict]:
+    """공개된 문제 전부. 한 페이지가 100 이라 커서를 따라간다 (§9.1)."""
+    items: list[dict] = []
+    cursor = None
+    while True:
+        page = request("GET", "/problems?limit=100" + (f"&cursor={cursor}" if cursor else ""))
+        items += page["items"]
+        cursor = page.get("nextCursor")
+        if not cursor:
+            return items
+
+
 def await_verdict(submission_id: str, headers: dict | None = None) -> dict:
     deadline = time.time() + TIMEOUT
     last = {}
@@ -388,7 +400,8 @@ def main() -> int:
     print("문제 조회")
     # 한 페이지 크기보다 문제가 많다. 목록을 통째로 고정하면 문제를 추가할 때마다
     # 스모크가 깨지므로, 이 스모크가 실제로 쓰는 문제들이 있는지만 본다.
-    problems = request("GET", "/problems?limit=100")["items"]
+    # 한 페이지는 100 이고 문제는 그보다 많다 — 커서를 따라 끝까지 읽는다.
+    problems = all_problems()
     slugs = sorted(p["id"] for p in problems)
     results.append(check("문제 목록", set(REQUIRED_PROBLEMS) <= set(slugs), True))
     detail = request("GET", "/problems/two-sum")
@@ -783,7 +796,7 @@ def main() -> int:
 
     # 공개된 문제만 목록에 나온다. 디렉터리에 파일을 놓는 것만으로 공개되면 §6.3 검증과
     # §11.2 승인이 모두 우회된다.
-    listed = [p["id"] for p in request("GET", "/problems?limit=100")["items"]]
+    listed = [p["id"] for p in all_problems()]
     results.append(check("공개된 문제만 목록에", pid not in listed, True))
     results.append(check("  검증·공개된 문제는 보인다", "two-sum" in listed, True))
 
@@ -1352,6 +1365,28 @@ def main() -> int:
     status, _ = raw_request("GET", f"/contests/{virtual['contest']['id']}")
     results.append(check("  가상 참가는 남에게 없다", status, 404))
     results.append(check("  원래 순위표는 그대로다", len(request("GET", f"/contests/{short['id']}")["standings"]), 1))
+
+    # 정기 레이팅: 레이팅 대회가 끝나면 순위표에서 Elo 를 한 번 적용한다. 둘 다 1500 에서 시작한다.
+    now = datetime.now(timezone.utc)
+    rated = request("POST", "/admin/contests", {"title": "스모크 레이팅 대회", "problemIds": ["two-sum"], "rated": True,
+                                                "startsAt": (now - timedelta(minutes=1)).isoformat(), "endsAt": (now + timedelta(seconds=30)).isoformat()}, registrar)
+    results.append(check("레이팅 대회를 만들었다", rated["rated"], True))
+    request("POST", f"/admin/contests/{rated['id']}/publish", None, publisher)
+    request("POST", f"/contests/{rated['id']}/join")
+    request("POST", f"/contests/{rated['id']}/join", None, honest.headers)
+    await_verdict(submit(ACCEPTED_SOURCE)["id"])
+    before = request("GET", "/contests/me/rating")
+    results.append(check("끝나기 전에는 레이팅이 안 움직인다", (before["rating"], before["contests"]), (1500, 0)))
+    while datetime.now(timezone.utc) < now + timedelta(seconds=31):
+        time.sleep(1)
+    view = request("GET", f"/contests/{rated['id']}")
+    results.append(check("끝나면 순위표에 변화가 실린다", sorted(r["ratingChange"] for r in view["standings"]), [-32, 32]))
+    results.append(check("  적용 시각이 찍힌다", view["contest"]["ratedAt"] is not None, True))
+    mine = request("GET", "/contests/me/rating")
+    results.append(check("내 레이팅이 올랐다", (mine["rating"], mine["contests"], mine["history"][0]["rank"]), (1532, 1, 1)))
+    results.append(check("  진 쪽은 내렸다", request("GET", "/contests/me/rating", None, honest.headers)["rating"], 1468))
+    request("GET", f"/contests/{rated['id']}")
+    results.append(check("  두 번 적용하지 않는다", request("GET", "/contests/me/rating")["rating"], 1532))
 
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
