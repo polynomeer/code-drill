@@ -825,6 +825,8 @@ export interface ProjectSubmission {
   hiddenTotal: number | null
   createdAt: string
   completedAt: string | null
+  /** 재채점마다 오른다. 1 이면 사용자가 낸 그대로의 판정이다. */
+  revision: number
   files: Record<string, string> | null
 }
 

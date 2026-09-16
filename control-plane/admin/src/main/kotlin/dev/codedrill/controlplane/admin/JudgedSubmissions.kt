@@ -23,4 +23,13 @@ interface JudgedSubmissions {
      * 실제로 큐에 오른 건수를 돌려준다. 사이에 사라진 제출은 조용히 빠진다.
      */
     fun requeue(ids: List<UUID>): Int
+
+    companion object {
+        /** 그 판정기가 없는 조립. 대상이 없으니 아무것도 다시 걸리지 않는다. */
+        val NONE = object : JudgedSubmissions {
+            override fun completedFor(problemId: String): List<UUID> = emptyList()
+            override fun completed(submissionId: UUID): List<UUID> = emptyList()
+            override fun requeue(ids: List<UUID>): Int = 0
+        }
+    }
 }

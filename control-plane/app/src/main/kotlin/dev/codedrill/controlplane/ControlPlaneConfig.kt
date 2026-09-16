@@ -69,6 +69,7 @@ import dev.codedrill.judge.protocol.Sources
 import dev.codedrill.platform.storage.BlobStore
 import dev.codedrill.controlplane.project.ProjectLearningSignals
 import dev.codedrill.controlplane.project.ProjectPersonalData
+import dev.codedrill.controlplane.project.ProjectRejudgeContext
 import dev.codedrill.controlplane.project.ProjectService
 import dev.codedrill.controlplane.project.PublishedProjects
 import dev.codedrill.controlplane.project.WorkspaceStore
@@ -242,7 +243,40 @@ class ControlPlaneConfig {
             return ref
         }
 
+        override fun ensure(submissionId: String, files: Map<String, String>): WorkspaceRef {
+            val bytes = Workspaces.encode(files)
+            val ref = WorkspaceRef(Workspaces.workspaceKey(submissionId), Workspaces.digest(bytes))
+            if (store.digestOf(ref.key) != ref.digest) store.put(ref.key, bytes, Workspaces.CONTENT_TYPE, ref.digest)
+            return ref
+        }
+
         override fun delete(submissionId: String) = store.delete(Workspaces.workspaceKey(submissionId))
+    }
+
+    /** 프로젝트형 재채점 (11단계). 알고리즘 제출과 같은 두 포트를 프로젝트 쪽에 하나씩 더 잇는다. */
+    @Bean
+    fun judgedProjects(projects: ObjectProvider<ProjectService>) = object : JudgedSubmissions {
+        override fun completedFor(problemId: String) = projects.getObject().completedFor(problemId)
+        override fun completed(submissionId: UUID) = projects.getObject().completed(submissionId)
+        override fun requeue(ids: List<UUID>) = projects.getObject().requeue(ids)
+    }
+
+    @Bean
+    fun projectRejudgeContext(rejudge: RejudgeService) = object : ProjectRejudgeContext {
+        override fun pendingFor(submissionId: UUID) =
+            rejudge.pendingFor(submissionId)?.let { ProjectRejudgeContext.Pending(jobId = it.jobId, dryRun = it.dryRun) }
+
+        override fun judged(outcome: ProjectRejudgeContext.Outcome) = rejudge.judged(
+            RejudgeResult(
+                submissionId = outcome.submissionId,
+                jobId = outcome.jobId,
+                applied = outcome.applied,
+                previousVerdict = outcome.previousVerdict,
+                previousScore = outcome.previousScore,
+                verdict = outcome.verdict,
+                score = outcome.score,
+            ),
+        )
     }
 
     /** 프로젝트형 판정 → 실무군 증거 (11단계). 두 모듈은 서로를 모른다. */

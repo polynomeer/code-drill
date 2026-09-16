@@ -1,5 +1,6 @@
 package dev.codedrill.controlplane.admin
 
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.stereotype.Service
@@ -29,7 +30,12 @@ import java.util.UUID
 class RejudgeService(
     private val jdbc: JdbcTemplate,
     private val audit: AuditLog,
-    private val submissions: JudgedSubmissions,
+    @Qualifier("judgedSubmissions") private val submissions: JudgedSubmissions,
+    /**
+     * 프로젝트형 제출 (11단계). 같은 포트, 다른 판정기. scope 의 종류가 어느 쪽인지 정하고
+     * 작업·대상·승인·감사는 하나다 — 재채점의 규칙이 판정기마다 다를 이유가 없다.
+     */
+    @Qualifier("judgedProjects") private val projects: JudgedSubmissions = JudgedSubmissions.NONE,
 ) {
 
     /** 요청. 이 시점에는 아무것도 바뀌지 않는다. */
@@ -128,17 +134,24 @@ class RejudgeService(
      *
      * 제출 테이블은 제출 도메인의 것이므로 직접 읽지 않는다 (§3.1). Admin 이 정하는 것은
      * **무엇을 다시 돌릴지**이고, 그것이 무엇인지 아는 쪽은 제출 도메인이다.
+     *
+     * scope 는 `problem:<id>` · `submission:<uuid>` (알고리즘) 과 `project:<id>` ·
+     * `project-submission:<uuid>` (프로젝트형) 이다.
      */
     private fun targetsOf(job: RejudgeJob): List<UUID> {
         val (kind, value) = job.scope.split(':', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        val port = portFor(kind)
         return when (kind) {
-            "problem" -> submissions.completedFor(value)
-            "submission" -> runCatching { UUID.fromString(value) }
-                .map(submissions::completed)
+            "problem", "project" -> port.completedFor(value)
+            "submission", "project-submission" -> runCatching { UUID.fromString(value) }
+                .map(port::completed)
                 .getOrDefault(emptyList())
             else -> emptyList()
         }
     }
+
+    private fun portFor(kind: String): JudgedSubmissions =
+        if (kind.startsWith("project")) projects else submissions
 
     /**
      * 실행. 승인된 작업의 대상을 실제로 채점 큐에 올린다 (§3.2).
@@ -169,7 +182,7 @@ class RejudgeService(
                 id, submissionId,
             )
         }
-        val queued = submissions.requeue(ids)
+        val queued = portFor(job.scope.substringBefore(':')).requeue(ids)
 
         jdbc.update(
             """
@@ -268,14 +281,15 @@ class RejudgeService(
             Int::class.java, id,
         ) ?: 0
 
+        // 판정 이력은 판정기마다 표가 다르다. 작업의 scope 가 어느 쪽인지 말한다.
+        val judgement = if (job.scope.startsWith("project")) "project_judgement" else "submission_judgement"
         val changes = jdbc.query(
             """
-            SELECT g.submission_id, g.verdict, g.score, s.revision,
+            SELECT g.submission_id, g.verdict, g.score,
                    previous.verdict AS previous_verdict, previous.score AS previous_score
-              FROM submission_judgement g
-              JOIN submission s ON s.id = g.submission_id
+              FROM $judgement g
               LEFT JOIN LATERAL (
-                  SELECT p.verdict, p.score FROM submission_judgement p
+                  SELECT p.verdict, p.score FROM $judgement p
                    WHERE p.submission_id = g.submission_id AND p.id < g.id
                    ORDER BY p.id DESC LIMIT 1
               ) previous ON true

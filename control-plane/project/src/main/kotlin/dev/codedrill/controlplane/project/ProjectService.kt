@@ -33,6 +33,7 @@ class ProjectService(
     private val workspaces: WorkspaceStore,
     private val json: ObjectMapper,
     private val learning: ProjectLearningSignals = ProjectLearningSignals.NONE,
+    private val rejudges: ProjectRejudgeContext = ProjectRejudgeContext.NONE,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -222,25 +223,104 @@ class ProjectService(
         }
     }
 
-    /** 종료. 같은 실행이 다시 와도 한 번만 적힌다. */
+    /**
+     * 채점 종료를 반영한다 (§4.2 INV-02). 알고리즘 제출과 같은 규칙이다.
+     *
+     * - 최초 판정: QUEUED/LEASED → COMPLETED 로 옮기고 판정을 채운다.
+     * - 재채점: 이미 COMPLETED 인 행의 판정만 갈아 끼우고 revision 을 올린다.
+     * - dry-run 재채점: 이력에만 남기고 현재 판정은 건드리지 않는다.
+     * - 승인된 재채점 없이 끝난 제출에 온 결과(뒤늦은 실행)는 이력에만 남긴다 — 아무도 승인하지
+     *   않은 판정 변경은 없다 (§11.2).
+     *
+     * 이력을 먼저 남긴다. 같은 실행이 다시 와도 이력의 유일 제약이 걸러 revision 이 헛되이 오르지
+     * 않는다. 증거는 **최초 판정에서만** 쌓는다 — 재채점으로 바뀐 것은 사용자의 능력이 아니라
+     * 문제 데이터가 바뀐 것이다.
+     */
     @Transactional
     fun complete(message: ProjectCompleted): Boolean {
         val id = UUID.fromString(message.submissionId)
-        val changed = repository.complete(
-            id = id,
-            executionId = message.executionId,
-            verdict = message.verdict,
-            score = message.score,
-            log = message.log,
-            tests = message.tests,
-            hiddenPassed = message.hiddenPassed,
-            hiddenTotal = message.hiddenTotal,
+        val current = repository.findById(id) ?: return false
+        val pending = rejudges.pendingFor(id)
+        val first = current.status != ProjectSubmission.Status.COMPLETED
+        val late = !first && pending == null
+        val apply = pending?.dryRun != true && !late
+        val revision = if (apply && !first) current.revision + 1 else current.revision
+
+        val recorded = repository.recordJudgement(
+            id, revision, message.executionId, message.verdict, message.score, message.log, message.tests,
+            message.hiddenPassed, message.hiddenTotal, pending?.jobId, apply,
         )
-        if (changed) {
-            log.info("프로젝트 판정 완료: {} → {} ({}점, 숨은 {}/{})", id, message.verdict, message.score, message.hiddenPassed, message.hiddenTotal)
-            signal(id, message)
+        if (recorded == 0) return false
+
+        if (late) {
+            log.warn("끝난 프로젝트 제출에 뒤늦은 결과가 왔다. 이력에만 남긴다: {} ({})", id, message.executionId)
+            return true
         }
-        return changed
+        if (apply) {
+            repository.applyJudgement(
+                id, revision, message.executionId, message.verdict, message.score, message.log, message.tests,
+                message.hiddenPassed, message.hiddenTotal,
+            )
+            log.info("프로젝트 판정 완료: {} → {} ({}점, 숨은 {}/{}, revision {})", id, message.verdict, message.score, message.hiddenPassed, message.hiddenTotal, revision)
+        }
+        if (pending != null) {
+            rejudges.judged(
+                ProjectRejudgeContext.Outcome(
+                    submissionId = id,
+                    jobId = pending.jobId,
+                    applied = apply,
+                    previousVerdict = current.verdict?.name,
+                    previousScore = current.score,
+                    verdict = message.verdict.name,
+                    score = message.score,
+                ),
+            )
+        }
+        if (first) signal(id, message)
+        return true
+    }
+
+    fun judgements(id: UUID): List<ProjectJudgement> = repository.judgements(id)
+
+    // --- 재채점 (§8.1). Admin 이 무엇을 다시 돌릴지 정하고, 다시 거는 것은 여기다. ---
+
+    fun completedFor(projectId: String): List<UUID> = repository.completedFor(projectId)
+
+    fun completed(id: UUID): List<UUID> =
+        listOfNotNull(repository.findById(id)?.takeIf { it.status == ProjectSubmission.Status.COMPLETED }?.id)
+
+    /**
+     * 다시 채점 큐에 올린다. DB 의 파일이 원본이라 스토어의 복제가 사라졌거나 다르면 다시 올린다
+     * (§8.3). 같은 프로젝트 버전으로 돈다 — 그 버전이 더는 공개 버전이 아니어도, 판정의 근거는
+     * 제출 당시의 것이다. 실제로 큐에 오른 건수를 돌려준다.
+     */
+    @Transactional
+    fun requeue(ids: List<UUID>): Int = ids.count { id ->
+        val submission = repository.findById(id) ?: return@count false
+        val files = repository.files(id)
+        if (files.isEmpty()) return@count false
+        val ref = workspaces.ensure(id.toString(), files)
+        repository.enqueueOutbox(
+            OutboxEvent(
+                id = UUID.randomUUID(),
+                aggregate = "project-submission",
+                aggregateId = id.toString(),
+                type = PROJECT_EVENT,
+                payload = json.writeValueAsString(
+                    ProjectQueued(
+                        submissionId = id.toString(),
+                        correlationId = UUID.randomUUID().toString(),
+                        projectId = submission.projectId,
+                        projectVersion = submission.projectVersion,
+                        language = Language.valueOf(submission.language),
+                        workspace = ref,
+                        queuedAt = Instant.now(),
+                    ),
+                ),
+                occurredAt = Instant.now(),
+            ),
+        )
+        true
     }
 
     /**

@@ -90,10 +90,33 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         ) == 1
 
     /**
-     * 종착으로. 같은 실행의 결과가 다시 와도 한 번만 적힌다 — 이미 COMPLETED 인 행은 바뀌지 않는다.
+     * 판정을 이력에 남긴다. 같은 실행이 다시 오면 0 — 중복 전달이 revision 을 올리지 못하게 (§4.3).
      */
-    fun complete(
+    fun recordJudgement(
         id: UUID,
+        revision: Int,
+        executionId: String,
+        verdict: Verdict,
+        score: Int,
+        log: String?,
+        tests: List<ProjectTestOutcome>,
+        hiddenPassed: Int,
+        hiddenTotal: Int,
+        rejudgeJobId: UUID?,
+        applied: Boolean,
+    ): Int = jdbc.update(
+        """
+        INSERT INTO project_judgement (submission_id, revision, execution_id, verdict, score, log, tests, hidden_passed, hidden_total, rejudge_job_id, applied)
+        VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)
+        ON CONFLICT (execution_id) DO NOTHING
+        """.trimIndent(),
+        id, revision, executionId, verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, rejudgeJobId, applied,
+    )
+
+    /** 현재 판정을 갈아 끼운다. 최초 판정은 종착으로 옮기고, 재채점은 revision 을 올린다. */
+    fun applyJudgement(
+        id: UUID,
+        revision: Int,
         executionId: String,
         verdict: Verdict,
         score: Int,
@@ -105,11 +128,47 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         """
         UPDATE project_submission
            SET status = 'COMPLETED', verdict = ?, score = ?, log = ?, tests = ?::jsonb,
-               hidden_passed = ?, hidden_total = ?, execution_id = ?, completed_at = now(), version = version + 1
-         WHERE id = ? AND status <> 'COMPLETED'
+               hidden_passed = ?, hidden_total = ?, execution_id = ?, revision = ?,
+               completed_at = coalesce(completed_at, now()), version = version + 1
+         WHERE id = ?
         """.trimIndent(),
-        verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, executionId, id,
+        verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, executionId, revision, id,
     ) == 1
+
+    fun judgements(id: UUID): List<ProjectJudgement> = jdbc.query(
+        """
+        SELECT revision, execution_id, verdict, score, hidden_passed, hidden_total, rejudge_job_id, applied, created_at
+          FROM project_judgement WHERE submission_id = ? ORDER BY created_at
+        """.trimIndent(),
+        { rs, _ ->
+            ProjectJudgement(
+                revision = rs.getInt("revision"),
+                executionId = rs.getString("execution_id"),
+                verdict = Verdict.valueOf(rs.getString("verdict")),
+                score = rs.getInt("score"),
+                hiddenPassed = rs.getInt("hidden_passed"),
+                hiddenTotal = rs.getInt("hidden_total"),
+                rejudgeJobId = rs.getObject("rejudge_job_id", UUID::class.java),
+                applied = rs.getBoolean("applied"),
+                createdAt = rs.getTimestamp("created_at").toInstant(),
+            )
+        },
+        id,
+    )
+
+    /** 재채점 대상 — 종료된 제출 (§8.1). */
+    fun completedFor(projectId: String): List<UUID> =
+        jdbc.queryForList("SELECT id FROM project_submission WHERE project_id = ? AND status = 'COMPLETED'", UUID::class.java, projectId)
+
+    fun enqueueOutbox(event: OutboxEvent) {
+        jdbc.update(
+            """
+            INSERT INTO outbox_event (id, aggregate, aggregate_id, type, payload, occurred_at)
+            VALUES (?, ?, ?, ?, ?::jsonb, ?)
+            """.trimIndent(),
+            event.id, event.aggregate, event.aggregateId, event.type, event.payload, Timestamp.from(event.occurredAt),
+        )
+    }
 
     // --- 초안 (§8.1) ---
 
@@ -210,5 +269,6 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         createdAt = rs.getTimestamp("created_at").toInstant(),
         completedAt = rs.getTimestamp("completed_at")?.toInstant(),
         version = rs.getInt("version"),
+        revision = rs.getInt("revision"),
     )
 }

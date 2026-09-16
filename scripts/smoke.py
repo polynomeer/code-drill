@@ -1456,6 +1456,7 @@ def main() -> int:
     results.append(check("테스트를 하나 더 써서 냈다", (with_test["verdict"], len(with_test["tests"])), ("ACCEPTED", 4)))
     writing = request("GET", "/me/competencies/TEST_WRITING")
     results.append(check("  테스트 작성 증거가 섰다", (len(writing), writing[0]["source"], writing[0]["success"]), (1, "PROJECT_TESTS", True)))
+    spec_count_before = None  # 재채점 직전에 잰다 — 그 사이의 오답 제출들도 증거다.
 
     mutant = {**starter, **overlay(project_root / "mutants" / "partial-lot--drops-remainder")}
     wrong = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": mutant}, {"Idempotency-Key": f"p-mut-{uuid.uuid4()}"})["id"])
@@ -1508,6 +1509,27 @@ def main() -> int:
     results.append(check("  남의 초안은 없다", status, 204))
     status, _ = raw_request("DELETE", "/projects/inventory-ledger/draft")
     results.append(check("  초안 버리기", (status, raw_request("GET", "/projects/inventory-ledger/draft")[0]), (204, 204)))
+
+    # 프로젝트형 재채점 (§8.1, §4.2 INV-02). 작업·승인·대상은 알고리즘 재채점과 같은 것이다.
+    spec_count_before = len(request("GET", "/me/competencies/SPECIFICATION"))
+    results.append(check("최초 판정은 revision 1", (final["revision"], len(request("GET", f"/projects/submissions/{accepted['id']}/judgements"))), (1, 1)))
+    _, pdry = raw_request("POST", "/admin/rejudges", {"scope": f"project-submission:{accepted['id']}", "reason": "dry-run 확인", "dryRun": True}, operator)
+    raw_request("POST", f"/admin/rejudges/{pdry['id']}/approve", None, approver)
+    status, dispatched = raw_request("POST", f"/admin/rejudges/{pdry['id']}/dispatch", None, operator)
+    results.append(check("프로젝트 dry-run 재채점 실행", (status, dispatched["targets"]), (202, 1)))
+    await_rejudge(pdry["id"], operator)
+    results.append(check("  현재 판정 그대로", request("GET", f"/projects/submissions/{accepted['id']}")["revision"], 1))
+    pj = request("GET", f"/projects/submissions/{accepted['id']}/judgements")
+    results.append(check("  이력에는 남고 반영되지 않음", (len(pj), pj[1]["applied"], pj[1]["rejudgeJobId"]), (2, False, pdry["id"])))
+    _, preal = raw_request("POST", "/admin/rejudges", {"scope": "project:inventory-ledger", "reason": "숨은 테스트 수정"}, operator)
+    raw_request("POST", f"/admin/rejudges/{preal['id']}/approve", None, approver)
+    status, dispatched = raw_request("POST", f"/admin/rejudges/{preal['id']}/dispatch", None, operator)
+    results.append(check("프로젝트 단위 재채점 실행", (status, dispatched["targets"] >= 3), (202, True)))
+    report = await_rejudge(preal["id"], operator, timeout=TIMEOUT * 3)
+    results.append(check("  전부 돌아왔고 바뀐 판정은 없다", (report["job"]["status"], len(report["changes"])), ("COMPLETED", 0)))
+    rejudged = request("GET", f"/projects/submissions/{accepted['id']}")
+    results.append(check("  revision 이 올랐고 판정은 같다", (rejudged["revision"], rejudged["verdict"], rejudged["hiddenPassed"]), (2, "ACCEPTED", 10)))
+    results.append(check("  실무군 증거는 늘지 않았다 — 재채점은 능력이 아니다", request("GET", "/me/competencies/SPECIFICATION").__len__(), spec_count_before))
 
     history = request("GET", "/projects/submissions?projectId=inventory-ledger")
     results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))

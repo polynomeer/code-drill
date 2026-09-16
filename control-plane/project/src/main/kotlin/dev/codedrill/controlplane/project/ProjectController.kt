@@ -87,6 +87,16 @@ class ProjectController(private val service: ProjectService) {
         return ResponseEntity.noContent().build()
     }
 
+    /** 판정 이력 (§8.1). 재채점이 무엇을 무엇으로 바꿨는지 사용자도 본다. */
+    @GetMapping("/submissions/{id}/judgements")
+    fun judgements(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: UUID,
+    ): ResponseEntity<List<ProjectJudgement>> {
+        service.find(id)?.takeIf { it.userId == principal.id } ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(service.judgements(id))
+    }
+
     @GetMapping("/{id}")
     fun view(@PathVariable id: String): ResponseEntity<ProjectService.ProjectView> {
         val view = service.view(id) ?: return ResponseEntity.notFound().build()

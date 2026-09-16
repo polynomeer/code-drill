@@ -18,6 +18,8 @@ fun interface PublishedProjects {
  */
 interface WorkspaceStore {
     fun store(submissionId: String, files: Map<String, String>): WorkspaceRef
+    /** 있고 digest 가 맞으면 그대로, 아니면 다시 올린다 — 재채점의 길이다. */
+    fun ensure(submissionId: String, files: Map<String, String>): WorkspaceRef
     fun delete(submissionId: String)
 }
 
@@ -32,5 +34,36 @@ fun interface ProjectLearningSignals {
 
     companion object {
         val NONE = ProjectLearningSignals { _, _, _, _, _, _ -> }
+    }
+}
+
+/**
+ * 이 판정이 재채점의 결과인지, 그렇다면 어떻게 다뤄야 하는지 (§3.1 조립 지점).
+ *
+ * Submission 모듈의 RejudgeContext 와 같은 모양이다. 타입을 공유하면 두 모듈이 서로를 참조하게
+ * 되므로 여기 하나 더 두고, 조립 지점이 Admin 의 것으로 잇는다. 기본은 [NONE] — 재채점이 없는
+ * 조립에서도 최초 판정은 정상적으로 반영돼야 한다.
+ */
+interface ProjectRejudgeContext {
+    fun pendingFor(submissionId: java.util.UUID): Pending?
+    fun judged(outcome: Outcome)
+
+    data class Pending(val jobId: java.util.UUID, val dryRun: Boolean)
+
+    data class Outcome(
+        val submissionId: java.util.UUID,
+        val jobId: java.util.UUID,
+        val applied: Boolean,
+        val previousVerdict: String?,
+        val previousScore: Int?,
+        val verdict: String,
+        val score: Int,
+    )
+
+    companion object {
+        val NONE = object : ProjectRejudgeContext {
+            override fun pendingFor(submissionId: java.util.UUID): Pending? = null
+            override fun judged(outcome: Outcome) = Unit
+        }
     }
 }

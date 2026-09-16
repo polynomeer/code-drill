@@ -296,6 +296,7 @@ function ProjectResult({ submission }: { submission: ProjectSubmission }) {
           {submission.verdict ? VERDICT_LABEL[submission.verdict] : ''}
         </strong>{' '}
         <span className="muted">{submission.score}점</span>
+        {submission.revision > 1 && <span className="muted small"> · 재채점 {submission.revision - 1}회</span>}
       </p>
       {submission.log && <pre className="compile-log">{submission.log}</pre>}
       {submission.tests.length > 0 && (

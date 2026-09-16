@@ -31,6 +31,8 @@ data class ProjectSubmission(
     val createdAt: Instant = Instant.now(),
     val completedAt: Instant? = null,
     val version: Int = 0,
+    /** 재채점마다 오른다. 종료는 불변이고 바뀌는 것은 "무엇으로 판정됐는가"다 (§4.2 INV-02). */
+    val revision: Int = 1,
 ) {
     enum class Status {
         QUEUED, LEASED, COMPLETED;
@@ -54,6 +56,7 @@ data class ProjectSubmissionResponse(
     val hiddenTotal: Int?,
     val createdAt: Instant,
     val completedAt: Instant?,
+    val revision: Int,
     val files: Map<String, String>? = null,
 ) {
     companion object {
@@ -71,6 +74,7 @@ data class ProjectSubmissionResponse(
             hiddenTotal = submission.hiddenTotal,
             createdAt = submission.createdAt,
             completedAt = submission.completedAt,
+            revision = submission.revision,
             files = files,
         )
     }
@@ -86,4 +90,17 @@ data class ProjectDraft(
     val files: Map<String, String>,
     val version: Long,
     val updatedAt: Instant,
+)
+
+/** 판정 이력 한 줄 (§8.1). 재채점이 무엇을 무엇으로 바꿨는지 여기서 읽는다. */
+data class ProjectJudgement(
+    val revision: Int,
+    val executionId: String,
+    val verdict: Verdict,
+    val score: Int,
+    val hiddenPassed: Int,
+    val hiddenTotal: Int,
+    val rejudgeJobId: UUID?,
+    val applied: Boolean,
+    val createdAt: Instant,
 )
