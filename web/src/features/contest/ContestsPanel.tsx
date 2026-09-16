@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getContest, joinContest, joinDuel, listContests, openDuel } from '../../api/client'
+import { getContest, joinContest, joinDuel, listContests, openDuel, startVirtual } from '../../api/client'
 import type { ContestSummary, ContestView } from '../../shared/types'
 
-const KIND_LABEL: Record<ContestSummary['kind'], string> = { CONTEST: '대회', DUEL: '미니 대결', HACK: '반례 대전' }
+const KIND_LABEL: Record<ContestSummary['kind'], string> = { CONTEST: '대회', DUEL: '미니 대결', HACK: '반례 대전', VIRTUAL: '가상 참가' }
 
 const STATUS_LABEL: Record<ContestSummary['status'], string> = {
   DRAFT: '준비 중',
@@ -93,6 +93,23 @@ export function ContestsPanel({
               상대에게 알릴 코드: <code className="mono">{open.joinCode}</code> — 상대가 붙는 순간 시작합니다.
             </p>
           )}
+          {/* 끝난 대회는 같은 시간 조건으로 혼자 다시 돈다. 순위표는 그때 참가자들 사이의 내 자리다 (§8.4). */}
+          {open.contest.kind === 'CONTEST' && open.contest.status === 'FINISHED' && (
+            <p className="small">
+              {open.virtual ? (
+                <button type="button" className="linklike" onClick={() => show(open.virtual!)}>
+                  돌고 있는 가상 참가 열기
+                </button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => void act(() => startVirtual(open.contest.id))}>
+                    가상 참가
+                  </button>{' '}
+                  <span className="muted">같은 문제, 같은 길이로 지금부터. 그때 참가했다면 몇 등이었을지 봅니다.</span>
+                </>
+              )}
+            </p>
+          )}
           {!open.contest.joined && open.contest.kind === 'CONTEST' && open.contest.status !== 'FINISHED' && (
             <p className="small">
               <button type="button" onClick={() => void act(() => joinContest(open.contest.id), open.contest.id)}>
@@ -126,7 +143,11 @@ export function ContestsPanel({
               {open.standings.map((s) => (
                 <tr key={s.rank} className={s.mine ? 'mine' : undefined}>
                   <td>{s.rank}</td>
-                  <td>{s.displayName}{s.mine && ' (나)'}</td>
+                  <td>
+                    {s.displayName}
+                    {s.mine && ' (나)'}
+                    {s.virtual && <span className="muted"> · 가상</span>}
+                  </td>
                   <td>{s.total}</td>
                   <td>{s.solved}</td>
                 </tr>

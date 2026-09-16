@@ -720,7 +720,7 @@ export type ContestStatus = 'DRAFT' | 'WAITING' | 'SCHEDULED' | 'RUNNING' | 'FIN
 
 export interface ContestSummary {
   id: string
-  kind: 'CONTEST' | 'DUEL' | 'HACK'
+  kind: 'CONTEST' | 'DUEL' | 'HACK' | 'VIRTUAL'
   title: string
   status: ContestStatus
   startsAt: string | null
@@ -735,9 +735,12 @@ export interface Standing {
   rank: number
   displayName: string
   mine: boolean
+  /** 가상 참가로 낸 줄 (§8.4). 원래 순위표에는 없다. */
+  virtual: boolean
   total: number
   solved: number
   lastSolvedAt: string | null
+  elapsedSeconds: number | null
   perProblem: Record<string, number>
 }
 
@@ -747,4 +750,6 @@ export interface ContestView {
   standings: Standing[]
   /** 대결의 코드. 만든 사람에게만 온다. */
   joinCode: string | null
+  /** 끝난 대회에서 내가 돌고 있는 가상 참가의 id. */
+  virtual: string | null
 }

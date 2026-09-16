@@ -712,3 +712,8 @@ export async function joinDuel(code: string): Promise<{ contest: ContestSummary 
   })
   return json<{ contest: ContestSummary }>(response)
 }
+
+export async function startVirtual(contestId: string): Promise<{ contest: ContestSummary }> {
+  const response = await authed(`/contests/${contestId}/virtual`, { method: 'POST' })
+  return json<{ contest: ContestSummary }>(response)
+}
