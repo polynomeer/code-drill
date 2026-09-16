@@ -1,7 +1,9 @@
 # inventory-ledger 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
-# 역량은 없다 — 프로젝트형이 재는 것은 온톨로지 16개 안에 없다 (feature-roadmap 11단계).
 difficulty: MEDIUM
 tags:
   - queue
   - simulation
 summary: 선입선출 원가로 입고·출고를 기록하는 재고 원장을 요구사항대로 구현한다.
+# 실무군만 (Competency.engineering). 테스트 작성은 활동에서 나오므로 카탈로그에 달지 않는다.
+competencies:
+  - SPECIFICATION

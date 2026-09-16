@@ -32,6 +32,7 @@ class ProjectService(
     private val repository: ProjectRepository,
     private val workspaces: WorkspaceStore,
     private val json: ObjectMapper,
+    private val learning: ProjectLearningSignals = ProjectLearningSignals.NONE,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -200,9 +201,38 @@ class ProjectService(
         )
         if (changed) {
             log.info("프로젝트 판정 완료: {} → {} ({}점, 숨은 {}/{})", id, message.verdict, message.score, message.hiddenPassed, message.hiddenTotal)
+            signal(id, message)
         }
         return changed
     }
+
+    /**
+     * 판정을 증거로 (11단계). 실패해도 판정은 이미 적혔다 — 학습 기록은 판정보다 뒤의 관심사다.
+     *
+     * 더 쓴 테스트는 시작 저장소의 공개 테스트 파일과 제출의 같은 파일에서 `def test_` 를
+     * 세어 뺀 것이다. 파일을 새로 만든 테스트도 센다 — `tests/test_*.py` 면 스위트가 돈다.
+     */
+    private fun signal(id: UUID, message: ProjectCompleted) {
+        runCatching {
+            val submission = repository.findById(id) ?: return
+            val pkg = packages.load(submission.projectId)
+            val starterTests = pkg.starter.filterKeys { it.isPublicTest() }.values.sumOf { it.testMethods() }
+            // 숨은 테스트와 같은 경로에 쓴 것은 세지 않는다 — 채점 때 덮여 한 번도 돌지 않는다.
+            val submittedTests = repository.files(id).filterKeys { it.isPublicTest() && it !in pkg.hidden }.values.sumOf { it.testMethods() }
+            val added = (submittedTests - starterTests).coerceAtLeast(0)
+            learning.judged(
+                userId = submission.userId,
+                projectId = submission.projectId,
+                submissionId = id.toString(),
+                accepted = message.verdict == dev.codedrill.judge.protocol.Verdict.ACCEPTED,
+                addedTests = added,
+                addedTestsPassed = message.tests.isNotEmpty() && message.tests.all { it.passed },
+            )
+        }.onFailure { log.warn("프로젝트 판정을 증거로 잇지 못했다: {} ({})", id, it.message) }
+    }
+
+    private fun String.isPublicTest() = startsWith("tests/test_") && endsWith(".py")
+    private fun String.testMethods() = TEST_METHOD.findAll(this).count()
 
     private fun available(): List<ProjectPackage> {
         val ids = published.ids()
@@ -216,6 +246,9 @@ class ProjectService(
 
     companion object {
         const val PROJECT_EVENT = "ProjectQueued"
+
+        /** unittest 가 찾는 이름. 들여쓰기 안의 메서드만 — 최상위 함수는 스위트가 돌리지 않는다. */
+        private val TEST_METHOD = Regex("""^\s+def test_\w+\s*\(""", RegexOption.MULTILINE)
 
         /** 한 사람이 동시에 걸어 둘 수 있는 프로젝트 판정. 분 단위 실행이라 알고리즘 제출보다 좁다 (§10.2). */
         const val MAX_IN_FLIGHT = 2

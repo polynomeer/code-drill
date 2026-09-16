@@ -1444,6 +1444,19 @@ def main() -> int:
     results.append(check("  제출한 파일이 함께 온다", sorted(final["files"]) == sorted(reference), True))
     results.append(check("목록에 완료 표시", request("GET", "/projects")[0]["solved"], True))
 
+    # 프로젝트 판정은 실무군 역량의 증거다 (11단계). 알고리즘 칸에는 아무것도 붙지 않는다.
+    competencies = {c["competency"]: c for c in request("GET", "/me/competencies")["competencies"]}
+    spec = competencies["SPECIFICATION"]
+    results.append(check("요구사항 충실에 증거가 섰다", (spec["group"], spec["evidenceCount"] >= 1, spec["successCount"] >= 1), ("ENGINEERING", True, True)))
+    spec_rows = request("GET", "/me/competencies/SPECIFICATION")
+    results.append(check("  출처는 프로젝트 판정, 참조는 제출", (spec_rows[0]["source"], spec_rows[0]["reference"]), ("PROJECT", accepted["id"])))
+    results.append(check("  테스트를 더 쓰지 않았으면 테스트 작성 증거는 없다", competencies["TEST_WRITING"]["evidenceCount"], 0))
+    tested = {**reference, "tests/test_public.py": reference["tests/test_public.py"] + "\n    def test_mine(self):\n        self.assertEqual(0, Ledger().on_hand('zzz'))\n"}
+    with_test = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": tested}, {"Idempotency-Key": f"p-tested-{uuid.uuid4()}"})["id"])
+    results.append(check("테스트를 하나 더 써서 냈다", (with_test["verdict"], len(with_test["tests"])), ("ACCEPTED", 4)))
+    writing = request("GET", "/me/competencies/TEST_WRITING")
+    results.append(check("  테스트 작성 증거가 섰다", (len(writing), writing[0]["source"], writing[0]["success"]), (1, "PROJECT_TESTS", True)))
+
     mutant = {**starter, **overlay(project_root / "mutants" / "partial-lot--drops-remainder")}
     wrong = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": mutant}, {"Idempotency-Key": f"p-mut-{uuid.uuid4()}"})["id"])
     results.append(check("로트 나머지를 버리는 오답은 WRONG_ANSWER", (wrong["verdict"], wrong["hiddenTotal"] - wrong["hiddenPassed"] >= 1), ("WRONG_ANSWER", True)))

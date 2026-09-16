@@ -187,6 +187,11 @@ class ContentValidator(
         if (unknown.isNotEmpty()) {
             problems += "어휘에 없는 태그: ${unknown.joinToString()} (content/tags.yaml)"
         }
+        // 실무군은 프로젝트형의 것이다. 여기 달리면 알고리즘 증거가 그 칸에 섞인다 (11단계).
+        val engineering = pkg.catalog.competencies.filter { it.engineering }
+        if (engineering.isNotEmpty()) {
+            problems += "알고리즘 문제는 실무군 역량을 달 수 없다: ${engineering.joinToString()}"
+        }
 
         pkg.catalog.prerequisites.forEach { id ->
             if (!contentRoot.resolve(id).resolve("manifest.yaml").exists()) {

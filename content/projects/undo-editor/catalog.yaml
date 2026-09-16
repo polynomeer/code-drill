@@ -3,3 +3,6 @@ tags:
   - stack
   - string
 summary: 삽입·삭제와 되돌리기·다시 하기를 명령 이력 두 스택으로 구현하고, 새 편집이 다시 하기를 지우는 규칙까지 맞춘다.
+# 실무군만 (Competency.engineering). 테스트 작성은 활동에서 나오므로 카탈로그에 달지 않는다.
+competencies:
+  - SPECIFICATION

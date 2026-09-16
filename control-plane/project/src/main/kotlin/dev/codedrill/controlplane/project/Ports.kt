@@ -20,3 +20,17 @@ interface WorkspaceStore {
     fun store(submissionId: String, files: Map<String, String>): WorkspaceRef
     fun delete(submissionId: String)
 }
+
+/**
+ * 판정을 역량 증거로 잇는 창구 (§3.1 조립 지점, 11단계). Project 는 Competency 를 모른다.
+ *
+ * [addedTests] 는 사용자가 시작 저장소보다 더 쓴 테스트 메서드 수, [addedTestsPassed] 는
+ * 그것들이 — 공개 테스트 전부가 — 자기 제출에서 통과했는가다.
+ */
+fun interface ProjectLearningSignals {
+    fun judged(userId: String, projectId: String, submissionId: String, accepted: Boolean, addedTests: Int, addedTestsPassed: Boolean)
+
+    companion object {
+        val NONE = ProjectLearningSignals { _, _, _, _, _, _ -> }
+    }
+}

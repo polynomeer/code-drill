@@ -563,6 +563,9 @@ export type EvidenceSource =
   | 'MUTATION'
   | 'TRANSFER'
   | 'PREDICTION'
+  | 'ARENA'
+  | 'PROJECT'
+  | 'PROJECT_TESTS'
 
 export const LEVEL_LABEL: Record<MasteryLevel, string> = {
   UNMEASURED: '아직 재지 않음',
@@ -584,6 +587,8 @@ export const GROUP_LABEL: Record<string, string> = {
   EXECUTION: '실행',
   VERIFICATION: '검증',
   EXTENSION: '확장',
+  // 프로젝트형 문제가 재는 것 (11단계). 알고리즘 증거와 섞이지 않는 칸이다.
+  ENGINEERING: '실무',
 }
 
 export const COMPETENCY_LABEL: Record<string, string> = {
@@ -603,6 +608,8 @@ export const COMPETENCY_LABEL: Record<string, string> = {
   TRANSFER: '전이',
   METACOGNITION: '메타인지',
   AI_COLLABORATION: 'AI 협업',
+  SPECIFICATION: '요구사항 충실',
+  TEST_WRITING: '테스트 작성',
 }
 
 export const SOURCE_LABEL: Record<EvidenceSource, string> = {
@@ -612,6 +619,9 @@ export const SOURCE_LABEL: Record<EvidenceSource, string> = {
   MUTATION: '테스트 점검',
   TRANSFER: '전이 확인',
   PREDICTION: '상태 예측',
+  ARENA: '아레나',
+  PROJECT: '프로젝트 판정',
+  PROJECT_TESTS: '프로젝트에서 쓴 테스트',
 }
 
 export interface MasteryView {

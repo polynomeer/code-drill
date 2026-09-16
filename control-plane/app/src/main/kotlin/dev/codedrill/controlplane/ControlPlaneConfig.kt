@@ -67,6 +67,7 @@ import dev.codedrill.controlplane.submission.SourceStore
 import dev.codedrill.judge.protocol.SourceRef
 import dev.codedrill.judge.protocol.Sources
 import dev.codedrill.platform.storage.BlobStore
+import dev.codedrill.controlplane.project.ProjectLearningSignals
 import dev.codedrill.controlplane.project.ProjectPersonalData
 import dev.codedrill.controlplane.project.ProjectService
 import dev.codedrill.controlplane.project.PublishedProjects
@@ -242,6 +243,12 @@ class ControlPlaneConfig {
         }
 
         override fun delete(submissionId: String) = store.delete(Workspaces.workspaceKey(submissionId))
+    }
+
+    /** 프로젝트형 판정 → 실무군 증거 (11단계). 두 모듈은 서로를 모른다. */
+    @Bean
+    fun projectLearningSignals(service: CompetencyService) = ProjectLearningSignals { userId, projectId, submissionId, accepted, addedTests, addedTestsPassed ->
+        service.projectJudged(userId, projectId, submissionId, accepted, addedTests, addedTestsPassed)
     }
 
     @Bean

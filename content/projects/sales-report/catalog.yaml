@@ -4,3 +4,6 @@ tags:
   - hash-map
   - sorting
 summary: 줄 단위 매출 기록을 읽어 잘못된 줄은 줄 번호와 함께 모으고, 지역별로 집계해 정해진 형식의 보고서를 만든다.
+# 실무군만 (Competency.engineering). 테스트 작성은 활동에서 나오므로 카탈로그에 달지 않는다.
+competencies:
+  - SPECIFICATION

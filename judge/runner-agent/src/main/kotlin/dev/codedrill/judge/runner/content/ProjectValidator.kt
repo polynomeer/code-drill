@@ -91,11 +91,15 @@ class ProjectValidator(
 
     private fun catalog(pkg: ProjectPackage): List<Check> {
         val unknown = pkg.catalog.tags.filterNot { it in vocabulary }
+        // 프로젝트형은 실무군만 단다. 알고리즘 칸에 달리면 프로젝트 증거가 거기 섞인다 (11단계).
+        val foreign = pkg.catalog.competencies.filterNot { it.engineering }
         return listOf(
             when {
                 unknown.isNotEmpty() -> Check.fail("catalog", "어휘에 없는 태그: ${unknown.joinToString()} (content/tags.yaml)")
                 pkg.catalog.summary.isBlank() -> Check.fail("catalog", "summary 가 비어 있다")
-                else -> Check.pass("catalog", "${pkg.catalog.difficulty} · 태그 ${pkg.catalog.tags.size}")
+                pkg.catalog.competencies.isEmpty() -> Check.fail("catalog", "역량이 없다. 이 문제를 풀어도 숙련도가 움직이지 않는다")
+                foreign.isNotEmpty() -> Check.fail("catalog", "프로젝트형은 실무군 역량만 달 수 있다: ${foreign.joinToString()}")
+                else -> Check.pass("catalog", "${pkg.catalog.difficulty} · 태그 ${pkg.catalog.tags.size} · 역량 ${pkg.catalog.competencies.size}")
             },
         )
     }

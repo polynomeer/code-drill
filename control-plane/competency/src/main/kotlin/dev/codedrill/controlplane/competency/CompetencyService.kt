@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.competency
 import dev.codedrill.platform.problempackage.Competency
 import dev.codedrill.platform.problempackage.DefectKind
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
+import dev.codedrill.platform.problempackage.ProjectPackageLoader
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -21,6 +22,8 @@ import java.util.UUID
 class CompetencyService(
     private val repository: EvidenceRepository,
     private val packages: ProblemPackageLoader,
+    /** 프로젝트형 문제의 카탈로그 (11단계). null 이면 프로젝트 판정은 증거가 되지 않는다 — 프로젝트 없는 조립뿐이다. */
+    private val projects: ProjectPackageLoader? = null,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -49,6 +52,41 @@ class CompetencyService(
             detail = if (accepted) "제출이 통과했다" else "제출이 통과하지 못했다",
             weight = weightFor(helpLevel),
         )
+    }
+
+    /**
+     * 프로젝트형 판정을 증거로 삼는다 (11단계).
+     *
+     * 어느 역량에 붙는지는 프로젝트의 카탈로그가 정하고, 그것은 실무군뿐이다 — 알고리즘
+     * 증거와 한 칸에 섞이지 않는다. 사용자가 시작 저장소보다 테스트를 더 썼으면 테스트 작성의
+     * 증거가 하나 더 선다: 더한 테스트가 자기 제출에서 통과했는가.
+     *
+     * 도움 단계는 없다. 프로젝트형에는 아직 코칭이 붙지 않았고, 붙으면 알고리즘 제출과 같은
+     * 무게 표를 쓴다.
+     */
+    fun projectJudged(
+        userId: String,
+        projectId: String,
+        submissionId: String,
+        accepted: Boolean,
+        addedTests: Int,
+        addedTestsPassed: Boolean,
+    ) {
+        val competencies = projects?.let { loader ->
+            runCatching { loader.load(projectId).catalog.competencies }.getOrNull()
+        }?.takeIf { it.isNotEmpty() } ?: return
+        record(
+            userId, competencies, EvidenceSource.PROJECT, accepted, projectId,
+            reference = submissionId,
+            detail = if (accepted) "숨은 스위트를 전부 통과했다" else "숨은 스위트를 다 통과하지 못했다",
+        )
+        if (addedTests > 0) {
+            record(
+                userId, listOf(Competency.TEST_WRITING), EvidenceSource.PROJECT_TESTS, addedTestsPassed, projectId,
+                reference = submissionId,
+                detail = if (addedTestsPassed) "테스트 ${addedTests}개를 더 썼고 통과했다" else "테스트 ${addedTests}개를 더 썼는데 통과하지 못했다",
+            )
+        }
     }
 
     /**

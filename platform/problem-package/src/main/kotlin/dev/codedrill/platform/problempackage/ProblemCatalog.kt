@@ -134,6 +134,11 @@ enum class Difficulty {
  * 확장군(설명·전이·메타인지·AI 협업)은 문제가 아니라 **문제를 푼 뒤의 활동**에서 증거가
  * 나온다. 지금은 그 활동이 없어 어느 문제도 달지 않지만, 온톨로지에서 빼 두면 4단계에서
  * 다시 넣을 때 역량군 번호가 밀린다.
+ *
+ * 실무군은 **프로젝트형 문제**(feature-roadmap 11단계)가 재는 것이다. 늘린 것이지 끼운 것이
+ * 아니다 — 알고리즘 증거와 프로젝트 증거가 한 칸에 섞이면 그 칸의 숙련도가 무엇의 숙련도인지
+ * 아무도 말할 수 없다. 그래서 규칙이 있다: 알고리즘 문제의 카탈로그는 실무군을 달지 못하고,
+ * 프로젝트형의 카탈로그는 실무군만 단다. 저작 검증이 둘 다 막는다.
  */
 enum class Competency(val group: CompetencyGroup, val label: String) {
     /** 지문에서 무엇을 묻는지 읽어내기. */
@@ -183,7 +188,33 @@ enum class Competency(val group: CompetencyGroup, val label: String) {
 
     /** AI 결과를 검증하고 책임지기. */
     AI_COLLABORATION(CompetencyGroup.EXTENSION, "AI 협업"),
+
+    /**
+     * 문장으로 적힌 요구사항 — 특히 경계 조건 — 을 코드로 옮기기 (11단계).
+     *
+     * 프로젝트형 넷이 공통으로 재는 것이 이것이었다: 거절은 상태를 바꾸지 않는다, 실패한
+     * 편집은 편집이 아니다, 줄 번호는 사람의 것이다. 숨은 스위트가 그것을 묻고, 전부
+     * 통과했는가가 증거다.
+     */
+    SPECIFICATION(CompetencyGroup.ENGINEERING, "요구사항 충실"),
+
+    /**
+     * 자기 구현을 시험하는 테스트를 코드로 쓰기 (11단계).
+     *
+     * [TEST_DESIGN] 과 다르다. 저것은 "무엇을 시험할지 정하는" 것이고 시험 실행의 케이스에서
+     * 나오며, 이것은 테스트 코드 자체를 — 픽스처와 단언을 — 저장소에 쓰는 것이다. 프로젝트
+     * 제출에서 사용자가 시작 저장소보다 테스트를 더 썼고 그것이 통과했는가가 증거다.
+     */
+    TEST_WRITING(CompetencyGroup.ENGINEERING, "테스트 작성"),
+    ;
+
+    /** 프로젝트형 문제만 달 수 있는 역량인가. 저작 검증이 이 경계를 지킨다. */
+    val engineering: Boolean get() = group == CompetencyGroup.ENGINEERING
 }
 
-/** 역량군 (기획서 §4.2). 화면에서 묶어 보여주는 단위다. */
-enum class CompetencyGroup { UNDERSTANDING, DESIGN, EXECUTION, VERIFICATION, EXTENSION }
+/**
+ * 역량군 (기획서 §4.2). 화면에서 묶어 보여주는 단위다.
+ *
+ * [ENGINEERING] 은 11단계에 늘렸다 — 프로젝트형 문제가 재는 것은 앞의 다섯 어디에도 없었다.
+ */
+enum class CompetencyGroup { UNDERSTANDING, DESIGN, EXECUTION, VERIFICATION, EXTENSION, ENGINEERING }

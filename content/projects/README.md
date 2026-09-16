@@ -13,7 +13,7 @@
 <id>/
   manifest.yaml     id, version, title, language, statement, limits
   statement.md      요구사항. 사용자가 읽는 것. 무엇이 채점되는지 여기 적는다
-  catalog.yaml      difficulty, tags(content/tags.yaml 의 어휘), summary
+  catalog.yaml      difficulty, tags(content/tags.yaml 의 어휘), summary, competencies(실무군만)
   starter/          사용자가 받는 파일. 공개 테스트(tests/test_*.py)도 여기 있다
   hidden/           숨은 테스트. 채점 때 사용자 파일 위에 덮인다 — 같은 경로면 이것이 이긴다
   reference/        참조 구현. starter 위에 덮어 전부 통과해야 한다
@@ -37,6 +37,7 @@
 | 검사 | 왜 |
 |---|---|
 | structure | 공개 테스트가 하나는 있고, 숨은 모듈이 하나는 있고, 경로가 받을 수 있는 모양이다 |
+| catalog | 태그는 어휘에 있고, 역량은 하나 이상이며 **실무군만**이다. 알고리즘 칸에 달면 프로젝트 증거가 거기 섞인다 |
 | reference | 참조가 공개·숨은 테스트를 전부 통과한다 |
 | starter-fails | 시작 저장소 그대로는 정답이 아니다. 아니면 풀 것이 없다 |
 | mutation-kill-rate | 오답 전부가 잡힌다 |
@@ -59,3 +60,15 @@
   자기 것을 고치는 것이라 막지 않는다 — 판정은 숨은 것이 정한다.
 - 결과로 받는 것은 공개 테스트의 이름·사유와 숨은 테스트의 **통과 수**다. 숨은 테스트의
   이름은 무엇을 시험하는지의 힌트고, 사유는 기대값 그 자체라 서버가 보내지 않는다.
+
+## 무엇의 증거가 되나
+
+프로젝트형은 **실무군**(`CompetencyGroup.ENGINEERING`)에만 증거를 쌓는다. 처음의 16개 역량 안에
+프로젝트형이 재는 것이 없었고, 있는 칸에 끼우는 대신 늘렸다 — 알고리즘 증거와 한 칸에 섞이면
+그 칸의 숙련도가 무엇의 숙련도인지 아무도 말할 수 없다. 반대 방향도 막는다: 알고리즘 문제의
+카탈로그는 실무군을 달 수 없다.
+
+| 역량 | 증거 |
+|---|---|
+| 요구사항 충실 (`SPECIFICATION`) | 판정 — 숨은 스위트를 전부 통과했는가. 카탈로그에 단다 |
+| 테스트 작성 (`TEST_WRITING`) | 활동 — 시작 저장소보다 `tests/test_*.py` 의 `def test_` 를 더 썼고 그것이 자기 제출에서 통과했는가. 카탈로그에 달지 않는다; 더 쓰지 않았으면 증거가 없다 |

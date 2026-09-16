@@ -80,11 +80,13 @@ data class ProjectLimits(
 /**
  * 목록에 보이는 것. 패키지 digest 밖이다 — 요약 문장을 고쳤다고 판정이 무효가 되면 안 된다.
  *
- * 역량은 없다. 프로젝트형이 재는 것은 온톨로지 16개 안에 없고, 있는 칸에 끼워 넣지 않는다
- * (feature-roadmap 11단계). 역량을 늘릴 때 여기에 붙는다.
+ * [competencies] 는 **실무군만** 달 수 있다 ([Competency.engineering]). 프로젝트형이 재는 것은
+ * 처음의 16개 안에 없었고, 있는 칸에 끼워 넣는 대신 늘렸다 (feature-roadmap 11단계). 저작
+ * 검증이 이 경계를 지킨다.
  */
 data class ProjectCatalog(
     val difficulty: Difficulty,
     val tags: List<String>,
     val summary: String,
+    val competencies: List<Competency>,
 )
