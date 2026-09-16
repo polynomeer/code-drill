@@ -44,6 +44,13 @@ class ContestController(private val service: ContestService) {
         is ContestService.JoinOutcome.Invalid -> ResponseEntity.badRequest().body(error(outcome.reason))
     }
 
+    /** 가상 참가 (§8.4). 끝난 대회를 같은 시간 조건으로 혼자 다시. */
+    @PostMapping("/{id}/virtual")
+    fun virtual(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable id: UUID,
+    ): ResponseEntity<Any> = duel(service.virtual(principal.id, principal.displayName, id))
+
     @PostMapping("/duels")
     fun openDuel(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,

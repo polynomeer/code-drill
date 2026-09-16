@@ -13,11 +13,11 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
     fun insert(c: Contest, problemIds: List<String>) {
         jdbc.update(
             """
-            INSERT INTO contest (id, kind, title, created_by, starts_at, ends_at, minutes, published, join_code)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO contest (id, kind, title, created_by, starts_at, ends_at, minutes, published, join_code, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             c.id, c.kind.name, c.title, c.createdBy, c.startsAt?.let { Timestamp.from(it) }, c.endsAt?.let { Timestamp.from(it) },
-            c.minutes, c.published, c.joinCode,
+            c.minutes, c.published, c.joinCode, c.parentId,
         )
         problemIds.forEachIndexed { i, pid ->
             jdbc.update("INSERT INTO contest_problem (contest_id, problem_id, ord) VALUES (?, ?, ?)", c.id, pid, i)
@@ -33,11 +33,17 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
         """
         SELECT c.* FROM contest c
          WHERE (c.kind IN ('CONTEST', 'HACK') AND c.published)
-            OR (c.kind = 'DUEL' AND EXISTS (SELECT 1 FROM contest_entry e WHERE e.contest_id = c.id AND e.user_id = ?))
+            OR (c.kind IN ('DUEL', 'VIRTUAL') AND EXISTS (SELECT 1 FROM contest_entry e WHERE e.contest_id = c.id AND e.user_id = ?))
          ORDER BY c.starts_at DESC NULLS FIRST, c.created_at DESC LIMIT ?
         """.trimIndent(),
         CONTEST, userId, limit,
     )
+
+    /** 이 사람이 이 대회로 연 가상 참가 중 아직 도는 것. 하나면 된다. */
+    fun runningVirtual(parentId: UUID, userId: String, now: Instant): Contest? = jdbc.query(
+        "SELECT * FROM contest WHERE parent_id = ? AND created_by = ? AND ends_at > ? ORDER BY created_at DESC LIMIT 1",
+        CONTEST, parentId, userId, Timestamp.from(now),
+    ).firstOrNull()
 
     fun problems(contestId: UUID): List<String> =
         jdbc.query("SELECT problem_id FROM contest_problem WHERE contest_id = ? ORDER BY ord", { rs, _ -> rs.getString(1) }, contestId)
@@ -152,6 +158,7 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
                 minutes = rs.getInt("minutes").takeUnless { rs.wasNull() },
                 published = rs.getBoolean("published"),
                 joinCode = rs.getString("join_code"),
+                parentId = rs.getObject("parent_id", UUID::class.java),
                 createdAt = rs.getTimestamp("created_at").toInstant(),
             )
         }

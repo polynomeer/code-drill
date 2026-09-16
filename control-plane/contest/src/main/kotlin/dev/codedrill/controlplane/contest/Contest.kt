@@ -23,6 +23,8 @@ data class Contest(
     val minutes: Int?,
     val published: Boolean,
     val joinCode: String?,
+    /** 가상 참가면 원래 대회. 아니면 null. */
+    val parentId: UUID?,
     val createdAt: Instant,
 ) {
     fun status(now: Instant = Instant.now()): Status = when {
@@ -35,8 +37,8 @@ data class Contest(
 
     fun running(now: Instant = Instant.now()) = status(now) == Status.RUNNING
 
-    /** 대회(문제를 푼다), 대결(둘이 문제 하나를 푼다), 반례 대전(맞힌 뒤 과녁을 깨뜨린다). */
-    enum class Kind { CONTEST, DUEL, HACK }
+    /** 대회(문제를 푼다), 대결(둘이 문제 하나를 푼다), 반례 대전(맞힌 뒤 과녁을 깨뜨린다), 가상 참가(끝난 대회를 혼자 다시). */
+    enum class Kind { CONTEST, DUEL, HACK, VIRTUAL }
     enum class Status { DRAFT, WAITING, SCHEDULED, RUNNING, FINISHED }
 }
 
@@ -44,14 +46,23 @@ data class Entry(val contestId: UUID, val userId: String, val displayName: Strin
 
 data class Score(val userId: String, val problemId: String, val bestScore: Int, val attempts: Int, val solvedAt: Instant?)
 
-/** 순위표의 한 줄. 총점이 높은 순, 같으면 마지막 만점이 이른 순. */
+/**
+ * 순위표의 한 줄. 총점이 높은 순, 같으면 마지막 만점까지 걸린 시간이 짧은 순.
+ *
+ * 시각이 아니라 **걸린 시간**으로 견주는 이유는 가상 참가다 — 다른 날 돈 사람과 같은 시간
+ * 조건으로 견주려면 각자의 시작에서 잰 시간이어야 한다.
+ */
 data class Standing(
     val rank: Int,
     val displayName: String,
     val mine: Boolean,
+    /** 가상 참가로 낸 줄. 원래 순위표에는 없다. */
+    val virtual: Boolean,
     val total: Int,
     val solved: Int,
     val lastSolvedAt: Instant?,
+    /** 시작부터 마지막 만점까지의 초. 만점이 없으면 null. */
+    val elapsedSeconds: Long?,
     val perProblem: Map<String, Int>,
 )
 

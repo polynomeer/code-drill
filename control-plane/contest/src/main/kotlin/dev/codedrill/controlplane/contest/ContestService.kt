@@ -31,33 +31,52 @@ class ContestService(
     fun view(userId: String, id: UUID): ContestView? {
         val contest = repository.find(id) ?: return null
         val entry = repository.entry(id, userId)
-        // 공개 전 대회는 없는 것이다. 대결은 코드를 아는 사람에게만 열리므로, 참가하지 않았으면 없는 것이다.
-        if (contest.kind != Contest.Kind.DUEL && !contest.published) return null
-        if (contest.kind == Contest.Kind.DUEL && entry == null) return null
+        // 공개 전 대회는 없는 것이다. 대결과 가상 참가는 참가한 사람에게만 있다.
+        if (contest.kind in PUBLIC && !contest.published) return null
+        if (contest.kind !in PUBLIC && entry == null) return null
+        val standings = if (contest.kind == Contest.Kind.VIRTUAL) virtualStandings(userId, contest) else standings(userId, contest)
         return ContestView(
             contest = contest.summary(entry != null, repository.entryCount(id)),
             problems = repository.problems(id),
-            standings = standings(userId, contest),
+            standings = standings,
             // 코드는 만든 사람에게만 — 남에게 알리는 것은 그 사람의 몫이다.
             joinCode = contest.joinCode?.takeIf { contest.createdBy == userId },
+            // 끝난 대회는 혼자 다시 돌 수 있다 (§8.4 가상 참가). 이미 돌고 있는 것이 있으면 그것을.
+            virtual = contest.takeIf { it.kind == Contest.Kind.CONTEST && it.status() == Contest.Status.FINISHED }
+                ?.let { repository.runningVirtual(it.id, userId, Instant.now())?.id },
         )
     }
 
-    /** 순위표. 총점 높은 순, 같으면 마지막 만점이 이른 순. 참가했지만 점수가 없는 사람도 줄에 있다. */
-    fun standings(readerId: String, contest: Contest): List<Standing> {
+    /** 순위표. 총점 높은 순, 같으면 마지막 만점까지 걸린 시간이 짧은 순. 참가했지만 점수가 없는 사람도 줄에 있다. */
+    fun standings(readerId: String, contest: Contest): List<Standing> = rank(rows(readerId, contest, virtual = false))
+
+    /**
+     * 가상 참가의 순위표: 원래 대회의 순위표 사이에 내 가상 줄을 끼운다 — "그때 참가했다면
+     * 몇 등이었나". 원래 대회에서의 내 줄이 있으면 그것도 그대로 남는다; 둘은 다른 날의 나다.
+     */
+    private fun virtualStandings(readerId: String, virtual: Contest): List<Standing> {
+        val parent = virtual.parentId?.let { repository.find(it) } ?: return rank(rows(readerId, virtual, virtual = true))
+        return rank(rows(readerId, parent, virtual = false) + rows(readerId, virtual, virtual = true))
+    }
+
+    private fun rows(readerId: String, contest: Contest, virtual: Boolean): List<Standing> {
         val entries = repository.entries(contest.id)
         val byUser = repository.scores(contest.id).groupBy { it.userId }
-        val rows = entries.map { entry ->
+        return entries.map { entry ->
             val scores = byUser[entry.userId].orEmpty()
-            val total = scores.sumOf { it.bestScore }
+            val last = scores.mapNotNull { it.solvedAt }.maxOrNull()
             Standing(
-                rank = 0, displayName = entry.displayName, mine = entry.userId == readerId, total = total,
-                solved = scores.count { it.solvedAt != null }, lastSolvedAt = scores.mapNotNull { it.solvedAt }.maxOrNull(),
+                rank = 0, displayName = entry.displayName, mine = entry.userId == readerId, virtual = virtual,
+                total = scores.sumOf { it.bestScore }, solved = scores.count { it.solvedAt != null }, lastSolvedAt = last,
+                elapsedSeconds = if (last != null && contest.startsAt != null) java.time.Duration.between(contest.startsAt, last).seconds else null,
                 perProblem = scores.associate { it.problemId to it.bestScore },
             )
-        }.sortedWith(compareByDescending<Standing> { it.total }.thenBy { it.lastSolvedAt ?: Instant.MAX }.thenBy { it.displayName })
-        return rows.mapIndexed { i, row -> row.copy(rank = i + 1) }
+        }
     }
+
+    private fun rank(rows: List<Standing>): List<Standing> = rows
+        .sortedWith(compareByDescending<Standing> { it.total }.thenBy { it.elapsedSeconds ?: Long.MAX_VALUE }.thenBy { it.displayName })
+        .mapIndexed { i, row -> row.copy(rank = i + 1) }
 
     // --- 참가와 대결 ----------------------------------------------------------------
 
@@ -67,9 +86,30 @@ class ContestService(
      */
     @Transactional
     fun join(userId: String, displayName: String, id: UUID): JoinOutcome {
-        val contest = repository.find(id)?.takeIf { it.kind != Contest.Kind.DUEL && it.published } ?: return JoinOutcome.Invalid("그런 대회가 없다")
+        val contest = repository.find(id)?.takeIf { it.kind in PUBLIC && it.published } ?: return JoinOutcome.Invalid("그런 대회가 없다")
         if (contest.status() == Contest.Status.FINISHED) return JoinOutcome.Invalid("끝난 대회다")
         return if (repository.join(id, userId, displayName)) JoinOutcome.Joined(contest.summary(true, repository.entryCount(id))) else JoinOutcome.AlreadyJoined
+    }
+
+    /**
+     * 가상 참가 (§8.4). 끝난 대회를 같은 문제·같은 길이로 지금부터 혼자 돈다. 순위표는
+     * 원래 참가자들 사이의 내 자리다. 돌고 있는 것이 있으면 새로 열지 않고 그것을 돌려준다.
+     */
+    @Transactional
+    fun virtual(userId: String, displayName: String, parentId: UUID): DuelOutcome {
+        val parent = repository.find(parentId)?.takeIf { it.kind == Contest.Kind.CONTEST && it.published } ?: return DuelOutcome.Invalid("그런 대회가 없다")
+        if (parent.status() != Contest.Status.FINISHED) return DuelOutcome.Invalid("끝난 대회만 가상으로 돈다")
+        repository.runningVirtual(parentId, userId, Instant.now())?.let { return DuelOutcome.Opened(it.summary(true, 1), null) }
+        val now = Instant.now()
+        val length = Duration.between(parent.startsAt!!, parent.endsAt!!)
+        val virtual = Contest(
+            id = UUID.randomUUID(), kind = Contest.Kind.VIRTUAL, title = "가상 참가: ${parent.title}", createdBy = userId,
+            startsAt = now, endsAt = now.plus(length), minutes = length.toMinutes().toInt(), published = true, joinCode = null,
+            parentId = parentId, createdAt = now,
+        )
+        repository.insert(virtual, repository.problems(parentId))
+        repository.join(virtual.id, userId, displayName)
+        return DuelOutcome.Opened(virtual.summary(true, 1), null)
     }
 
     /** 대결을 연다. 문제 하나, 몇 분. 코드를 받아 상대에게 알린다. */
@@ -79,7 +119,7 @@ class ContestService(
         if (minutes !in MIN_DUEL_MINUTES..MAX_DUEL_MINUTES) return DuelOutcome.Invalid("대결은 ${MIN_DUEL_MINUTES}~${MAX_DUEL_MINUTES}분")
         val duel = Contest(
             id = UUID.randomUUID(), kind = Contest.Kind.DUEL, title = "미니 대결: $problemId", createdBy = userId,
-            startsAt = null, endsAt = null, minutes = minutes, published = true, joinCode = code(), createdAt = Instant.now(),
+            startsAt = null, endsAt = null, minutes = minutes, published = true, joinCode = code(), parentId = null, createdAt = Instant.now(),
         )
         repository.insert(duel, listOf(problemId))
         repository.join(duel.id, userId, displayName)
@@ -101,7 +141,7 @@ class ContestService(
     // --- 운영자 -----------------------------------------------------------------
 
     fun create(createdBy: String, kind: Contest.Kind, title: String, problemIds: List<String>, startsAt: Instant, endsAt: Instant): AdminOutcome {
-        if (kind == Contest.Kind.DUEL) return AdminOutcome.Rejected("대결은 사용자가 연다")
+        if (kind !in PUBLIC) return AdminOutcome.Rejected("운영자가 여는 것은 대회와 반례 대전이다")
         if (title.isBlank()) return AdminOutcome.Rejected("제목이 필요하다")
         if (problemIds.isEmpty() || problemIds.size > MAX_PROBLEMS) return AdminOutcome.Rejected("문제는 1~${MAX_PROBLEMS}개")
         if (problemIds.toSet().size != problemIds.size) return AdminOutcome.Rejected("같은 문제가 두 번 있다")
@@ -109,7 +149,7 @@ class ContestService(
         if (!endsAt.isAfter(startsAt)) return AdminOutcome.Rejected("끝이 시작보다 뒤여야 한다")
         val contest = Contest(
             id = UUID.randomUUID(), kind = kind, title = title.trim(), createdBy = createdBy,
-            startsAt = startsAt, endsAt = endsAt, minutes = null, published = false, joinCode = null, createdAt = Instant.now(),
+            startsAt = startsAt, endsAt = endsAt, minutes = null, published = false, joinCode = null, parentId = null, createdAt = Instant.now(),
         )
         repository.insert(contest, problemIds)
         return AdminOutcome.Decided(contest)
@@ -117,7 +157,7 @@ class ContestService(
 
     /** 연다. 만든 사람은 못 연다 — 문제 공개와 같은 2인 원칙이다 (§11.2). */
     fun publish(id: UUID, actor: String): AdminOutcome {
-        val contest = repository.find(id)?.takeIf { it.kind != Contest.Kind.DUEL } ?: return AdminOutcome.Rejected("그런 대회가 없다")
+        val contest = repository.find(id)?.takeIf { it.kind in PUBLIC } ?: return AdminOutcome.Rejected("그런 대회가 없다")
         if (contest.createdBy == actor) return AdminOutcome.Rejected("만든 사람은 열지 못한다 — 다른 사람이 연다 (2인 승인)")
         if (repository.publish(id) == 0) return AdminOutcome.Rejected("이미 공개된 대회다")
         return AdminOutcome.Decided(repository.find(id)!!)
@@ -156,7 +196,11 @@ class ContestService(
         val joined: Boolean, val entrants: Int, val problemCount: Int,
     )
 
-    data class ContestView(val contest: ContestSummary, val problems: List<String>, val standings: List<Standing>, val joinCode: String?)
+    data class ContestView(
+        val contest: ContestSummary, val problems: List<String>, val standings: List<Standing>, val joinCode: String?,
+        /** 끝난 대회에서, 내가 돌고 있는 가상 참가의 id. 없으면 null — 열 수 있다는 뜻은 contest.status 가 말한다. */
+        val virtual: UUID?,
+    )
 
     sealed interface JoinOutcome {
         data class Joined(val contest: ContestSummary) : JoinOutcome
@@ -176,7 +220,9 @@ class ContestService(
 
     companion object {
         /** 판정이 점수인 종류. 반례 대전은 판정이 아니라 깨뜨린 과녁이 점수다. */
-        val SOLVING = setOf(Contest.Kind.CONTEST, Contest.Kind.DUEL)
+        val SOLVING = setOf(Contest.Kind.CONTEST, Contest.Kind.DUEL, Contest.Kind.VIRTUAL)
+        /** 운영자가 열고 누구나 보는 종류. 대결과 가상 참가는 참가한 사람에게만 있다. */
+        val PUBLIC = setOf(Contest.Kind.CONTEST, Contest.Kind.HACK)
         const val LIST_LIMIT = 50
         const val MAX_PROBLEMS = 10
         const val MIN_DUEL_MINUTES = 5

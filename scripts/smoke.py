@@ -1327,6 +1327,32 @@ def main() -> int:
     view = request("GET", f"/contests/{hack['id']}")
     results.append(check("  같은 과녁을 다시 깨뜨려도 한 번이다", next(r for r in view["standings"] if r["mine"])["total"], broken))
 
+    # 가상 참가: 끝난 대회를 같은 시간 조건으로 혼자 다시. 짧은 대회를 열어 끝내고 돈다.
+    now = datetime.now(timezone.utc)  # 위의 아레나 시도가 시간을 먹었다. 창을 여기서 다시 잰다.
+    short = request("POST", "/admin/contests", {"title": "스모크 짧은 대회", "problemIds": ["two-sum"],
+                                                "startsAt": (now - timedelta(minutes=2)).isoformat(), "endsAt": (now + timedelta(seconds=30)).isoformat()}, registrar)
+    request("POST", f"/admin/contests/{short['id']}/publish", None, publisher)
+    request("POST", f"/contests/{short['id']}/join")
+    await_verdict(submit(ACCEPTED_SOURCE)["id"])
+    status, _ = raw_request("POST", f"/contests/{short['id']}/virtual", None, honest.headers)
+    results.append(check("돌고 있는 대회는 가상으로 못 돈다", status, 400))
+    while datetime.now(timezone.utc) < now + timedelta(seconds=31):
+        time.sleep(1)
+    view = request("GET", f"/contests/{short['id']}")
+    results.append(check("대회가 끝났다", (view["contest"]["status"], view["virtual"]), ("FINISHED", None)))
+    status, virtual = raw_request("POST", f"/contests/{short['id']}/virtual", None, honest.headers)
+    results.append(check("끝난 대회를 가상으로 돈다", (status, virtual["contest"]["kind"], virtual["contest"]["status"], virtual["contest"]["minutes"]),
+                         (201, "VIRTUAL", "RUNNING", 2)))
+    again = request("POST", f"/contests/{short['id']}/virtual", None, honest.headers)
+    results.append(check("  돌고 있으면 새로 열지 않는다", again["contest"]["id"], virtual["contest"]["id"]))
+    await_verdict(submit(ACCEPTED_SOURCE, headers=honest.headers)["id"], headers=honest.headers)
+    vview = request("GET", f"/contests/{virtual['contest']['id']}", None, honest.headers)
+    rows = [(r["virtual"], r["mine"], r["total"]) for r in vview["standings"]]
+    results.append(check("원래 순위표 사이에 내 가상 줄이 있다", (sorted(rows), len(rows)), (sorted([(False, False, 100), (True, True, 100)]), 2)))
+    status, _ = raw_request("GET", f"/contests/{virtual['contest']['id']}")
+    results.append(check("  가상 참가는 남에게 없다", status, 404))
+    results.append(check("  원래 순위표는 그대로다", len(request("GET", f"/contests/{short['id']}")["standings"]), 1))
+
     print("\nSSE (§9.1)")
     pending = submit(ACCEPTED_SOURCE)
     events = read_events(pending["id"])
