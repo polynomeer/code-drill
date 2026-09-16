@@ -1,0 +1,19 @@
+# max-tasks-before-deadlines 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - heap
+  - greedy
+  - sorting
+competencies:
+  - READING
+  - CONSTRAINTS
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - meeting-rooms
+  - kth-largest
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "정렬 + 힙 O(n log n). 넘칠 때마다 훑으면 O(n²)"

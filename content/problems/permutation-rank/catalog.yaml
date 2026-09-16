@@ -1,0 +1,16 @@
+# permutation-rank 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - math
+  - recursion
+  - counting
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - count-inversions
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "n ≤ 12 라 자리마다 뒤를 훑어도 된다. 펜윅 트리면 O(n log n)"

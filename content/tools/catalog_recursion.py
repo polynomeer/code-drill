@@ -1048,3 +1048,195 @@ fun canPartition(nums: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 133. 연산자를 끼워 목표를 만드는 방법의 수 (백트래킹) ------------------------------------------------
+
+def _expression_targets(num, target):
+    n = len(num)
+    count = 0
+
+    def go(pos, total, last):
+        nonlocal count
+        if pos == n:
+            if total == target:
+                count += 1
+            return
+        for end in range(pos + 1, n + 1):
+            piece = num[pos:end]
+            if len(piece) > 1 and piece[0] == "0":
+                break
+            value = int(piece)
+            if pos == 0:
+                go(end, value, value)
+            else:
+                go(end, total + value, value)
+                go(end, total - value, -value)
+                go(end, total - last + last * value, last * value)
+
+    go(0, 0, 0)
+    return count
+
+
+def _digits_str(n, salt):
+    return "".join(str(d) for d in randoms(n, 0, 9, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="expression-targets-count",
+    title="연산자를 끼워 목표 만들기",
+    summary="""
+숫자로만 된 문자열 `num` 과 정수 `target` 이 주어진다. 자리 사이에 `+`, `-`, `*` 중 하나를 끼우거나
+아무것도 끼우지 않아(자리를 이어 붙여) 식을 만든다. 만든 식의 값이 `target` 인 **서로 다른 식의
+수**를 반환한다.
+
+이어 붙인 수는 앞에 `0` 이 올 수 없다 — `"05"` 는 안 되고 `"0"` 은 된다. 곱셈은 덧셈·뺄셈보다
+먼저 계산한다.
+""",
+    notes="""
+자리마다 세 연산자와 "이어 붙이기"를 다 해 본다 — 가지가 최대 4ⁿ⁻¹ 이라 `n <= 10` 에서
+26만 갈래이고 그것이면 충분하다. 곱셈이 먼저라는 것이 함정이다: 지금까지의 합에 곱을 그냥
+곱할 수 없고, **마지막으로 더한 항**을 기억했다가 그 항을 빼고 `항 × 값` 을 더해야 한다.
+""",
+    drill_doc="""
+Drill.call("2+3")             // 식을 하나 더 늘렸다
+Drill.ret("2+3", total)       // 그 가지의 값
+""",
+    constraints="""
+- `1 <= num.length <= 10`
+- `num` 은 `0`~`9` 로만 되어 있다
+- `-10^9 <= target <= 10^9`
+""",
+    signature=dict(name="expressionTargets", parameters=[("num", "STRING"), ("target", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_expression_targets,
+    limits={"timeMillis": 4000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", ["123", 6]), ("02", ["232", 8])],
+        "boundary": [
+            ("01-single-digit", ["7", 7]),
+            ("02-single-digit-miss", ["7", 8]),
+            # 앞에 0 이 오는 수는 안 된다 — "05" 는 없다.
+            ("03-leading-zero", ["105", 5]),
+            ("04-zero-alone", ["00", 0]),
+            # 곱셈이 먼저다: 2+3*4 = 14.
+            ("05-precedence", ["234", 14]),
+            # 곱셈 뒤에 뺄셈이 오는 경우: 1-2*3 = -5.
+            ("06-minus-then-multiply", ["123", -5]),
+            ("07-concat-all", ["345623749", 345623749]),
+            ("08-negative-target", ["123", -4]),
+        ],
+        "hidden": [
+            ("01-random-6", [_digits_str(6, salt=8521), 30]),
+            ("02-random-8", [_digits_str(8, salt=8522), 0]),
+            ("03-random-10", [_digits_str(10, salt=8523), 100]),
+            ("04-many-ways", ["1111111111", 0]),
+            ("05-zeros", ["0000000000", 0]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 마지막 항을 들고 다니는 백트래킹.
+fun expressionTargets(num: String, target: Int): Int {
+    val n = num.length
+    var count = 0
+    fun go(pos: Int, total: Long, last: Long) {
+        if (pos == n) { if (total == target.toLong()) count += 1; return }
+        var value = 0L
+        for (end in pos until n) {
+            if (end > pos && num[pos] == '0') break
+            value = value * 10 + (num[end] - '0')
+            if (pos == 0) {
+                Drill.call("start")
+                go(end + 1, value, value)
+            } else {
+                Drill.call("op")
+                go(end + 1, total + value, value)
+                go(end + 1, total - value, -value)
+                go(end + 1, total - last + last * value, last * value)
+            }
+        }
+    }
+    go(0, 0L, 0L)
+    return count
+}
+""",
+    mutants=[
+        ("multiplies-total--ignores-precedence", "WRONG_ALGORITHM",
+         "곱셈을 지금까지의 합 전체에 적용한다. 곱셈이 먼저라는 규칙을 어긴다.",
+         """
+fun expressionTargets(num: String, target: Int): Int {
+    val n = num.length
+    var count = 0
+    fun go(pos: Int, total: Long) {
+        if (pos == n) { if (total == target.toLong()) count += 1; return }
+        var value = 0L
+        for (end in pos until n) {
+            if (end > pos && num[pos] == '0') break
+            value = value * 10 + (num[end] - '0')
+            if (pos == 0) go(end + 1, value) else { go(end + 1, total + value); go(end + 1, total - value); go(end + 1, total * value) }
+        }
+    }
+    go(0, 0L)
+    return count
+}
+"""),
+        ("allows-leading-zeros", "MISSING_EDGE_CASE",
+         "앞에 0 이 오는 수를 허용한다. 05 를 5 로 센다.",
+         """
+fun expressionTargets(num: String, target: Int): Int {
+    val n = num.length
+    var count = 0
+    fun go(pos: Int, total: Long, last: Long) {
+        if (pos == n) { if (total == target.toLong()) count += 1; return }
+        var value = 0L
+        for (end in pos until n) {
+            value = value * 10 + (num[end] - '0')
+            if (pos == 0) go(end + 1, value, value) else {
+                go(end + 1, total + value, value); go(end + 1, total - value, -value); go(end + 1, total - last + last * value, last * value)
+            }
+        }
+    }
+    go(0, 0L, 0L)
+    return count
+}
+"""),
+        ("no-concatenation", "MISSING_EDGE_CASE",
+         "자리를 이어 붙이는 경우를 빼고 한 자리씩만 쓴다.",
+         """
+fun expressionTargets(num: String, target: Int): Int {
+    val n = num.length
+    var count = 0
+    fun go(pos: Int, total: Long, last: Long) {
+        if (pos == n) { if (total == target.toLong()) count += 1; return }
+        val value = (num[pos] - '0').toLong()
+        if (pos == 0) go(pos + 1, value, value) else {
+            go(pos + 1, total + value, value); go(pos + 1, total - value, -value); go(pos + 1, total - last + last * value, last * value)
+        }
+    }
+    go(0, 0L, 0L)
+    return count
+}
+"""),
+        ("last-term-wrong-after-minus", "WRONG_BRANCH",
+         "뺄셈 뒤의 곱셈에서 마지막 항의 부호를 잃는다. 1-2*3 을 1-(-2*3) 처럼 계산한다.",
+         """
+fun expressionTargets(num: String, target: Int): Int {
+    val n = num.length
+    var count = 0
+    fun go(pos: Int, total: Long, last: Long) {
+        if (pos == n) { if (total == target.toLong()) count += 1; return }
+        var value = 0L
+        for (end in pos until n) {
+            if (end > pos && num[pos] == '0') break
+            value = value * 10 + (num[end] - '0')
+            if (pos == 0) go(end + 1, value, value) else {
+                go(end + 1, total + value, value); go(end + 1, total - value, value); go(end + 1, total - last + last * value, last * value)
+            }
+        }
+    }
+    go(0, 0L, 0L)
+    return count
+}
+"""),
+    ],
+))

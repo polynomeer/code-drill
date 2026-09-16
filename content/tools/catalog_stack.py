@@ -1408,3 +1408,164 @@ fun ticketQueueTime(tickets: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 132. 합이 k 이상인 가장 짧은 구간 (누적합 위의 단조 큐, EXPERT) ---------------------------------------
+
+def _shortest_at_least_k(nums, k):
+    from collections import deque
+    n = len(nums)
+    prefix = [0] * (n + 1)
+    for i, x in enumerate(nums):
+        prefix[i + 1] = prefix[i] + x
+    best = n + 1
+    queue = deque()
+    for j in range(n + 1):
+        while queue and prefix[j] - prefix[queue[0]] >= k:
+            best = min(best, j - queue.popleft())
+        while queue and prefix[queue[-1]] >= prefix[j]:
+            queue.pop()
+        queue.append(j)
+    return best if best <= n else -1
+
+
+PROBLEMS.append(Problem(
+    id="shortest-subarray-at-least-k",
+    title="합이 k 이상인 가장 짧은 구간",
+    summary="""
+정수 배열 `nums` 와 양의 정수 `k` 가 주어진다. 원소가 **음수일 수 있다.** 합이 `k` 이상인 비어
+있지 않은 연속 부분 배열 중 가장 짧은 것의 길이를 반환한다. 없으면 `-1` 이다.
+""",
+    notes="""
+원소가 전부 양수면 슬라이딩 윈도우로 끝나지만, 음수가 있으면 창을 줄여도 합이 늘 수 있어
+그 방법이 무너진다. 누적합 `P` 위에서 "`P[j] - P[i] >= k` 인 `i < j` 중 `j - i` 가 최소"를
+찾는다. 관찰 둘: `P[i] >= P[j]` 인 `i < j` 가 있으면 `i` 는 앞으로 영영 쓸모없다(`j` 가 더
+가깝고 더 작다), 그리고 어떤 `i` 가 `j` 와 짝이 되어 답 후보가 됐으면 그 `i` 는 뒤의 `j` 와는
+더 긴 답밖에 못 만든다. 그래서 큐가 단조 증가로 유지되고 앞뒤 양쪽에서 뺀다.
+""",
+    drill_doc="""
+Drill.enqueue(j)              // 누적합 자리를 큐 뒤에 넣었다
+Drill.dequeue(i)              // 답 후보를 만든 자리를 앞에서 뺐다
+Drill.pop(i)                  // 쓸모없어진 자리를 뒤에서 뺐다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `-10^5 <= nums[i] <= 10^5`, `1 <= k <= 10^9`
+""",
+    signature=dict(name="shortestSubarrayAtLeastK", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    # 모든 쌍 오답이 10 만에서 1.8 배로 겨우 넘겼다. 입력은 상한이라 한도를 조인다.
+    groups=perf_groups(time_multiplier=0.4),
+    reference=_shortest_at_least_k,
+    cases={
+        "sample": [("01", [[2, -1, 2], 3]), ("02", [[1, 2], 4])],
+        "boundary": [
+            ("01-single-hit", [[5], 5]),
+            ("02-single-miss", [[4], 5]),
+            # 음수를 건너뛰어야 더 짧은 구간이 나온다 — 슬라이딩 윈도우는 여기서 틀린다.
+            ("03-negative-inside", [[84, -37, 32, 40, 95], 167]),
+            # 음수 뒤의 원소 하나가 답이다.
+            ("04-after-negative", [[-1, 10], 10]),
+            ("05-all-negative", [[-1, -2, -3], 1]),
+            ("06-whole-array", [[1, 1, 1, 1], 4]),
+            # 큰 음수를 지나 앞과 뒤를 묶으면 길고, 뒤만 쓰면 짧다.
+            ("07-skip-dip", [[5, -10, 5, 5], 10]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -5, 9, salt=8501), 12]),
+            ("02-random-medium", [randoms(300, -50, 100, salt=8502), 400]),
+            ("03-random-hard", [randoms(2000, -100, 100, salt=8503), 250]),
+            ("04-large-k-missing", [randoms(100, 1, 10, salt=8504), 1000000000]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, -100000, 100000, salt=8511), 1000000000]),
+            ("02-medium", [randoms(30000, -100000, 100000, salt=8512), 1000000000]),
+            ("03-large", [randoms(100000, -100000, 100000, salt=8513), 1000000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 누적합 위의 단조 증가 양쪽 큐.
+fun shortestSubarrayAtLeastK(nums: IntArray, k: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val queue = IntArray(n + 1)
+    var head = 0
+    var tail = 0
+    var best = n + 1
+    for (j in 0..n) {
+        while (head < tail && prefix[j] - prefix[queue[head]] >= k) {
+            val i = queue[head++]
+            Drill.dequeue(i)
+            if (j - i < best) best = j - i
+        }
+        while (head < tail && prefix[queue[tail - 1]] >= prefix[j]) { Drill.pop(queue[tail - 1]); tail -= 1 }
+        queue[tail++] = j
+        Drill.enqueue(j)
+    }
+    return if (best <= n) best else -1
+}
+""",
+    mutants=[
+        ("sliding-window--assumes-positive", "WRONG_ALGORITHM",
+         "원소가 양수인 것처럼 슬라이딩 윈도우를 돌린다. 음수가 있으면 창을 줄여도 합이 늘 수 있다.",
+         """
+fun shortestSubarrayAtLeastK(nums: IntArray, k: Int): Int {
+    var best = nums.size + 1
+    var sum = 0L
+    var left = 0
+    for (right in nums.indices) {
+        sum += nums[right]
+        while (left <= right && sum >= k) { best = minOf(best, right - left + 1); sum -= nums[left]; left += 1 }
+    }
+    return if (best <= nums.size) best else -1
+}
+"""),
+        ("keeps-popped-front", "WRONG_BRANCH",
+         "답 후보를 만든 앞자리를 큐에 남긴다. 결과는 맞지만 큐가 단조롭지 않게 되어 뒤에서 잘못 뺀다.",
+         """
+fun shortestSubarrayAtLeastK(nums: IntArray, k: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val queue = ArrayDeque<Int>()
+    var best = n + 1
+    for (j in 0..n) {
+        for (i in queue) if (prefix[j] - prefix[i] >= k) best = minOf(best, j - i)
+        while (queue.isNotEmpty() && prefix[queue.last()] > prefix[j]) queue.removeLast()
+        queue.addLast(j)
+        if (queue.size > 2) queue.removeFirst()
+    }
+    return if (best <= n) best else -1
+}
+"""),
+        ("skips-empty-prefix", "OFF_BY_ONE",
+         "누적합의 0 번 자리를 큐에 넣지 않는다. 배열의 처음에서 시작하는 구간을 못 센다.",
+         """
+fun shortestSubarrayAtLeastK(nums: IntArray, k: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val queue = ArrayDeque<Int>()
+    var best = n + 1
+    for (j in 1..n) {
+        while (queue.isNotEmpty() && prefix[j] - prefix[queue.first()] >= k) best = minOf(best, j - queue.removeFirst())
+        while (queue.isNotEmpty() && prefix[queue.last()] >= prefix[j]) queue.removeLast()
+        queue.addLast(j)
+    }
+    return if (best <= n) best else -1
+}
+"""),
+        ("all-pairs--quadratic", "PERFORMANCE",
+         "누적합의 모든 쌍을 본다. O(n²).",
+         """
+fun shortestSubarrayAtLeastK(nums: IntArray, k: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    var best = n + 1
+    for (i in 0..n) for (j in i + 1..n) { Drill.compare(i, j); if (prefix[j] - prefix[i] >= k && j - i < best) best = j - i }
+    return if (best <= n) best else -1
+}
+"""),
+    ],
+))

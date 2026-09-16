@@ -1,0 +1,19 @@
+# kth-smallest-pair-distance 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - binary-search
+  - sorting
+  - two-pointers
+competencies:
+  - CONSTRAINTS
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - min-ship-capacity
+  - pair-sum-sorted
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "정렬 + 거리 이분 탐색 × 두 포인터 O(n log n + n log W). 모든 쌍은 O(n² log n)"

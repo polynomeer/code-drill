@@ -1137,3 +1137,260 @@ fun isPalindromeNumber(n: Int): Int {
 """),
     ],
 ))
+
+
+# --- 127. n 번째 못생긴 수 (세 포인터) ----------------------------------------------------------
+
+def _nth_ugly(n):
+    ugly = [1]
+    i2 = i3 = i5 = 0
+    while len(ugly) < n:
+        nxt = min(ugly[i2] * 2, ugly[i3] * 3, ugly[i5] * 5)
+        ugly.append(nxt)
+        if nxt == ugly[i2] * 2:
+            i2 += 1
+        if nxt == ugly[i3] * 3:
+            i3 += 1
+        if nxt == ugly[i5] * 5:
+            i5 += 1
+    return ugly[-1]
+
+
+PROBLEMS.append(Problem(
+    id="nth-ugly-number",
+    title="n 번째 못생긴 수",
+    summary="""
+소인수가 `2`, `3`, `5` 뿐인 양의 정수를 **못생긴 수**라 한다. `1` 도 못생긴 수다. 작은 것부터
+`1, 2, 3, 4, 5, 6, 8, 9, 10, 12, ...` 이다.
+
+`n` 번째 못생긴 수를 반환한다.
+""",
+    notes="""
+못생긴 수는 이미 만든 못생긴 수에 2, 3, 5 를 곱한 것 중 하나다. 만든 수 목록을 두고 "아직
+2 를 안 곱한 첫 자리", "3 을 안 곱한 첫 자리", "5 를 안 곱한 첫 자리"를 가리키는 포인터 셋을
+두면, 다음 수는 셋 중 가장 작은 곱이다. 같은 값을 두 포인터가 동시에 만들면 **둘 다** 나아가야
+중복이 안 생긴다. 힙에 넣고 꺼내도 되지만 중복을 걸러야 한다.
+""",
+    drill_doc="""
+Drill.write(i, value)         // i 번째 못생긴 수를 적었다
+Drill.compare(a, b)           // 세 후보를 비교했다
+""",
+    constraints="""
+- `1 <= n <= 1690` (1690 번째까지가 `Int` 안이다)
+""",
+    signature=dict(name="nthUglyNumber", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_nth_ugly,
+    cases={
+        "sample": [("01", [10]), ("02", [1])],
+        "boundary": [
+            ("01-two", [2]),
+            # 6 = 2·3 = 3·2. 한 번만 세야 한다.
+            ("02-duplicate-product", [7]),
+            ("03-eleven", [11]),
+            ("04-max", [1690]),
+            # 7 은 못생긴 수가 아니다 — 8 이 7 번째다.
+            ("05-skips-seven", [7]),
+        ],
+        "hidden": [
+            ("01-hundred", [100]), ("02-random", [randoms(1, 1, 1690, salt=8421)[0]]),
+            ("03-large", [1500]), ("04-random-mid", [randoms(1, 200, 900, salt=8423)[0]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 세 포인터.
+fun nthUglyNumber(n: Int): Int {
+    val ugly = IntArray(n)
+    ugly[0] = 1
+    var i2 = 0; var i3 = 0; var i5 = 0
+    for (k in 1 until n) {
+        val c2 = ugly[i2] * 2; val c3 = ugly[i3] * 3; val c5 = ugly[i5] * 5
+        Drill.compare(c2, c3); Drill.compare(c3, c5)
+        val next = minOf(c2, minOf(c3, c5))
+        ugly[k] = next
+        Drill.write(k, next)
+        if (next == c2) i2 += 1
+        if (next == c3) i3 += 1
+        if (next == c5) i5 += 1
+    }
+    return ugly[n - 1]
+}
+""",
+    mutants=[
+        ("only-one-pointer-advances", "WRONG_BRANCH",
+         "가장 작은 곱을 만든 포인터 하나만 나아간다. 6 이 두 번 나온다.",
+         """
+fun nthUglyNumber(n: Int): Int {
+    val ugly = IntArray(n)
+    ugly[0] = 1
+    var i2 = 0; var i3 = 0; var i5 = 0
+    for (k in 1 until n) {
+        val c2 = ugly[i2] * 2; val c3 = ugly[i3] * 3; val c5 = ugly[i5] * 5
+        val next = minOf(c2, minOf(c3, c5))
+        ugly[k] = next
+        if (next == c2) i2 += 1 else if (next == c3) i3 += 1 else i5 += 1
+    }
+    return ugly[n - 1]
+}
+"""),
+        ("counts-from-two", "OFF_BY_ONE",
+         "1 을 못생긴 수로 세지 않는다. 답이 한 자리 밀린다.",
+         """
+fun nthUglyNumber(n: Int): Int {
+    val ugly = IntArray(n + 1)
+    ugly[0] = 1
+    var i2 = 0; var i3 = 0; var i5 = 0
+    for (k in 1..n) {
+        val c2 = ugly[i2] * 2; val c3 = ugly[i3] * 3; val c5 = ugly[i5] * 5
+        val next = minOf(c2, minOf(c3, c5))
+        ugly[k] = next
+        if (next == c2) i2 += 1
+        if (next == c3) i3 += 1
+        if (next == c5) i5 += 1
+    }
+    return ugly[n]
+}
+"""),
+        ("checks-divisibility--misses-seven", "WRONG_ALGORITHM",
+         "2·3·5 중 하나로 나누어떨어지면 못생긴 수로 센다. 14 처럼 다른 소인수가 섞인 수를 센다.",
+         """
+fun nthUglyNumber(n: Int): Int {
+    var count = 0
+    var x = 0
+    while (count < n) {
+        x += 1
+        if (x == 1 || x % 2 == 0 || x % 3 == 0 || x % 5 == 0) count += 1
+    }
+    return x
+}
+"""),
+    ],
+))
+
+
+# --- 128. 순열의 순위 (계승 진법) ----------------------------------------------------------------
+
+def _permutation_rank(perm):
+    n = len(perm)
+    fact = [1] * (n + 1)
+    for i in range(1, n + 1):
+        fact[i] = fact[i - 1] * i
+    rank = 0
+    for i, value in enumerate(perm):
+        smaller = sum(1 for other in perm[i + 1:] if other < value)
+        rank += smaller * fact[n - 1 - i]
+    return rank
+
+
+def _perm(n, salt):
+    from author import shuffled
+    return shuffled(range(1, n + 1), salt=salt)
+
+
+PROBLEMS.append(Problem(
+    id="permutation-rank",
+    title="순열의 순위",
+    summary="""
+`1` 부터 `n` 까지의 수를 한 번씩 쓴 순열 `perm` 이 주어진다. `1..n` 의 모든 순열을 사전순으로
+늘어놓았을 때 이 순열이 **몇 번째**인지 `0` 부터 세어 반환한다. `[1, 2, ..., n]` 이 `0` 번이고
+`[n, ..., 2, 1]` 이 `n! - 1` 번이다.
+""",
+    notes="""
+첫 자리에 `perm[0]` 보다 작은 수가 `k` 개 있으면, 그 `k` 개를 첫 자리로 하는 순열 `k · (n-1)!`
+개가 전부 앞에 있다. 첫 자리를 떼고 나머지에 같은 셈을 되풀이한다 — 계승 진법이다. "작은
+수의 개수"는 **아직 안 쓴 수** 중에서 세야 한다.
+""",
+    drill_doc="""
+Drill.compare(value, other)   // 뒤에 남은 수와 비교했다
+Drill.write(i, rank)          // 자리를 하나 처리하고 순위를 갱신했다
+""",
+    constraints="""
+- `1 <= n <= 12` (12! - 1 이 `Int` 안이다)
+- `perm` 은 `1..n` 의 순열이다
+""",
+    signature=dict(name="permutationRank", parameters=[("perm", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_permutation_rank,
+    cases={
+        "sample": [("01", [[1, 3, 2]]), ("02", [[3, 1, 2]])],
+        "boundary": [
+            ("01-single", [[1]]),
+            ("02-identity", [[1, 2, 3, 4]]),
+            ("03-reversed", [[4, 3, 2, 1]]),
+            # 뒤에서 앞자리보다 작은 수만 세야 한다 — 이미 쓴 수는 빼고.
+            ("04-used-numbers-excluded", [[2, 1, 3]]),
+            ("05-max-n-reversed", [[12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]]),
+            ("06-two", [[2, 1]]),
+        ],
+        "hidden": [
+            ("01-random-5", [_perm(5, salt=8431)]), ("02-random-8", [_perm(8, salt=8432)]),
+            ("03-random-12", [_perm(12, salt=8433)]), ("04-random-10", [_perm(10, salt=8434)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 계승 진법 — 자리마다 뒤에 남은 더 작은 수를 센다.
+fun permutationRank(perm: IntArray): Int {
+    val n = perm.size
+    val factorial = IntArray(n + 1)
+    factorial[0] = 1
+    for (i in 1..n) factorial[i] = factorial[i - 1] * i
+    var rank = 0
+    for (i in 0 until n) {
+        var smaller = 0
+        for (j in i + 1 until n) {
+            Drill.compare(perm[i], perm[j])
+            if (perm[j] < perm[i]) smaller += 1
+        }
+        rank += smaller * factorial[n - 1 - i]
+        Drill.write(i, rank)
+    }
+    return rank
+}
+""",
+    mutants=[
+        ("counts-all-smaller--including-used", "WRONG_ALGORITHM",
+         "자리마다 값 - 1 을 곱한다 — 이미 앞에 쓴 수까지 작은 수로 센다.",
+         """
+fun permutationRank(perm: IntArray): Int {
+    val n = perm.size
+    val factorial = IntArray(n + 1); factorial[0] = 1
+    for (i in 1..n) factorial[i] = factorial[i - 1] * i
+    var rank = 0
+    for (i in 0 until n) rank += (perm[i] - 1) * factorial[n - 1 - i]
+    return rank
+}
+"""),
+        ("one-based-rank", "OFF_BY_ONE",
+         "1 부터 센다.",
+         """
+fun permutationRank(perm: IntArray): Int {
+    val n = perm.size
+    val factorial = IntArray(n + 1); factorial[0] = 1
+    for (i in 1..n) factorial[i] = factorial[i - 1] * i
+    var rank = 1
+    for (i in 0 until n) {
+        var smaller = 0
+        for (j in i + 1 until n) if (perm[j] < perm[i]) smaller += 1
+        rank += smaller * factorial[n - 1 - i]
+    }
+    return rank
+}
+"""),
+        ("wrong-factorial--uses-n-minus-i", "OFF_BY_ONE",
+         "자리 i 의 가중치를 (n-i)! 로 둔다. 한 자리씩 큰 계승을 쓴다.",
+         """
+fun permutationRank(perm: IntArray): Int {
+    val n = perm.size
+    val factorial = IntArray(n + 1); factorial[0] = 1
+    for (i in 1..n) factorial[i] = factorial[i - 1] * i
+    var rank = 0
+    for (i in 0 until n) {
+        var smaller = 0
+        for (j in i + 1 until n) if (perm[j] < perm[i]) smaller += 1
+        rank += smaller * factorial[n - i]
+    }
+    return rank
+}
+"""),
+    ],
+))

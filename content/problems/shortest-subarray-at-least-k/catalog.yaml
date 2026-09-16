@@ -1,0 +1,21 @@
+# shortest-subarray-at-least-k 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - array
+  - prefix-sum
+  - monotonic-stack
+  - queue
+competencies:
+  - CONSTRAINTS
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - min-subarray-len
+  - sliding-window-max
+  - count-range-sums
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "누적합 위의 단조 양쪽 큐 O(n). 모든 쌍은 O(n²)"

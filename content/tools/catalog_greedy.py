@@ -821,3 +821,177 @@ fun leastInterval(tasks: String, n: Int): Int {
 """),
     ],
 ))
+
+
+# --- 126. 마감 전에 끝낼 수 있는 작업의 최대 수 (정렬 + 힙) -------------------------------------------
+
+def _max_tasks(durations, deadlines):
+    import heapq
+    tasks = sorted(zip(deadlines, durations))
+    heap = []
+    elapsed = 0
+    for deadline, duration in tasks:
+        elapsed += duration
+        heapq.heappush(heap, -duration)
+        if elapsed > deadline:
+            elapsed += heapq.heappop(heap)  # 가장 긴 것을 뺀다 (음수라 더한다)
+    return len(heap)
+
+
+def _tasks_random(n, salt):
+    # 마감의 간격을 평균 걸리는 시간의 절반(250/500)으로 둔다. 남는 작업의 비율 f 가 250/500 이고
+    # 빼는 횟수는 (1-f)·n 이라, 힙 없이 훑는 풀이의 일은 n²·f(1-f)/2 — f = 1/2 에서 가장 크다.
+    # 걸리는 시간을 고르게 둔다(450~550). 편차가 크면 긴 것 하나를 빼는 것으로 한참을 버텨 뺄 일이 드물다.
+    durations = randoms(n, 450, 550, salt=salt)
+    order = shuffled(range(n), salt=salt + 1)
+    deadlines = [0] * n
+    for rank, i in enumerate(order):
+        deadlines[i] = 250 * (rank + 1)
+    return durations, deadlines
+
+
+PROBLEMS.append(Problem(
+    id="max-tasks-before-deadlines",
+    title="마감 전에 끝낼 수 있는 작업의 최대 수",
+    summary="""
+작업이 `n` 개 있다. `durations[i]` 는 `i` 번째 작업에 걸리는 시간, `deadlines[i]` 는 그 작업을
+**끝내야 하는** 시각이다. 시각 `0` 부터 작업을 하나씩 골라 쉬지 않고 이어서 한다 — 한 번에
+하나, 중간에 끊지 않는다. 작업은 끝나는 시각이 마감 **이하**여야 한다.
+
+끝낼 수 있는 작업 수의 최댓값을 반환한다. 어떤 작업을 골라 어떤 순서로 할지는 자유다.
+""",
+    notes="""
+마감이 이른 순서로 보면서 일단 넣고, 넣은 것들의 합이 지금 작업의 마감을 넘기면 **지금까지
+넣은 것 중 가장 긴 하나**를 뺀다. 뺄 것을 빨리 찾는 구조가 최대 힙이다. 남은 작업 수가
+답이다 — 무엇을 남겼는지는 안 물어본다.
+""",
+    drill_doc="""
+Drill.push(duration)          // 작업을 힙에 넣었다
+Drill.pop(duration)           // 가장 긴 작업을 뺐다
+Drill.compare(elapsed, deadline)
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `1 <= durations[i] <= 1000`, `1 <= deadlines[i] <= 10^8`
+- `durations.size == deadlines.size`
+""",
+    signature=dict(
+        name="maxTasksBeforeDeadlines",
+        parameters=[("durations", "INT_ARRAY"), ("deadlines", "INT_ARRAY")],
+        returns="INT",
+    ),
+    # 힙 없이 훑는 오답의 일이 n²/8 이라 10 만에서 한도를 배로밖에 못 넘긴다. 입력은 상한이라 한도를 조인다.
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_max_tasks,
+    cases={
+        "sample": [
+            ("01", [[3, 2, 1], [3, 5, 5]]),
+            ("02", [[5, 5], [4, 4]]),
+        ],
+        "boundary": [
+            ("01-single-fits", [[3], [3]]),
+            ("02-single-late", [[4], [3]]),
+            # 마감이 이른 것을 먼저 해야 둘 다 된다.
+            ("03-order-matters", [[2, 1], [3, 1]]),
+            # 짧은 것을 남기고 긴 것을 버려야 셋이 된다.
+            ("04-drop-longest", [[5, 1, 1, 1], [5, 6, 7, 8]]),
+            # 넣은 것을 나중에 빼야 하는 경우 — 처음 넣을 때는 맞았다.
+            ("05-evict-earlier-task", [[4, 1, 1], [4, 5, 5]]),
+            ("06-all-same-deadline", [[3, 3, 3, 3], [6, 6, 6, 6]]),
+            ("07-none-fit", [[9, 9], [1, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(8, 1, 10, salt=8401), randoms(8, 1, 30, salt=8402)]),
+            ("02-random-medium", [randoms(60, 1, 50, salt=8403), randoms(60, 1, 400, salt=8404)]),
+            ("03-tight", [[1, 2, 3, 4, 5], [1, 3, 6, 10, 15]]),
+            ("04-random-large-values", [randoms(200, 1, 1000, salt=8405), randoms(200, 1, 20000, salt=8406)]),
+        ],
+        "performance": [
+            ("01-small", list(_tasks_random(3000, salt=8411))),
+            ("02-medium", list(_tasks_random(30000, salt=8413))),
+            ("03-large", list(_tasks_random(100000, salt=8415))),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 마감순으로 넣고 넘치면 가장 긴 것을 뺀다.
+fun maxTasksBeforeDeadlines(durations: IntArray, deadlines: IntArray): Int {
+    val order = durations.indices.sortedBy { deadlines[it] }
+    val heap = java.util.PriorityQueue<Int>(compareByDescending { it })
+    var elapsed = 0L
+    for (i in order) {
+        elapsed += durations[i]
+        heap.add(durations[i])
+        Drill.push(durations[i])
+        Drill.compare(elapsed.toInt(), deadlines[i])
+        if (elapsed > deadlines[i]) {
+            val longest = heap.poll()
+            Drill.pop(longest)
+            elapsed -= longest
+        }
+    }
+    return heap.size
+}
+""",
+    mutants=[
+        ("no-eviction--skip-when-late", "WRONG_ALGORITHM",
+         "마감을 넘기는 작업을 건너뛰기만 한다. 이미 넣은 긴 작업을 빼고 지금 것을 넣는 편이 나을 때를 놓친다.",
+         """
+fun maxTasksBeforeDeadlines(durations: IntArray, deadlines: IntArray): Int {
+    val order = durations.indices.sortedBy { deadlines[it] }
+    var elapsed = 0L
+    var count = 0
+    for (i in order) {
+        if (elapsed + durations[i] <= deadlines[i]) { elapsed += durations[i]; count += 1 }
+    }
+    return count
+}
+"""),
+        ("sorted-by-duration--not-deadline", "WRONG_BRANCH",
+         "마감이 아니라 걸리는 시간 순으로 본다. 마감이 이른 것을 뒤로 미룬다.",
+         """
+fun maxTasksBeforeDeadlines(durations: IntArray, deadlines: IntArray): Int {
+    val order = durations.indices.sortedBy { durations[it] }
+    val heap = java.util.PriorityQueue<Int>(compareByDescending { it })
+    var elapsed = 0L
+    for (i in order) {
+        elapsed += durations[i]; heap.add(durations[i])
+        if (elapsed > deadlines[i]) elapsed -= heap.poll()
+    }
+    return heap.size
+}
+"""),
+        ("evicts-shortest", "WRONG_BRANCH",
+         "넘치면 가장 짧은 작업을 뺀다. 시간을 가장 적게 되찾는다.",
+         """
+fun maxTasksBeforeDeadlines(durations: IntArray, deadlines: IntArray): Int {
+    val order = durations.indices.sortedBy { deadlines[it] }
+    val heap = java.util.PriorityQueue<Int>()
+    var elapsed = 0L
+    for (i in order) {
+        elapsed += durations[i]; heap.add(durations[i])
+        if (elapsed > deadlines[i]) elapsed -= heap.poll()
+    }
+    return heap.size
+}
+"""),
+        ("scan-for-longest--quadratic", "PERFORMANCE",
+         "힙 없이 넣은 작업들을 목록에 두고 넘칠 때마다 훑어 가장 긴 것을 찾는다. O(n²).",
+         """
+fun maxTasksBeforeDeadlines(durations: IntArray, deadlines: IntArray): Int {
+    val order = durations.indices.sortedBy { deadlines[it] }
+    val chosen = ArrayList<Int>()
+    var elapsed = 0L
+    for (i in order) {
+        elapsed += durations[i]; chosen.add(durations[i])
+        if (elapsed > deadlines[i]) {
+            var longest = 0
+            for (k in chosen.indices) { Drill.compare(chosen[k], chosen[longest]); if (chosen[k] > chosen[longest]) longest = k }
+            elapsed -= chosen[longest]
+            chosen.removeAt(longest)
+        }
+    }
+    return chosen.size
+}
+"""),
+    ],
+))

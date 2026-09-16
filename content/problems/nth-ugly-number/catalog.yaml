@@ -1,0 +1,16 @@
+# nth-ugly-number 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - math
+  - heap
+  - dynamic-programming
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - kth-largest
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "세 포인터 O(n). 힙은 O(n log n), 하나씩 세어 보면 답의 크기만큼"

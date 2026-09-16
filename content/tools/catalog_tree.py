@@ -1454,3 +1454,350 @@ fun treeDiameter(parent: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 130. 조상보다 작지 않은 정점의 수 ------------------------------------------------------------
+
+def _good_nodes(parent, values):
+    n = len(parent)
+    best = [0] * n  # 루트부터 자기까지의 최댓값 (자기 포함)
+    count = 0
+    for i in range(n):
+        if parent[i] == -1:
+            best[i] = values[i]
+            count += 1
+        else:
+            above = best[parent[i]]
+            best[i] = max(above, values[i])
+            if values[i] >= above:
+                count += 1
+    return count
+
+
+PROBLEMS.append(Problem(
+    id="good-nodes-count",
+    title="조상보다 작지 않은 정점",
+    summary="""
+트리가 부모 배열로 주어진다. `parent[i]` 는 `i` 의 부모이고 루트는 `-1` 이다. 부모의 번호는
+항상 자식보다 작다. `values[i]` 는 정점의 값이다.
+
+루트에서 어떤 정점까지 내려오는 길에 그 정점보다 **큰 값이 없으면** 그 정점은 좋은 정점이다
+— 조상들 중 자기보다 큰 것이 없다. 루트는 언제나 좋다. 좋은 정점의 수를 반환한다.
+""",
+    notes="""
+정점마다 "루트에서 여기까지의 최댓값"을 알면 된다. 부모가 자식보다 앞에 오므로 번호 순서로
+한 번 지나며 `best[i] = max(best[parent], values[i])` 를 채우면 재귀도 스택도 필요 없다. 좋은
+정점의 조건은 `values[i] >= best[parent]` — 같으면 좋다.
+""",
+    drill_doc="""
+Drill.visit(i, values[i])     // 정점을 봤다
+Drill.compare(values[i], above)
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `parent[i] < i` (루트는 `-1`), 값은 `-10^4 <= values[i] <= 10^4`
+""",
+    signature=dict(name="goodNodes", parameters=[("parent", "INT_ARRAY"), ("values", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_good_nodes,
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0, 1, 1, 2], [3, 1, 4, 3, 5, 2]]),
+            ("02", [[-1, 0, 1], [3, 3, 3]]),
+        ],
+        "boundary": [
+            ("01-single", [[-1], [-5]]),
+            # 같은 값은 좋다.
+            ("02-equal-is-good", [[-1, 0], [2, 2]]),
+            # 부모는 작지만 조상 중에 큰 것이 있다.
+            ("03-grandparent-blocks", [[-1, 0, 1], [9, 1, 5]]),
+            ("04-negative-values", [[-1, 0, 0], [-3, -3, -10]]),
+            ("05-increasing-chain", [[-1, 0, 1, 2], [1, 2, 3, 4]]),
+            ("06-decreasing-chain", [[-1, 0, 1, 2], [4, 3, 2, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(12, salt=8461), randoms(12, -5, 5, salt=8462)]),
+            ("02-random-medium", [_random_parents(200, salt=8463), randoms(200, -100, 100, salt=8464)]),
+            ("03-random-large", [_random_parents(5000, salt=8465), randoms(5000, -10000, 10000, salt=8466)]),
+            ("04-chain-large", [[-1] + list(range(9999)), randoms(10000, -10000, 10000, salt=8467)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 부모가 앞에 오므로 번호 순서로 최댓값을 내려보낸다.
+fun goodNodes(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val best = IntArray(n)
+    var count = 0
+    for (i in 0 until n) {
+        Drill.visit(i, values[i])
+        if (parent[i] == -1) {
+            best[i] = values[i]
+            count += 1
+        } else {
+            val above = best[parent[i]]
+            Drill.compare(values[i], above)
+            best[i] = maxOf(above, values[i])
+            if (values[i] >= above) count += 1
+        }
+    }
+    return count
+}
+""",
+    mutants=[
+        ("compares-parent-only", "WRONG_ALGORITHM",
+         "부모 하나와만 비교한다. 조상 중에 더 큰 것이 있어도 좋다고 센다.",
+         """
+fun goodNodes(parent: IntArray, values: IntArray): Int {
+    var count = 0
+    for (i in parent.indices) if (parent[i] == -1 || values[i] >= values[parent[i]]) count += 1
+    return count
+}
+"""),
+        ("strictly-greater", "OFF_BY_ONE",
+         "조상과 같은 값을 좋지 않다고 본다. '크지 않으면' 좋은 것이다.",
+         """
+fun goodNodes(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val best = IntArray(n)
+    var count = 0
+    for (i in 0 until n) {
+        if (parent[i] == -1) { best[i] = values[i]; count += 1 } else {
+            val above = best[parent[i]]
+            best[i] = maxOf(above, values[i])
+            if (values[i] > above) count += 1
+        }
+    }
+    return count
+}
+"""),
+        ("skips-parent-value", "WRONG_BRANCH",
+         "내려보내는 최댓값에 부모 자신의 값을 넣지 않는다. 조부모 위로만 비교된다.",
+         """
+fun goodNodes(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val best = IntArray(n) { Int.MIN_VALUE }
+    var count = 0
+    for (i in 0 until n) {
+        if (parent[i] == -1) { count += 1 } else {
+            val above = best[parent[i]]
+            best[i] = maxOf(above, values[parent[i]])
+            if (values[i] >= above) count += 1
+        }
+    }
+    return count
+}
+"""),
+    ],
+))
+
+
+# --- 131. 합이 목표인 아래로 가는 경로의 수 (트리 위의 누적합) ----------------------------------------
+
+def _path_sum_count(parent, values, target):
+    n = len(parent)
+    children = [[] for _ in range(n)]
+    root = 0
+    for i in range(n):
+        if parent[i] == -1:
+            root = i
+        else:
+            children[parent[i]].append(i)
+    seen = {0: 1}
+    count = 0
+    # 반복 DFS: (정점, 들어가는가)
+    stack = [(root, True)]
+    prefix = [0] * n
+    while stack:
+        node, entering = stack.pop()
+        if entering:
+            above = 0 if parent[node] == -1 else prefix[parent[node]]
+            prefix[node] = above + values[node]
+            count += seen.get(prefix[node] - target, 0)
+            seen[prefix[node]] = seen.get(prefix[node], 0) + 1
+            stack.append((node, False))
+            for child in children[node]:
+                stack.append((child, True))
+        else:
+            seen[prefix[node]] -= 1
+    return count
+
+
+PROBLEMS.append(Problem(
+    id="path-sum-count",
+    title="합이 목표인 경로의 수",
+    summary="""
+트리가 부모 배열로 주어진다. `parent[i]` 는 `i` 의 부모이고 루트는 `-1` 이며, 부모의 번호는
+항상 자식보다 작다. `values[i]` 는 정점의 값이고 음수일 수 있다.
+
+**아래로만 가는** 경로 — 어떤 정점에서 시작해 자식 방향으로만 내려가는, 길이 1 이상의 정점열
+— 중 값의 합이 `target` 인 것의 수를 반환한다. 시작이 루트일 필요도, 끝이 잎일 필요도 없다.
+""",
+    notes="""
+루트에서 정점까지의 누적합을 `P` 라 하면, 조상 `a` 에서 정점 `v` 까지의 경로 합은 `P[v] - P[a]`
+다. 그래서 `v` 에서 끝나는 답은 "조상 중 `P[a] == P[v] - target` 인 것의 수"다. DFS 로
+내려가며 지나온 조상들의 누적합을 해시맵에 세고, 되돌아올 때 빼면 된다 — 빼지 않으면 다른
+가지의 정점이 조상으로 세어진다. 값이 음수라 누적합은 오르내리고, 그래서 "합이 넘으면
+끊는" 가지치기는 틀린다.
+""",
+    drill_doc="""
+Drill.visit(v, prefix)        // 정점에 들어가 누적합을 적었다
+Drill.write(v, count)         // 여기서 끝나는 경로를 더했다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `parent[i] < i` (루트는 `-1`), `-1000 <= values[i] <= 1000`, `-10^9 <= target <= 10^9`
+- 답은 `Int` 범위 안이다
+""",
+    signature=dict(name="pathSumCount", parameters=[("parent", "INT_ARRAY"), ("values", "INT_ARRAY"), ("target", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_path_sum_count,
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0, 1, 1, 2], [1, 2, -1, 1, 3, 2], 3]),
+            ("02", [[-1, 0, 1], [1, 1, 1], 2]),
+        ],
+        "boundary": [
+            ("01-single-hit", [[-1], [5], 5]),
+            ("02-single-miss", [[-1], [5], 4]),
+            # 음수가 있어 같은 정점에서 끝나는 경로가 둘이다.
+            ("03-negative-makes-two", [[-1, 0, 1, 2], [2, -2, 2, 0], 2]),
+            # 루트에서 시작하지 않는 경로.
+            ("04-not-from-root", [[-1, 0, 1], [10, 1, 1], 2]),
+            # 잎에서 끝나지 않는 경로.
+            ("05-not-at-leaf", [[-1, 0, 1], [1, 1, 10], 2]),
+            # 다른 가지의 정점을 조상으로 세면 틀린다.
+            ("06-sibling-not-ancestor", [[-1, 0, 0], [0, 1, 1], 1]),
+            ("07-target-zero", [[-1, 0, 1], [1, -1, 1], 0]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(12, salt=8471), randoms(12, -3, 3, salt=8472), 2]),
+            ("02-random-medium", [_random_parents(300, salt=8473), randoms(300, -5, 5, salt=8474), 0]),
+            ("03-chain", [[-1] + list(range(199)), randoms(200, -2, 2, salt=8475), 1]),
+            ("04-random-large", [_random_parents(3000, salt=8476), randoms(3000, -10, 10, salt=8477), 7]),
+        ],
+        "performance": [
+            ("01-small", [[-1] + list(range(4999)), randoms(5000, -2, 2, salt=8481), 3]),
+            ("02-medium", [[-1] + list(range(29999)), randoms(30000, -2, 2, salt=8482), 3]),
+            ("03-large", [[-1] + list(range(99999)), randoms(100000, -2, 2, salt=8483), 3]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 반복 DFS 로 조상들의 누적합을 세고 되돌아올 때 뺀다.
+fun pathSumCount(parent: IntArray, values: IntArray, target: Int): Int {
+    val n = parent.size
+    val head = IntArray(n) { -1 }
+    val next = IntArray(n)
+    var root = 0
+    for (i in 0 until n) {
+        if (parent[i] == -1) { root = i; continue }
+        next[i] = head[parent[i]]; head[parent[i]] = i
+    }
+    val prefix = LongArray(n)
+    val seen = HashMap<Long, Int>()
+    seen[0L] = 1
+    var count = 0
+    // 스택에는 정점을 두 번 넣는다 — 들어갈 때(양수)와 나올 때(음수 표시).
+    val stack = IntArray(2 * n + 2)
+    var top = 0
+    stack[top++] = root
+    while (top > 0) {
+        val item = stack[--top]
+        if (item >= 0) {
+            val v = item
+            val above = if (parent[v] == -1) 0L else prefix[parent[v]]
+            prefix[v] = above + values[v]
+            Drill.visit(v, prefix[v].toInt())
+            val hits = seen[prefix[v] - target] ?: 0
+            count += hits
+            Drill.write(v, count)
+            seen[prefix[v]] = (seen[prefix[v]] ?: 0) + 1
+            stack[top++] = -v - 1
+            var child = head[v]
+            while (child != -1) { stack[top++] = child; child = next[child] }
+        } else {
+            val v = -item - 1
+            seen[prefix[v]] = seen[prefix[v]]!! - 1
+        }
+    }
+    return count
+}
+""",
+    mutants=[
+        ("root-paths-only", "WRONG_ALGORITHM",
+         "루트에서 시작하는 경로만 센다.",
+         """
+fun pathSumCount(parent: IntArray, values: IntArray, target: Int): Int {
+    val n = parent.size
+    val prefix = LongArray(n)
+    var count = 0
+    for (i in 0 until n) {
+        prefix[i] = (if (parent[i] == -1) 0L else prefix[parent[i]]) + values[i]
+        if (prefix[i] == target.toLong()) count += 1
+    }
+    return count
+}
+"""),
+        ("never-removes-on-backtrack", "WRONG_BRANCH",
+         "되돌아올 때 누적합을 해시맵에서 빼지 않는다. 다른 가지의 정점을 조상으로 센다.",
+         """
+fun pathSumCount(parent: IntArray, values: IntArray, target: Int): Int {
+    val n = parent.size
+    val prefix = LongArray(n)
+    val seen = HashMap<Long, Int>()
+    seen[0L] = 1
+    var count = 0
+    for (i in 0 until n) {
+        prefix[i] = (if (parent[i] == -1) 0L else prefix[parent[i]]) + values[i]
+        count += seen[prefix[i] - target] ?: 0
+        seen[prefix[i]] = (seen[prefix[i]] ?: 0) + 1
+    }
+    return count
+}
+"""),
+        ("prunes-when-over", "MISSING_EDGE_CASE",
+         "합이 목표를 넘으면 더 내려가지 않는다. 값이 음수면 나중에 다시 목표가 될 수 있다.",
+         """
+fun pathSumCount(parent: IntArray, values: IntArray, target: Int): Int {
+    val n = parent.size
+    val children = Array(n) { mutableListOf<Int>() }
+    var root = 0
+    for (i in 0 until n) if (parent[i] == -1) root = i else children[parent[i]].add(i)
+    var count = 0
+    val stack = ArrayDeque<Pair<Int, Long>>()
+    for (start in 0 until n) {
+        stack.addLast(start to 0L)
+        while (stack.isNotEmpty()) {
+            val (v, above) = stack.removeLast()
+            val sum = above + values[v]
+            if (sum == target.toLong()) count += 1
+            if (sum > target) continue
+            for (c in children[v]) stack.addLast(c to sum)
+        }
+    }
+    return count
+}
+"""),
+        ("start-at-every-node--quadratic", "PERFORMANCE",
+         "모든 정점에서 시작해 아래로 다 내려가 본다. 사슬에서 O(n²).",
+         """
+fun pathSumCount(parent: IntArray, values: IntArray, target: Int): Int {
+    val n = parent.size
+    val children = Array(n) { mutableListOf<Int>() }
+    for (i in 0 until n) if (parent[i] != -1) children[parent[i]].add(i)
+    var count = 0
+    val stack = ArrayDeque<Pair<Int, Long>>()
+    for (start in 0 until n) {
+        stack.addLast(start to 0L)
+        while (stack.isNotEmpty()) {
+            val (v, above) = stack.removeLast()
+            val sum = above + values[v]
+            Drill.compare(v, start)
+            if (sum == target.toLong()) count += 1
+            for (c in children[v]) stack.addLast(c to sum)
+        }
+    }
+    return count
+}
+"""),
+    ],
+))

@@ -1202,3 +1202,177 @@ fun countRangeSums(nums: IntArray, lower: Int, upper: Int): Int {
 """),
     ],
 ))
+
+
+# --- 129. k 번째로 작은 쌍의 거리 (이분 탐색 + 두 포인터) --------------------------------------------
+
+def _kth_pair_distance(nums, k):
+    values = sorted(nums)
+    n = len(values)
+
+    def pairs_within(limit):
+        count = 0
+        left = 0
+        for right in range(n):
+            while values[right] - values[left] > limit:
+                left += 1
+            count += right - left
+        return count
+
+    lo, hi = 0, values[-1] - values[0]
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if pairs_within(mid) >= k:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+
+PROBLEMS.append(Problem(
+    id="kth-smallest-pair-distance",
+    title="k 번째로 작은 쌍의 거리",
+    summary="""
+정수 배열 `nums` 와 `k` 가 주어진다. 서로 다른 두 자리 `i < j` 의 **거리**를 `|nums[i] - nums[j]|`
+라 한다. 모든 쌍의 거리를 작은 것부터 늘어놓았을 때 `k` 번째(1 부터)를 반환한다.
+""",
+    notes="""
+쌍은 최대 5천만 개라 다 만들 수 없고 정렬은 더 못 한다 — 제약이 접근을 정한다. 답을 `d` 라
+두면 "거리가 `d` 이하인 쌍의 수"는 `d` 가 커질수록 늘어난다. 그러니 `d` 를 이분 탐색하고,
+정해진 `d` 에 대해 쌍의 수를 정렬된 배열 위에서 두 포인터로 O(n) 에 센다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 거리 후보의 범위를 좁혔다
+Drill.pointer("left", i)      // 두 포인터의 왼쪽을 옮겼다
+""",
+    constraints="""
+- `2 <= nums.length <= 20_000`
+- `0 <= nums[i] <= 1_000_000`
+- `1 <= k <= n·(n-1)/2`
+""",
+    signature=dict(name="kthPairDistance", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_kth_pair_distance,
+    cases={
+        "sample": [("01", [[1, 3, 1], 1]), ("02", [[1, 6, 1], 3])],
+        "boundary": [
+            ("01-two", [[5, 9], 1]),
+            ("02-all-equal", [[7, 7, 7, 7], 6]),
+            # 거리 0 인 쌍이 있어도 k 가 크면 답은 0 이 아니다.
+            ("03-past-zeros", [[1, 1, 1, 4], 4]),
+            ("04-last-pair", [[1, 5, 9, 14], 6]),
+            # 같은 거리의 쌍이 여럿일 때 k 가 그 사이에 있다.
+            ("05-ties", [[1, 2, 3, 4], 3]),
+            ("06-unsorted", [[9, 1, 5, 3], 2]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 0, 20, salt=8441), 17]),
+            ("02-random-medium", [randoms(80, 0, 1000, salt=8442), 1500]),
+            ("03-clustered", [randoms(60, 100, 103, salt=8443), 1000]),
+            ("04-wide", [randoms(50, 0, 1000000, salt=8444), 600]),
+        ],
+        "performance": [
+            ("01-small", [randoms(1000, 0, 1000000, salt=8451), 200000]),
+            ("02-medium", [randoms(4000, 0, 1000000, salt=8452), 5000000]),
+            ("03-large", [randoms(20000, 0, 1000000, salt=8453), 100000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 거리를 이분 탐색하고, 거리마다 두 포인터로 쌍을 센다.
+fun kthPairDistance(nums: IntArray, k: Int): Int {
+    val values = nums.sortedArray()
+    val n = values.size
+    fun pairsWithin(limit: Int): Long {
+        var count = 0L
+        var left = 0
+        for (right in 0 until n) {
+            while (values[right] - values[left] > limit) { left += 1; Drill.pointer("left", left) }
+            count += right - left
+        }
+        return count
+    }
+    var lo = 0
+    var hi = values[n - 1] - values[0]
+    while (lo < hi) {
+        val mid = (lo + hi) / 2
+        Drill.compare(lo, hi)
+        if (pairsWithin(mid) >= k) hi = mid else lo = mid + 1
+    }
+    return lo
+}
+""",
+    mutants=[
+        ("counts-strictly-less", "OFF_BY_ONE",
+         "거리가 한도 '미만'인 쌍을 센다. 이하여야 한다 — 답이 정확히 한도인 쌍을 놓친다.",
+         """
+fun kthPairDistance(nums: IntArray, k: Int): Int {
+    val values = nums.sortedArray()
+    val n = values.size
+    fun pairsWithin(limit: Int): Long {
+        var count = 0L; var left = 0
+        for (right in 0 until n) {
+            while (values[right] - values[left] >= limit) left += 1
+            count += right - left
+        }
+        return count
+    }
+    var lo = 0; var hi = values[n - 1] - values[0]
+    while (lo < hi) { val mid = (lo + hi) / 2; if (pairsWithin(mid) >= k) hi = mid else lo = mid + 1 }
+    return lo
+}
+"""),
+        ("forgets-to-sort", "MISSING_EDGE_CASE",
+         "정렬하지 않고 두 포인터를 돌린다. 이미 정렬된 입력에서만 맞는다.",
+         """
+fun kthPairDistance(nums: IntArray, k: Int): Int {
+    val values = nums
+    val n = values.size
+    fun pairsWithin(limit: Int): Long {
+        var count = 0L; var left = 0
+        for (right in 0 until n) {
+            while (left < right && kotlin.math.abs(values[right] - values[left]) > limit) left += 1
+            count += right - left
+        }
+        return count
+    }
+    var lo = 0; var hi = values.max() - values.min()
+    while (lo < hi) { val mid = (lo + hi) / 2; if (pairsWithin(mid) >= k) hi = mid else lo = mid + 1 }
+    return lo
+}
+"""),
+        ("upper-bound-too-small", "WRONG_BRANCH",
+         "이분 탐색의 위 경계를 최댓값의 절반으로 둔다. 답이 그 위에 있으면 경계에서 멈춘다.",
+         """
+fun kthPairDistance(nums: IntArray, k: Int): Int {
+    val values = nums.sortedArray()
+    val n = values.size
+    fun pairsWithin(limit: Int): Long {
+        var count = 0L; var left = 0
+        for (right in 0 until n) {
+            while (values[right] - values[left] > limit) left += 1
+            count += right - left
+        }
+        return count
+    }
+    var lo = 0; var hi = values[n - 1] / 2
+    while (lo < hi) { val mid = (lo + hi) / 2; if (pairsWithin(mid) >= k) hi = mid else lo = mid + 1 }
+    return lo
+}
+"""),
+        ("count-pairs-by-double-loop", "PERFORMANCE",
+         "거리를 이분 탐색하되 쌍을 셀 때 정렬도 두 포인터도 없이 모든 쌍을 본다. O(n² log W).",
+         """
+fun kthPairDistance(nums: IntArray, k: Int): Int {
+    val n = nums.size
+    fun pairsWithin(limit: Int): Long {
+        var count = 0L
+        for (i in 0 until n) for (j in i + 1 until n) { Drill.compare(i, j); if (kotlin.math.abs(nums[i] - nums[j]) <= limit) count += 1 }
+        return count
+    }
+    var lo = 0; var hi = nums.max() - nums.min()
+    while (lo < hi) { val mid = (lo + hi) / 2; if (pairsWithin(mid) >= k) hi = mid else lo = mid + 1 }
+    return lo
+}
+"""),
+    ],
+))
