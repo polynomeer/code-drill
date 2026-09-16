@@ -1567,7 +1567,10 @@ Drill.match(r, c)             // 마지막 글자까지 맞았다
 - 격자와 단어는 대문자 영문자
 """,
     signature=dict(name="wordSearch", parameters=[("board", "STRING_ARRAY"), ("word", "STRING")], returns="INT"),
-    groups=perf_groups(time_multiplier=0.5),
+    # 글자를 늦게 보는 오답이 개발 머신에서 한도의 2.9~3.0배로 겨우 넘겼다. 한도를 조여 자릿수로 지게 한다.
+    groups=perf_groups(time_multiplier=0.25),
+    # 공개 뒤 한도를 조였다 — 판정이 바뀌므로 새 버전이다 (§6.1 공개 후 불변).
+    version=2,
     reference=_word_search,
     cases={
         "sample": [
