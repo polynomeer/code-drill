@@ -1,0 +1,14 @@
+# ticket-queue-time 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - queue
+  - simulation
+competencies:
+  - READING
+  - MODELING
+  - IMPLEMENTATION
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(Σ tickets). 셈으로 풀면 O(n)"

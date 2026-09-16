@@ -4,7 +4,7 @@
 그래프를 인접 리스트로 옮기는 것부터가 문제의 일부다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms, flat
+from author import Problem, standard_groups, perf_groups, randoms, flat, shuffled
 
 PROBLEMS = []
 
@@ -2184,6 +2184,877 @@ fun wordLadder(begin: String, end: String, words: Array<String>): Int {
         for (u in adj[v]) if (dist[u] == 0) { dist[u] = dist[v] + 1; queue.addLast(u) }
     }
     return 0
+}
+"""),
+    ],
+))
+
+
+# --- 116. 신호가 모두 닿는 시간 (방향 다익스트라) -------------------------------------------------
+
+def _signal_delay(n, edges, source):
+    import heapq
+    graph = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        graph[edges[i]].append((edges[i + 1], edges[i + 2]))
+    dist = [-1] * n
+    dist[source] = 0
+    heap = [(0, source)]
+    while heap:
+        d, node = heapq.heappop(heap)
+        if d > dist[node]:
+            continue
+        for nxt, w in graph[node]:
+            nd = d + w
+            if dist[nxt] == -1 or nd < dist[nxt]:
+                dist[nxt] = nd
+                heapq.heappush(heap, (nd, nxt))
+    if any(d == -1 for d in dist):
+        return -1
+    return max(dist)
+
+
+def _directed_chain(n, salt):
+    weights = randoms(n - 1, 1, 100, salt=salt)
+    return flat([i, i + 1, weights[i]] for i in range(n - 1))
+
+
+def _directed_random(n, m, salt):
+    # 사슬로 먼저 모두 닿게 하고, 그 위에 무작위 간선을 얹는다 — 답이 -1 이 아니어야 시간이 시험된다.
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    w = randoms(m, 1, 1000, salt=salt + 2)
+    return _directed_chain(n, salt + 3) + flat([a[i], b[i], w[i]] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="signal-delay",
+    title="신호가 모두 닿는 시간",
+    summary="""
+정점이 `0` 부터 `n-1` 까지 있는 **방향 가중 그래프**가 주어진다. `edges` 는
+`[a1, b1, w1, a2, b2, w2, ...]` 이며 `a → b` 로 가는 데 `w` 만큼 걸린다.
+
+`source` 에서 신호를 보낸다. 신호는 간선을 따라 동시에 퍼진다. **모든 정점이 신호를 받는
+데 걸리는 시간**을 반환한다. 받지 못하는 정점이 하나라도 있으면 `-1` 이다.
+""",
+    notes="""
+답은 "가장 늦게 받는 정점의 시간"이다 — 출발점에서 각 정점까지의 최단 시간 중 최댓값.
+간선은 한 방향이라 `a → b` 를 `b → a` 로도 넣으면 갈 수 없는 곳이 갈 수 있게 된다.
+""",
+    drill_doc="""
+Drill.node("v3")              // 정점의 시간을 확정했다
+Drill.edge("v3", "v7")        // 간선으로 이웃의 시간을 낮췄다
+Drill.write(v, time)          // 정점의 시간을 적었다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `edges.size` 는 3 의 배수이며 `0 <= edges.size <= 600_000`
+- `1 <= w <= 1000`, 모든 시간의 합은 `Int` 범위 안이다
+- `0 <= source < n`
+""",
+    signature=dict(
+        name="signalDelay",
+        parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("source", "INT")],
+        returns="INT",
+    ),
+    groups=perf_groups(),
+    reference=_signal_delay,
+    cases={
+        "sample": [
+            ("01", [4, [1, 0, 1, 1, 2, 1, 2, 3, 1], 1]),
+            ("02", [2, [0, 1, 1], 1]),
+        ],
+        "boundary": [
+            ("01-single", [1, [], 0]),
+            # 반대 방향 간선뿐이다. 무방향으로 읽으면 닿는다.
+            ("02-one-way-only", [2, [1, 0, 5], 0]),
+            # 가장 늦은 정점이 답이지 가장 가까운 정점이 아니다.
+            ("03-max-not-min", [3, [0, 1, 1, 0, 2, 9], 0]),
+            # 닿는 정점만 보면 답이 있는데, 못 닿는 정점이 하나 있다.
+            ("04-one-unreachable", [4, [0, 1, 1, 1, 2, 1], 0]),
+            # 더 빠른 길이 나중에 발견된다.
+            ("05-relax-later", [4, [0, 1, 1, 0, 2, 5, 1, 2, 1, 2, 3, 1], 0]),
+            ("06-parallel-edges", [2, [0, 1, 9, 0, 1, 2], 0]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _directed_random(8, 14, salt=8101), 0]),
+            ("02-random-medium", [50, _directed_random(50, 120, salt=8105), 0]),
+            ("03-chain", [10, _directed_chain(10, salt=8109), 0]),
+            # 출발점이 사슬의 중간이면 앞쪽은 못 닿는다.
+            ("04-chain-mid-source", [10, _directed_chain(10, salt=8110), 4]),
+        ],
+        "performance": [
+            ("01-small", [3000, _directed_random(3000, 9000, salt=8111), 0]),
+            ("02-medium", [20000, _directed_random(20000, 60000, salt=8115), 0]),
+            ("03-large", [100000, _directed_random(100000, 200000, salt=8119), 0]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 방향 간선으로 다익스트라, 답은 최댓값.
+fun signalDelay(n: Int, edges: IntArray, source: Int): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }
+    val next = IntArray(m)
+    val to = IntArray(m)
+    val cost = IntArray(m)
+    var e = 0
+    var i = 0
+    while (i < edges.size) {
+        to[e] = edges[i + 1]; cost[e] = edges[i + 2]; next[e] = head[edges[i]]; head[edges[i]] = e; e += 1
+        i += 3
+    }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0].toInt()
+        val node = top[1].toInt()
+        if (d > dist[node]) continue
+        Drill.node("v$node")
+        var edge = head[node]
+        while (edge != -1) {
+            val nxt = to[edge]
+            val nd = d + cost[edge]
+            if (dist[nxt] == -1 || nd < dist[nxt]) {
+                dist[nxt] = nd
+                Drill.edge("v$node", "v$nxt")
+                Drill.write(nxt, nd)
+                heap.add(longArrayOf(nd.toLong(), nxt.toLong()))
+            }
+            edge = next[edge]
+        }
+    }
+    var answer = 0
+    for (v in 0 until n) {
+        if (dist[v] == -1) return -1
+        if (dist[v] > answer) answer = dist[v]
+    }
+    return answer
+}
+""",
+    mutants=[
+        ("undirected--adds-reverse-edge", "MISSING_EDGE_CASE",
+         "간선을 양방향으로 넣는다. 한 방향뿐인 그래프에서 못 닿는 곳이 닿는다.",
+         """
+fun signalDelay(n: Int, edges: IntArray, source: Int): Int {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) {
+        graph[edges[i]].add(edges[i + 1] to edges[i + 2]); graph[edges[i + 1]].add(edges[i] to edges[i + 2]); i += 3
+    }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0].toInt(); val node = top[1].toInt()
+        if (d > dist[node]) continue
+        for ((nxt, w) in graph[node]) {
+            if (dist[nxt] == -1 || d + w < dist[nxt]) { dist[nxt] = d + w; heap.add(longArrayOf(dist[nxt].toLong(), nxt.toLong())) }
+        }
+    }
+    if (dist.any { it == -1 }) return -1
+    return dist.max()
+}
+"""),
+        ("min-instead-of-max", "WRONG_BRANCH",
+         "가장 늦게 받는 정점이 아니라 가장 먼저 받는 정점의 시간을 돌려준다.",
+         """
+fun signalDelay(n: Int, edges: IntArray, source: Int): Int {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) { graph[edges[i]].add(edges[i + 1] to edges[i + 2]); i += 3 }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0].toInt(); val node = top[1].toInt()
+        if (d > dist[node]) continue
+        for ((nxt, w) in graph[node]) {
+            if (dist[nxt] == -1 || d + w < dist[nxt]) { dist[nxt] = d + w; heap.add(longArrayOf(dist[nxt].toLong(), nxt.toLong())) }
+        }
+    }
+    if (dist.any { it == -1 }) return -1
+    var best = Int.MAX_VALUE
+    for (v in 0 until n) if (v != source && dist[v] < best) best = dist[v]
+    return if (best == Int.MAX_VALUE) 0 else best
+}
+"""),
+        ("ignores-unreachable", "MISSING_EDGE_CASE",
+         "못 닿는 정점을 빼고 최댓값을 낸다. 모두 닿아야 답이 있다.",
+         """
+fun signalDelay(n: Int, edges: IntArray, source: Int): Int {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) { graph[edges[i]].add(edges[i + 1] to edges[i + 2]); i += 3 }
+    val dist = IntArray(n) { -1 }
+    dist[source] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0L, source.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0].toInt(); val node = top[1].toInt()
+        if (d > dist[node]) continue
+        for ((nxt, w) in graph[node]) {
+            if (dist[nxt] == -1 || d + w < dist[nxt]) { dist[nxt] = d + w; heap.add(longArrayOf(dist[nxt].toLong(), nxt.toLong())) }
+        }
+    }
+    return dist.max()
+}
+"""),
+        ("array-scan--quadratic", "PERFORMANCE",
+         "힙 없이 매번 모든 정점을 훑어 가장 빠른 미확정 정점을 고른다. O(n²).",
+         """
+fun signalDelay(n: Int, edges: IntArray, source: Int): Int {
+    val graph = Array(n) { mutableListOf<Pair<Int, Int>>() }
+    var i = 0
+    while (i < edges.size) { graph[edges[i]].add(edges[i + 1] to edges[i + 2]); i += 3 }
+    val dist = IntArray(n) { -1 }
+    val done = BooleanArray(n)
+    dist[source] = 0
+    repeat(n) {
+        var best = -1
+        for (v in 0 until n) {
+            Drill.compare(v, best)
+            if (!done[v] && dist[v] != -1 && (best == -1 || dist[v] < dist[best])) best = v
+        }
+        if (best == -1) return -1
+        done[best] = true
+        for ((nxt, w) in graph[best]) {
+            if (dist[nxt] == -1 || dist[best] + w < dist[nxt]) dist[nxt] = dist[best] + w
+        }
+    }
+    return dist.max()
+}
+"""),
+    ],
+))
+
+
+# --- 117. 사전순 수강 순서 (힙으로 위상 정렬) -----------------------------------------------------
+
+def _smallest_order(n, prereqs):
+    import heapq
+    graph = [[] for _ in range(n)]
+    indegree = [0] * n
+    for i in range(0, len(prereqs), 2):
+        graph[prereqs[i]].append(prereqs[i + 1])
+        indegree[prereqs[i + 1]] += 1
+    heap = [v for v in range(n) if indegree[v] == 0]
+    heapq.heapify(heap)
+    order = []
+    while heap:
+        v = heapq.heappop(heap)
+        order.append(v)
+        for nxt in graph[v]:
+            indegree[nxt] -= 1
+            if indegree[nxt] == 0:
+                heapq.heappush(heap, nxt)
+    return order if len(order) == n else []
+
+
+def _dag_pairs(n, m, salt):
+    # 큰 번호 → 작은 번호로만 간선을 두어 순환이 없게 한다. 사전순이 시험되도록 방향을 뒤집는다.
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    return flat([max(a[i], b[i]), min(a[i], b[i])] for i in range(m) if a[i] != b[i])
+
+
+PROBLEMS.append(Problem(
+    id="smallest-course-order",
+    title="사전순 수강 순서",
+    summary="""
+과목이 `0` 부터 `n-1` 까지 있고 `prereqs` 는 `[a1, b1, a2, b2, ...]` 로 "`a` 를 들은 뒤에야
+`b` 를 들을 수 있다"는 조건들이다.
+
+조건을 모두 지키는 수강 순서 중 **사전순으로 가장 앞선 것**을 반환한다 — 순서를 배열로
+봤을 때 가장 작은 것. 조건이 서로 얽혀 모든 과목을 들을 수 없으면 빈 배열을 반환한다.
+""",
+    notes="""
+들을 수 있는 과목(남은 선수가 없는 과목)이 여럿일 때 **번호가 가장 작은 것**을 먼저 들어야
+사전순으로 가장 앞선다. "지금 들을 수 있는 것 중 가장 작은 것"을 매번 빨리 꺼내는 구조가
+필요하다. 끝났는데 든 과목이 `n` 개가 안 되면 순환이다.
+""",
+    drill_doc="""
+Drill.enqueue(v)              // 들을 수 있게 된 과목을 후보에 넣었다
+Drill.dequeue(v)              // 가장 작은 후보를 들었다
+Drill.edge("c1", "c4")        // 선수 하나를 지웠다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `prereqs.size` 는 짝수이며 `0 <= prereqs.size <= 400_000`
+- 같은 조건이 여러 번 나올 수 있다
+""",
+    signature=dict(
+        name="smallestOrder",
+        parameters=[("n", "INT"), ("prereqs", "INT_ARRAY")],
+        returns="INT_ARRAY",
+    ),
+    groups=perf_groups(),
+    reference=_smallest_order,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [4, [1, 0, 2, 0, 3, 1, 3, 2]]),
+            ("02", [2, [0, 1, 1, 0]]),
+        ],
+        "boundary": [
+            ("01-single", [1, []]),
+            ("02-no-prereqs", [4, []]),
+            # 선입선출로 처리하면 유효한 순서지만 사전순이 아니다.
+            ("03-fifo-is-not-smallest", [4, [3, 0, 1, 2]]),
+            # 순환이 있으면 일부만 들을 수 있어도 빈 배열이다.
+            ("04-partial-cycle", [4, [0, 1, 1, 2, 2, 1, 2, 3]]),
+            ("05-self-loop", [2, [0, 0]]),
+            ("06-duplicate-condition", [3, [2, 0, 2, 0, 1, 0]]),
+            # 방향을 뒤집어 읽으면 다른 순서가 나온다.
+            ("07-direction-matters", [3, [2, 1, 1, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _dag_pairs(8, 12, salt=8121)]),
+            ("02-random-medium", [60, _dag_pairs(60, 150, salt=8125)]),
+            ("03-reversed-chain", [10, flat([i + 1, i] for i in range(9))]),
+            ("04-cycle-deep", [6, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 3]]),
+        ],
+        "performance": [
+            ("01-small", [3000, _dag_pairs(3000, 9000, salt=8131)]),
+            ("02-medium", [20000, _dag_pairs(20000, 60000, salt=8135)]),
+            ("03-large", [100000, _dag_pairs(100000, 200000, salt=8139)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 남은 선수가 없는 과목 중 가장 작은 것을 힙으로 꺼낸다.
+fun smallestOrder(n: Int, prereqs: IntArray): IntArray {
+    val m = prereqs.size / 2
+    val head = IntArray(n) { -1 }
+    val next = IntArray(m)
+    val to = IntArray(m)
+    val indegree = IntArray(n)
+    var i = 0
+    var e = 0
+    while (i < prereqs.size) {
+        to[e] = prereqs[i + 1]; next[e] = head[prereqs[i]]; head[prereqs[i]] = e; e += 1
+        indegree[prereqs[i + 1]] += 1
+        i += 2
+    }
+    val heap = java.util.PriorityQueue<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) { heap.add(v); Drill.enqueue(v) }
+    val order = IntArray(n)
+    var taken = 0
+    while (heap.isNotEmpty()) {
+        val v = heap.poll()
+        Drill.dequeue(v)
+        order[taken] = v
+        taken += 1
+        var edge = head[v]
+        while (edge != -1) {
+            val nxt = to[edge]
+            Drill.edge("c$v", "c$nxt")
+            indegree[nxt] -= 1
+            if (indegree[nxt] == 0) { heap.add(nxt); Drill.enqueue(nxt) }
+            edge = next[edge]
+        }
+    }
+    return if (taken == n) order else IntArray(0)
+}
+""",
+    mutants=[
+        ("fifo-queue--valid-but-not-smallest", "WRONG_BRANCH",
+         "들을 수 있는 과목을 선입선출로 든다. 유효한 순서이지만 사전순이 아니다.",
+         """
+fun smallestOrder(n: Int, prereqs: IntArray): IntArray {
+    val graph = Array(n) { mutableListOf<Int>() }
+    val indegree = IntArray(n)
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i]].add(prereqs[i + 1]); indegree[prereqs[i + 1]] += 1; i += 2 }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) queue.addLast(v)
+    val order = mutableListOf<Int>()
+    while (queue.isNotEmpty()) {
+        val v = queue.removeFirst()
+        order.add(v)
+        for (nxt in graph[v]) { indegree[nxt] -= 1; if (indegree[nxt] == 0) queue.addLast(nxt) }
+    }
+    return if (order.size == n) order.toIntArray() else IntArray(0)
+}
+"""),
+        ("partial-on-cycle--returns-what-it-could", "MISSING_EDGE_CASE",
+         "순환이 있어도 들을 수 있었던 과목까지만 돌려준다. 순환이면 빈 배열이어야 한다.",
+         """
+fun smallestOrder(n: Int, prereqs: IntArray): IntArray {
+    val graph = Array(n) { mutableListOf<Int>() }
+    val indegree = IntArray(n)
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i]].add(prereqs[i + 1]); indegree[prereqs[i + 1]] += 1; i += 2 }
+    val heap = java.util.PriorityQueue<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) heap.add(v)
+    val order = mutableListOf<Int>()
+    while (heap.isNotEmpty()) {
+        val v = heap.poll()
+        order.add(v)
+        for (nxt in graph[v]) { indegree[nxt] -= 1; if (indegree[nxt] == 0) heap.add(nxt) }
+    }
+    return order.toIntArray()
+}
+"""),
+        ("reversed-direction", "WRONG_ALGORITHM",
+         "조건의 방향을 거꾸로 읽는다 — b 를 들은 뒤 a 를 듣는다.",
+         """
+fun smallestOrder(n: Int, prereqs: IntArray): IntArray {
+    val graph = Array(n) { mutableListOf<Int>() }
+    val indegree = IntArray(n)
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i + 1]].add(prereqs[i]); indegree[prereqs[i]] += 1; i += 2 }
+    val heap = java.util.PriorityQueue<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) heap.add(v)
+    val order = mutableListOf<Int>()
+    while (heap.isNotEmpty()) {
+        val v = heap.poll()
+        order.add(v)
+        for (nxt in graph[v]) { indegree[nxt] -= 1; if (indegree[nxt] == 0) heap.add(nxt) }
+    }
+    return if (order.size == n) order.toIntArray() else IntArray(0)
+}
+"""),
+        ("scan-all--quadratic", "PERFORMANCE",
+         "매번 모든 과목을 훑어 들을 수 있는 가장 작은 것을 찾는다. O(n²).",
+         """
+fun smallestOrder(n: Int, prereqs: IntArray): IntArray {
+    val graph = Array(n) { mutableListOf<Int>() }
+    val indegree = IntArray(n)
+    var i = 0
+    while (i < prereqs.size) { graph[prereqs[i]].add(prereqs[i + 1]); indegree[prereqs[i + 1]] += 1; i += 2 }
+    val taken = BooleanArray(n)
+    val order = IntArray(n)
+    for (step in 0 until n) {
+        var chosen = -1
+        for (v in 0 until n) {
+            Drill.compare(v, chosen)
+            if (!taken[v] && indegree[v] == 0) { chosen = v; break }
+        }
+        if (chosen == -1) return IntArray(0)
+        taken[chosen] = true
+        order[step] = chosen
+        for (nxt in graph[chosen]) indegree[nxt] -= 1
+    }
+    return order
+}
+"""),
+    ],
+))
+
+
+# --- 118. 결국 멈추는 정점 ---------------------------------------------------------------------
+
+def _safe_nodes(n, edges):
+    reverse = [[] for _ in range(n)]
+    outdegree = [0] * n
+    for i in range(0, len(edges), 2):
+        a, b = edges[i], edges[i + 1]
+        reverse[b].append(a)
+        outdegree[a] += 1
+    queue = [v for v in range(n) if outdegree[v] == 0]
+    safe = [False] * n
+    head = 0
+    while head < len(queue):
+        v = queue[head]
+        head += 1
+        safe[v] = True
+        for prev in reverse[v]:
+            outdegree[prev] -= 1
+            if outdegree[prev] == 0:
+                queue.append(prev)
+    return [v for v in range(n) if safe[v]]
+
+
+def _directed_pairs(n, m, salt):
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    return flat([a[i], b[i]] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="eventually-safe",
+    title="결국 멈추는 정점",
+    summary="""
+정점이 `0` 부터 `n-1` 까지 있는 **방향 그래프**가 주어진다. `edges` 는 `[a1, b1, a2, b2, ...]`
+로 `a → b` 간선들이다. 나가는 간선이 없는 정점을 **끝 정점**이라 한다.
+
+어떤 정점에서 출발해 간선을 따라 어떻게 걸어도 **반드시 유한 걸음 안에 끝 정점에 닿으면**
+그 정점은 안전하다. 안전한 정점을 오름차순으로 담은 배열을 반환한다.
+""",
+    notes="""
+끝 정점은 안전하다. 나가는 간선이 **전부** 안전한 정점으로만 가는 정점도 안전하다. 그래서
+끝 정점에서 거꾸로 — 간선을 뒤집어 — 퍼져 나가며 "남은 나가는 간선"을 세면 된다. 순환에
+걸린 정점은 남은 간선이 0 이 되지 않아 영영 안전해지지 않는다.
+""",
+    drill_doc="""
+Drill.enqueue(v)              // 안전해진 정점을 큐에 넣었다
+Drill.dequeue(v)              // 안전한 정점을 꺼내 거꾸로 퍼진다
+Drill.edge("v3", "v1")        // 뒤집은 간선을 따라 남은 간선 수를 줄였다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `edges.size` 는 짝수이며 `0 <= edges.size <= 400_000`
+- 자기 자신으로 가는 간선이 있을 수 있다
+""",
+    signature=dict(
+        name="safeNodes",
+        parameters=[("n", "INT"), ("edges", "INT_ARRAY")],
+        returns="INT_ARRAY",
+    ),
+    groups=perf_groups(),
+    reference=_safe_nodes,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [7, [0, 1, 0, 2, 1, 2, 1, 3, 2, 5, 3, 0, 4, 5]]),
+            ("02", [3, [0, 1, 1, 2]]),
+        ],
+        "boundary": [
+            ("01-single-terminal", [1, []]),
+            # 자기 자신으로 가는 간선은 순환이다.
+            ("02-self-loop", [2, [0, 0]]),
+            # 순환에 닿을 수 있는 정점은 끝 정점으로도 갈 수 있어도 안전하지 않다.
+            ("03-can-reach-cycle", [4, [0, 1, 0, 3, 1, 2, 2, 1]]),
+            # 순환에서 빠져나가는 간선이 있어도 순환 안의 정점은 안전하지 않다.
+            ("04-cycle-with-exit", [3, [0, 1, 1, 0, 1, 2]]),
+            ("05-all-terminal", [3, []]),
+            # 끝 정점만이 아니라 끝 정점으로만 가는 정점도 안전하다.
+            ("06-chain-to-terminal", [4, [0, 1, 1, 2, 2, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _directed_pairs(8, 10, salt=8141)]),
+            ("02-random-medium", [60, _directed_pairs(60, 90, salt=8145)]),
+            ("03-two-cycles", [7, [0, 1, 1, 0, 2, 3, 3, 4, 4, 2, 5, 6, 6, 0]]),
+            ("04-long-chain", [12, flat([i, i + 1] for i in range(11))]),
+        ],
+        "performance": [
+            ("01-chain-small", [5000, flat([i, i + 1] for i in range(4999))]),
+            ("02-chain-medium", [30000, flat([i, i + 1] for i in range(29999))]),
+            ("03-chain-large", [100000, flat([i, i + 1] for i in range(99999))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 간선을 뒤집어 끝 정점에서부터 남은 나가는 간선을 센다.
+fun safeNodes(n: Int, edges: IntArray): IntArray {
+    val m = edges.size / 2
+    val head = IntArray(n) { -1 }
+    val next = IntArray(m)
+    val to = IntArray(m)
+    val outdegree = IntArray(n)
+    var i = 0
+    var e = 0
+    while (i < edges.size) {
+        val a = edges[i]; val b = edges[i + 1]
+        to[e] = a; next[e] = head[b]; head[b] = e; e += 1
+        outdegree[a] += 1
+        i += 2
+    }
+    val queue = IntArray(n)
+    var tail = 0
+    for (v in 0 until n) if (outdegree[v] == 0) { queue[tail] = v; tail += 1; Drill.enqueue(v) }
+    val safe = BooleanArray(n)
+    var front = 0
+    while (front < tail) {
+        val v = queue[front]; front += 1
+        Drill.dequeue(v)
+        safe[v] = true
+        var edge = head[v]
+        while (edge != -1) {
+            val prev = to[edge]
+            Drill.edge("v$v", "v$prev")
+            outdegree[prev] -= 1
+            if (outdegree[prev] == 0) { queue[tail] = prev; tail += 1; Drill.enqueue(prev) }
+            edge = next[edge]
+        }
+    }
+    val out = IntArray(tail)
+    var k = 0
+    for (v in 0 until n) if (safe[v]) { out[k] = v; k += 1 }
+    return out
+}
+""",
+    mutants=[
+        ("terminal-only", "WRONG_ALGORITHM",
+         "나가는 간선이 없는 정점만 안전하다고 본다. 끝 정점으로만 가는 정점도 안전하다.",
+         """
+fun safeNodes(n: Int, edges: IntArray): IntArray {
+    val outdegree = IntArray(n)
+    var i = 0
+    while (i < edges.size) { outdegree[edges[i]] += 1; i += 2 }
+    return (0 until n).filter { outdegree[it] == 0 }.toIntArray()
+}
+"""),
+        ("no-gray--memo-without-in-progress", "WRONG_BRANCH",
+         "DFS 에서 방문 중인 정점을 표시하지 않아 순환에 걸린 정점을 안전하다고 적는다.",
+         """
+fun safeNodes(n: Int, edges: IntArray): IntArray {
+    val graph = Array(n) { mutableListOf<Int>() }
+    var i = 0
+    while (i < edges.size) { graph[edges[i]].add(edges[i + 1]); i += 2 }
+    val memo = IntArray(n) // 0 모름, 1 안전, 2 위험
+    fun safe(v: Int): Boolean {
+        if (memo[v] != 0) return memo[v] == 1
+        memo[v] = 1
+        for (nxt in graph[v]) if (!safe(nxt)) { memo[v] = 2; return false }
+        return true
+    }
+    return (0 until n).filter { safe(it) }.toIntArray()
+}
+"""),
+        ("ignores-self-loop", "MISSING_EDGE_CASE",
+         "자기 자신으로 가는 간선을 빼고 센다. 자기 순환은 순환이다.",
+         """
+fun safeNodes(n: Int, edges: IntArray): IntArray {
+    val reverse = Array(n) { mutableListOf<Int>() }
+    val outdegree = IntArray(n)
+    var i = 0
+    while (i < edges.size) {
+        val a = edges[i]; val b = edges[i + 1]
+        if (a != b) { reverse[b].add(a); outdegree[a] += 1 }
+        i += 2
+    }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (outdegree[v] == 0) queue.addLast(v)
+    val safe = BooleanArray(n)
+    while (queue.isNotEmpty()) {
+        val v = queue.removeFirst()
+        safe[v] = true
+        for (prev in reverse[v]) { outdegree[prev] -= 1; if (outdegree[prev] == 0) queue.addLast(prev) }
+    }
+    return (0 until n).filter { safe[it] }.toIntArray()
+}
+"""),
+        ("dfs-per-node--no-memo", "PERFORMANCE",
+         "정점마다 처음부터 DFS 를 돌려 순환에 닿는지 본다. 사슬에서 O(n²).",
+         """
+fun safeNodes(n: Int, edges: IntArray): IntArray {
+    val graph = Array(n) { mutableListOf<Int>() }
+    var i = 0
+    while (i < edges.size) { graph[edges[i]].add(edges[i + 1]); i += 2 }
+    fun reachesCycle(start: Int): Boolean {
+        val state = IntArray(n)
+        val stack = ArrayDeque<IntArray>()
+        stack.addLast(intArrayOf(start, 0)); state[start] = 1
+        while (stack.isNotEmpty()) {
+            val top = stack.last()
+            val v = top[0]
+            if (top[1] < graph[v].size) {
+                val nxt = graph[v][top[1]]; top[1] += 1
+                Drill.compare(v, nxt)
+                if (state[nxt] == 1) return true
+                if (state[nxt] == 0) { state[nxt] = 1; stack.addLast(intArrayOf(nxt, 0)) }
+            } else { state[v] = 2; stack.removeLast() }
+        }
+        return false
+    }
+    return (0 until n).filter { !reachesCycle(it) }.toIntArray()
+}
+"""),
+    ],
+))
+
+
+# --- 119. 모두 이어지는 순간 (정렬 + 유니온파인드) --------------------------------------------------
+
+def _earliest_all_connected(n, logs):
+    if n == 1:
+        return 0
+    events = sorted((logs[i], logs[i + 1], logs[i + 2]) for i in range(0, len(logs), 3))
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    groups = n
+    for t, a, b in events:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+            groups -= 1
+            if groups == 1:
+                return t
+    return -1
+
+
+def _friend_logs(n, m, salt):
+    # 사슬로 먼저 다 잇고 무작위를 얹은 뒤 시각을 뒤섞는다 — 입력 순서를 믿으면 틀리게.
+    t = randoms(m, 1, 10 ** 9, salt=salt)
+    a = randoms(m, 0, n - 1, salt=salt + 1)
+    b = randoms(m, 0, n - 1, salt=salt + 2)
+    chain_t = randoms(n - 1, 1, 10 ** 9, salt=salt + 3)
+    rows = [[chain_t[i], i, i + 1] for i in range(n - 1)] + [[t[i], a[i], b[i]] for i in range(m)]
+    return flat(shuffled(rows, salt=salt + 4))
+
+
+PROBLEMS.append(Problem(
+    id="earliest-all-connected",
+    title="모두 친구가 되는 순간",
+    summary="""
+사람이 `0` 부터 `n-1` 까지 있다. `logs` 는 `[t1, a1, b1, t2, a2, b2, ...]` 로 "시각 `t` 에
+`a` 와 `b` 가 친구가 됐다"는 기록들이며 **시각 순서대로 주어지지 않는다.** 친구 관계는
+이어진다 — `a` 와 `b` 가 친구이고 `b` 와 `c` 가 친구면 `a` 와 `c` 는 서로 아는 사이다.
+
+모든 사람이 서로 아는 사이가 되는 **가장 이른 시각**을 반환한다. 끝까지 그런 순간이 없으면
+`-1` 이다. 사람이 한 명이면 `0` 이다.
+""",
+    notes="""
+시각순으로 정렬한 뒤 기록을 하나씩 반영하며 "서로 아는 무리"의 수를 센다. 무리가 하나가
+되는 순간의 시각이 답이다. 이미 같은 무리인 둘의 기록은 무리 수를 줄이지 않는다 — 기록 수를
+세면 틀린다.
+""",
+    drill_doc="""
+Drill.compare(a, b)           // 두 사람의 무리를 비교했다
+Drill.write(root, newRoot)    // 무리를 합쳤다
+""",
+    constraints="""
+- `1 <= n <= 100_000`
+- `logs.size` 는 3 의 배수이며 `0 <= logs.size <= 600_000`
+- `1 <= t <= 10^9`, `0 <= a, b < n`, `a != b`
+- 시각은 겹칠 수 있다
+""",
+    signature=dict(
+        name="earliestAllConnected",
+        parameters=[("n", "INT"), ("logs", "INT_ARRAY")],
+        returns="INT",
+    ),
+    groups=perf_groups(),
+    reference=_earliest_all_connected,
+    cases={
+        "sample": [
+            ("01", [4, [20, 0, 1, 5, 2, 3, 30, 1, 2, 40, 0, 3]]),
+            ("02", [3, [10, 0, 1, 20, 0, 1]]),
+        ],
+        "boundary": [
+            ("01-single-person", [1, []]),
+            ("02-two-people", [2, [7, 0, 1]]),
+            # 입력 순서를 믿으면 마지막 기록의 시각을 답한다.
+            ("03-unsorted", [3, [50, 1, 2, 10, 0, 1]]),
+            # 세 번째 기록은 이미 같은 무리라 아무것도 잇지 않는다. 기록 수로 세면 틀린다.
+            ("04-redundant-log", [3, [1, 0, 1, 2, 0, 1, 3, 0, 1, 4, 1, 2]]),
+            ("05-never", [3, [1, 0, 1, 2, 0, 1]]),
+            # 같은 시각의 기록 둘이 함께 완성한다.
+            ("06-tie-time", [3, [5, 0, 1, 5, 1, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _friend_logs(8, 10, salt=8151)]),
+            ("02-random-medium", [60, _friend_logs(60, 80, salt=8156)]),
+            ("03-late-bridge", [6, [1, 0, 1, 2, 1, 2, 3, 3, 4, 4, 4, 5, 100, 2, 3, 50, 0, 2]]),
+            ("04-never-large", [7, flat([i * 3 + 1, i, i + 1] for i in range(5))]),
+        ],
+        "performance": [
+            ("01-small", [3000, _friend_logs(3000, 6000, salt=8161)]),
+            ("02-medium", [20000, _friend_logs(20000, 40000, salt=8166)]),
+            ("03-large", [100000, _friend_logs(100000, 100000, salt=8171)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 시각순 정렬 뒤 유니온파인드로 무리 수를 센다.
+fun earliestAllConnected(n: Int, logs: IntArray): Int {
+    if (n == 1) return 0
+    val m = logs.size / 3
+    val order = (0 until m).sortedBy { logs[it * 3] }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var v = x
+        while (parent[v] != v) { parent[v] = parent[parent[v]]; v = parent[v] }
+        return v
+    }
+    var groups = n
+    for (k in order) {
+        val t = logs[k * 3]; val a = logs[k * 3 + 1]; val b = logs[k * 3 + 2]
+        val ra = find(a); val rb = find(b)
+        Drill.compare(ra, rb)
+        if (ra != rb) {
+            parent[ra] = rb
+            Drill.write(ra, rb)
+            groups -= 1
+            if (groups == 1) return t
+        }
+    }
+    return -1
+}
+""",
+    mutants=[
+        ("input-order--no-sort", "WRONG_ALGORITHM",
+         "기록을 주어진 순서대로 반영한다. 시각순이 아니면 답이 나중 기록의 시각이 된다.",
+         """
+fun earliestAllConnected(n: Int, logs: IntArray): Int {
+    if (n == 1) return 0
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var v = x; while (parent[v] != v) v = parent[v]; return v }
+    var groups = n
+    var i = 0
+    while (i < logs.size) {
+        val ra = find(logs[i + 1]); val rb = find(logs[i + 2])
+        if (ra != rb) { parent[ra] = rb; groups -= 1; if (groups == 1) return logs[i] }
+        i += 3
+    }
+    return -1
+}
+"""),
+        ("counts-logs--not-merges", "WRONG_BRANCH",
+         "무리가 실제로 합쳐졌는지 보지 않고 기록 n-1 개째의 시각을 답한다.",
+         """
+fun earliestAllConnected(n: Int, logs: IntArray): Int {
+    if (n == 1) return 0
+    val m = logs.size / 3
+    val order = (0 until m).sortedBy { logs[it * 3] }
+    var merges = 0
+    for (k in order) {
+        merges += 1
+        if (merges == n - 1) return logs[k * 3]
+    }
+    return -1
+}
+"""),
+        ("single-person--returns-minus-one", "MISSING_EDGE_CASE",
+         "사람이 한 명일 때 -1 을 돌려준다. 혼자면 이미 모두가 아는 사이다.",
+         """
+fun earliestAllConnected(n: Int, logs: IntArray): Int {
+    val m = logs.size / 3
+    val order = (0 until m).sortedBy { logs[it * 3] }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var v = x; while (parent[v] != v) { parent[v] = parent[parent[v]]; v = parent[v] }; return v }
+    var groups = n
+    for (k in order) {
+        val ra = find(logs[k * 3 + 1]); val rb = find(logs[k * 3 + 2])
+        if (ra != rb) { parent[ra] = rb; groups -= 1; if (groups == 1) return logs[k * 3] }
+    }
+    return -1
+}
+"""),
+        ("recount-by-bfs--each-log", "PERFORMANCE",
+         "기록마다 그래프를 처음부터 훑어 무리 수를 다시 센다. O(m·(n+m)).",
+         """
+fun earliestAllConnected(n: Int, logs: IntArray): Int {
+    if (n == 1) return 0
+    val m = logs.size / 3
+    val order = (0 until m).sortedBy { logs[it * 3] }
+    val graph = Array(n) { mutableListOf<Int>() }
+    for (k in order) {
+        val a = logs[k * 3 + 1]; val b = logs[k * 3 + 2]
+        graph[a].add(b); graph[b].add(a)
+        val seen = BooleanArray(n)
+        val queue = ArrayDeque<Int>()
+        queue.addLast(0); seen[0] = true
+        var count = 1
+        while (queue.isNotEmpty()) {
+            val v = queue.removeFirst()
+            for (nxt in graph[v]) { Drill.compare(v, nxt); if (!seen[nxt]) { seen[nxt] = true; count += 1; queue.addLast(nxt) } }
+        }
+        if (count == n) return logs[k * 3]
+    }
+    return -1
 }
 """),
     ],

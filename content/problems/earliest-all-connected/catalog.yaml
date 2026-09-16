@@ -1,0 +1,18 @@
+# earliest-all-connected 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - union-find
+  - sorting
+competencies:
+  - READING
+  - CONSTRAINTS
+  - ALGORITHM_CHOICE
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - redundant-connection
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "정렬 O(m log m) + 유니온파인드 O(m α(n)). 기록마다 다시 세면 O(m·(n+m))"

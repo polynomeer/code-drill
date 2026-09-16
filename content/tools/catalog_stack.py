@@ -1104,3 +1104,307 @@ fun longestValidParentheses(s: String): Int {
 """),
     ],
 ))
+
+
+# --- 122. k 자리 지워 가장 작은 수 (단조 스택) ------------------------------------------------------
+
+def _remove_k_digits(num, k):
+    stack = []
+    for ch in num:
+        while k > 0 and stack and stack[-1] > ch:
+            stack.pop()
+            k -= 1
+        stack.append(ch)
+    while k > 0:
+        stack.pop()
+        k -= 1
+    result = "".join(stack).lstrip("0")
+    return result if result else "0"
+
+
+def _digits(n, salt):
+    return "".join(str(d) for d in randoms(n, 0, 9, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="remove-k-digits",
+    title="k 자리 지워 가장 작은 수",
+    summary="""
+숫자로만 된 문자열 `num` 과 정수 `k` 가 주어진다. `num` 에서 자리 `k` 개를 지워 만들 수
+있는 **가장 작은 수**를 문자열로 반환한다. 남은 자리의 순서는 바뀌지 않는다.
+
+앞에 붙은 `0` 은 지운다. 전부 지워졌거나 `0` 만 남으면 `"0"` 이다.
+""",
+    notes="""
+앞자리가 작을수록 수가 작다. 왼쪽부터 보며 **바로 앞 자리가 지금 자리보다 크면** 앞 자리를
+지우는 것이 이득이다 — 그 자리에 더 작은 것이 온다. 지울 수 있는 만큼 그렇게 지우고,
+끝까지 갔는데 `k` 가 남았으면 뒤에서 지운다 (남은 자리는 오름차순이라 뒤가 가장 크다).
+""",
+    drill_doc="""
+Drill.push(digit)             // 자리를 스택에 쌓았다
+Drill.pop(digit)              // 더 작은 자리가 와서 앞 자리를 지웠다
+Drill.compare(top, digit)     // 스택 꼭대기와 지금 자리를 비교했다
+""",
+    constraints="""
+- `1 <= num.length <= 100_000`
+- `0 <= k <= num.length`
+- `num` 은 `0`~`9` 로만 되어 있고, 앞에 `0` 이 올 수 있다
+""",
+    signature=dict(
+        name="removeKDigits",
+        parameters=[("num", "STRING"), ("k", "INT")],
+        returns="STRING",
+    ),
+    groups=perf_groups(),
+    reference=_remove_k_digits,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 400000},
+    cases={
+        "sample": [
+            ("01", ["1432219", 3]),
+            ("02", ["10200", 1]),
+        ],
+        "boundary": [
+            ("01-remove-all", ["10", 2]),
+            ("02-remove-none", ["135", 0]),
+            # 오름차순이면 지울 곳이 없어 뒤에서 지운다.
+            ("03-ascending--drop-tail", ["12345", 2]),
+            # 앞의 0 이 여럿 남는다.
+            ("04-leading-zeros", ["100200", 1]),
+            ("05-all-zeros", ["0000", 2]),
+            # 가장 큰 자리를 지우는 것과 다르다.
+            ("06-not-largest-digit", ["9219", 1]),
+            ("07-single-digit", ["7", 1]),
+            ("08-descending", ["54321", 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [_digits(12, salt=8301), 4]),
+            ("02-random-medium", [_digits(60, salt=8302), 25]),
+            ("03-repeated", ["1111222233", 5]),
+            ("04-zeros-inside", ["3000200", 3]),
+            ("05-random-many", [_digits(200, salt=8305), 199]),
+        ],
+        "performance": [
+            # 오름차순 뒤에 내림차순 — 앞쪽에서는 아무것도 못 지우고 뒤에서 몰아 지운다.
+            ("01-small", ["".join(str(i % 10) for i in range(3000)) + "9" * 3000, 2999]),
+            ("02-medium", [_digits(30000, salt=8311), 15000]),
+            ("03-large", ["0123456789" * 5000 + _digits(50000, salt=8313), 50000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 단조 증가 스택 — 앞 자리가 크면 지운다.
+fun removeKDigits(num: String, k: Int): String {
+    val stack = CharArray(num.length)
+    var top = 0
+    var left = k
+    for (ch in num) {
+        while (left > 0 && top > 0 && stack[top - 1] > ch) {
+            Drill.compare(stack[top - 1] - '0', ch - '0')
+            Drill.pop(stack[top - 1] - '0')
+            top -= 1
+            left -= 1
+        }
+        stack[top] = ch
+        Drill.push(ch - '0')
+        top += 1
+    }
+    top -= left
+    var start = 0
+    while (start < top && stack[start] == '0') start += 1
+    return if (start == top) "0" else String(stack, start, top - start)
+}
+""",
+    mutants=[
+        ("keeps-leading-zeros", "MISSING_EDGE_CASE",
+         "앞에 남은 0 을 지우지 않는다.",
+         """
+fun removeKDigits(num: String, k: Int): String {
+    val stack = StringBuilder()
+    var left = k
+    for (ch in num) {
+        while (left > 0 && stack.isNotEmpty() && stack.last() > ch) { stack.setLength(stack.length - 1); left -= 1 }
+        stack.append(ch)
+    }
+    stack.setLength(stack.length - left)
+    return if (stack.isEmpty()) "0" else stack.toString()
+}
+"""),
+        ("never-drops-tail", "OFF_BY_ONE",
+         "끝까지 갔는데 k 가 남아도 뒤에서 지우지 않는다. 오름차순 입력에서 자리 수가 남는다.",
+         """
+fun removeKDigits(num: String, k: Int): String {
+    val stack = StringBuilder()
+    var left = k
+    for (ch in num) {
+        while (left > 0 && stack.isNotEmpty() && stack.last() > ch) { stack.setLength(stack.length - 1); left -= 1 }
+        stack.append(ch)
+    }
+    val trimmed = stack.toString().trimStart('0')
+    return if (trimmed.isEmpty()) "0" else trimmed
+}
+"""),
+        ("removes-largest-digits", "WRONG_ALGORITHM",
+         "값이 가장 큰 자리 k 개를 지운다. 자리의 위치가 값보다 중요하다.",
+         """
+fun removeKDigits(num: String, k: Int): String {
+    val keep = BooleanArray(num.length) { true }
+    var left = k
+    var digit = '9'
+    while (left > 0 && digit >= '0') {
+        for (i in num.indices) if (left > 0 && keep[i] && num[i] == digit) { keep[i] = false; left -= 1 }
+        digit -= 1
+    }
+    val out = StringBuilder()
+    for (i in num.indices) if (keep[i]) out.append(num[i])
+    val trimmed = out.toString().trimStart('0')
+    return if (trimmed.isEmpty()) "0" else trimmed
+}
+"""),
+        ("rescan-per-removal", "PERFORMANCE",
+         "지울 때마다 문자열 전체를 훑어 내려가는 첫 자리를 찾는다. O(n·k).",
+         """
+fun removeKDigits(num: String, k: Int): String {
+    val digits = StringBuilder(num)
+    // 훑으며 내림 자리의 수까지 센다 — 이 값을 쓰지 않으면 JIT 가 빈 순회를 통째로 지운다.
+    var descents = 0L
+    repeat(k) {
+        var first = -1
+        for (i in 0 until digits.length - 1) {
+            Drill.compare(digits[i] - '0', digits[i + 1] - '0')
+            if (digits[i] > digits[i + 1]) { descents += 1; if (first == -1) first = i }
+        }
+        if (digits.isNotEmpty()) digits.deleteCharAt(if (first == -1) digits.length - 1 else first)
+    }
+    val trimmed = digits.toString().trimStart('0')
+    return if (descents < 0) "!" else if (trimmed.isEmpty()) "0" else trimmed
+}
+"""),
+    ],
+))
+
+
+# --- 123. 표 사는 데 걸리는 시간 (큐 시뮬레이션) --------------------------------------------------
+
+def _ticket_time(tickets, k):
+    queue = list(range(len(tickets)))
+    remaining = list(tickets)
+    seconds = 0
+    while queue:
+        i = queue.pop(0)
+        remaining[i] -= 1
+        seconds += 1
+        if i == k and remaining[i] == 0:
+            return seconds
+        if remaining[i] > 0:
+            queue.append(i)
+    return seconds
+
+
+PROBLEMS.append(Problem(
+    id="ticket-queue-time",
+    title="표 사는 데 걸리는 시간",
+    summary="""
+매표소 앞에 사람들이 한 줄로 서 있다. `tickets[i]` 는 `i` 번째 사람이 사려는 표의 수다. 맨
+앞사람이 1 초에 표 **한 장**을 사고, 더 살 표가 있으면 줄의 **맨 뒤**로 가서 다시 선다. 다
+샀으면 줄을 떠난다.
+
+`k` 번째 사람이 표를 다 사서 줄을 떠나는 데 걸리는 시간을 초로 반환한다.
+""",
+    notes="""
+줄을 그대로 흉내 내면 된다 — 앞에서 꺼내 한 장 사고, 남았으면 뒤에 넣는다. `k` 번째 사람이
+마지막 표를 사는 순간이 답이다. 셈으로 푸는 길도 있다: `k` 보다 앞에 선 사람은 `min(t, tickets[k])`
+장을, 뒤에 선 사람은 `min(t, tickets[k] - 1)` 장을 `k` 가 끝나기 전에 산다.
+""",
+    drill_doc="""
+Drill.dequeue(i)              // 맨 앞사람이 표를 산다
+Drill.enqueue(i)              // 더 살 표가 있어 뒤로 갔다
+""",
+    constraints="""
+- `1 <= tickets.length <= 100_000`
+- `1 <= tickets[i] <= 100`
+- `0 <= k < tickets.length`
+""",
+    signature=dict(
+        name="ticketQueueTime",
+        parameters=[("tickets", "INT_ARRAY"), ("k", "INT")],
+        returns="INT",
+    ),
+    groups=standard_groups(),
+    reference=_ticket_time,
+    cases={
+        "sample": [
+            ("01", [[2, 3, 2], 2]),
+            ("02", [[5, 1, 1, 1], 0]),
+        ],
+        "boundary": [
+            ("01-alone", [[4], 0]),
+            ("02-first-with-one", [[1, 5, 5], 0]),
+            ("03-last-with-one", [[5, 5, 1], 2]),
+            # 뒤에 선 사람은 k 가 마지막 표를 사기 전에 한 장 덜 산다.
+            ("04-behind-buys-one-less", [[3, 3, 3], 0]),
+            ("05-all-ones", [[1, 1, 1, 1], 3]),
+            ("06-k-has-most", [[1, 9, 1], 1]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(8, 1, 6, salt=8321), 5]),
+            ("02-random-medium", [randoms(50, 1, 20, salt=8322), 17]),
+            ("03-random-k-first", [randoms(30, 1, 10, salt=8323), 0]),
+            ("04-random-k-last", [randoms(30, 1, 10, salt=8324), 29]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 줄을 그대로 흉내 낸다.
+fun ticketQueueTime(tickets: IntArray, k: Int): Int {
+    val remaining = tickets.copyOf()
+    val queue = ArrayDeque<Int>()
+    for (i in tickets.indices) queue.addLast(i)
+    var seconds = 0
+    while (queue.isNotEmpty()) {
+        val i = queue.removeFirst()
+        Drill.dequeue(i)
+        remaining[i] -= 1
+        seconds += 1
+        if (i == k && remaining[i] == 0) return seconds
+        if (remaining[i] > 0) { queue.addLast(i); Drill.enqueue(i) }
+    }
+    return seconds
+}
+""",
+    mutants=[
+        ("no-requeue--front-buys-all", "WRONG_ALGORITHM",
+         "맨 앞사람이 표를 다 살 때까지 줄이 움직이지 않는다. 뒤로 가서 다시 서지 않는다.",
+         """
+fun ticketQueueTime(tickets: IntArray, k: Int): Int {
+    var seconds = 0
+    for (i in 0..k) seconds += tickets[i]
+    return seconds
+}
+"""),
+        ("behind-counts-full", "OFF_BY_ONE",
+         "k 뒤에 선 사람도 k 가 끝나기 전에 min(t, tickets[k]) 장을 산 것으로 센다. 한 장 덜 사야 한다.",
+         """
+fun ticketQueueTime(tickets: IntArray, k: Int): Int {
+    var seconds = 0
+    for (i in tickets.indices) seconds += minOf(tickets[i], tickets[k])
+    return seconds
+}
+"""),
+        ("stops-at-first-visit", "WRONG_BRANCH",
+         "k 번째 사람이 처음 표를 사는 순간을 답한다. 마지막 표를 사는 순간이어야 한다.",
+         """
+fun ticketQueueTime(tickets: IntArray, k: Int): Int {
+    val remaining = tickets.copyOf()
+    val queue = ArrayDeque<Int>()
+    for (i in tickets.indices) queue.addLast(i)
+    var seconds = 0
+    while (queue.isNotEmpty()) {
+        val i = queue.removeFirst()
+        remaining[i] -= 1
+        seconds += 1
+        if (i == k) return seconds
+        if (remaining[i] > 0) queue.addLast(i)
+    }
+    return seconds
+}
+"""),
+    ],
+))

@@ -1,0 +1,17 @@
+# smallest-course-order 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - topological-sort
+  - heap
+competencies:
+  - READING
+  - ALGORITHM_CHOICE
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - minimum-semesters
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O((V + E) log V). 매번 전부 훑으면 O(V²)"

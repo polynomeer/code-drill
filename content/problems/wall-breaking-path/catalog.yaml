@@ -1,0 +1,18 @@
+# wall-breaking-path 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - shortest-path
+  - bfs
+  - queue
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - rotting-oranges
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(rows·cols). 모든 경로를 다 가 보면 지수적"

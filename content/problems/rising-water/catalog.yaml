@@ -1,0 +1,19 @@
+# rising-water 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - matrix
+  - binary-search
+  - bfs
+  - heap
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - min-ship-capacity
+  - island-count
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(n² log n²). 시각을 하나씩 올리며 BFS 를 돌리면 O(n⁴)"

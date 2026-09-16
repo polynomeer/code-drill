@@ -1,0 +1,17 @@
+# signal-delay 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - shortest-path
+  - heap
+competencies:
+  - READING
+  - ALGORITHM_CHOICE
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - cheapest-paths
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O((V + E) log V). 힙 없이 매번 훑으면 O(V²)"

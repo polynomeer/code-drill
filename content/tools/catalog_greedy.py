@@ -701,3 +701,123 @@ fun connectCost(lengths: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 124. 냉각 시간이 있는 작업 (탐욕 셈) ---------------------------------------------------------
+
+def _least_interval(tasks, n):
+    from collections import Counter
+    counts = Counter(tasks)
+    most = max(counts.values())
+    ties = sum(1 for v in counts.values() if v == most)
+    return max(len(tasks), (most - 1) * (n + 1) + ties)
+
+
+def _tasks(length, kinds, salt):
+    return "".join(chr(ord("A") + d) for d in randoms(length, 0, kinds - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="cooldown-schedule",
+    title="냉각 시간이 있는 작업",
+    summary="""
+CPU 가 할 작업들이 대문자 한 글자씩 `tasks` 로 주어진다. 같은 글자는 같은 종류의 작업이다.
+한 칸의 시간에 작업 하나를 하거나 쉰다. **같은 종류의 작업 사이에는 적어도 `n` 칸**이
+있어야 한다 — 그 사이에 다른 작업을 하거나 쉬어야 한다.
+
+모든 작업을 마치는 데 필요한 **최소 칸 수**를 반환한다.
+""",
+    notes="""
+가장 많은 종류의 작업이 뼈대를 만든다. 그 작업이 `m` 번이면 `m-1` 개의 틈이 있고 틈마다
+`n` 칸이다 — `(m-1)(n+1)` 칸 뒤에 마지막 것을 놓는다. 가장 많은 종류가 여럿이면 마지막 줄에
+그 수만큼 나란히 선다. 작업이 그 뼈대보다 많으면 쉴 필요가 없어 답은 작업 수다.
+""",
+    drill_doc="""
+Drill.compare(count, most)    // 종류별 횟수와 최댓값을 비교했다
+Drill.write(kind, count)      // 종류별 횟수를 셌다
+""",
+    constraints="""
+- `1 <= tasks.length <= 100_000`
+- `tasks` 는 `A`~`Z` 로만 되어 있다
+- `0 <= n <= 100`
+""",
+    signature=dict(
+        name="leastInterval",
+        parameters=[("tasks", "STRING"), ("n", "INT")],
+        returns="INT",
+    ),
+    groups=standard_groups(),
+    reference=_least_interval,
+    cases={
+        "sample": [
+            ("01", ["AAABBB", 2]),
+            ("02", ["AAABBB", 0]),
+        ],
+        "boundary": [
+            ("01-single", ["A", 5]),
+            # 뼈대보다 작업이 많으면 쉴 틈이 없다.
+            ("02-more-tasks-than-frame", ["AAABBBCCCDDE", 2]),
+            # 가장 많은 종류가 셋 — 마지막 줄에 셋이 선다.
+            ("03-three-way-tie", ["AABBCC", 3]),
+            ("04-no-cooldown", ["ABCABC", 0]),
+            # 한 종류뿐이면 틈마다 n 칸을 전부 쉰다.
+            ("05-one-kind", ["AAAA", 3]),
+            ("06-tie-and-extra", ["AAABBBC", 2]),
+        ],
+        "hidden": [
+            ("01-random-small", [_tasks(12, 3, salt=8331), 2]),
+            ("02-random-medium", [_tasks(200, 5, salt=8332), 7]),
+            ("03-random-large", [_tasks(100000, 26, salt=8333), 100]),
+            ("04-one-kind-large", ["Z" * 1000, 100]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 가장 많은 작업이 뼈대, 나머지는 틈에 들어간다.
+fun leastInterval(tasks: String, n: Int): Int {
+    val counts = IntArray(26)
+    for (ch in tasks) counts[ch - 'A'] += 1
+    var most = 0
+    var ties = 0
+    for (kind in 0 until 26) {
+        Drill.write(kind, counts[kind])
+        Drill.compare(counts[kind], most)
+        if (counts[kind] > most) { most = counts[kind]; ties = 1 } else if (counts[kind] == most && most > 0) ties += 1
+    }
+    return maxOf(tasks.length, (most - 1) * (n + 1) + ties)
+}
+""",
+    mutants=[
+        ("no-length-clamp", "MISSING_EDGE_CASE",
+         "작업이 뼈대보다 많을 때도 뼈대 길이를 답한다. 작업 수보다 작은 답이 나온다.",
+         """
+fun leastInterval(tasks: String, n: Int): Int {
+    val counts = IntArray(26)
+    for (ch in tasks) counts[ch - 'A'] += 1
+    val most = counts.max()
+    val ties = counts.count { it == most }
+    return (most - 1) * (n + 1) + ties
+}
+"""),
+        ("ignores-ties", "OFF_BY_ONE",
+         "가장 많은 종류가 여럿이어도 마지막 줄에 하나만 센다.",
+         """
+fun leastInterval(tasks: String, n: Int): Int {
+    val counts = IntArray(26)
+    for (ch in tasks) counts[ch - 'A'] += 1
+    val most = counts.max()
+    return maxOf(tasks.length, (most - 1) * (n + 1) + 1)
+}
+"""),
+        ("gap-is-n--not-n-plus-one", "OFF_BY_ONE",
+         "틈 하나를 n 칸으로 센다. 같은 작업 사이는 n 칸이지만 작업 자체까지 n+1 칸이 한 주기다.",
+         """
+fun leastInterval(tasks: String, n: Int): Int {
+    val counts = IntArray(26)
+    for (ch in tasks) counts[ch - 'A'] += 1
+    val most = counts.max()
+    val ties = counts.count { it == most }
+    return maxOf(tasks.length, (most - 1) * n + ties)
+}
+"""),
+    ],
+))

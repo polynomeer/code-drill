@@ -973,3 +973,232 @@ fun medianDoubled(a: IntArray, b: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 125. 합이 범위 안인 구간의 수 (누적합 위의 분할 정복, EXPERT) --------------------------------------
+
+def _count_range_sums(nums, lower, upper):
+    prefix = [0]
+    for x in nums:
+        prefix.append(prefix[-1] + x)
+
+    def count(lo, hi):
+        if hi - lo <= 1:
+            return 0
+        mid = (lo + hi) // 2
+        total = count(lo, mid) + count(mid, hi)
+        j = k = mid
+        for left in prefix[lo:mid]:
+            while j < hi and prefix[j] - left < lower:
+                j += 1
+            while k < hi and prefix[k] - left <= upper:
+                k += 1
+            total += k - j
+        prefix[lo:hi] = sorted(prefix[lo:hi])
+        return total
+
+    return count(0, len(prefix))
+
+
+PROBLEMS.append(Problem(
+    id="count-range-sums",
+    title="합이 범위 안인 구간의 수",
+    summary="""
+정수 배열 `nums` 와 두 정수 `lower <= upper` 가 주어진다. 비어 있지 않은 연속 부분 배열
+중 원소의 합이 `lower` 이상 `upper` 이하인 것의 **개수**를 반환한다.
+
+예: `[-2, 5, -1]`, `lower = -2`, `upper = 2` 이면 `[-2]`, `[-2, 5, -1]`, `[5, -1]` 셋이다.
+""",
+    notes="""
+구간의 합은 누적합의 차 `P[j] - P[i]` 다. 그래서 문제는 "`i < j` 이고 `P[j] - P[i]` 가 범위 안인
+쌍의 수"가 된다. 모든 쌍을 보면 n² 이다. 누적합을 절반으로 나눠 왼쪽 절반의 `i` 와 오른쪽
+절반의 `j` 사이의 쌍만 세고 양쪽을 정렬해 두면, 각 `i` 에 대해 범위에 드는 `j` 가 연속한
+구간이라 두 포인터로 센다 — 병합 정렬로 역전 쌍을 세는 것과 같은 뼈대다. 누적합은 `Int` 를
+넘을 수 있다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 왼쪽 누적합과 오른쪽 누적합을 비교했다
+Drill.write(index, value)     // 병합해 정렬된 누적합을 적었다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `-10^9 <= nums[i] <= 10^9`
+- `-10^9 <= lower <= upper <= 10^9`
+- 답은 `Int` 범위 안이다
+""",
+    signature=dict(
+        name="countRangeSums",
+        parameters=[("nums", "INT_ARRAY"), ("lower", "INT"), ("upper", "INT")],
+        returns="INT",
+    ),
+    # 모든 쌍을 보는 오답이 10 만에서 한도의 2.3 배로 겨우 넘겼다. 입력은 자료형 상한이라 한도를 조인다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_count_range_sums,
+    cases={
+        "sample": [
+            ("01", [[-2, 5, -1], -2, 2]),
+            ("02", [[0], 0, 0]),
+        ],
+        "boundary": [
+            ("01-single-in", [[3], 1, 5]),
+            ("02-single-out", [[3], 4, 5]),
+            # 경계값이 포함이다 — 이상·이하.
+            ("03-inclusive-bounds", [[1, 2], 1, 3]),
+            # 길이 1 짜리 구간도 센다.
+            ("04-length-one-counts", [[1, 1, 1], 1, 1]),
+            # 누적합이 Int 를 넘는다.
+            ("05-int-overflow", [[1000000000, 1000000000, 1000000000, -1000000000], 0, 2000000000]),
+            ("06-all-negative", [[-1, -2, -3], -3, -1]),
+            ("07-zeros", [[0, 0, 0], 0, 0]),
+            ("08-range-below-all", [[5, 6, 7], -10, -1]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -10, 10, salt=8341), -3, 4]),
+            ("02-random-medium", [randoms(200, -100, 100, salt=8342), -50, 50]),
+            ("03-random-wide", [randoms(500, -1000000000, 1000000000, salt=8343), -1000000000, 1000000000]),
+            ("04-mixed-large", [randoms(300, -1000000000, 1000000000, salt=8344), 0, 500000000]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, -1000, 1000, salt=8351), -100, 100]),
+            ("02-medium", [randoms(30000, -1000, 1000, salt=8352), -100, 100]),
+            ("03-large", [randoms(100000, -1000, 1000, salt=8353), -50, 50]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 누적합 위에서 병합 정렬하며 범위에 드는 쌍을 두 포인터로 센다.
+fun countRangeSums(nums: IntArray, lower: Int, upper: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val buffer = LongArray(n + 1)
+    fun count(lo: Int, hi: Int): Int {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) / 2
+        var total = count(lo, mid) + count(mid, hi)
+        var j = mid
+        var k = mid
+        for (i in lo until mid) {
+            while (j < hi && prefix[j] - prefix[i] < lower) j += 1
+            while (k < hi && prefix[k] - prefix[i] <= upper) k += 1
+            Drill.compare(i, k)
+            total += k - j
+        }
+        var a = lo; var b = mid; var out = lo
+        while (a < mid || b < hi) {
+            if (b >= hi || (a < mid && prefix[a] <= prefix[b])) { buffer[out] = prefix[a]; a += 1 } else { buffer[out] = prefix[b]; b += 1 }
+            out += 1
+        }
+        for (t in lo until hi) { prefix[t] = buffer[t]; Drill.write(t, prefix[t].toInt()) }
+        return total
+    }
+    return count(0, n + 1)
+}
+""",
+    mutants=[
+        ("int-prefix--overflows", "MISSING_EDGE_CASE",
+         "누적합을 Int 로 둔다. 원소가 10억이면 셋만 더해도 넘친다.",
+         """
+fun countRangeSums(nums: IntArray, lower: Int, upper: Int): Int {
+    val n = nums.size
+    val prefix = IntArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val buffer = IntArray(n + 1)
+    fun count(lo: Int, hi: Int): Int {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) / 2
+        var total = count(lo, mid) + count(mid, hi)
+        var j = mid; var k = mid
+        for (i in lo until mid) {
+            while (j < hi && prefix[j] - prefix[i] < lower) j += 1
+            while (k < hi && prefix[k] - prefix[i] <= upper) k += 1
+            total += k - j
+        }
+        var a = lo; var b = mid; var out = lo
+        while (a < mid || b < hi) {
+            if (b >= hi || (a < mid && prefix[a] <= prefix[b])) { buffer[out] = prefix[a]; a += 1 } else { buffer[out] = prefix[b]; b += 1 }
+            out += 1
+        }
+        for (t in lo until hi) prefix[t] = buffer[t]
+        return total
+    }
+    return count(0, n + 1)
+}
+"""),
+        ("strict-upper-bound", "OFF_BY_ONE",
+         "합이 upper 와 같은 구간을 세지 않는다. 이하인데 미만으로 본다.",
+         """
+fun countRangeSums(nums: IntArray, lower: Int, upper: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val buffer = LongArray(n + 1)
+    fun count(lo: Int, hi: Int): Int {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) / 2
+        var total = count(lo, mid) + count(mid, hi)
+        var j = mid; var k = mid
+        for (i in lo until mid) {
+            while (j < hi && prefix[j] - prefix[i] < lower) j += 1
+            while (k < hi && prefix[k] - prefix[i] < upper) k += 1
+            total += k - j
+        }
+        var a = lo; var b = mid; var out = lo
+        while (a < mid || b < hi) {
+            if (b >= hi || (a < mid && prefix[a] <= prefix[b])) { buffer[out] = prefix[a]; a += 1 } else { buffer[out] = prefix[b]; b += 1 }
+            out += 1
+        }
+        for (t in lo until hi) prefix[t] = buffer[t]
+        return total
+    }
+    return count(0, n + 1)
+}
+"""),
+        ("skips-length-one", "OFF_BY_ONE",
+         "누적합 배열의 0 번을 빼고 세어 원소 하나짜리 구간을 놓친다.",
+         """
+fun countRangeSums(nums: IntArray, lower: Int, upper: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    val buffer = LongArray(n + 1)
+    fun count(lo: Int, hi: Int): Int {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) / 2
+        var total = count(lo, mid) + count(mid, hi)
+        var j = mid; var k = mid
+        for (i in lo until mid) {
+            while (j < hi && prefix[j] - prefix[i] < lower) j += 1
+            while (k < hi && prefix[k] - prefix[i] <= upper) k += 1
+            total += k - j
+        }
+        var a = lo; var b = mid; var out = lo
+        while (a < mid || b < hi) {
+            if (b >= hi || (a < mid && prefix[a] <= prefix[b])) { buffer[out] = prefix[a]; a += 1 } else { buffer[out] = prefix[b]; b += 1 }
+            out += 1
+        }
+        for (t in lo until hi) prefix[t] = buffer[t]
+        return total
+    }
+    return count(1, n + 1)
+}
+"""),
+        ("all-pairs--quadratic", "PERFORMANCE",
+         "누적합의 모든 쌍을 본다. O(n²).",
+         """
+fun countRangeSums(nums: IntArray, lower: Int, upper: Int): Int {
+    val n = nums.size
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = prefix[i] + nums[i]
+    var total = 0
+    for (i in 0..n) {
+        for (j in i + 1..n) {
+            Drill.compare(i, j)
+            val sum = prefix[j] - prefix[i]
+            if (sum >= lower && sum <= upper) total += 1
+        }
+    }
+    return total
+}
+"""),
+    ],
+))

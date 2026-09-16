@@ -1,0 +1,17 @@
+# eventually-safe 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - topological-sort
+  - dfs
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - detect-cycle-directed
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(V + E). 정점마다 DFS 를 새로 돌리면 사슬에서 O(V²)"

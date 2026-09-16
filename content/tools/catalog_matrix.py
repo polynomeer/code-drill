@@ -14,7 +14,7 @@
 그대로 통과한다. rotate-grid 의 2×3 케이스와 빈 격자·0열 격자가 그 자리를 지킨다.
 """
 
-from author import Problem, perf_groups, randoms, standard_groups, flat
+from author import Problem, perf_groups, randoms, standard_groups, flat, shuffled
 
 PROBLEMS = []
 
@@ -1713,6 +1713,481 @@ fun wordSearch(board: Array<String>, word: String): Int {
     }
     for (r in 0 until rows) for (c in 0 until cols) if (walk(r, c, 0)) return 1
     return 0
+}
+"""),
+    ],
+))
+
+
+# --- 120. 최소 벽 부수기 (0-1 BFS) ---------------------------------------------------------------
+
+def _min_walls(grid):
+    from collections import deque
+    rows, cols = len(grid), len(grid[0])
+    INF = 1 << 30
+    cost = [[INF] * cols for _ in range(rows)]
+    cost[0][0] = grid[0][0]
+    queue = deque([(0, 0)])
+    while queue:
+        r, c = queue.popleft()
+        here = cost[r][c]
+        for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+            if 0 <= nr < rows and 0 <= nc < cols:
+                nd = here + grid[nr][nc]
+                if nd < cost[nr][nc]:
+                    cost[nr][nc] = nd
+                    if grid[nr][nc] == 0:
+                        queue.appendleft((nr, nc))
+                    else:
+                        queue.append((nr, nc))
+    return cost[rows - 1][cols - 1]
+
+
+def _wall_grid(rows, cols, wall_percent, salt):
+    values = randoms(rows * cols, 0, 99, salt=salt)
+    return [[1 if values[r * cols + c] < wall_percent else 0 for c in range(cols)] for r in range(rows)]
+
+
+PROBLEMS.append(Problem(
+    id="wall-breaking-path",
+    title="최소 벽 부수기",
+    summary="""
+`0` 은 빈 칸, `1` 은 벽인 격자가 주어진다. 왼쪽 위 `(0, 0)` 에서 상하좌우로 움직여
+오른쪽 아래 `(rows-1, cols-1)` 까지 간다. 벽인 칸에는 **벽을 부수고** 들어갈 수 있다.
+
+가는 동안 부수는 벽의 **최소 개수**를 반환한다. 출발 칸과 도착 칸이 벽이면 그것도 센다.
+격자는 비어 있지 않다.
+""",
+    notes="""
+걸음 수가 아니라 부순 벽의 수를 줄여야 한다. 빈 칸으로 가는 것은 비용 0, 벽으로 가는 것은
+비용 1 이다. 비용이 0 과 1 뿐인 그래프에서는 힙 없이도 된다 — 비용 0 으로 간 칸을 큐의
+**앞**에, 비용 1 로 간 칸을 **뒤**에 넣으면 큐가 언제나 비용순으로 정렬돼 있다.
+""",
+    drill_doc="""
+Drill.visit(r * cols + c, grid[r][c])   // 칸을 봤다
+Drill.write(r * cols + c, walls)        // 칸까지의 최소 벽 수를 적었다
+""",
+    constraints="""
+- `1 <= rows, cols <= 600`
+- `grid[r][c]` 는 `0` 또는 `1`
+""",
+    signature=dict(
+        name="minWallsToBreak",
+        parameters=[("grid", "INT_MATRIX")],
+        returns="INT",
+    ),
+    groups=perf_groups(),
+    reference=_min_walls,
+    cases={
+        "sample": [
+            ("01", [[[0, 1, 1], [0, 1, 1], [0, 0, 0]]]),
+            ("02", [[[0, 1, 0], [1, 1, 0], [0, 0, 0]]]),
+        ],
+        "boundary": [
+            ("01-single-open", [[[0]]]),
+            ("02-single-wall", [[[1]]]),
+            # 걸음이 가장 적은 길은 벽을 둘 부수고, 돌아가는 길은 하나도 안 부순다.
+            ("03-shortest-steps-is-not-fewest-walls", [[[0, 1, 1, 0], [0, 0, 0, 0], [1, 1, 1, 0]]]),
+            # 출발 칸이 벽이다.
+            ("04-start-is-wall", [[[1, 0], [0, 0]]]),
+            ("05-all-walls", [[[1, 1], [1, 1]]]),
+            ("06-single-row", [[[0, 1, 0, 1, 0]]]),
+            ("07-single-column", [[[0], [1], [1], [0]]]),
+            # 벽을 뚫고 가는 것이 돌아가는 것보다 싸다.
+            ("08-break-beats-detour", [[[0, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [0, 0, 0]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_wall_grid(6, 7, 40, salt=8201)]),
+            ("02-random-dense", [_wall_grid(12, 12, 70, salt=8202)]),
+            ("03-random-sparse", [_wall_grid(15, 10, 15, salt=8203)]),
+            ("04-corridor", [[[0, 0, 0, 0, 0], [1, 1, 1, 1, 0], [0, 0, 0, 0, 0], [0, 1, 1, 1, 1], [0, 0, 0, 0, 0]]]),
+        ],
+        "performance": [
+            ("01-small", [_wall_grid(60, 60, 30, salt=8211)]),
+            ("02-medium", [_wall_grid(250, 250, 30, salt=8212)]),
+            ("03-large", [_wall_grid(600, 600, 30, salt=8213)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 0-1 BFS — 비용 0 은 큐 앞에, 비용 1 은 뒤에.
+fun minWallsToBreak(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    val cols = grid[0].size
+    val cost = IntArray(rows * cols) { Int.MAX_VALUE }
+    val deque = java.util.ArrayDeque<Int>()
+    cost[0] = grid[0][0]
+    deque.addFirst(0)
+    val dr = intArrayOf(1, -1, 0, 0)
+    val dc = intArrayOf(0, 0, 1, -1)
+    while (deque.isNotEmpty()) {
+        val cell = deque.pollFirst()
+        val r = cell / cols
+        val c = cell % cols
+        Drill.visit(cell, grid[r][c])
+        for (k in 0 until 4) {
+            val nr = r + dr[k]
+            val nc = c + dc[k]
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue
+            val nd = cost[cell] + grid[nr][nc]
+            val idx = nr * cols + nc
+            if (nd < cost[idx]) {
+                cost[idx] = nd
+                Drill.write(idx, nd)
+                if (grid[nr][nc] == 0) deque.addFirst(idx) else deque.addLast(idx)
+            }
+        }
+    }
+    return cost[rows * cols - 1]
+}
+""",
+    mutants=[
+        ("bfs-by-steps", "WRONG_ALGORITHM",
+         "걸음 수가 가장 적은 길을 찾고 그 길의 벽을 센다. 돌아가면 벽을 덜 부수는 경우를 놓친다.",
+         """
+fun minWallsToBreak(grid: Array<IntArray>): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val walls = IntArray(rows * cols) { -1 }
+    val queue = ArrayDeque<Int>()
+    walls[0] = grid[0][0]; queue.addLast(0)
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (queue.isNotEmpty()) {
+        val cell = queue.removeFirst(); val r = cell / cols; val c = cell % cols
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue
+            val idx = nr * cols + nc
+            if (walls[idx] == -1) { walls[idx] = walls[cell] + grid[nr][nc]; queue.addLast(idx) }
+        }
+    }
+    return walls[rows * cols - 1]
+}
+"""),
+        ("ignores-start-wall", "OFF_BY_ONE",
+         "출발 칸이 벽이어도 세지 않는다.",
+         """
+fun minWallsToBreak(grid: Array<IntArray>): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val cost = IntArray(rows * cols) { Int.MAX_VALUE }
+    val deque = java.util.ArrayDeque<Int>()
+    cost[0] = 0; deque.addFirst(0)
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (deque.isNotEmpty()) {
+        val cell = deque.pollFirst(); val r = cell / cols; val c = cell % cols
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue
+            val nd = cost[cell] + grid[nr][nc]; val idx = nr * cols + nc
+            if (nd < cost[idx]) { cost[idx] = nd; if (grid[nr][nc] == 0) deque.addFirst(idx) else deque.addLast(idx) }
+        }
+    }
+    return cost[rows * cols - 1]
+}
+"""),
+        ("plain-queue--zero-cost-not-first", "WRONG_BRANCH",
+         "비용 0 으로 간 칸도 큐의 뒤에 넣는다. 큐가 비용순이 아니게 되어 나중에 더 싼 길을 놓친다.",
+         """
+fun minWallsToBreak(grid: Array<IntArray>): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val cost = IntArray(rows * cols) { Int.MAX_VALUE }
+    val seen = BooleanArray(rows * cols)
+    val queue = ArrayDeque<Int>()
+    cost[0] = grid[0][0]; queue.addLast(0)
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (queue.isNotEmpty()) {
+        val cell = queue.removeFirst()
+        if (seen[cell]) continue
+        seen[cell] = true
+        val r = cell / cols; val c = cell % cols
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue
+            val nd = cost[cell] + grid[nr][nc]; val idx = nr * cols + nc
+            if (nd < cost[idx]) { cost[idx] = nd; queue.addLast(idx) }
+        }
+    }
+    return cost[rows * cols - 1]
+}
+"""),
+        ("dfs-all-paths", "PERFORMANCE",
+         "모든 경로를 깊이 우선으로 다 가 보고 가장 적게 부순 것을 고른다. 지수적이다.",
+         """
+fun minWallsToBreak(grid: Array<IntArray>): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val seen = BooleanArray(rows * cols)
+    var best = Int.MAX_VALUE
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    fun go(r: Int, c: Int, walls: Int) {
+        Drill.visit(r * cols + c, grid[r][c])
+        val w = walls + grid[r][c]
+        if (w >= best) return
+        if (r == rows - 1 && c == cols - 1) { best = w; return }
+        seen[r * cols + c] = true
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols || seen[nr * cols + nc]) continue
+            go(nr, nc, w)
+        }
+        seen[r * cols + c] = false
+    }
+    go(0, 0, 0)
+    return best
+}
+"""),
+    ],
+))
+
+
+# --- 121. 물이 차오르는 격자 (이분 탐색 + BFS) --------------------------------------------------
+
+def _earliest_swim(grid):
+    from collections import deque
+    n = len(grid)
+
+    def reachable(t):
+        if grid[0][0] > t:
+            return False
+        seen = [[False] * n for _ in range(n)]
+        seen[0][0] = True
+        queue = deque([(0, 0)])
+        while queue:
+            r, c = queue.popleft()
+            if r == n - 1 and c == n - 1:
+                return True
+            for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+                if 0 <= nr < n and 0 <= nc < n and not seen[nr][nc] and grid[nr][nc] <= t:
+                    seen[nr][nc] = True
+                    queue.append((nr, nc))
+        return False
+
+    lo, hi = max(grid[0][0], grid[n - 1][n - 1]), n * n - 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if reachable(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+
+def _elevation_grid(n, salt, locked_corner=False):
+    values = shuffled(range(n * n), salt=salt)
+    grid = [values[r * n:(r + 1) * n] for r in range(n)]
+    if locked_corner:
+        # 도착 칸과 그 두 이웃에 가장 높은 셋을 둔다. 답이 n²-1 이 되어, 시각을 하나씩 올리는
+        # 풀이는 격자가 거의 다 잠긴 뒤로도 수만 번의 BFS 를 더 돌아야 한다 — 무작위 격자에서는
+        # 답이 격자가 이어지는 시각 근처라 그 풀이가 한도를 겨우 넘겼다.
+        def place(r, c, value):
+            for rr in range(n):
+                for cc in range(n):
+                    if grid[rr][cc] == value:
+                        grid[rr][cc], grid[r][c] = grid[r][c], grid[rr][cc]
+                        return
+        place(n - 1, n - 1, n * n - 1)
+        place(n - 2, n - 1, n * n - 2)
+        place(n - 1, n - 2, n * n - 3)
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="rising-water",
+    title="물이 차오르는 격자",
+    summary="""
+`n × n` 격자의 각 칸에 서로 다른 높이 `0` 부터 `n²-1` 이 적혀 있다. 시각 `t` 에 물의 높이는
+`t` 이고, 높이가 `t` **이하**인 칸은 물에 잠겨 있다. 잠긴 칸에서 상하좌우로 잠긴 칸으로는
+시간 없이 헤엄쳐 갈 수 있다. 잠기지 않은 칸에는 들어갈 수 없다.
+
+왼쪽 위 `(0, 0)` 에서 출발해 오른쪽 아래 `(n-1, n-1)` 에 닿을 수 있는 **가장 이른 시각**을
+반환한다. 출발 칸에 들어가는 것부터 시각의 조건을 받는다.
+""",
+    notes="""
+답은 "경로가 지나는 칸들의 최대 높이"를 가장 작게 만드는 경로의 그 최댓값이다 — 합이
+아니라 최댓값. 시각 `t` 가 정해지면 닿을 수 있는지는 BFS 한 번으로 알 수 있고, `t` 가 크면
+답이고 작으면 아니므로 이분 탐색이 된다. 힙으로 "지금까지의 최댓값이 가장 작은 칸"을 먼저
+확정해도 된다.
+""",
+    drill_doc="""
+Drill.visit(r * n + c, grid[r][c])   // 칸에 들어갔다
+Drill.compare(t, grid[r][c])         // 물 높이와 칸 높이를 비교했다
+""",
+    constraints="""
+- `1 <= n <= 300`
+- `grid[r][c]` 는 `0` 부터 `n²-1` 까지의 서로 다른 정수
+""",
+    signature=dict(
+        name="earliestSwimTime",
+        parameters=[("grid", "INT_MATRIX")],
+        returns="INT",
+    ),
+    groups=perf_groups(),
+    reference=_earliest_swim,
+    cases={
+        "sample": [
+            ("01", [[[0, 2], [1, 3]]]),
+            ("02", [[[0, 1, 2, 3, 4], [24, 23, 22, 21, 5], [12, 13, 14, 15, 16], [11, 17, 18, 19, 20], [10, 9, 8, 7, 6]]]),
+        ],
+        "boundary": [
+            ("01-single", [[[0]]]),
+            # 출발 칸이 가장 높다.
+            ("02-start-is-highest", [[[3, 0], [1, 2]]]),
+            # 도착 칸이 가장 높다.
+            ("03-end-is-highest", [[[0, 1], [2, 3]]]),
+            # 합이 작은 길과 최댓값이 작은 길이 다르다.
+            ("04-sum-vs-max", [[[0, 7, 8], [1, 2, 3], [6, 5, 4]]]),
+            # 돌아가는 길이 최댓값이 작다.
+            ("05-detour-lower-max", [[[0, 8, 2], [1, 7, 3], [6, 5, 4]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_elevation_grid(5, salt=8221)]),
+            ("02-random-medium", [_elevation_grid(12, salt=8222)]),
+            ("03-random-large", [_elevation_grid(30, salt=8223)]),
+            ("04-snake", [[[0, 1, 2], [5, 4, 3], [6, 7, 8]]]),
+        ],
+        "performance": [
+            ("01-small", [_elevation_grid(60, salt=8231, locked_corner=True)]),
+            ("02-medium", [_elevation_grid(150, salt=8232, locked_corner=True)]),
+            ("03-large", [_elevation_grid(300, salt=8233, locked_corner=True)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 시각을 이분 탐색하고, 시각마다 BFS 로 닿는지 본다.
+fun earliestSwimTime(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val dr = intArrayOf(1, -1, 0, 0)
+    val dc = intArrayOf(0, 0, 1, -1)
+    val seen = BooleanArray(n * n)
+    val queue = IntArray(n * n)
+    fun reachable(t: Int): Boolean {
+        Drill.compare(t, grid[0][0])
+        if (grid[0][0] > t) return false
+        java.util.Arrays.fill(seen, false)
+        var head = 0; var tail = 0
+        queue[tail++] = 0; seen[0] = true
+        while (head < tail) {
+            val cell = queue[head++]
+            val r = cell / n; val c = cell % n
+            Drill.visit(cell, grid[r][c])
+            if (cell == n * n - 1) return true
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue
+                val idx = nr * n + nc
+                if (!seen[idx] && grid[nr][nc] <= t) { seen[idx] = true; queue[tail++] = idx }
+            }
+        }
+        return false
+    }
+    var lo = maxOf(grid[0][0], grid[n - 1][n - 1])
+    var hi = n * n - 1
+    while (lo < hi) {
+        val mid = (lo + hi) / 2
+        if (reachable(mid)) hi = mid else lo = mid + 1
+    }
+    return lo
+}
+""",
+    mutants=[
+        ("min-sum-path--dijkstra-on-sum", "WRONG_ALGORITHM",
+         "지나는 칸들의 높이 합이 가장 작은 길을 찾고 그 길의 최댓값을 답한다. 합과 최댓값은 다른 길을 고른다.",
+         """
+fun earliestSwimTime(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val dist = LongArray(n * n) { Long.MAX_VALUE }
+    val peak = IntArray(n * n)
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    dist[0] = grid[0][0].toLong(); peak[0] = grid[0][0]
+    heap.add(longArrayOf(dist[0], 0L))
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val d = top[0]; val cell = top[1].toInt()
+        if (d > dist[cell]) continue
+        val r = cell / n; val c = cell % n
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue
+            val idx = nr * n + nc; val nd = d + grid[nr][nc]
+            if (nd < dist[idx]) { dist[idx] = nd; peak[idx] = maxOf(peak[cell], grid[nr][nc]); heap.add(longArrayOf(nd, idx.toLong())) }
+        }
+    }
+    return peak[n * n - 1]
+}
+"""),
+        ("ignores-start-height", "OFF_BY_ONE",
+         "출발 칸의 높이를 최댓값에 넣지 않는다. 출발 칸이 가장 높으면 틀린다.",
+         """
+fun earliestSwimTime(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val best = IntArray(n * n) { Int.MAX_VALUE }
+    val heap = java.util.PriorityQueue<IntArray>(compareBy { it[0] })
+    best[0] = 0
+    heap.add(intArrayOf(0, 0))
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val t = top[0]; val cell = top[1]
+        if (t > best[cell]) continue
+        if (cell == n * n - 1) return t
+        val r = cell / n; val c = cell % n
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue
+            val idx = nr * n + nc; val nt = maxOf(t, grid[nr][nc])
+            if (nt < best[idx]) { best[idx] = nt; heap.add(intArrayOf(nt, idx)) }
+        }
+    }
+    return best[n * n - 1]
+}
+"""),
+        ("greedy-lowest-neighbor", "WRONG_ALGORITHM",
+         "매번 가장 낮은 이웃으로만 나아간다. 돌아가야 최댓값이 낮아지는 격자에서 틀린다.",
+         """
+fun earliestSwimTime(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val seen = BooleanArray(n * n)
+    var r = 0; var c = 0
+    var peak = grid[0][0]
+    seen[0] = true
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (!(r == n - 1 && c == n - 1)) {
+        var bestR = -1; var bestC = -1
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr < 0 || nr >= n || nc < 0 || nc >= n || seen[nr * n + nc]) continue
+            if (bestR == -1 || grid[nr][nc] < grid[bestR][bestC]) { bestR = nr; bestC = nc }
+        }
+        if (bestR == -1) return n * n - 1
+        r = bestR; c = bestC; seen[r * n + c] = true
+        peak = maxOf(peak, grid[r][c])
+    }
+    return peak
+}
+"""),
+        ("linear-time-scan", "PERFORMANCE",
+         "시각을 0 부터 하나씩 올리며 매번 BFS 를 돌린다. 이분 탐색이 없어 O(n⁴).",
+         """
+fun earliestSwimTime(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    fun reachable(t: Int): Boolean {
+        if (grid[0][0] > t) return false
+        val seen = BooleanArray(n * n)
+        val queue = ArrayDeque<Int>()
+        queue.addLast(0); seen[0] = true
+        while (queue.isNotEmpty()) {
+            val cell = queue.removeFirst()
+            if (cell == n * n - 1) return true
+            val r = cell / n; val c = cell % n
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue
+                val idx = nr * n + nc
+                Drill.compare(t, grid[nr][nc])
+                if (!seen[idx] && grid[nr][nc] <= t) { seen[idx] = true; queue.addLast(idx) }
+            }
+        }
+        return false
+    }
+    var t = 0
+    while (!reachable(t)) t += 1
+    return t
 }
 """),
     ],

@@ -1,0 +1,17 @@
+# remove-k-digits 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - monotonic-stack
+  - greedy
+competencies:
+  - CORRECTNESS
+  - EDGE_CASES
+  - IMPLEMENTATION
+  - COMPLEXITY
+prerequisites:
+  - next-greater-distance
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(n). 지울 때마다 처음부터 훑으면 O(n·k)"
