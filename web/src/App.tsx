@@ -10,6 +10,7 @@ import { HistoryPanel } from './features/submissions/HistoryPanel'
 import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CoachingPanel } from './features/coaching/CoachingPanel'
 import { ContestsPanel } from './features/contest/ContestsPanel'
+import { ProjectsPanel } from './features/project/ProjectsPanel'
 import { DiscussionPanel } from './features/discussion/DiscussionPanel'
 import { EditorialPanel } from './features/lab/EditorialPanel'
 import { CollectionsPanel } from './features/learning/CollectionsPanel'
@@ -199,6 +200,8 @@ function Drill({ session }: { session: Session }) {
           {/* 처방 아래, 목록 위. 대회 중이면 무엇을 풀지는 대회가 정한다 (§8.4). */}
           <ContestsPanel currentProblem={slug} onOpenProblem={selectProblem} refreshKey={history.length} />
           <ProblemList selected={slug} onSelect={selectProblem} />
+          {/* 목록 아래. 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
+          <ProjectsPanel refreshKey={history.length} />
           <section className="panel statement">
             <h3>{problem?.title ?? '문제를 고르세요'}</h3>
             {problem && (

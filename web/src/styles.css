@@ -1192,3 +1192,93 @@ table.groups td {
   width: 96px;
   text-transform: uppercase;
 }
+
+/* 프로젝트형 문제 (11단계). 파일 탭이 편집기 위에 있고, 결과는 케이스가 아니라 테스트다. */
+.project-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.project-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-list p {
+  margin: 2px 0 0;
+}
+
+.project-statement {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.project-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
+
+.file-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  padding: 0 4px;
+}
+
+.file-tab button[role='tab'] {
+  border: none;
+  background: transparent;
+  padding: 4px 6px;
+  font-family: inherit;
+}
+
+.file-tab.active {
+  background: var(--panel);
+  border-bottom-color: transparent;
+  font-weight: 600;
+}
+
+.file-add {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.file-add input {
+  width: 160px;
+  font-size: 12px;
+}
+
+.project-editor {
+  height: 300px;
+}
+
+.project-result {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.project-tests {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.project-tests li {
+  padding: 2px 0;
+}
+
+.project-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 12px;
+}

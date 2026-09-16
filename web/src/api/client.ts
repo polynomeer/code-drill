@@ -40,6 +40,9 @@ import type {
   TransferTask,
   Trial,
   TrialCaseInput,
+  ProjectSubmission,
+  ProjectSummary,
+  ProjectView,
 } from '../shared/types'
 
 const BASE = '/api/v1'
@@ -721,4 +724,31 @@ export async function startVirtual(contestId: string): Promise<{ contest: Contes
 
 export async function getMyRating(): Promise<Rating> {
   return json<Rating>(await authed('/contests/me/rating'))
+}
+
+// --- 프로젝트형 문제 (feature-roadmap 11단계) ---
+
+export async function listProjects(): Promise<ProjectSummary[]> {
+  return json<ProjectSummary[]>(await authed('/projects'))
+}
+
+export async function getProject(id: string): Promise<ProjectView> {
+  return json<ProjectView>(await authed(`/projects/${id}`))
+}
+
+export async function submitProject(id: string, files: Record<string, string>): Promise<ProjectSubmission> {
+  const response = await authed(`/projects/${id}/submissions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+    body: JSON.stringify({ files }),
+  })
+  return json<ProjectSubmission>(response)
+}
+
+export async function getProjectSubmission(id: string): Promise<ProjectSubmission> {
+  return json<ProjectSubmission>(await authed(`/projects/submissions/${id}`))
+}
+
+export async function listProjectSubmissions(projectId: string): Promise<ProjectSubmission[]> {
+  return json<ProjectSubmission[]>(await authed(`/projects/submissions?projectId=${encodeURIComponent(projectId)}`))
 }

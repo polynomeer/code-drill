@@ -765,3 +765,55 @@ export interface ContestView {
   /** 끝난 대회에서 내가 돌고 있는 가상 참가의 id. */
   virtual: string | null
 }
+
+// --- 프로젝트형 문제 (feature-roadmap 11단계) ---
+
+export interface ProjectSummary {
+  id: string
+  version: number
+  title: string
+  language: string
+  difficulty: Difficulty
+  tags: string[]
+  summary: string
+  solved: boolean
+}
+
+/** 상세. `files` 가 시작 저장소다 — 편집기가 여는 것. 숨은 테스트는 어디에도 없다. */
+export interface ProjectView {
+  id: string
+  version: number
+  title: string
+  language: string
+  difficulty: Difficulty
+  tags: string[]
+  statement: string
+  files: Record<string, string>
+  limits: { buildSeconds: number; testSeconds: number; memoryMb: number; maxFiles: number; maxTotalBytes: number }
+  publicTests: string[]
+}
+
+export interface ProjectTestOutcome {
+  module: string
+  name: string
+  passed: boolean
+  message: string | null
+}
+
+/** 프로젝트형 제출. 공개 테스트는 이름과 사유로, 숨은 테스트는 두 수로만 온다. */
+export interface ProjectSubmission {
+  id: string
+  projectId: string
+  projectVersion: number
+  language: string
+  status: 'QUEUED' | 'LEASED' | 'COMPLETED'
+  verdict: Verdict | null
+  score: number | null
+  log: string | null
+  tests: ProjectTestOutcome[]
+  hiddenPassed: number | null
+  hiddenTotal: number | null
+  createdAt: string
+  completedAt: string | null
+  files: Record<string, string> | null
+}
