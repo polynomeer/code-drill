@@ -75,7 +75,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Learning | problem state, collection, activity | 채점 원본 로그 의존 |
 | Admin | review, publish, rejudge, audit | 감사 로그 우회 |
 | Integrity | submission fingerprint, similarity flag | 소스 보관, 판정·계정 변경 |
-| Contest | contest, entry, score | 제출·판정 변경, 문제 공개 상태 변경 |
+| Contest | contest, entry, score, rating | 제출·판정 변경, 문제 공개 상태 변경 |
 
 ## 문제 패키지 값 타입
 
@@ -113,6 +113,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | 미니 대결 (duel) | 사용자가 문제 하나로 여는 둘의 대회. 코드로 붙는 순간 시작하고 끝난 뒤 순위표를 본다. 참가가 곧 이름 공개 동의 (§8.4) |
 | 반례 대전 (hack) | 아레나 위의 대회. 맞힌 뒤 대회 중 깨뜨린 서로 다른 과녁의 수가 점수이고 정답은 점수가 아니다 (§8.4) |
 | 가상 참가 (virtual) | 끝난 대회를 같은 문제·같은 길이로 지금부터 혼자 도는 것. 순위표는 원래 참가자들 사이의 내 자리다 (§8.4) |
+| 레이팅 (rating) | 레이팅 대회가 끝날 때 순위표에서 한 번 적용하는 여러 명의 Elo. 변화의 합이라 다시 셀 수 있다. 처음 1500, 첫 다섯 대회는 잠정 (§8.4, §10.2) |
 | 검증 보고서 | §6.3 파이프라인의 산출물. 이 digest 가 맞는 버전만 공개할 수 있다 |
 | Trace Event | 코드 줄이 아니라 의미 단위(compare, swap, push, enqueue…)로 기록하는 실행 이벤트 |
 | Trace manifest | 트레이스 목차. 청크 범위와 요약을 담고 이벤트 본문은 담지 않는다 (§7.4) |
