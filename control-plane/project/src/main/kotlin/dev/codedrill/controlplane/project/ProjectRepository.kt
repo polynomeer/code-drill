@@ -60,14 +60,16 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
     ).toMap(linkedMapOf())
 
     /** 한 사람의 제출, 최근 것부터. 목록은 파일을 싣지 않는다. */
-    fun history(userId: String, projectId: String?, limit: Int): List<ProjectSubmission> = jdbc.query(
-        """
-        SELECT * FROM project_submission
-         WHERE user_id = ? AND (? IS NULL OR project_id = ?)
-         ORDER BY created_at DESC LIMIT ?
-        """.trimIndent(),
-        ::map, userId, projectId, projectId, limit,
-    )
+    fun history(userId: String, projectId: String?, limit: Int): List<ProjectSubmission> =
+        // 필터를 SQL 로 접지 않는다 — `? IS NULL` 하나만 있는 자리는 Postgres 가 타입을 정하지 못한다.
+        if (projectId == null) {
+            jdbc.query("SELECT * FROM project_submission WHERE user_id = ? ORDER BY created_at DESC LIMIT ?", ::map, userId, limit)
+        } else {
+            jdbc.query(
+                "SELECT * FROM project_submission WHERE user_id = ? AND project_id = ? ORDER BY created_at DESC LIMIT ?",
+                ::map, userId, projectId, limit,
+            )
+        }
 
     /** 아직 끝나지 않은 제출 수. 한 사람이 분 단위 실행을 여럿 쌓지 못하게 한다 (§10.2). */
     fun inFlight(userId: String): Int = jdbc.queryForObject(

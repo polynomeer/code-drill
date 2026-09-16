@@ -1467,6 +1467,8 @@ def main() -> int:
 
     history = request("GET", "/projects/submissions?projectId=inventory-ledger")
     results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))
+    # 필터 없이도. `? IS NULL` 하나만 있는 자리에 Postgres 가 타입을 못 정해 500 이 났었다.
+    results.append(check("  프로젝트를 안 골라도 기록이 온다", len(request("GET", "/projects/submissions")) >= len(history), True))
     status, _ = raw_request("GET", f"/projects/submissions/{accepted['id']}", None, honest.headers)
     results.append(check("남의 프로젝트 제출은 404", status, 404))
 
