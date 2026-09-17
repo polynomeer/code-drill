@@ -21,6 +21,8 @@ subprojects {
     //
     // BOM 의 프로퍼티를 덮어쓰는 방식이다. 셋(core·el·websocket)이 이 한 값을 함께 쓴다.
     extra["tomcat.version"] = rootProject.libs.versions.tomcat.get()
+    // 같은 방식. lettuce 가 끌고 오는 netty 다 — 이유는 libs.versions.toml 에.
+    extra["netty.version"] = rootProject.libs.versions.netty.get()
 
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {

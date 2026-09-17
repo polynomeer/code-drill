@@ -3,6 +3,9 @@ kotlin = "2.1.20"
 springBoot = "3.4.4"
 # Boot 3.4.4 가 고정하는 10.1.39 를 덮어쓴다. 그 판에 고칠 수 있는 CRITICAL 이 여섯 있다.
 tomcat = "10.1.59"
+# Boot 3.4.4 가 고정하는 4.1.119 를 덮어쓴다. netty-handler 에 고칠 수 있는 CRITICAL 이 있다 (CVE-2026-75595).
+# 오케스트레이터의 Redis 클라이언트(lettuce)가 쓰므로 뺄 수는 없다.
+netty = "4.1.137.Final"
 springDependencyManagement = "1.1.7"
 awsSdk = "2.31.16"
 
