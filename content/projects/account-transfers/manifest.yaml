@@ -1,0 +1,11 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다). 첫 Java 프로젝트.
+id: account-transfers
+version: 1
+title: 계좌와 이체
+language: JAVA
+statement: statement.md
+
+limits:
+  buildSeconds: 120
+  testSeconds: 120
+  memoryMb: 256

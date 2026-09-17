@@ -1,0 +1,7 @@
+difficulty: EASY
+tags:
+  - hash-map
+  - simulation
+summary: 계좌를 열고 입금·출금·이체하는 은행 원장을 요구사항대로 구현한다 — 이체는 전부 되거나 전부 안 된다. 첫 Java 프로젝트.
+competencies:
+  - SPECIFICATION
