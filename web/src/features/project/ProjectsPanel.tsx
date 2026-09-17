@@ -18,6 +18,9 @@ const MonacoWorkspace = lazy(() => import('../workspace/MonacoWorkspace'))
 
 const EDITOR_LANGUAGE: Record<string, string> = { PYTHON: 'python', KOTLIN: 'kotlin', JAVA: 'java' }
 
+/** 서버의 파일 한도(256KB)와 같다. 넘는 것은 어차피 제출이 거절된다. */
+const MAX_IMPORT_BYTES = 256 * 1024
+
 /**
  * 프로젝트형 문제 (feature-roadmap 11단계 — 두 번째 판정기).
  *
@@ -53,6 +56,7 @@ export function ProjectsPanel({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fromDraft, setFromDraft] = useState(false)
+  const [imported, setImported] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
   const poll = useRef<number | null>(null)
 
@@ -142,6 +146,37 @@ export function ProjectsPanel({
     setTouched(true)
   }
 
+  /**
+   * 파일·폴더 가져오기 (§8.1). 브라우저가 고른 파일을 읽어 워크스페이스에 얹는다 — 서버는
+   * 모른다. 폴더를 고르면 맨 위 폴더 이름을 떼고 그 아래 경로를 쓴다. 숨은 파일과 너무 큰
+   * 파일은 건너뛰고 그 사실을 말한다; 조용히 빠지면 제출이 왜 다른지 아무도 모른다.
+   */
+  const importFiles = async (list: FileList | null) => {
+    if (!list || !open) return
+    const next = { ...files }
+    let taken = 0
+    const skipped: string[] = []
+    for (const file of Array.from(list)) {
+      const relative = file.webkitRelativePath || file.name
+      const parts = relative.split('/')
+      const path = (file.webkitRelativePath ? parts.slice(1) : parts).join('/')
+      if (!path || parts.some((part) => part.startsWith('.'))) {
+        skipped.push(relative)
+        continue
+      }
+      if (file.size > MAX_IMPORT_BYTES) {
+        skipped.push(`${relative} (너무 큼)`)
+        continue
+      }
+      next[path] = await file.text()
+      taken += 1
+    }
+    setFiles(next)
+    setTouched(true)
+    setCurrent((cur) => cur ?? Object.keys(next)[0] ?? null)
+    setImported(`${taken}개 파일을 가져왔습니다.` + (skipped.length ? ` 건너뜀: ${skipped.join(', ')}` : ''))
+  }
+
   const removeFile = (path: string) => {
     const next = { ...files }
     delete next[path]
@@ -213,8 +248,23 @@ export function ProjectsPanel({
               <button type="button" onClick={addFile}>
                 추가
               </button>
+              <label className="import-label">
+                가져오기
+                <input type="file" multiple aria-label="파일 가져오기" onChange={(event) => void importFiles(event.target.files)} />
+              </label>
+              <label className="import-label">
+                폴더
+                <input
+                  type="file"
+                  aria-label="폴더 가져오기"
+                  // 표준 속성이 아니라 ref 로 붙인다. 브라우저가 폴더 선택 대화상자를 연다.
+                  ref={(node) => node?.setAttribute('webkitdirectory', '')}
+                  onChange={(event) => void importFiles(event.target.files)}
+                />
+              </label>
             </span>
           </div>
+          {imported && <p className="muted small">{imported}</p>}
           <SaveIndicator
             state={draftSync.state}
             onResolve={(server, version) => {

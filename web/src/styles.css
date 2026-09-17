@@ -1282,3 +1282,17 @@ table.groups td {
   margin: 0;
   font-size: 12px;
 }
+
+.import-label {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.import-label input[type='file'] {
+  display: none;
+}
