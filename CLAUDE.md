@@ -40,6 +40,7 @@ python3 scripts/loadtest.py       # 부하 시험과 §12.1 SLO 판정
 python3 scripts/drill.py all      # 장애 주입 훈련 (컨테이너와 Runner 를 실제로 죽인다)
 python3 scripts/backup.py verify  # 백업을 임시 DB 에 복원해 본다 (§12.3)
 python3 scripts/scan-images.py    # 배포 이미지 취약점 게이트 (§11.4)
+python3 scripts/preflight.py app  # 배포 호스트 점검 (app | runner) — 띄우기 전과 후
 ```
 
 경보가 울렸을 때의 첫 대응은 → [docs/runbook.md](docs/runbook.md)
