@@ -1251,7 +1251,10 @@ Drill.pointer("left", i)      // 두 포인터의 왼쪽을 옮겼다
 - `1 <= k <= n·(n-1)/2`
 """,
     signature=dict(name="kthPairDistance", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
-    groups=perf_groups(time_multiplier=0.5),
+    # 이중 반복 오답이 동기 JIT(-Xbatch) 아래서 2.8배에 그쳤다 — 한도를 조여 자릿수로.
+    groups=perf_groups(time_multiplier=0.25),
+    # 공개 뒤 한도를 조였다 — 판정이 바뀌므로 새 버전이다 (§6.1 공개 후 불변).
+    version=2,
     reference=_kth_pair_distance,
     cases={
         "sample": [("01", [[1, 3, 1], 1]), ("02", [[1, 6, 1], 3])],
