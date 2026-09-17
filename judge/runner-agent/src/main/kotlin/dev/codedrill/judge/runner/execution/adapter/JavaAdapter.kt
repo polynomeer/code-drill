@@ -60,6 +60,8 @@ class JavaAdapter : RuntimeAdapter {
         "-Xmx${memoryMb}m",
         "-XX:+UseSerialGC",
         "-XX:-UsePerfData",
+        // 동기 JIT — 이유는 KotlinAdapter 의 같은 자리에.
+        "-Xbatch",
         "-Dfile.encoding=UTF-8",
         "-cp",
         outputDir.absolutePathString(),

@@ -136,6 +136,13 @@ class KotlinAdapter(
         // 힙을 다 쓰면 즉시 OOM 으로 끝내 MEMORY_LIMIT 판정을 결정적으로 만든다.
         "-XX:+UseSerialGC",
         "-XX:-UsePerfData",
+        // JIT 을 동기로 돌린다. 기본(백그라운드 컴파일)에서는 같은 n² 풀이가 같은 머신에서
+        // 1초에 끝나기도 4초에 끝나기도 했다 — 앞 케이스가 데운 메서드의 C2 컴파일이 다음
+        // 케이스 시작 전에 끝났는지가 컴파일러 스레드와의 경주였다. 판정이 경주에 걸리면
+        // 판정이 아니다. 동기 컴파일은 컴파일 시점을 호출 횟수로 못 박아 어느 실행이든 같은
+        // 코드를 같은 때 돌린다. 컴파일 시간이 케이스에 얹히지만 검증의 여유(정답 ≤ 한도의
+        // 절반, 성능 오답 ≥ 3배)가 그 값으로 재어진다.
+        "-Xbatch",
         "-Dfile.encoding=UTF-8",
         "-cp",
         (runtime.plusElement(outputDir)).joinToString(File.pathSeparator) {
