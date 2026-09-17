@@ -30,10 +30,20 @@ interface WorkspaceStore {
  * 그것들이 — 공개 테스트 전부가 — 자기 제출에서 통과했는가다.
  */
 fun interface ProjectLearningSignals {
-    fun judged(userId: String, projectId: String, submissionId: String, accepted: Boolean, addedTests: Int, addedTestsPassed: Boolean)
+    /** [score] 와 [submittedAt] 은 대회의 것이다 — 대회 중의 판정은 그 대회의 점수이고, 창은 제출 시각으로 본다 (§8.4). */
+    fun judged(
+        userId: String,
+        projectId: String,
+        submissionId: String,
+        accepted: Boolean,
+        score: Int,
+        submittedAt: java.time.Instant,
+        addedTests: Int,
+        addedTestsPassed: Boolean,
+    )
 
     companion object {
-        val NONE = ProjectLearningSignals { _, _, _, _, _, _ -> }
+        val NONE = ProjectLearningSignals { _, _, _, _, _, _, _, _ -> }
     }
 }
 

@@ -279,11 +279,18 @@ class ControlPlaneConfig {
         )
     }
 
-    /** 프로젝트형 판정 → 실무군 증거 (11단계). 두 모듈은 서로를 모른다. */
+    /**
+     * 프로젝트형 판정 → 실무군 증거와 대회 점수 (11단계). 세 모듈은 서로를 모른다.
+     *
+     * 프로젝트형 문제도 문제라 대회에 들어간다 — 공개된 id 면 대회 문제로 받는다. 판정이 오면
+     * 알고리즘 제출과 같은 자리에서 같은 창(제출 시각)으로 점수를 적는다 (§8.4).
+     */
     @Bean
-    fun projectLearningSignals(service: CompetencyService) = ProjectLearningSignals { userId, projectId, submissionId, accepted, addedTests, addedTestsPassed ->
-        service.projectJudged(userId, projectId, submissionId, accepted, addedTests, addedTestsPassed)
-    }
+    fun projectLearningSignals(service: CompetencyService, contests: ContestService) =
+        ProjectLearningSignals { userId, projectId, submissionId, accepted, score, submittedAt, addedTests, addedTestsPassed ->
+            runCatching { contests.judged(userId, projectId, score, accepted, submittedAt) }
+            service.projectJudged(userId, projectId, submissionId, accepted, addedTests, addedTestsPassed)
+        }
 
     @Bean
     fun projectPersonalArea(data: ProjectPersonalData) = object : PersonalData {

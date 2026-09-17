@@ -1531,6 +1531,19 @@ def main() -> int:
     results.append(check("  revision 이 올랐고 판정은 같다", (rejudged["revision"], rejudged["verdict"], rejudged["hiddenPassed"]), (2, "ACCEPTED", 10)))
     results.append(check("  실무군 증거는 늘지 않았다 — 재채점은 능력이 아니다", request("GET", "/me/competencies/SPECIFICATION").__len__(), spec_count_before))
 
+    # 프로젝트형 문제도 대회에 들어간다 (§8.4, 11단계). 대회 중의 판정이 그 대회의 점수다.
+    now = datetime.now(timezone.utc)
+    pcontest = request("POST", "/admin/contests", {"title": "스모크 프로젝트 대회", "problemIds": ["inventory-ledger"],
+                                                   "startsAt": (now - timedelta(minutes=1)).isoformat(), "endsAt": (now + timedelta(minutes=10)).isoformat()}, registrar)
+    results.append(check("프로젝트를 문제로 하는 대회를 만들었다", pcontest["problemCount"], 1))
+    request("POST", f"/admin/contests/{pcontest['id']}/publish", None, publisher)
+    request("POST", f"/contests/{pcontest['id']}/join")
+    in_contest = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": reference}, {"Idempotency-Key": f"p-contest-{uuid.uuid4()}"})["id"])
+    results.append(check("  대회 중의 프로젝트 판정", in_contest["verdict"], "ACCEPTED"))
+    pview = request("GET", f"/contests/{pcontest['id']}")
+    mine_row = next(r for r in pview["standings"] if r["mine"])
+    results.append(check("  순위표에 프로젝트 점수가 올랐다", (mine_row["total"], mine_row["solved"], mine_row["perProblem"].get("inventory-ledger")), (100, 1, 100)))
+
     history = request("GET", "/projects/submissions?projectId=inventory-ledger")
     results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))
     # 필터 없이도. `? IS NULL` 하나만 있는 자리에 Postgres 가 타입을 못 정해 500 이 났었다.

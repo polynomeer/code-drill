@@ -33,7 +33,16 @@ const EDITOR_LANGUAGE: Record<string, string> = { PYTHON: 'python', KOTLIN: 'kot
  * ([useDraftSync]). 다시 열면 시작 저장소가 아니라 초안이 열리고, "시작 저장소로 되돌리기"가
  * 초안을 버린다.
  */
-export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
+export function ProjectsPanel({
+  refreshKey,
+  requestedId = null,
+  onRequestHandled,
+}: {
+  refreshKey: number
+  /** 밖에서 열어 달라는 프로젝트 — 대회의 문제 목록에서 눌렀을 때 (§8.4). */
+  requestedId?: string | null
+  onRequestHandled?: () => void
+}) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
   const [open, setOpen] = useState<ProjectView | null>(null)
   const [files, setFiles] = useState<Record<string, string>>({})
@@ -83,6 +92,13 @@ export function ProjectsPanel({ refreshKey }: { refreshKey: number }) {
       .then(setHistory)
       .catch(() => setHistory([]))
   }, [])
+
+  useEffect(() => {
+    if (!requestedId) return
+    show(requestedId)
+    onRequestHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedId])
 
   // 판정은 분 단위다. 끝날 때까지 1초마다 묻는다 — SSE 는 알고리즘 제출의 것이고, 여기서는
   // 기다리는 시간이 길어 폴링의 비용이 문제가 되지 않는다.

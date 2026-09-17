@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { createSubmission, getDraft, getProblem, listSubmissions, logout } from './api/client'
+import { createSubmission, getDraft, getProblem, listProjects, listSubmissions, logout } from './api/client'
 import { getSession, onSessionChange, type Session } from './api/session'
 import { AccountSettings } from './features/auth/AccountSettings'
 import { SanctionBanner } from './features/auth/SanctionBanner'
@@ -54,6 +54,14 @@ function Drill({ session }: { session: Session }) {
   const [source, setSource] = useState('')
   const [touched, setTouched] = useState(false)
   const [history, setHistory] = useState<Submission[]>([])
+  // 대회의 문제 목록에는 프로젝트형 문제도 온다 (11단계). 어느 패널로 열지 여기서 가른다.
+  const [projectIds, setProjectIds] = useState<Set<string>>(() => new Set())
+  const [requestedProject, setRequestedProject] = useState<string | null>(null)
+  useEffect(() => {
+    listProjects()
+      .then((projects) => setProjectIds(new Set(projects.map((project) => project.id))))
+      .catch(() => undefined)
+  }, [])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -198,10 +206,14 @@ function Drill({ session }: { session: Session }) {
               PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
           <TodayPanel onOpenProblem={selectProblem} refreshKey={history.length} />
           {/* 처방 아래, 목록 위. 대회 중이면 무엇을 풀지는 대회가 정한다 (§8.4). */}
-          <ContestsPanel currentProblem={slug} onOpenProblem={selectProblem} refreshKey={history.length} />
+          <ContestsPanel
+            currentProblem={slug}
+            onOpenProblem={(id) => (projectIds.has(id) ? setRequestedProject(id) : selectProblem(id))}
+            refreshKey={history.length}
+          />
           <ProblemList selected={slug} onSelect={selectProblem} />
           {/* 목록 아래. 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
-          <ProjectsPanel refreshKey={history.length} />
+          <ProjectsPanel refreshKey={history.length} requestedId={requestedProject} onRequestHandled={() => setRequestedProject(null)} />
           <section className="panel statement">
             <h3>{problem?.title ?? '문제를 고르세요'}</h3>
             {problem && (

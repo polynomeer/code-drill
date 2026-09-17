@@ -322,7 +322,7 @@ class ProjectService(
     }
 
     /**
-     * 판정을 증거로 (11단계). 실패해도 판정은 이미 적혔다 — 학습 기록은 판정보다 뒤의 관심사다.
+     * 판정을 증거와 대회 점수로 (11단계). 실패해도 판정은 이미 적혔다 — 학습 기록은 판정보다 뒤의 관심사다.
      *
      * 더 쓴 테스트는 시작 저장소의 공개 테스트 파일과 제출의 같은 파일에서 `def test_` 를
      * 세어 뺀 것이다. 파일을 새로 만든 테스트도 센다 — `tests/test_*.py` 면 스위트가 돈다.
@@ -342,6 +342,8 @@ class ProjectService(
                 projectId = submission.projectId,
                 submissionId = id.toString(),
                 accepted = message.verdict == dev.codedrill.judge.protocol.Verdict.ACCEPTED,
+                score = message.score,
+                submittedAt = submission.createdAt,
                 addedTests = added,
                 addedTestsPassed = message.tests.isNotEmpty() && message.tests.all { it.passed },
             )
