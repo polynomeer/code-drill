@@ -1,0 +1,18 @@
+# unique-bst-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - recursion
+  - dynamic-programming
+  - math
+  - tree
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - OPTIMIZATION
+  - EDGE_CASES
+prerequisites:
+  - climb-stairs
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "O(n²). 기억하지 않으면 지수"

@@ -1,0 +1,18 @@
+# sum-of-subarray-minimums 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - monotonic-stack
+  - math
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - OPTIMIZATION
+  - CONSTRAINTS
+  - COMPLEXITY
+prerequisites:
+  - histogram-rectangle
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(n). 모든 부분 배열을 보면 O(n²)"

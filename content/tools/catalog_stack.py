@@ -1569,3 +1569,166 @@ fun shortestSubarrayAtLeastK(nums: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 139. 모든 부분 배열의 최솟값의 합 (양쪽 경계로 기여 세기) -----------------------------------------
+
+_MOD = 1_000_000_007
+
+
+def _sum_subarray_mins(nums):
+    n = len(nums)
+    left = [0] * n   # i 가 최솟값이 되는 왼쪽 길이 (같은 값은 왼쪽이 이긴다: 엄격히 작은 값까지)
+    right = [0] * n  # 오른쪽 길이 (같은 값이면 오른쪽은 멈춘다: 작거나 같은 값까지)
+    stack = []
+    for i in range(n):
+        while stack and nums[stack[-1]] > nums[i]:
+            stack.pop()
+        left[i] = i - (stack[-1] if stack else -1)
+        stack.append(i)
+    stack = []
+    for i in range(n - 1, -1, -1):
+        while stack and nums[stack[-1]] >= nums[i]:
+            stack.pop()
+        right[i] = (stack[-1] if stack else n) - i
+        stack.append(i)
+    return sum(nums[i] * left[i] * right[i] for i in range(n)) % _MOD
+
+
+PROBLEMS.append(Problem(
+    id="sum-of-subarray-minimums",
+    title="모든 부분 배열의 최솟값의 합",
+    summary="""
+양의 정수 배열 `nums` 가 주어진다. 비어 있지 않은 모든 연속 부분 배열의 최솟값을 전부 더한
+값을 `1_000_000_007` 로 나눈 나머지를 반환한다.
+""",
+    notes="""
+부분 배열을 전부 보면 n² 이다. 대신 원소마다 "내가 최솟값인 부분 배열이 몇 개인가"를 센다 —
+왼쪽으로 나보다 **작은** 값이 나올 때까지의 길이와 오른쪽으로 나보다 **작거나 같은** 값이
+나올 때까지의 길이의 곱이다. 같은 값이 여럿일 때 한쪽만 등호를 두어야 부분 배열이 정확히
+한 원소에 배정된다. 그 경계는 단조 스택으로 한 번에 나온다. 곱은 `Int` 를 넘는다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 스택 꼭대기와 현재를 비교했다
+Drill.write(i, contribution)  // 원소의 기여를 정했다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `1 <= nums[i] <= 30_000`
+""",
+    signature=dict(name="sumOfSubarrayMinimums", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_sum_subarray_mins,
+    cases={
+        "sample": [("01", [[3, 1, 2, 4]]), ("02", [[11, 81, 94, 43, 3]])],
+        "boundary": [
+            ("01-single", [[5]]),
+            # 같은 값 — 한쪽만 등호여야 한다.
+            ("02-all-equal", [[2, 2, 2]]),
+            ("03-equal-pairs", [[1, 2, 1, 2]]),
+            ("04-ascending", [[1, 2, 3, 4, 5]]),
+            ("05-descending", [[5, 4, 3, 2, 1]]),
+            # 한 원소의 기여가 Int 를 넘는다: 20000 × 401 × 401 > 2³¹. 최솟값이 큰 값이면서 양쪽으로
+            # 넓게 뻗어야 하니, 더 큰 값의 벽 사이에 두었다.
+            ("06-int-overflow-contribution", [[30000] * 400 + [20000] + [30000] * 400]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 9, salt=8681)]),
+            ("02-random-medium", [randoms(300, 1, 100, salt=8682)]),
+            ("03-random-max-values", [randoms(500, 1, 30000, salt=8683)]),
+            ("04-many-duplicates", [randoms(400, 1, 3, salt=8684)]),
+            ("05-modulo-needed", [[30000] * 2000]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, 1, 30000, salt=8691)]),
+            ("02-medium", [randoms(30000, 1, 30000, salt=8692)]),
+            ("03-large", [[30000 - (i % 30000) for i in range(100000)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 단조 스택으로 양쪽 경계, 기여는 Long.
+fun sumOfSubarrayMinimums(nums: IntArray): Int {
+    val n = nums.size
+    val mod = 1_000_000_007L
+    val left = IntArray(n)
+    val right = IntArray(n)
+    val stack = IntArray(n)
+    var top = 0
+    for (i in 0 until n) {
+        while (top > 0 && nums[stack[top - 1]] > nums[i]) { Drill.compare(stack[top - 1], i); top -= 1 }
+        left[i] = i - (if (top > 0) stack[top - 1] else -1)
+        stack[top++] = i
+    }
+    top = 0
+    for (i in n - 1 downTo 0) {
+        while (top > 0 && nums[stack[top - 1]] >= nums[i]) { Drill.compare(stack[top - 1], i); top -= 1 }
+        right[i] = (if (top > 0) stack[top - 1] else n) - i
+        stack[top++] = i
+    }
+    var total = 0L
+    for (i in 0 until n) {
+        val contribution = nums[i].toLong() * left[i] * right[i] % mod
+        Drill.write(i, contribution.toInt())
+        total = (total + contribution) % mod
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("strict-both-sides--double-counts-ties", "WRONG_BRANCH",
+         "양쪽 모두 엄격히 작은 값에서 멈춘다. 같은 값이 있는 부분 배열을 두 번 센다.",
+         """
+fun sumOfSubarrayMinimums(nums: IntArray): Int {
+    val n = nums.size; val mod = 1_000_000_007L
+    val left = IntArray(n); val right = IntArray(n); val stack = IntArray(n); var top = 0
+    for (i in 0 until n) { while (top > 0 && nums[stack[top - 1]] > nums[i]) top -= 1; left[i] = i - (if (top > 0) stack[top - 1] else -1); stack[top++] = i }
+    top = 0
+    for (i in n - 1 downTo 0) { while (top > 0 && nums[stack[top - 1]] > nums[i]) top -= 1; right[i] = (if (top > 0) stack[top - 1] else n) - i; stack[top++] = i }
+    var total = 0L
+    for (i in 0 until n) total = (total + nums[i].toLong() * left[i] * right[i]) % mod
+    return total.toInt()
+}
+"""),
+        ("int-product--overflow", "WRONG_BRANCH",
+         "기여를 Int 로 곱한다. 넓은 구간의 큰 값에서 넘친다.",
+         """
+fun sumOfSubarrayMinimums(nums: IntArray): Int {
+    val n = nums.size; val mod = 1_000_000_007L
+    val left = IntArray(n); val right = IntArray(n); val stack = IntArray(n); var top = 0
+    for (i in 0 until n) { while (top > 0 && nums[stack[top - 1]] > nums[i]) top -= 1; left[i] = i - (if (top > 0) stack[top - 1] else -1); stack[top++] = i }
+    top = 0
+    for (i in n - 1 downTo 0) { while (top > 0 && nums[stack[top - 1]] >= nums[i]) top -= 1; right[i] = (if (top > 0) stack[top - 1] else n) - i; stack[top++] = i }
+    var total = 0L
+    for (i in 0 until n) total = (total + (nums[i] * left[i] * right[i]).toLong()) % mod
+    return total.toInt()
+}
+"""),
+        ("left-length-excludes-self", "OFF_BY_ONE",
+         "왼쪽 길이를 자기 자신을 빼고 센다. 원소 하나짜리 부분 배열이 사라진다.",
+         """
+fun sumOfSubarrayMinimums(nums: IntArray): Int {
+    val n = nums.size; val mod = 1_000_000_007L
+    val left = IntArray(n); val right = IntArray(n); val stack = IntArray(n); var top = 0
+    for (i in 0 until n) { while (top > 0 && nums[stack[top - 1]] > nums[i]) top -= 1; left[i] = i - (if (top > 0) stack[top - 1] else -1) - 1; stack[top++] = i }
+    top = 0
+    for (i in n - 1 downTo 0) { while (top > 0 && nums[stack[top - 1]] >= nums[i]) top -= 1; right[i] = (if (top > 0) stack[top - 1] else n) - i; stack[top++] = i }
+    var total = 0L
+    for (i in 0 until n) total = (total + nums[i].toLong() * (left[i] + 1) * right[i] - nums[i].toLong() * right[i]) % mod
+    return total.toInt()
+}
+"""),
+        ("all-subarrays--quadratic", "PERFORMANCE",
+         "모든 부분 배열의 최솟값을 직접 본다. O(n²).",
+         """
+fun sumOfSubarrayMinimums(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    for (i in nums.indices) {
+        var m = Int.MAX_VALUE
+        for (j in i until nums.size) { Drill.compare(i, j); if (nums[j] < m) m = nums[j]; total = (total + m) % mod }
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))

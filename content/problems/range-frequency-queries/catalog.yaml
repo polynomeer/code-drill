@@ -1,0 +1,18 @@
+# range-frequency-queries 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - binary-search
+  - hash-map
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - OPTIMIZATION
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - binary-search-insert
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "전처리 O(n), 질의당 O(log n). 질의마다 훑으면 O(질의 × n)"

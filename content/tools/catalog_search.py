@@ -1376,3 +1376,540 @@ fun kthPairDistance(nums: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 134. 뒤에 있는 더 작은 수의 개수 (병합 정렬로 세기) -------------------------------------------------
+
+def _count_smaller_after(nums):
+    n = len(nums)
+    counts = [0] * n
+    order = list(range(n))
+
+    def sort(lo, hi):
+        if hi - lo <= 1:
+            return
+        mid = (lo + hi) // 2
+        sort(lo, mid)
+        sort(mid, hi)
+        merged = []
+        i, j = lo, mid
+        while i < mid or j < hi:
+            if j >= hi or (i < mid and nums[order[i]] <= nums[order[j]]):
+                counts[order[i]] += j - mid
+                merged.append(order[i])
+                i += 1
+            else:
+                merged.append(order[j])
+                j += 1
+        order[lo:hi] = merged
+
+    sort(0, n)
+    return counts
+
+
+PROBLEMS.append(Problem(
+    id="count-smaller-after-self",
+    title="뒤에 있는 더 작은 수의 개수",
+    summary="""
+정수 배열 `nums` 가 주어진다. 각 자리 `i` 에 대해 `i` 보다 **뒤에** 있으면서 `nums[i]` 보다
+**작은** 원소의 개수를 담은 배열을 반환한다.
+""",
+    notes="""
+자리마다 뒤를 훑으면 n² 이다. 역전 쌍 세기의 뼈대다 — 병합 정렬을 하되 값이 아니라 **자리**를
+정렬하고, 병합할 때 왼쪽 원소가 나가는 순간 오른쪽에서 이미 나간 원소의 수가 곧 "뒤에 있는
+더 작은 수"다. 같은 값은 작지 않으니 왼쪽을 먼저 내보낸다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 왼쪽과 오른쪽 원소를 비교했다
+Drill.write(index, count)     // 자리의 답을 늘렸다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="countSmallerAfter", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    # n² 훑기가 한도의 1.1배에 그쳤다 — 비교 50억 번이 JIT 아래서 1초다. 자릿수로 지게 한다.
+    groups=perf_groups(time_multiplier=0.15),
+    reference=_count_smaller_after,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [[5, 2, 6, 1]]), ("02", [[3, 3, 1]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            # 같은 값은 작지 않다.
+            ("02-equal-values", [[2, 2, 2]]),
+            ("03-descending", [[4, 3, 2, 1]]),
+            ("04-ascending", [[1, 2, 3, 4]]),
+            ("05-negative", [[-1, -3, -2]]),
+            # 병합 경계에서 안정성이 필요하다 — 같은 값이 양쪽에 있다.
+            ("06-equal-across-halves", [[1, 3, 1, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -5, 5, salt=8601)]),
+            ("02-random-medium", [randoms(300, -100, 100, salt=8602)]),
+            ("03-random-wide", [randoms(500, -1000000000, 1000000000, salt=8603)]),
+            ("04-many-duplicates", [randoms(400, 0, 3, salt=8604)]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, -100000, 100000, salt=8611)]),
+            ("02-medium", [randoms(30000, -100000, 100000, salt=8612)]),
+            ("03-large", [list(range(100000, 0, -1))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 자리를 병합 정렬하며 왼쪽이 나갈 때 오른쪽에서 먼저 나간 수를 더한다.
+fun countSmallerAfter(nums: IntArray): IntArray {
+    val n = nums.size
+    val counts = IntArray(n)
+    var order = IntArray(n) { it }
+    var buffer = IntArray(n)
+    fun sort(lo: Int, hi: Int) {
+        if (hi - lo <= 1) return
+        val mid = (lo + hi) / 2
+        sort(lo, mid); sort(mid, hi)
+        var i = lo; var j = mid; var out = lo
+        while (i < mid || j < hi) {
+            if (j >= hi || (i < mid && nums[order[i]] <= nums[order[j]])) {
+                Drill.compare(order[i], if (j < hi) order[j] else order[i])
+                counts[order[i]] += j - mid
+                Drill.write(order[i], counts[order[i]])
+                buffer[out++] = order[i++]
+            } else {
+                buffer[out++] = order[j++]
+            }
+        }
+        for (t in lo until hi) order[t] = buffer[t]
+    }
+    sort(0, n)
+    return counts
+}
+""",
+    mutants=[
+        ("strict-merge--counts-equal-as-smaller", "OFF_BY_ONE",
+         "병합에서 같은 값일 때 오른쪽을 먼저 내보낸다. 같은 값이 '더 작은 수'로 세어진다.",
+         """
+fun countSmallerAfter(nums: IntArray): IntArray {
+    val n = nums.size
+    val counts = IntArray(n)
+    val order = IntArray(n) { it }
+    val buffer = IntArray(n)
+    fun sort(lo: Int, hi: Int) {
+        if (hi - lo <= 1) return
+        val mid = (lo + hi) / 2
+        sort(lo, mid); sort(mid, hi)
+        var i = lo; var j = mid; var out = lo
+        while (i < mid || j < hi) {
+            if (j >= hi || (i < mid && nums[order[i]] < nums[order[j]])) { counts[order[i]] += j - mid; buffer[out++] = order[i++] } else buffer[out++] = order[j++]
+        }
+        for (t in lo until hi) order[t] = buffer[t]
+    }
+    sort(0, n)
+    return counts
+}
+"""),
+        ("counts-before-instead-of-after", "WRONG_ALGORITHM",
+         "앞에 있는 더 작은 수를 센다.",
+         """
+fun countSmallerAfter(nums: IntArray): IntArray {
+    val n = nums.size
+    val counts = IntArray(n)
+    val order = IntArray(n) { it }
+    val buffer = IntArray(n)
+    fun sort(lo: Int, hi: Int) {
+        if (hi - lo <= 1) return
+        val mid = (lo + hi) / 2
+        sort(lo, mid); sort(mid, hi)
+        var i = lo; var j = mid; var out = lo
+        while (i < mid || j < hi) {
+            if (i >= mid || (j < hi && nums[order[j]] < nums[order[i]])) { counts[order[j]] += i - lo; buffer[out++] = order[j++] } else buffer[out++] = order[i++]
+        }
+        for (t in lo until hi) order[t] = buffer[t]
+    }
+    sort(0, n)
+    return counts
+}
+"""),
+        ("sorts-values--loses-positions", "WRONG_BRANCH",
+         "값을 정렬하고 자리를 잃는다. 답이 원래 자리가 아니라 정렬된 자리에 적힌다.",
+         """
+fun countSmallerAfter(nums: IntArray): IntArray {
+    val n = nums.size
+    val values = nums.copyOf()
+    val counts = IntArray(n)
+    val buffer = IntArray(n)
+    val cbuf = IntArray(n)
+    fun sort(lo: Int, hi: Int) {
+        if (hi - lo <= 1) return
+        val mid = (lo + hi) / 2
+        sort(lo, mid); sort(mid, hi)
+        var i = lo; var j = mid; var out = lo
+        while (i < mid || j < hi) {
+            if (j >= hi || (i < mid && values[i] <= values[j])) { cbuf[out] = counts[i] + (j - mid); buffer[out++] = values[i++] } else { cbuf[out] = counts[j]; buffer[out++] = values[j++] }
+        }
+        for (t in lo until hi) { values[t] = buffer[t]; counts[t] = cbuf[t] }
+    }
+    sort(0, n)
+    return counts
+}
+"""),
+        ("scan-right--quadratic", "PERFORMANCE",
+         "자리마다 뒤를 훑는다. O(n²).",
+         """
+fun countSmallerAfter(nums: IntArray): IntArray {
+    val n = nums.size
+    val counts = IntArray(n)
+    for (i in 0 until n) {
+        var c = 0
+        for (j in i + 1 until n) { Drill.compare(i, j); if (nums[j] < nums[i]) c += 1 }
+        counts[i] = c
+    }
+    return counts
+}
+"""),
+    ],
+))
+
+
+# --- 135. 가장 가까운 두 점의 거리 제곱 (분할 정복) ----------------------------------------------------
+
+def _closest_pair(points):
+    pts = sorted((points[i], points[i + 1]) for i in range(0, len(points), 2))
+
+    def solve(lo, hi):
+        if hi - lo <= 3:
+            best = None
+            for i in range(lo, hi):
+                for j in range(i + 1, hi):
+                    d = (pts[i][0] - pts[j][0]) ** 2 + (pts[i][1] - pts[j][1]) ** 2
+                    if best is None or d < best:
+                        best = d
+            return best if best is not None else float("inf")
+        mid = (lo + hi) // 2
+        mid_x = pts[mid][0]
+        best = min(solve(lo, mid), solve(mid, hi))
+        strip = [p for p in pts[lo:hi] if (p[0] - mid_x) ** 2 < best]
+        strip.sort(key=lambda p: p[1])
+        for i in range(len(strip)):
+            j = i + 1
+            while j < len(strip) and (strip[j][1] - strip[i][1]) ** 2 < best:
+                d = (strip[i][0] - strip[j][0]) ** 2 + (strip[i][1] - strip[j][1]) ** 2
+                if d < best:
+                    best = d
+                j += 1
+        return best
+
+    return int(solve(0, len(pts)))
+
+
+def _points(n, span, salt):
+    xs = randoms(n, -span, span, salt=salt)
+    ys = randoms(n, -span, span, salt=salt + 1)
+    return flat([xs[i], ys[i]] for i in range(n))
+
+
+PROBLEMS.append(Problem(
+    id="closest-pair-squared",
+    title="가장 가까운 두 점",
+    summary="""
+평면의 점들이 `[x1, y1, x2, y2, ...]` 로 주어진다. 서로 다른 두 점 사이의 **거리의 제곱**
+`(x1-x2)² + (y1-y2)²` 중 가장 작은 값을 반환한다. 같은 자리에 점이 둘 있으면 `0` 이다.
+""",
+    notes="""
+모든 쌍은 n² 이다. x 로 정렬해 절반으로 나누고, 양쪽의 답 `d` 를 구한 뒤 경계선에서 `d` 안에
+있는 점들(띠)만 다시 본다. 띠를 y 로 정렬하면 각 점은 y 차가 `d` 를 넘기 전까지 — 많아야
+상수 개 — 만 비교하면 된다. 그것이 O(n log² n) 이고, 이 제약에서 충분하다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 두 점의 거리를 봤다
+Drill.write(0, best)          // 답을 줄였다
+""",
+    constraints="""
+- `2 <= 점의 수 <= 100_000`, `points.size` 는 짝수
+- `-30_000 <= x, y <= 30_000` (거리 제곱은 `Int` 안이다)
+""",
+    signature=dict(name="closestPairSquared", parameters=[("points", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_closest_pair,
+    cases={
+        "sample": [("01", [[0, 0, 3, 4, 1, 1]]), ("02", [[0, 0, 5, 5]])],
+        "boundary": [
+            ("01-two-points", [[-3, 2, 4, -2]]),
+            ("02-duplicate-point", [[1, 1, 5, 5, 1, 1]]),
+            # 가장 가까운 두 점이 경계선 양쪽에 있다.
+            ("03-across-split", [[-10, 0, -1, 0, 1, 0, 10, 0]]),
+            # x 는 같고 y 만 다르다 — 정렬이 x 만 보면 띠가 전부다.
+            ("04-vertical-line", [[0, 0, 0, 7, 0, 3, 0, 10]]),
+            ("05-three-collinear", [[0, 0, 100, 0, 51, 0]]),
+            # 띠에서 y 차가 큰 점은 볼 필요가 없지만, 보는 범위를 너무 좁히면 놓친다.
+            ("06-strip-diagonal", [[-2, 0, 2, 3, 0, 100, 0, -100]]),
+            # 띠를 y 로 늘어놓으면 답인 두 점 사이에 두 점이 끼어 있다 — "다음 둘만" 보면 놓친다.
+            ("07-strip-partner-third", [[-6, -4, -1, -6, -1, -4, 4, -5]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_points(10, 20, salt=8621)]),
+            ("02-random-medium", [_points(200, 1000, salt=8623)]),
+            ("03-random-large", [_points(2000, 30000, salt=8625)]),
+            ("04-grid-points", [flat([x * 7, y * 5] for x in range(20) for y in range(20))]),
+        ],
+        "performance": [
+            ("01-small", [_points(5000, 30000, salt=8631)]),
+            ("02-medium", [_points(30000, 30000, salt=8633)]),
+            ("03-large", [_points(100000, 30000, salt=8635)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). x 정렬 → 분할 → 띠에서 y 순으로 이웃만.
+fun closestPairSquared(points: IntArray): Int {
+    val n = points.size / 2
+    val order = (0 until n).sortedWith(compareBy({ points[it * 2] }, { points[it * 2 + 1] })).toIntArray()
+    val xs = IntArray(n) { points[order[it] * 2] }
+    val ys = IntArray(n) { points[order[it] * 2 + 1] }
+    fun dist(i: Int, j: Int): Long {
+        val dx = (xs[i] - xs[j]).toLong(); val dy = (ys[i] - ys[j]).toLong()
+        return dx * dx + dy * dy
+    }
+    val strip = IntArray(n)
+    fun solve(lo: Int, hi: Int): Long {
+        if (hi - lo <= 3) {
+            var best = Long.MAX_VALUE
+            for (i in lo until hi) for (j in i + 1 until hi) { Drill.compare(i, j); best = minOf(best, dist(i, j)) }
+            return best
+        }
+        val mid = (lo + hi) / 2
+        val midX = xs[mid]
+        var best = minOf(solve(lo, mid), solve(mid, hi))
+        var m = 0
+        for (i in lo until hi) {
+            val dx = (xs[i] - midX).toLong()
+            if (dx * dx < best) strip[m++] = i
+        }
+        val band = strip.copyOfRange(0, m).sortedBy { ys[it] }
+        for (a in band.indices) {
+            var b = a + 1
+            while (b < band.size) {
+                val dy = (ys[band[b]] - ys[band[a]]).toLong()
+                if (dy * dy >= best) break
+                Drill.compare(band[a], band[b])
+                val d = dist(band[a], band[b])
+                if (d < best) { best = d; Drill.write(0, best.toInt()) }
+                b += 1
+            }
+        }
+        return best
+    }
+    return solve(0, n).toInt()
+}
+""",
+    mutants=[
+        # "다음 셋"은 열린 띠와 같은 편 간격 때문에 실제로 놓치는 입력이 없었다 — 동치 오답이라 둘로 줄였다.
+        ("strip-checks-only-next-two", "MISSING_EDGE_CASE",
+         "띠에서 이웃을 y 차와 무관하게 다음 둘만 본다. 답인 두 점 사이에 둘이 끼면 놓친다.",
+         """
+fun closestPairSquared(points: IntArray): Int {
+    val n = points.size / 2
+    val order = (0 until n).sortedWith(compareBy({ points[it * 2] }, { points[it * 2 + 1] })).toIntArray()
+    val xs = IntArray(n) { points[order[it] * 2] }
+    val ys = IntArray(n) { points[order[it] * 2 + 1] }
+    fun dist(i: Int, j: Int): Long { val dx = (xs[i] - xs[j]).toLong(); val dy = (ys[i] - ys[j]).toLong(); return dx * dx + dy * dy }
+    fun solve(lo: Int, hi: Int): Long {
+        if (hi - lo <= 3) { var best = Long.MAX_VALUE; for (i in lo until hi) for (j in i + 1 until hi) best = minOf(best, dist(i, j)); return best }
+        val mid = (lo + hi) / 2; val midX = xs[mid]
+        var best = minOf(solve(lo, mid), solve(mid, hi))
+        val band = (lo until hi).filter { val dx = (xs[it] - midX).toLong(); dx * dx < best }.sortedBy { ys[it] }
+        for (a in band.indices) for (b in a + 1 until minOf(band.size, a + 3)) best = minOf(best, dist(band[a], band[b]))
+        return best
+    }
+    return solve(0, n).toInt()
+}
+"""),
+        ("ignores-cross-pairs", "WRONG_ALGORITHM",
+         "양쪽의 답만 보고 경계를 가로지르는 쌍을 보지 않는다.",
+         """
+fun closestPairSquared(points: IntArray): Int {
+    val n = points.size / 2
+    val order = (0 until n).sortedBy { points[it * 2] }.toIntArray()
+    val xs = IntArray(n) { points[order[it] * 2] }
+    val ys = IntArray(n) { points[order[it] * 2 + 1] }
+    fun dist(i: Int, j: Int): Long { val dx = (xs[i] - xs[j]).toLong(); val dy = (ys[i] - ys[j]).toLong(); return dx * dx + dy * dy }
+    fun solve(lo: Int, hi: Int): Long {
+        if (hi - lo <= 3) { var best = Long.MAX_VALUE; for (i in lo until hi) for (j in i + 1 until hi) best = minOf(best, dist(i, j)); return best }
+        val mid = (lo + hi) / 2
+        return minOf(solve(lo, mid), solve(mid, hi))
+    }
+    return solve(0, n).toInt()
+}
+"""),
+        ("int-distance--overflow-free-but-manhattan", "WRONG_BRANCH",
+         "거리를 |dx| + |dy| 로 잰다. 축에 나란한 쌍에서만 맞는다.",
+         """
+fun closestPairSquared(points: IntArray): Int {
+    val n = points.size / 2
+    var best = Long.MAX_VALUE
+    var bestSq = Long.MAX_VALUE
+    for (i in 0 until n) for (j in i + 1 until n) {
+        val dx = (points[i * 2] - points[j * 2]).toLong(); val dy = (points[i * 2 + 1] - points[j * 2 + 1]).toLong()
+        val manhattan = kotlin.math.abs(dx) + kotlin.math.abs(dy)
+        if (manhattan < best) { best = manhattan; bestSq = dx * dx + dy * dy }
+    }
+    return bestSq.toInt()
+}
+"""),
+        ("all-pairs--quadratic", "PERFORMANCE",
+         "모든 쌍을 본다. O(n²).",
+         """
+fun closestPairSquared(points: IntArray): Int {
+    val n = points.size / 2
+    var best = Long.MAX_VALUE
+    for (i in 0 until n) for (j in i + 1 until n) {
+        Drill.compare(i, j)
+        val dx = (points[i * 2] - points[j * 2]).toLong(); val dy = (points[i * 2 + 1] - points[j * 2 + 1]).toLong()
+        val d = dx * dx + dy * dy
+        if (d < best) best = d
+    }
+    return best.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 136. 구간에서 값의 빈도 (자리 목록 위 이분 탐색) --------------------------------------------------
+
+def _range_frequency(nums, queries):
+    import bisect
+    positions = {}
+    for i, x in enumerate(nums):
+        positions.setdefault(x, []).append(i)
+    out = []
+    for q in range(0, len(queries), 3):
+        left, right, value = queries[q], queries[q + 1], queries[q + 2]
+        pos = positions.get(value)
+        if not pos:
+            out.append(0)
+            continue
+        out.append(bisect.bisect_right(pos, right) - bisect.bisect_left(pos, left))
+    return out
+
+
+def _queries(n, count, salt):
+    a = randoms(count, 0, n - 1, salt=salt)
+    b = randoms(count, 0, n - 1, salt=salt + 1)
+    v = randoms(count, 0, 20, salt=salt + 2)
+    return flat([min(a[i], b[i]), max(a[i], b[i]), v[i]] for i in range(count))
+
+
+PROBLEMS.append(Problem(
+    id="range-frequency-queries",
+    title="구간에서 값의 빈도",
+    summary="""
+정수 배열 `nums` 와 질의들이 주어진다. `queries` 는 `[l1, r1, v1, l2, r2, v2, ...]` 이며 질의
+하나는 "`nums[l..r]` (양 끝 포함) 에 `v` 가 몇 번 나오는가"다. 질의마다의 답을 순서대로 담은
+배열을 반환한다.
+""",
+    notes="""
+질의마다 구간을 훑으면 질의 수 × 구간 길이다. 값마다 **그 값이 나오는 자리들의 정렬된 목록**을
+만들어 두면, 질의는 그 목록에서 `l` 이상인 첫 자리와 `r` 초과인 첫 자리를 이분 탐색으로 찾아
+빼는 것이다. 없는 값은 0 이다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 이분 탐색의 범위를 좁혔다
+Drill.write(q, answer)        // 질의의 답을 적었다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`, `0 <= nums[i] <= 10^9`
+- `queries.size` 는 3 의 배수이며 질의는 최대 `100_000` 개, `0 <= l <= r < n`
+""",
+    signature=dict(name="rangeFrequency", parameters=[("nums", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_range_frequency,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [[1, 2, 1, 1, 3, 1], [0, 5, 1, 1, 3, 1, 2, 2, 5]]), ("02", [[7], [0, 0, 7, 0, 0, 8]])],
+        "boundary": [
+            ("01-single-query-whole", [[3, 3, 3], [0, 2, 3]]),
+            # 양 끝이 포함이다.
+            ("02-inclusive-ends", [[5, 1, 5], [0, 0, 5, 2, 2, 5, 0, 2, 5]]),
+            ("03-missing-value", [[1, 2, 3], [0, 2, 9]]),
+            # 값은 있는데 구간 밖이다.
+            ("04-value-outside-range", [[4, 0, 0, 4], [1, 2, 4]]),
+            ("05-same-position", [[2, 2], [1, 1, 2]]),
+            ("06-no-queries", [[1, 2], []]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 0, 3, salt=8641), _queries(12, 8, salt=8642)]),
+            ("02-random-medium", [randoms(300, 0, 20, salt=8645), _queries(300, 100, salt=8646)]),
+            ("03-large-values", [randoms(100, 0, 1000000000, salt=8649), [0, 99, 1000000000, 0, 99, 0]]),
+            ("04-all-same", [[9] * 200, [0, 199, 9, 50, 60, 9, 0, 0, 9]]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, 0, 20, salt=8651), _queries(5000, 5000, salt=8652)]),
+            ("02-medium", [randoms(30000, 0, 20, salt=8655), _queries(30000, 30000, salt=8656)]),
+            ("03-large", [randoms(100000, 0, 20, salt=8659), _queries(100000, 100000, salt=8660)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 값마다 자리 목록, 질의마다 이분 탐색 둘.
+fun rangeFrequency(nums: IntArray, queries: IntArray): IntArray {
+    val positions = HashMap<Int, MutableList<Int>>()
+    for (i in nums.indices) positions.getOrPut(nums[i]) { ArrayList() }.add(i)
+    fun lowerBound(list: List<Int>, target: Int): Int {
+        var lo = 0; var hi = list.size
+        while (lo < hi) { val mid = (lo + hi) / 2; Drill.compare(lo, hi); if (list[mid] < target) lo = mid + 1 else hi = mid }
+        return lo
+    }
+    val out = IntArray(queries.size / 3)
+    for (q in out.indices) {
+        val left = queries[q * 3]; val right = queries[q * 3 + 1]; val value = queries[q * 3 + 2]
+        val list = positions[value]
+        out[q] = if (list == null) 0 else lowerBound(list, right + 1) - lowerBound(list, left)
+        Drill.write(q, out[q])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("exclusive-right-end", "OFF_BY_ONE",
+         "오른쪽 끝을 빼고 센다. 양 끝 포함이다.",
+         """
+fun rangeFrequency(nums: IntArray, queries: IntArray): IntArray {
+    val positions = HashMap<Int, MutableList<Int>>()
+    for (i in nums.indices) positions.getOrPut(nums[i]) { ArrayList() }.add(i)
+    fun lowerBound(list: List<Int>, target: Int): Int { var lo = 0; var hi = list.size; while (lo < hi) { val mid = (lo + hi) / 2; if (list[mid] < target) lo = mid + 1 else hi = mid }; return lo }
+    val out = IntArray(queries.size / 3)
+    for (q in out.indices) {
+        val list = positions[queries[q * 3 + 2]]
+        out[q] = if (list == null) 0 else lowerBound(list, queries[q * 3 + 1]) - lowerBound(list, queries[q * 3])
+    }
+    return out
+}
+"""),
+        ("upper-bound-as-lower", "WRONG_BRANCH",
+         "왼쪽 끝을 초과로 찾는다. 왼쪽 끝 자리의 값을 놓친다.",
+         """
+fun rangeFrequency(nums: IntArray, queries: IntArray): IntArray {
+    val positions = HashMap<Int, MutableList<Int>>()
+    for (i in nums.indices) positions.getOrPut(nums[i]) { ArrayList() }.add(i)
+    fun upperBound(list: List<Int>, target: Int): Int { var lo = 0; var hi = list.size; while (lo < hi) { val mid = (lo + hi) / 2; if (list[mid] <= target) lo = mid + 1 else hi = mid }; return lo }
+    val out = IntArray(queries.size / 3)
+    for (q in out.indices) {
+        val list = positions[queries[q * 3 + 2]]
+        out[q] = if (list == null) 0 else upperBound(list, queries[q * 3 + 1]) - upperBound(list, queries[q * 3])
+    }
+    return out
+}
+"""),
+        ("scan-per-query", "PERFORMANCE",
+         "질의마다 구간을 훑는다. O(질의 × 구간 길이).",
+         """
+fun rangeFrequency(nums: IntArray, queries: IntArray): IntArray {
+    val out = IntArray(queries.size / 3)
+    for (q in out.indices) {
+        var c = 0
+        for (i in queries[q * 3]..queries[q * 3 + 1]) { Drill.compare(i, q); if (nums[i] == queries[q * 3 + 2]) c += 1 }
+        out[q] = c
+    }
+    return out
+}
+"""),
+    ],
+))

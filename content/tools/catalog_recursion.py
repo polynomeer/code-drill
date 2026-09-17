@@ -1240,3 +1240,331 @@ fun expressionTargets(num: String, target: Int): Int {
 """),
     ],
 ))
+
+
+# --- 137. 서로 다른 이진 탐색 트리의 수 (루트로 나누기) -------------------------------------------------
+
+def _unique_bst(n):
+    memo = {0: 1, 1: 1}
+
+    def go(k):
+        if k in memo:
+            return memo[k]
+        total = 0
+        for root in range(1, k + 1):
+            total += go(root - 1) * go(k - root)
+        memo[k] = total
+        return total
+
+    return go(n)
+
+
+PROBLEMS.append(Problem(
+    id="unique-bst-count",
+    title="서로 다른 이진 탐색 트리의 수",
+    summary="""
+`1` 부터 `n` 까지의 값을 모두 담는 **구조가 서로 다른** 이진 탐색 트리의 수를 반환한다.
+`n = 0` 이면 빈 트리 하나로 `1` 이다.
+""",
+    notes="""
+루트를 `r` 로 잡으면 왼쪽에는 `1..r-1`, 오른쪽에는 `r+1..n` 이 들어간다. 왼쪽의 모양 수는
+값이 무엇이든 크기만으로 정해진다 — 그래서 답은 `sum over r of f(r-1) * f(n-r)` 이다.
+같은 크기를 거듭 부르니 기억하지 않으면 지수다. 카탈란 수이지만 그 이름을 몰라도 된다.
+""",
+    drill_doc="""
+Drill.compare(left, right)    // 왼쪽·오른쪽 크기의 곱을 봤다
+Drill.write(size, count)      // 크기의 답을 정했다
+""",
+    constraints="""
+- `0 <= n <= 19` (답은 `Int` 안이다)
+""",
+    signature=dict(name="uniqueBstCount", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_unique_bst,
+    # 기억 없는 재귀는 n = 19 에서 3^19 번쯤 부르고 1초 남짓이다. 기본 한도 2초 안에 들어와
+    # 살아남았고, 400ms 에서도 1.9배였다. 정답은 마이크로초라 200ms 로 줄여 자릿수로 지게 한다.
+    limits={"timeMillis": 200, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [3]), ("02", [1])],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-two", [2]),
+            ("03-four", [4]),
+            ("04-max", [19]),
+            ("05-eighteen", [18]),
+        ],
+        "hidden": [
+            ("01-seven", [7]),
+            ("02-ten", [10]),
+            ("03-thirteen", [13]),
+            ("04-sixteen", [16]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 크기별로 기억하는 재귀.
+fun uniqueBstCount(n: Int): Int {
+    val memo = IntArray(n + 1) { -1 }
+    fun go(k: Int): Int {
+        if (k <= 1) return 1
+        if (memo[k] >= 0) return memo[k]
+        var total = 0
+        for (root in 1..k) { Drill.compare(root - 1, k - root); total += go(root - 1) * go(k - root) }
+        memo[k] = total
+        Drill.write(k, total)
+        return total
+    }
+    return go(n)
+}
+""",
+    mutants=[
+        ("root-ranges-to-n-minus-one", "OFF_BY_ONE",
+         "루트를 1..k-1 만 잡는다. 마지막 값이 루트인 트리를 빠뜨린다.",
+         """
+fun uniqueBstCount(n: Int): Int {
+    val memo = IntArray(n + 1) { -1 }
+    fun go(k: Int): Int {
+        if (k <= 1) return 1
+        if (memo[k] >= 0) return memo[k]
+        var total = 0
+        for (root in 1 until k) total += go(root - 1) * go(k - root)
+        memo[k] = total
+        return total
+    }
+    return go(n)
+}
+"""),
+        ("adds-instead-of-multiplies", "WRONG_ALGORITHM",
+         "왼쪽과 오른쪽의 모양 수를 곱하지 않고 더한다.",
+         """
+fun uniqueBstCount(n: Int): Int {
+    val memo = IntArray(n + 1) { -1 }
+    fun go(k: Int): Int {
+        if (k <= 1) return 1
+        if (memo[k] >= 0) return memo[k]
+        var total = 0
+        for (root in 1..k) total += go(root - 1) + go(k - root)
+        memo[k] = total
+        return total
+    }
+    return go(n)
+}
+"""),
+        ("empty-subtree-counts-zero", "MISSING_EDGE_CASE",
+         "빈 서브트리의 모양 수를 0 으로 둔다. 한쪽이 비는 루트가 전부 사라진다.",
+         """
+fun uniqueBstCount(n: Int): Int {
+    if (n == 0) return 1
+    val memo = IntArray(n + 1) { -1 }
+    fun go(k: Int): Int {
+        if (k == 0) return 0
+        if (k == 1) return 1
+        if (memo[k] >= 0) return memo[k]
+        var total = 0
+        for (root in 1..k) total += go(root - 1) * go(k - root)
+        memo[k] = total
+        return total
+    }
+    return go(n)
+}
+"""),
+        ("no-memo--exponential", "PERFORMANCE",
+         "기억하지 않는다. 같은 크기를 지수 번 다시 센다.",
+         """
+fun uniqueBstCount(n: Int): Int {
+    fun go(k: Int): Int {
+        if (k <= 1) return 1
+        var total = 0
+        for (root in 1..k) { Drill.compare(root - 1, k - root); total += go(root - 1) * go(k - root) }
+        return total
+    }
+    return go(n)
+}
+"""),
+    ],
+))
+
+
+# --- 138. 괄호를 넣는 모든 방법의 값 (연산자에서 나누기) ------------------------------------------------
+
+def _different_ways(expression):
+    memo = {}
+
+    def go(lo, hi):
+        if (lo, hi) in memo:
+            return memo[(lo, hi)]
+        piece = expression[lo:hi]
+        if piece.isdigit():
+            result = [int(piece)]
+        else:
+            result = []
+            for i in range(lo, hi):
+                op = expression[i]
+                if op in "+-*":
+                    for a in go(lo, i):
+                        for b in go(i + 1, hi):
+                            result.append(a + b if op == "+" else a - b if op == "-" else a * b)
+        memo[(lo, hi)] = result
+        return result
+
+    return sorted(go(0, len(expression)))
+
+
+def _expression(count, salt):
+    digits = randoms(count + 1, 0, 9, salt=salt)
+    ops = randoms(count, 0, 2, salt=salt + 1)
+    out = [str(digits[0])]
+    for i in range(count):
+        out.append("+-*"[ops[i]])
+        out.append(str(digits[i + 1]))
+    return "".join(out)
+
+
+PROBLEMS.append(Problem(
+    id="different-ways-to-compute",
+    title="괄호를 넣는 모든 방법",
+    summary="""
+한 자리 숫자와 `+`, `-`, `*` 로 된 식이 주어진다. 괄호를 넣어 계산 순서를 정하는 **모든**
+방법의 결과를 오름차순으로 담은 배열을 반환한다. 다른 괄호가 같은 값을 내면 그 값은 그
+수만큼 여러 번 들어간다.
+""",
+    notes="""
+마지막에 계산되는 연산자를 고르면 식은 그 왼쪽과 오른쪽으로 나뉘고, 답은 왼쪽의 모든 값과
+오른쪽의 모든 값의 조합이다. 숫자 하나는 값 하나다. 같은 부분식이 여러 번 나오니 구간을
+기억하면 좋지만, 이 제약에서는 없이도 된다 — 결과의 수 자체가 카탈란 수라 그것이 비용의
+하한이다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 구간을 나누기 시작했다
+Drill.write(i, value)         // 결과 하나를 얻었다
+""",
+    constraints="""
+- `1 <= expression.length <= 17` — 숫자는 한 자리, 연산자는 최대 8 개
+- 모든 중간값과 결과는 `Int` 안이다
+""",
+    signature=dict(name="differentWaysToCompute", parameters=[("expression", "STRING")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_different_ways,
+    cases={
+        "sample": [("01", ["2-1-1"]), ("02", ["2*3-4*5"])],
+        "boundary": [
+            ("01-single-digit", ["7"]),
+            ("02-one-operator", ["3*4"]),
+            # 같은 값이 여러 번 — 중복을 지우면 틀린다.
+            ("03-duplicates-kept", ["1+1+1"]),
+            ("04-zero-digits", ["0*0-0"]),
+            # 빼기는 순서가 답을 바꾼다.
+            ("05-subtraction-chain", ["9-5-3-1"]),
+            ("06-max-operators", ["1+2*3-4+5*6-7+8*9"]),
+        ],
+        "hidden": [
+            ("01-random-three", [_expression(3, salt=8671)]),
+            ("02-random-five", [_expression(5, salt=8673)]),
+            ("03-random-seven", [_expression(7, salt=8675)]),
+            ("04-all-multiply", ["9*9*9*9*9*9*9*9*9"]),
+            ("05-random-eight", [_expression(8, salt=8677)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 연산자마다 나누고 양쪽의 값을 조합한다.
+fun differentWaysToCompute(expression: String): IntArray {
+    val memo = HashMap<Long, List<Int>>()
+    fun go(lo: Int, hi: Int): List<Int> {
+        val key = lo.toLong() * 100 + hi
+        memo[key]?.let { return it }
+        Drill.compare(lo, hi)
+        val result = ArrayList<Int>()
+        var split = false
+        for (i in lo until hi) {
+            val op = expression[i]
+            if (op == '+' || op == '-' || op == '*') {
+                split = true
+                for (a in go(lo, i)) for (b in go(i + 1, hi)) {
+                    result.add(when (op) { '+' -> a + b; '-' -> a - b; else -> a * b })
+                }
+            }
+        }
+        if (!split) result.add(expression.substring(lo, hi).toInt())
+        memo[key] = result
+        return result
+    }
+    val out = go(0, expression.length).sorted().toIntArray()
+    out.forEachIndexed { i, v -> Drill.write(i, v) }
+    return out
+}
+""",
+    mutants=[
+        ("dedups-results", "WRONG_BRANCH",
+         "같은 값을 하나로 합친다. 다른 괄호가 같은 값을 내면 그 수만큼 들어가야 한다.",
+         """
+fun differentWaysToCompute(expression: String): IntArray {
+    fun go(lo: Int, hi: Int): List<Int> {
+        val result = ArrayList<Int>()
+        var split = false
+        for (i in lo until hi) {
+            val op = expression[i]
+            if (op == '+' || op == '-' || op == '*') {
+                split = true
+                for (a in go(lo, i)) for (b in go(i + 1, hi)) result.add(when (op) { '+' -> a + b; '-' -> a - b; else -> a * b })
+            }
+        }
+        if (!split) result.add(expression.substring(lo, hi).toInt())
+        return result
+    }
+    return go(0, expression.length).distinct().sorted().toIntArray()
+}
+"""),
+        ("subtraction-reversed", "WRONG_ALGORITHM",
+         "빼기를 오른쪽에서 왼쪽으로 뺀다.",
+         """
+fun differentWaysToCompute(expression: String): IntArray {
+    fun go(lo: Int, hi: Int): List<Int> {
+        val result = ArrayList<Int>()
+        var split = false
+        for (i in lo until hi) {
+            val op = expression[i]
+            if (op == '+' || op == '-' || op == '*') {
+                split = true
+                for (a in go(lo, i)) for (b in go(i + 1, hi)) result.add(when (op) { '+' -> a + b; '-' -> b - a; else -> a * b })
+            }
+        }
+        if (!split) result.add(expression.substring(lo, hi).toInt())
+        return result
+    }
+    return go(0, expression.length).sorted().toIntArray()
+}
+"""),
+        ("splits-only-at-first-operator", "MISSING_EDGE_CASE",
+         "첫 연산자에서만 나눈다. 왼쪽이 먼저 계산되는 괄호만 센다.",
+         """
+fun differentWaysToCompute(expression: String): IntArray {
+    fun go(lo: Int, hi: Int): List<Int> {
+        val result = ArrayList<Int>()
+        for (i in lo until hi) {
+            val op = expression[i]
+            if (op == '+' || op == '-' || op == '*') {
+                for (a in go(lo, i)) for (b in go(i + 1, hi)) result.add(when (op) { '+' -> a + b; '-' -> a - b; else -> a * b })
+                return result
+            }
+        }
+        result.add(expression.substring(lo, hi).toInt())
+        return result
+    }
+    return go(0, expression.length).sorted().toIntArray()
+}
+"""),
+        ("left-to-right-only", "WRONG_ALGORITHM",
+         "왼쪽에서 오른쪽으로 한 번 계산한 값 하나만 낸다.",
+         """
+fun differentWaysToCompute(expression: String): IntArray {
+    var value = expression[0] - '0'
+    var i = 1
+    while (i < expression.length) {
+        val b = expression[i + 1] - '0'
+        value = when (expression[i]) { '+' -> value + b; '-' -> value - b; else -> value * b }
+        i += 2
+    }
+    return intArrayOf(value)
+}
+"""),
+    ],
+))
