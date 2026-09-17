@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - string
+  - simulation
+summary: 경로 패턴을 등록하고 요청 경로를 맞추는 라우터를 구현한다 — 글자 조각이 매개변수를 이기고, 뒤의 슬래시와 질의 문자열은 무시한다.
+competencies:
+  - SPECIFICATION

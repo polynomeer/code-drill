@@ -1,0 +1,11 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다). 둘째 Kotlin 프로젝트.
+id: room-booking
+version: 1
+title: 회의실 예약
+language: KOTLIN
+statement: statement.md
+
+limits:
+  buildSeconds: 120
+  testSeconds: 120
+  memoryMb: 256

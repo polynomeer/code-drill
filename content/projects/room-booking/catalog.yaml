@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - simulation
+  - sorting
+summary: 반열린 구간으로 겹침을 판정하는 회의실 예약을 구현한다 — 옮기기는 자기 자리와 부딪히지 않고, 실패하면 원래 예약이 남는다.
+competencies:
+  - SPECIFICATION
