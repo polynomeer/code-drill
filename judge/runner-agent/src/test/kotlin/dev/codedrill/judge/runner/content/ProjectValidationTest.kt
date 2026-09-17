@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner.content
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.RuntimeClasspath
+import dev.codedrill.judge.runner.execution.project.JavaProjectAdapter
 import dev.codedrill.judge.runner.execution.project.KotlinProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
@@ -28,6 +29,7 @@ class ProjectValidationTest {
             adapters = mapOf(
                 Language.PYTHON to PythonProjectAdapter(),
                 Language.KOTLIN to KotlinProjectAdapter(RuntimeClasspath.all, RuntimeClasspath.kotlinCompiler),
+                Language.JAVA to JavaProjectAdapter(),
             ),
             sandboxes = { ProcessSandbox() },
             store = store,

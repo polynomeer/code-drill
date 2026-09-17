@@ -166,3 +166,61 @@ class KotlinProjectAdapter(
         const val COMPILER_HEAP_MB = 768
     }
 }
+
+
+/**
+ * Java 프로젝트. JDK 이미지의 javac 로 워크스페이스의 `.java` 전부와 하네스를 한 번에 컴파일한다.
+ * 테스트 기반은 JUnit 이 아니라 하네스의 `codedrill.Assertions` 다 — Kotlin 과 같은 약속이다.
+ */
+class JavaProjectAdapter : ProjectAdapter {
+
+    override val language = Language.JAVA
+
+    override fun harnessFiles(): Map<String, String> = mapOf(
+        "codedrill/CodedrillHarness.java" to resource("java_harness.java"),
+        "codedrill/Assertions.java" to resource("java_assertions.java"),
+    )
+
+    /** javac 는 디렉터리를 받지 않는다. 파일을 훑어 넘긴다 — 워크스페이스는 이미 만들어져 있다. */
+    override fun buildCommand(workspace: Path): List<String> {
+        val harness = workspace.resolveSibling("harness")
+        val sources = (walkJava(workspace) + walkJava(harness)).map { it.absolutePathString() }
+        return listOf(
+            "javac",
+            "-J-XX:+UseSerialGC", "-J-XX:TieredStopAtLevel=1", "-J-Xmx${COMPILER_HEAP_MB}m",
+            "-d", workspace.resolveSibling("out").resolve(CLASSES).absolutePathString(),
+            "-encoding", "UTF-8",
+        ) + sources
+    }
+
+    override fun testCommand(workspace: Path, harnessDir: Path, outputDir: Path, reportFile: Path, nonceFile: Path, memoryMb: Int): List<String> = listOf(
+        "java",
+        "-Xmx${memoryMb}m",
+        "-XX:+UseSerialGC",
+        "-XX:-UsePerfData",
+        "-Dfile.encoding=UTF-8",
+        "-cp", outputDir.resolve(CLASSES).absolutePathString(),
+        "codedrill.CodedrillHarness",
+        outputDir.resolve(CLASSES).absolutePathString(),
+        reportFile.absolutePathString(),
+        nonceFile.absolutePathString(),
+    )
+
+    override fun env() = mapOf("TZ" to "UTC")
+
+    override fun buildMemoryMb(limitMb: Int): Int = maxOf(limitMb, COMPILER_HEAP_MB)
+
+    private fun walkJava(root: Path): List<Path> =
+        java.nio.file.Files.walk(root).use { stream ->
+            stream.filter { java.nio.file.Files.isRegularFile(it) && it.toString().endsWith(".java") }.sorted().toList()
+        }
+
+    private fun resource(name: String): String =
+        JavaProjectAdapter::class.java.getResourceAsStream("/project/$name")?.bufferedReader()?.readText()
+            ?: error("프로젝트 하네스가 리소스에 없다: /project/$name")
+
+    companion object {
+        const val CLASSES = "classes"
+        const val COMPILER_HEAP_MB = 512
+    }
+}

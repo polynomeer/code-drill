@@ -49,10 +49,11 @@
 |---|---|---|---|
 | Python | `*.py`, 테스트는 `tests/test_*.py` | 전 파일 문법 검사 | `unittest` 로 찾아 돌린다 |
 | Kotlin | `src/**/*.kt`, 테스트는 `tests/*Test.kt` | 워크스페이스 전체와 하네스를 한 번에 컴파일 | 이름이 `Test` 로 끝나는 클래스의 `test…` 메서드. 단언은 `import codedrill.*` 의 `assertEquals`·`assertTrue`·`assertFalse`·`assertNull`·`assertThrows<T>` |
+| Java | `src/**/*.java`, 테스트는 `tests/*Test.java` | javac 로 워크스페이스 전체와 하네스를 한 번에 컴파일 | 이름이 `Test` 로 끝나는 클래스의 `public void test…()`. 단언은 `import static codedrill.Assertions.*;` 의 같은 다섯 |
 
-Kotlin 테스트 파일은 **파일 이름과 같은 클래스 하나**를 담는다 — 오케스트레이터가 파일 경로에서
+Kotlin·Java 테스트 파일은 **파일 이름과 같은 클래스 하나**를 담는다 — 오케스트레이터가 파일 경로에서
 만든 모듈 이름(`tests.HiddenCacheTest`)으로 숨은 것을 자르기 때문이다. 검증의 `hidden-modules`
-가 리포트에 그 이름이 나타나는지 본다. 두 언어 모두 표준 라이브러리 밖의 의존성은 없다 —
+가 리포트에 그 이름이 나타나는지 본다. 세 언어 모두 표준 라이브러리 밖의 의존성은 없다 —
 샌드박스에 네트워크가 없다.
 
 ## 테스트 기반을 손대는 오답
@@ -68,7 +69,7 @@ Kotlin 테스트 파일은 **파일 이름과 같은 클래스 하나**를 담�
 
 그래서 문제마다 `mutants/tamper--*` 하나를 둔다. 가드가 조용히 무너져도 그 오답은 다른
 테스트에 떨어져 "잡힘"으로 남을 수 있으므로, 검증은 **가드가** 잡았는지를 따로 본다. Python 은
-unittest 를 손대는 오답, Kotlin 은 리포트를 꾸며 쓰는 오답이다.
+unittest 를 손대는 오답, Kotlin·Java 는 리포트를 꾸며 쓰는 오답이다.
 
 ## 사용자가 할 수 있는 것과 없는 것
 

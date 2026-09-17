@@ -7,6 +7,7 @@ import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
 import dev.codedrill.judge.runner.execution.RuntimeClasspath
+import dev.codedrill.judge.runner.execution.project.JavaProjectAdapter
 import dev.codedrill.judge.runner.execution.project.KotlinProjectAdapter
 import dev.codedrill.judge.runner.execution.project.PythonProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectEngine
@@ -67,6 +68,7 @@ object ValidateContent {
                 adapters = mapOf(
                     Language.PYTHON to PythonProjectAdapter(),
                     Language.KOTLIN to KotlinProjectAdapter(RuntimeClasspath.all, RuntimeClasspath.kotlinCompiler),
+                    Language.JAVA to JavaProjectAdapter(),
                 ),
                 sandboxes = { ProcessSandbox() },
                 store = store,

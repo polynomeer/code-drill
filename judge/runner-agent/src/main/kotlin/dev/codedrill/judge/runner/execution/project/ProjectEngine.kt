@@ -17,6 +17,7 @@ import dev.codedrill.judge.runner.execution.sandbox.SandboxSpec
 import dev.codedrill.platform.storage.BlobStore
 import java.nio.file.Path
 import java.security.MessageDigest
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.isRegularFile
@@ -94,7 +95,7 @@ class ProjectEngine(
         val out = sandboxDir.resolve("out").also { it.createDirectories() }
         for ((path, content) in files.workspace) write(workspace, path, content)
         for ((path, content) in files.suite) write(workspace, path, content)
-        for ((name, content) in adapter.harnessFiles()) harness.resolve(name).writeText(content)
+        for ((name, content) in adapter.harnessFiles()) harness.resolve(name).also { it.parent.createDirectories() }.writeText(content)
 
         // build
         val buildStart = System.nanoTime()
@@ -105,11 +106,13 @@ class ProjectEngine(
         val buildMillis = (System.nanoTime() - buildStart) / 1_000_000
         onPhase("build", request.language, if (build == null || build.exitCode == 0) "success" else "failure", System.nanoTime() - buildStart)
         if (build != null && build.exitCode != 0) {
+            // 컴파일러가 찍는 경로는 샌드박스의 것이다. 사용자가 보는 것은 워크스페이스 상대 경로다.
+            val output = build.output.replace(workspace.absolutePathString() + "/", "")
             val log = when (build.exitCode) {
-                null -> "빌드가 ${request.limits.buildSeconds}초 안에 끝나지 않았다\n${build.output}"
-                else -> build.output.ifBlank { "빌드가 코드 ${build.exitCode} 로 끝났다" }
+                null -> "빌드가 ${request.limits.buildSeconds}초 안에 끝나지 않았다\n$output"
+                else -> output.ifBlank { "빌드가 코드 ${build.exitCode} 로 끝났다" }
             }
-            return terminal(request, Verdict.COMPILE_ERROR, log.trim(), buildMillis = buildMillis)
+            return terminal(request, Verdict.COMPILE_ERROR, log.trim().take(MAX_LOG_CHARS), buildMillis = buildMillis)
         }
 
         // test — 리포트의 진위는 nonce 로 본다. 하네스가 사용자 코드를 들이기 전에 읽고 지우는 값이다.

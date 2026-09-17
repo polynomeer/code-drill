@@ -13,6 +13,7 @@ import dev.codedrill.judge.runner.execution.adapter.JavaAdapter
 import dev.codedrill.judge.runner.execution.adapter.KotlinAdapter
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
 import dev.codedrill.judge.runner.execution.adapter.RuntimeAdapter
+import dev.codedrill.judge.runner.execution.project.JavaProjectAdapter
 import dev.codedrill.judge.runner.execution.project.KotlinProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectAdapter
 import dev.codedrill.judge.runner.execution.project.ProjectEngine
@@ -175,7 +176,7 @@ class RunnerConfig {
             )
         }
         return ProjectEngine(
-            adapters = listOf<ProjectAdapter>(PythonProjectAdapter(), kotlin).associateBy { it.language },
+            adapters = listOf<ProjectAdapter>(PythonProjectAdapter(), kotlin, JavaProjectAdapter()).associateBy { it.language },
             sandboxes = selector::forLanguage,
             store = store,
             workRoot = workRoot(properties),

@@ -40,8 +40,8 @@ data class ProjectPackage(
      * 숨은 테스트의 모듈 이름. 리포트에서 숨은 것을 가른다.
      *
      * 파일 경로에서 나온다 — `tests/test_hidden.py` → `tests.test_hidden`, `tests/LedgerTest.kt` →
-     * `tests.LedgerTest`. Python 은 모듈 이름이 곧 파일이고, Kotlin 은 파일 하나에 같은 이름의
-     * 클래스 하나라는 약속을 저작 검증이 지킨다 (`hidden-modules-observed`).
+     * `tests.LedgerTest`. Python 은 모듈 이름이 곧 파일이고, Kotlin·Java 는 파일 하나에 같은 이름의
+     * 클래스 하나라는 약속을 저작 검증이 지킨다 (`hidden-modules`).
      */
     val hiddenModules: Set<String>
         get() = hidden.keys.filter(::isTestModule).map(::moduleName).toSet()
@@ -51,11 +51,12 @@ data class ProjectPackage(
         get() = starter.keys.filter(::isTestModule).map(::moduleName)
 
     companion object {
-        /** 테스트 모듈인 경로. Python 은 `tests/test_*.py`, Kotlin 은 `tests/…Test.kt` 다. */
+        /** 테스트 모듈인 경로. Python 은 `tests/test_*.py`, Kotlin·Java 는 `tests/…Test.kt`·`.java` 다. */
         fun isTestModule(path: String): Boolean =
-            path.matches(PYTHON_TEST) || path.matches(KOTLIN_TEST)
+            path.matches(PYTHON_TEST) || path.matches(JVM_TEST)
 
-        fun moduleName(path: String): String = path.removeSuffix(".py").removeSuffix(".kt").replace('/', '.')
+        fun moduleName(path: String): String =
+            path.removeSuffix(".py").removeSuffix(".kt").removeSuffix(".java").replace('/', '.')
 
         /**
          * 파일 안의 테스트 수. Python 은 들여쓴 `def test_`, Kotlin 은 `fun test`. 사용자가 시작
@@ -64,13 +65,15 @@ data class ProjectPackage(
         fun testMethods(path: String, content: String): Int = when {
             path.endsWith(".py") -> PYTHON_METHOD.findAll(content).count()
             path.endsWith(".kt") -> KOTLIN_METHOD.findAll(content).count()
+            path.endsWith(".java") -> JAVA_METHOD.findAll(content).count()
             else -> 0
         }
 
         private val PYTHON_TEST = Regex("""tests/test_[A-Za-z0-9_]+\.py""")
-        private val KOTLIN_TEST = Regex("""tests/(?:[A-Za-z0-9_]+/)*[A-Za-z0-9_]+Test\.kt""")
+        private val JVM_TEST = Regex("""tests/(?:[A-Za-z0-9_]+/)*[A-Za-z0-9_]+Test\.(?:kt|java)""")
         private val PYTHON_METHOD = Regex("""^\s+def test_\w+\s*\(""", RegexOption.MULTILINE)
         private val KOTLIN_METHOD = Regex("""^\s+fun test\w+\s*\(""", RegexOption.MULTILINE)
+        private val JAVA_METHOD = Regex("""^\s+public void test\w+\s*\(""", RegexOption.MULTILINE)
     }
 }
 
