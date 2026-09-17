@@ -6,9 +6,14 @@
 확인한 뒤 지운다. 운영 DB 를 건드리지 않으므로 아무 때나 돌릴 수 있다.
 
     python3 scripts/backup.py create            # 덤프를 받는다
+    python3 scripts/backup.py create --keep 96 --offsite offsite/codedrill-backups
+                                                # 받고, 이 머신에는 96개만 남기고, 밖으로 복사한다
     python3 scripts/backup.py verify            # 최신 덤프를 임시 DB 에 복원해 본다
     python3 scripts/backup.py restore <파일>    # 운영 DB 를 덮어쓴다 (--yes 필요)
     python3 scripts/backup.py list
+
+주기 실행은 앱 호스트의 cron 이 한다 — 어떤 줄을 거는지는 docs/deploying.md 의 백업 절에 있다.
+이 스크립트는 한 번 도는 것만 안다.
 
 ## 무엇을 받고 무엇을 받지 않나
 
@@ -17,8 +22,16 @@
 - **브로커**: 진행 중인 작업만 들어 있다. 제출은 아웃박스와 함께 커밋되므로 복원 후
   다시 발행된다 (§3.2). 큐를 복원하면 오히려 같은 작업을 두 번 돌린다.
 - **문제 패키지**: git 과 이미지에 있다. 공개 포인터만 DB 에 있고, 그건 덤프에 들어간다.
-- **오브젝트 스토어**: 아직 실제 데이터가 없다. §8.3 이 붙어 소스와 트레이스가 그쪽으로
-  옮겨가면 **이 스크립트도 함께 늘어야 한다.**
+- **오브젝트 스토어**: 실행용 복제다 (B3). 테스트 번들은 패키지 digest 에서, 제출 소스와
+  프로젝트 워크스페이스는 DB 의 원본에서 다시 만들어진다. DB 가 있으면 스토어는 되살아난다.
+
+## 밖으로 복사한다
+
+이 머신의 덤프는 이 머신과 함께 죽는다. `--offsite` 는 덤프와 매니페스트를 S3 호환 버킷에
+`mc` 로 복사한다 — 대상은 `mc alias set` 으로 미리 잡아 둔 별칭이라 자격 증명은 mc 의 설정에
+있고 이 스크립트와 cron 줄에는 없다. 복사가 실패하면 0 이 아닌 값으로 끝나 cron 이 알린다;
+로컬 덤프는 남아 있으니 다음 주기가 다시 시도한다 — 같은 이름은 덮어쓰므로 두 번 올라가도
+하나다.
 """
 
 from __future__ import annotations
@@ -26,6 +39,7 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import time
@@ -105,6 +119,40 @@ def create(args) -> int:
     print(f"  스키마 {manifest['schemaVersion']}, 커밋 {manifest['gitSha'][:12]}")
     for table, count in manifest["rows"].items():
         print(f"  {table:<18} {count}행")
+
+    if args.keep is not None:
+        for old in prune(args.keep):
+            print(f"  지움: {old.name} (--keep {args.keep})")
+
+    # 복사는 지우기 뒤다. 지우기가 방금 받은 것을 지울 수는 없지만(가장 새 것이다), 순서를
+    # 바꾸면 복사에 실패한 실행이 옛 덤프까지 지우고 끝난다.
+    if args.offsite:
+        return offsite(target, args.offsite)
+    return 0
+
+
+def prune(keep: int) -> list[pathlib.Path]:
+    """가장 새 덤프 [keep]개만 남긴다. 매니페스트도 함께 지운다. 지운 덤프를 돌려준다."""
+    dumps = sorted(BACKUPS.glob("*.dump"))
+    removed = []
+    for dump in dumps[:-keep] if keep > 0 else dumps:
+        dump.unlink()
+        dump.with_suffix(".json").unlink(missing_ok=True)
+        removed.append(dump)
+    return removed
+
+
+def offsite(dump: pathlib.Path, target: str) -> int:
+    """덤프와 매니페스트를 `mc` 로 S3 호환 버킷에 복사한다. `target` 은 `별칭/버킷[/경로]`."""
+    if shutil.which("mc") is None:
+        print("  ✗ 밖으로 복사하지 못했다: mc 가 없다 (docs/deploying.md 백업 절)")
+        return 1
+    for file in (dump, dump.with_suffix(".json")):
+        copied = subprocess.run(["mc", "cp", "--quiet", str(file), f"{target.rstrip('/')}/{file.name}"], capture_output=True)
+        if copied.returncode != 0:
+            print(f"  ✗ 밖으로 복사하지 못했다: {file.name} — {copied.stderr.decode(errors='replace')[:200].strip()}")
+            return 1
+    print(f"  밖으로 복사했다: {target}/{dump.name}")
     return 0
 
 
@@ -208,7 +256,10 @@ def listing(args) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("create", help="덤프를 받는다").set_defaults(run=create)
+    create_cmd = sub.add_parser("create", help="덤프를 받는다")
+    create_cmd.add_argument("--keep", type=int, help="이 머신에 남길 덤프 수. 넘는 옛것을 지운다")
+    create_cmd.add_argument("--offsite", help="복사할 곳 — mc 별칭/버킷[/경로]")
+    create_cmd.set_defaults(run=create)
     verify_cmd = sub.add_parser("verify", help="임시 DB 에 복원해 본다")
     verify_cmd.add_argument("file", nargs="?", help="생략하면 가장 최근 덤프")
     verify_cmd.set_defaults(run=verify)
