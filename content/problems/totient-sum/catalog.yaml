@@ -1,0 +1,17 @@
+# totient-sum 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - math
+  - number-theory
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - OPTIMIZATION
+  - CONSTRAINTS
+prerequisites:
+  - count-primes
+  - prime-factor-sums
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(n log log n). 수마다 gcd 를 세면 O(n² log n)"

@@ -3059,3 +3059,418 @@ fun earliestAllConnected(n: Int, logs: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 145. 공통 소인수로 이어진 가장 큰 무리 (유니온파인드 + 소인수 체) ----------------------------------
+
+def _largest_common_factor_component(nums):
+    limit = max(nums)
+    spf = list(range(limit + 1))
+    for i in range(2, int(limit ** 0.5) + 1):
+        if spf[i] == i:
+            for k in range(i * i, limit + 1, i):
+                if spf[k] == k:
+                    spf[k] = i
+    parent = list(range(limit + 1))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        a, b = find(a), find(b)
+        if a != b:
+            parent[a] = b
+
+    for x in nums:
+        v = x
+        while v > 1:
+            p = spf[v]
+            union(x, p)
+            while v % p == 0:
+                v //= p
+    counts = {}
+    best = 0
+    for x in nums:
+        r = find(x)
+        counts[r] = counts.get(r, 0) + 1
+        best = max(best, counts[r])
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="largest-common-factor-component",
+    title="공통 소인수로 이어진 가장 큰 무리",
+    summary="""
+서로 다른 양의 정수 배열 `nums` 가 주어진다. 두 수가 `1` 보다 큰 공약수를 가지면 이어져 있다.
+이어짐을 따라 만들어지는 무리(연결 요소) 중 가장 큰 것의 크기를 반환한다.
+""",
+    notes="""
+쌍마다 gcd 를 보면 n² 이다. 두 수가 이어진다는 것은 **공통 소인수**가 있다는 것이니, 수를 그
+소인수들과 묶으면 — 수 하나를 자기 소인수 각각과 union — 같은 소인수를 가진 수들은 저절로
+한 무리다. 소인수는 최대값까지의 최소 소인수 체로 O(log) 에 나온다. 1 은 소인수가 없어 혼자다.
+""",
+    drill_doc="""
+Drill.compare(x, p)           // 수를 소인수와 묶었다
+Drill.write(root, size)       // 무리의 크기를 늘렸다
+""",
+    constraints="""
+- `1 <= nums.length <= 20_000`, 원소는 서로 다르다
+- `1 <= nums[i] <= 100_000`
+""",
+    signature=dict(name="largestCommonFactorComponent", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_largest_common_factor_component,
+    cases={
+        "sample": [("01", [[4, 6, 15, 35]]), ("02", [[20, 50, 9, 63]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            # 1 은 아무와도 이어지지 않는다.
+            ("02-one-alone", [[1, 2, 3]]),
+            ("03-all-primes", [[2, 3, 5, 7, 11]]),
+            # 같은 소수의 거듭제곱들은 한 무리다.
+            ("04-prime-powers", [[2, 4, 8, 16, 3]]),
+            # 사슬: 6-10-15 는 쌍마다 다른 소수로 이어진다.
+            ("05-chain-through-different-primes", [[6, 10, 15, 77]]),
+            ("06-large-primes-alone", [[99991, 99989, 2, 4]]),
+        ],
+        "hidden": [
+            ("01-random-small", [shuffled(sorted(set(randoms(15, 1, 60, salt=8731))), salt=8732)]),
+            ("02-random-medium", [shuffled(sorted(set(randoms(500, 1, 5000, salt=8733))), salt=8734)]),
+            ("03-random-wide", [shuffled(sorted(set(randoms(2000, 1, 100000, salt=8735))), salt=8736)]),
+            ("04-evens-and-odd-primes", [[2 * k for k in range(1, 200)] + [99991, 99989, 99971]]),
+        ],
+        "performance": [
+            ("01-small", [shuffled(sorted(set(randoms(5000, 1, 100000, salt=8741))), salt=8742)]),
+            ("02-medium", [shuffled(sorted(set(randoms(12000, 1, 100000, salt=8743))), salt=8744)]),
+            ("03-large", [shuffled(list(range(80001, 100001)), salt=8745)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최소 소인수 체 + 수를 소인수와 union.
+fun largestCommonFactorComponent(nums: IntArray): Int {
+    val limit = nums.max()
+    val spf = IntArray(limit + 1) { it }
+    var i = 2
+    while (i.toLong() * i <= limit) {
+        if (spf[i] == i) { var k = i * i; while (k <= limit) { if (spf[k] == k) spf[k] = i; k += i } }
+        i += 1
+    }
+    val parent = IntArray(limit + 1) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) parent[ra] = rb }
+    for (x in nums) {
+        var v = x
+        while (v > 1) {
+            val p = spf[v]
+            Drill.compare(x, p)
+            union(x, p)
+            while (v % p == 0) v /= p
+        }
+    }
+    val counts = HashMap<Int, Int>()
+    var best = 0
+    for (x in nums) {
+        val root = find(x)
+        val size = (counts[root] ?: 0) + 1
+        counts[root] = size
+        Drill.write(root, size)
+        if (size > best) best = size
+    }
+    return best
+}
+""",
+    mutants=[
+        ("unions-only-smallest-prime", "MISSING_EDGE_CASE",
+         "수를 가장 작은 소인수와만 묶는다. 6 과 15 처럼 큰 소인수로만 이어진 쌍이 끊긴다.",
+         """
+fun largestCommonFactorComponent(nums: IntArray): Int {
+    val limit = nums.max()
+    val spf = IntArray(limit + 1) { it }
+    var i = 2
+    while (i.toLong() * i <= limit) { if (spf[i] == i) { var k = i * i; while (k <= limit) { if (spf[k] == k) spf[k] = i; k += i } }; i += 1 }
+    val parent = IntArray(limit + 1) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) parent[ra] = rb }
+    for (x in nums) if (x > 1) union(x, spf[x])
+    val counts = HashMap<Int, Int>()
+    var best = 0
+    for (x in nums) { val size = (counts[find(x)] ?: 0) + 1; counts[find(x)] = size; if (size > best) best = size }
+    return best
+}
+"""),
+        ("counts-primes-as-members", "WRONG_BRANCH",
+         "무리의 크기를 소수 정점까지 세어 답한다. 배열에 없는 소수가 크기에 들어간다.",
+         """
+fun largestCommonFactorComponent(nums: IntArray): Int {
+    val limit = nums.max()
+    val spf = IntArray(limit + 1) { it }
+    var i = 2
+    while (i.toLong() * i <= limit) { if (spf[i] == i) { var k = i * i; while (k <= limit) { if (spf[k] == k) spf[k] = i; k += i } }; i += 1 }
+    val parent = IntArray(limit + 1) { it }
+    val size = IntArray(limit + 1) { 1 }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) { parent[ra] = rb; size[rb] += size[ra] } }
+    for (x in nums) { var v = x; while (v > 1) { val p = spf[v]; union(x, p); while (v % p == 0) v /= p } }
+    var best = 0
+    for (x in nums) best = maxOf(best, size[find(x)])
+    return best
+}
+"""),
+        ("one-joins-everything", "MISSING_EDGE_CASE",
+         "1 을 소인수 1 과 묶고 다른 수도 1 과 묶는다 — 1 이 있으면 전부 한 무리가 된다.",
+         """
+fun largestCommonFactorComponent(nums: IntArray): Int {
+    val limit = nums.max()
+    val spf = IntArray(limit + 1) { it }
+    var i = 2
+    while (i.toLong() * i <= limit) { if (spf[i] == i) { var k = i * i; while (k <= limit) { if (spf[k] == k) spf[k] = i; k += i } }; i += 1 }
+    val parent = IntArray(limit + 1) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) parent[ra] = rb }
+    for (x in nums) { var v = x; while (v >= 1) { val p = spf[v]; union(x, p); if (p == 1) break; while (v % p == 0) v /= p } }
+    val counts = HashMap<Int, Int>()
+    var best = 0
+    for (x in nums) { val size = (counts[find(x)] ?: 0) + 1; counts[find(x)] = size; if (size > best) best = size }
+    return best
+}
+"""),
+        ("pairwise-gcd--quadratic", "PERFORMANCE",
+         "모든 쌍의 gcd 를 본다. O(n² log).",
+         """
+fun largestCommonFactorComponent(nums: IntArray): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    val n = nums.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    for (i in 0 until n) for (j in i + 1 until n) {
+        Drill.compare(i, j)
+        if (gcd(nums[i], nums[j]) > 1) { val a = find(i); val b = find(j); if (a != b) parent[a] = b }
+    }
+    val counts = IntArray(n)
+    var best = 0
+    for (i in 0 until n) { val r = find(i); counts[r] += 1; if (counts[r] > best) best = counts[r] }
+    return best
+}
+"""),
+    ],
+))
+
+
+# --- 146. 외계어 사전의 글자 순서 (위상 정렬, 사전순 최소) ---------------------------------------------
+
+def _alien_order(words):
+    import heapq
+    letters = set("".join(words))
+    after = {c: set() for c in letters}
+    indegree = {c: 0 for c in letters}
+    for a, b in zip(words, words[1:]):
+        for x, y in zip(a, b):
+            if x != y:
+                if y not in after[x]:
+                    after[x].add(y)
+                    indegree[y] += 1
+                break
+        else:
+            if len(a) > len(b):
+                return ""
+    heap = [c for c in letters if indegree[c] == 0]
+    heapq.heapify(heap)
+    out = []
+    while heap:
+        c = heapq.heappop(heap)
+        out.append(c)
+        for d in sorted(after[c]):
+            indegree[d] -= 1
+            if indegree[d] == 0:
+                heapq.heappush(heap, d)
+    return "".join(out) if len(out) == len(letters) else ""
+
+
+def _alien_words(order, count, max_len, salt):
+    """숨은 순서 `order` 에 맞게 정렬된 단어들. 정렬 후 인접 쌍만 순서를 준다."""
+    rank = {c: i for i, c in enumerate(order)}
+    lengths = randoms(count, 1, max_len, salt=salt)
+    picks = randoms(count * max_len, 0, len(order) - 1, salt=salt + 1)
+    words = []
+    for i in range(count):
+        words.append("".join(order[picks[i * max_len + j]] for j in range(lengths[i])))
+    words.sort(key=lambda w: [rank[c] for c in w])
+    return words
+
+
+PROBLEMS.append(Problem(
+    id="alien-dictionary-order",
+    title="외계어 사전의 글자 순서",
+    summary="""
+소문자로 된 단어들이 **어떤 알 수 없는 글자 순서**로 정렬돼 있다. 그 순서와 모순되지 않는 글자
+배열을 문자열로 반환한다 — 단어들에 나오는 글자 전부를 한 번씩. 가능한 배열이 여럿이면
+**사전순(보통의 a..z 순)으로 가장 앞선 것**을, 모순이 있으면 빈 문자열 `""` 을 반환한다.
+""",
+    notes="""
+인접한 두 단어에서 처음으로 다른 글자 쌍이 "앞 < 뒤" 하나를 준다 — 그 뒤의 글자는 아무 정보가
+없다. 앞 단어가 뒤 단어의 진짜 접두사보다 길면(`["abc", "ab"]`) 모순이다. 간선들 위의 위상
+정렬에서 들어오는 간선이 없는 글자를 **최소 힙**으로 뽑으면 사전순 최소이고, 다 뽑지 못하면
+순환이라 모순이다. 같은 쌍의 간선을 두 번 세면 진입 차수가 어긋난다.
+""",
+    drill_doc="""
+Drill.compare(x, y)           // 글자 x 가 y 보다 앞이라는 것을 얻었다
+Drill.write(i, letter)        // 글자를 순서에 놓았다
+""",
+    constraints="""
+- `1 <= words.length <= 10_000`, `1 <= words[i].length <= 20`, 소문자
+""",
+    signature=dict(name="alienDictionaryOrder", parameters=[("words", "STRING_ARRAY")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_alien_order,
+    cases={
+        "sample": [("01", [["wrt", "wrf", "er", "ett", "rftt"]]), ("02", [["z", "x", "z"]])],
+        "boundary": [
+            ("01-single-word", [["zyx"]]),
+            # 정보가 없으면 사전순.
+            ("02-no-constraints", [["b", "b"]]),
+            ("03-prefix-longer-first", [["abc", "ab"]]),
+            ("04-prefix-shorter-first", [["ab", "abc"]]),
+            # 같은 간선이 두 번 — 진입 차수를 두 번 올리면 안 된다.
+            ("05-duplicate-edge", [["ba", "bb", "ca", "cb"]]),
+            # 순환.
+            ("06-cycle", [["ab", "ba", "ab"]]),
+            # 여러 답 중 사전순 최소: c 가 먼저여야 하지만 a·b 는 자유.
+            ("07-lexicographic-tie", [["cb", "ca"]]),
+            ("08-unconstrained-letters", [["dz", "da"]]),
+        ],
+        "hidden": [
+            ("01-permuted-small", [_alien_words("dcba", 8, 3, salt=8751)]),
+            ("02-permuted-medium", [_alien_words("hgfedcba", 200, 5, salt=8753)]),
+            ("03-permuted-full", [_alien_words("zyxwvutsrqponmlkjihgfedcba", 3000, 8, salt=8755)]),
+            ("04-partial-order", [_alien_words("qwertyuiop", 1000, 20, salt=8757)]),
+            ("05-large", [_alien_words("mnbvcxzlkjhgfdsapoiuytrewq", 10000, 20, salt=8759)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 인접 쌍에서 간선, 최소 힙 Kahn.
+fun alienDictionaryOrder(words: Array<String>): String {
+    val present = BooleanArray(26)
+    for (w in words) for (c in w) present[c - 'a'] = true
+    val after = Array(26) { BooleanArray(26) }
+    val indegree = IntArray(26)
+    for (i in 0 until words.size - 1) {
+        val a = words[i]; val b = words[i + 1]
+        var j = 0
+        while (j < a.length && j < b.length && a[j] == b[j]) j += 1
+        if (j == minOf(a.length, b.length)) { if (a.length > b.length) return ""; continue }
+        val x = a[j] - 'a'; val y = b[j] - 'a'
+        if (!after[x][y]) { after[x][y] = true; indegree[y] += 1; Drill.compare(x, y) }
+    }
+    val heap = java.util.PriorityQueue<Int>()
+    for (c in 0 until 26) if (present[c] && indegree[c] == 0) heap.add(c)
+    val out = StringBuilder()
+    while (heap.isNotEmpty()) {
+        val c = heap.poll()
+        Drill.write(out.length, c)
+        out.append('a' + c)
+        for (d in 0 until 26) if (after[c][d]) { indegree[d] -= 1; if (indegree[d] == 0) heap.add(d) }
+    }
+    val total = present.count { it }
+    return if (out.length == total) out.toString() else ""
+}
+""",
+    mutants=[
+        ("ignores-prefix-conflict", "MISSING_EDGE_CASE",
+         "앞 단어가 뒤 단어의 접두사보다 길어도 모순으로 보지 않는다.",
+         """
+fun alienDictionaryOrder(words: Array<String>): String {
+    val present = BooleanArray(26)
+    for (w in words) for (c in w) present[c - 'a'] = true
+    val after = Array(26) { BooleanArray(26) }
+    val indegree = IntArray(26)
+    for (i in 0 until words.size - 1) {
+        val a = words[i]; val b = words[i + 1]
+        var j = 0
+        while (j < a.length && j < b.length && a[j] == b[j]) j += 1
+        if (j == minOf(a.length, b.length)) continue
+        val x = a[j] - 'a'; val y = b[j] - 'a'
+        if (!after[x][y]) { after[x][y] = true; indegree[y] += 1 }
+    }
+    val heap = java.util.PriorityQueue<Int>()
+    for (c in 0 until 26) if (present[c] && indegree[c] == 0) heap.add(c)
+    val out = StringBuilder()
+    while (heap.isNotEmpty()) { val c = heap.poll(); out.append('a' + c); for (d in 0 until 26) if (after[c][d]) { indegree[d] -= 1; if (indegree[d] == 0) heap.add(d) } }
+    return if (out.length == present.count { it }) out.toString() else ""
+}
+"""),
+        ("counts-duplicate-edges", "OFF_BY_ONE",
+         "같은 간선을 볼 때마다 진입 차수를 올린다. 두 번 나온 간선의 끝 글자가 영원히 안 나온다.",
+         """
+fun alienDictionaryOrder(words: Array<String>): String {
+    val present = BooleanArray(26)
+    for (w in words) for (c in w) present[c - 'a'] = true
+    val after = Array(26) { BooleanArray(26) }
+    val indegree = IntArray(26)
+    for (i in 0 until words.size - 1) {
+        val a = words[i]; val b = words[i + 1]
+        var j = 0
+        while (j < a.length && j < b.length && a[j] == b[j]) j += 1
+        if (j == minOf(a.length, b.length)) { if (a.length > b.length) return ""; continue }
+        val x = a[j] - 'a'; val y = b[j] - 'a'
+        after[x][y] = true; indegree[y] += 1
+    }
+    val heap = java.util.PriorityQueue<Int>()
+    for (c in 0 until 26) if (present[c] && indegree[c] == 0) heap.add(c)
+    val out = StringBuilder()
+    while (heap.isNotEmpty()) { val c = heap.poll(); out.append('a' + c); for (d in 0 until 26) if (after[c][d]) { indegree[d] -= 1; if (indegree[d] == 0) heap.add(d) } }
+    return if (out.length == present.count { it }) out.toString() else ""
+}
+"""),
+        ("plain-queue--not-lexicographic", "WRONG_BRANCH",
+         "최소 힙 대신 보통 큐를 쓴다. 답이 여럿일 때 사전순 최소가 아니다.",
+         """
+fun alienDictionaryOrder(words: Array<String>): String {
+    val present = BooleanArray(26)
+    for (w in words) for (c in w) present[c - 'a'] = true
+    val after = Array(26) { BooleanArray(26) }
+    val indegree = IntArray(26)
+    for (i in 0 until words.size - 1) {
+        val a = words[i]; val b = words[i + 1]
+        var j = 0
+        while (j < a.length && j < b.length && a[j] == b[j]) j += 1
+        if (j == minOf(a.length, b.length)) { if (a.length > b.length) return ""; continue }
+        val x = a[j] - 'a'; val y = b[j] - 'a'
+        if (!after[x][y]) { after[x][y] = true; indegree[y] += 1 }
+    }
+    val queue = ArrayDeque<Int>()
+    for (c in 0 until 26) if (present[c] && indegree[c] == 0) queue.addLast(c)
+    val out = StringBuilder()
+    while (queue.isNotEmpty()) { val c = queue.removeFirst(); out.append('a' + c); for (d in 25 downTo 0) if (after[c][d]) { indegree[d] -= 1; if (indegree[d] == 0) queue.addLast(d) } }
+    return if (out.length == present.count { it }) out.toString() else ""
+}
+"""),
+        ("compares-all-positions", "WRONG_ALGORITHM",
+         "처음 다른 글자 뒤의 자리들도 순서로 삼는다. 없는 제약이 생겨 모순이 난다.",
+         """
+fun alienDictionaryOrder(words: Array<String>): String {
+    val present = BooleanArray(26)
+    for (w in words) for (c in w) present[c - 'a'] = true
+    val after = Array(26) { BooleanArray(26) }
+    val indegree = IntArray(26)
+    for (i in 0 until words.size - 1) {
+        val a = words[i]; val b = words[i + 1]
+        var j = 0
+        var differed = false
+        while (j < a.length && j < b.length) {
+            if (a[j] != b[j]) { differed = true; val x = a[j] - 'a'; val y = b[j] - 'a'; if (!after[x][y]) { after[x][y] = true; indegree[y] += 1 } }
+            j += 1
+        }
+        if (!differed && a.length > b.length) return ""
+    }
+    val heap = java.util.PriorityQueue<Int>()
+    for (c in 0 until 26) if (present[c] && indegree[c] == 0) heap.add(c)
+    val out = StringBuilder()
+    while (heap.isNotEmpty()) { val c = heap.poll(); out.append('a' + c); for (d in 0 until 26) if (after[c][d]) { indegree[d] -= 1; if (indegree[d] == 0) heap.add(d) } }
+    return if (out.length == present.count { it }) out.toString() else ""
+}
+"""),
+    ],
+))

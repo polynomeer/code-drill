@@ -1,0 +1,17 @@
+# single-number-thrice 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - bit-manipulation
+  - counting
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - CONSTRAINTS
+prerequisites:
+  - single-number
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(32n), 추가 공간 O(1). 해시맵으로 세면 O(n) 공간"

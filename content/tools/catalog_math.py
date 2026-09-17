@@ -1394,3 +1394,142 @@ fun permutationRank(perm: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 144. 오일러 피 함수의 합 (체로 한 번에) -----------------------------------------------------------
+
+_TOTIENT_MOD = 1_000_000_007
+
+
+def _totient_sum(n):
+    phi = list(range(n + 1))
+    for p in range(2, n + 1):
+        if phi[p] == p:  # 소수
+            for k in range(p, n + 1, p):
+                phi[k] -= phi[k] // p
+    return sum(phi[1:]) % _TOTIENT_MOD
+
+
+PROBLEMS.append(Problem(
+    id="totient-sum",
+    title="오일러 피 함수의 합",
+    summary="""
+`φ(k)` 는 `1..k` 중 `k` 와 서로소인 수의 개수다. `φ(1) + φ(2) + ... + φ(n)` 을 `1_000_000_007`
+로 나눈 나머지를 반환한다. `φ(1) = 1` 이다.
+""",
+    notes="""
+수마다 gcd 를 세면 n² 이다. `φ(k) = k · Π(1 - 1/p)` (p 는 k 의 소인수) 이니, 소수마다 그 배수
+전부에서 `phi[k] -= phi[k] / p` 를 하는 체 한 번이면 모든 φ 가 나온다 — 나눗셈이 정확히
+떨어지는 순서(곱하기 전에 나누기가 아니라, 현재 값에서 1/p 만큼 빼기)가 핵심이다. 합은 n²
+규모라 `Long` 으로 더하고 나머지를 취한다.
+""",
+    drill_doc="""
+Drill.compare(p, k)           // 소수 p 로 k 를 걸렀다
+Drill.write(k, phi)           // φ(k) 를 정했다
+""",
+    constraints="""
+- `1 <= n <= 1_000_000`
+""",
+    signature=dict(name="totientSum", parameters=[("n", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_totient_sum,
+    cases={
+        "sample": [("01", [5]), ("02", [1])],
+        "boundary": [
+            ("01-two", [2]),
+            ("02-prime", [13]),
+            ("03-prime-power", [64]),
+            ("04-composite", [30]),
+            # 합이 Int 를 넘는다: 100000 에서 약 3.04 × 10⁹.
+            ("05-sum-exceeds-int", [100000]),
+            ("06-mod-needed", [200000]),
+        ],
+        "hidden": [
+            ("01-small", [97]),
+            ("02-medium", [1234]),
+            ("03-larger", [65536]),
+            ("04-large", [333333]),
+        ],
+        "performance": [
+            ("01-small", [300000]),
+            ("02-medium", [700000]),
+            ("03-max", [1000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 소수마다 배수를 걸러 φ 를 한 번에 만든다.
+fun totientSum(n: Int): Int {
+    val phi = IntArray(n + 1) { it }
+    for (p in 2..n) {
+        if (phi[p] != p) continue
+        var k = p
+        while (k <= n) { Drill.compare(p, k); phi[k] -= phi[k] / p; k += p }
+    }
+    var total = 0L
+    for (k in 1..n) { Drill.write(k, phi[k]); total += phi[k] }
+    return (total % 1_000_000_007L).toInt()
+}
+""",
+    mutants=[
+        # 더할 때마다 나머지를 취하는 판은 Int 로도 넘치지 않아 동치였다 — 끝에서만 나머지를 취한다.
+        ("int-sum--overflows", "WRONG_BRANCH",
+         "합을 Int 로 다 더한 뒤 나머지를 취한다. 10 만 근처에서 넘친다.",
+         """
+fun totientSum(n: Int): Int {
+    val phi = IntArray(n + 1) { it }
+    for (p in 2..n) {
+        if (phi[p] != p) continue
+        var k = p
+        while (k <= n) { phi[k] -= phi[k] / p; k += p }
+    }
+    var total = 0
+    for (k in 1..n) total += phi[k]
+    return total % 1_000_000_007
+}
+"""),
+        ("multiplies-then-divides--wrong-order", "WRONG_ALGORITHM",
+         "φ(k) 를 k × (p−1) / p 로 원래 k 에서 매번 새로 계산한다. 소인수가 둘 이상이면 틀린다.",
+         """
+fun totientSum(n: Int): Int {
+    val phi = IntArray(n + 1) { it }
+    for (p in 2..n) {
+        if (phi[p] != p) continue
+        var k = p
+        while (k <= n) { phi[k] = k / p * (p - 1); k += p }
+    }
+    var total = 0L
+    for (k in 1..n) total += phi[k]
+    return (total % 1_000_000_007L).toInt()
+}
+"""),
+        ("excludes-phi-of-one", "OFF_BY_ONE",
+         "φ(1) 을 더하지 않는다.",
+         """
+fun totientSum(n: Int): Int {
+    val phi = IntArray(n + 1) { it }
+    for (p in 2..n) {
+        if (phi[p] != p) continue
+        var k = p
+        while (k <= n) { phi[k] -= phi[k] / p; k += p }
+    }
+    var total = 0L
+    for (k in 2..n) total += phi[k]
+    return (total % 1_000_000_007L).toInt()
+}
+"""),
+        ("gcd-count--quadratic", "PERFORMANCE",
+         "수마다 1..k 의 gcd 를 센다. O(n² log n).",
+         """
+fun totientSum(n: Int): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    var total = 0L
+    for (k in 1..n) {
+        var phi = 0
+        for (i in 1..k) { Drill.compare(i, k); if (gcd(i, k) == 1) phi += 1 }
+        total += phi
+    }
+    return (total % 1_000_000_007L).toInt()
+}
+"""),
+    ],
+))

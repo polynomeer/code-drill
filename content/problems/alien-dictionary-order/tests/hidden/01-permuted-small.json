@@ -1,0 +1,1 @@
+{"args": [["dd", "bda", "bc", "baa", "a", "a", "adc", "aac"]], "expected": "dbca"}

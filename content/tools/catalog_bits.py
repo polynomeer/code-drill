@@ -4,6 +4,8 @@
 느리거나. 둘 다 여기 있다.
 """
 
+import collections
+
 from author import Problem, standard_groups, perf_groups, randoms, shuffled
 
 PROBLEMS = []
@@ -382,6 +384,264 @@ fun isPowerOfTwo(n: Int): Int {
     var v = n
     while (v % 2 == 0) v /= 2
     return if (v == 1) 1 else 0
+}
+"""),
+    ],
+))
+
+
+# --- 142. 세 번씩 나오는 수 사이의 하나 (비트 자리별 개수) ------------------------------------------
+
+def _single_thrice(nums):
+    counts = collections.Counter(nums)
+    return next(x for x, c in counts.items() if c == 1)
+
+
+def _thrice(count, lo, hi, salt):
+    base = randoms(count, lo, hi, salt=salt)
+    single = base[0]
+    rest = [x for x in base[1:] if x != single]
+    return shuffled(rest * 3 + [single], salt=salt + 1)
+
+
+PROBLEMS.append(Problem(
+    id="single-number-thrice",
+    title="세 번씩 나오는 수 사이의 하나",
+    summary="""
+정수 배열 `nums` 에서 모든 수가 **정확히 세 번** 나오고 하나만 한 번 나온다. 그 하나를 반환한다.
+""",
+    notes="""
+두 번씩 나올 때의 XOR 은 여기서 안 된다 — 세 번 XOR 하면 자기 자신이 남는다. 대신 비트 자리마다
+1 인 수의 개수를 세면, 세 번 나오는 수의 몫은 3 의 배수라 `개수 % 3` 이 답의 그 비트다.
+음수는 32 비트 전부를 봐야 하고, 마지막에 부호 비트를 그대로 합치면 `Int` 가 알아서 음수다.
+""",
+    drill_doc="""
+Drill.compare(bit, count)     // 비트 자리의 개수를 봤다
+Drill.write(0, answer)        // 답을 정했다
+""",
+    constraints="""
+- `1 <= nums.length <= 300_000`, 길이는 `3k + 1`
+- `-2^31 <= nums[i] <= 2^31 - 1`
+""",
+    signature=dict(name="singleNumberThrice", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_single_thrice,
+    limits={"timeMillis": 2000, "memoryMb": 64, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[2, 2, 3, 2]]), ("02", [[0, 1, 0, 1, 0, 1, 99]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            # 답이 음수 — 부호 비트를 세어야 한다.
+            ("02-negative-answer", [[-2, 5, 5, 5]]),
+            ("03-negative-others", [[-1, -1, -1, 3]]),
+            ("04-zero-answer", [[4, 4, 4, 0]]),
+            ("05-int-extremes", [[2147483647, -2147483648, -2147483648, -2147483648]]),
+            ("06-min-answer", [[-2147483648, 1, 1, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_thrice(6, -20, 20, salt=8701)]),
+            ("02-random-medium", [_thrice(300, -1000, 1000, salt=8703)]),
+            ("03-random-wide", [_thrice(3000, -2147483648, 2147483647, salt=8705)]),
+            ("04-large", [_thrice(100000, -2147483648, 2147483647, salt=8707)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 32 비트 자리마다 개수 % 3.
+fun singleNumberThrice(nums: IntArray): Int {
+    var answer = 0
+    for (bit in 0 until 32) {
+        var count = 0
+        for (x in nums) if ((x ushr bit) and 1 == 1) count += 1
+        Drill.compare(bit, count)
+        if (count % 3 != 0) answer = answer or (1 shl bit)
+    }
+    Drill.write(0, answer)
+    return answer
+}
+""",
+    mutants=[
+        ("xor-all--pairs-trick", "WRONG_ALGORITHM",
+         "전부 XOR 한다. 두 번씩일 때의 요령이라 세 번씩에서는 틀린다.",
+         """
+fun singleNumberThrice(nums: IntArray): Int {
+    var x = 0
+    for (v in nums) x = x xor v
+    return x
+}
+"""),
+        ("skips-sign-bit", "MISSING_EDGE_CASE",
+         "비트 31 을 세지 않는다. 답이 음수면 부호가 사라진다.",
+         """
+fun singleNumberThrice(nums: IntArray): Int {
+    var answer = 0
+    for (bit in 0 until 31) {
+        var count = 0
+        for (x in nums) if ((x ushr bit) and 1 == 1) count += 1
+        if (count % 3 != 0) answer = answer or (1 shl bit)
+    }
+    return answer
+}
+"""),
+        ("mod-two", "WRONG_BRANCH",
+         "개수를 2 로 나눈 나머지를 본다. 세 번 나온 수의 비트가 남는다.",
+         """
+fun singleNumberThrice(nums: IntArray): Int {
+    var answer = 0
+    for (bit in 0 until 32) {
+        var count = 0
+        for (x in nums) if ((x ushr bit) and 1 == 1) count += 1
+        if (count % 2 != 0) answer = answer or (1 shl bit)
+    }
+    return answer
+}
+"""),
+        ("sum-formula--overflows", "WRONG_ALGORITHM",
+         "3 × (서로 다른 수의 합) − 전체 합 을 2 로 나눈다. Long 없이 넘친다.",
+         """
+fun singleNumberThrice(nums: IntArray): Int {
+    val distinct = HashSet<Int>()
+    var total = 0
+    var distinctSum = 0
+    for (x in nums) { total += x; if (distinct.add(x)) distinctSum += x }
+    return (3 * distinctSum - total) / 2
+}
+"""),
+    ],
+))
+
+
+# --- 143. 두 수의 XOR 최댓값 (비트 트라이) -------------------------------------------------------------
+
+def _max_xor(nums):
+    best = 0
+    mask = 0
+    for bit in range(29, -1, -1):
+        mask |= 1 << bit
+        prefixes = {x & mask for x in nums}
+        candidate = best | (1 << bit)
+        if any((candidate ^ p) in prefixes for p in prefixes):
+            best = candidate
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="max-xor-pair",
+    title="두 수의 XOR 최댓값",
+    summary="""
+음이 아닌 정수 배열 `nums` 에서 서로 다른 두 자리의 원소 `nums[i] xor nums[j]` (`i != j`) 의 최댓값을
+반환한다. 원소가 하나뿐이면 `0` 이다.
+""",
+    notes="""
+모든 쌍은 n² 이다. 답을 **높은 비트부터** 결정한다 — 지금까지의 답에 이 비트를 1 로 더한 값이
+가능한지는, 모든 수의 상위 비트 접두사를 모아 두고 `후보 xor 접두사` 가 집합에 있는지로 안다.
+비트 트라이에 수를 넣고 각 수마다 반대 비트로 내려가는 것도 같은 O(30n) 이다.
+""",
+    drill_doc="""
+Drill.compare(bit, best)      // 비트 자리를 결정했다
+Drill.write(0, best)          // 답을 늘렸다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `0 <= nums[i] < 2^30`
+""",
+    signature=dict(name="maxXorPair", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_max_xor,
+    cases={
+        "sample": [("01", [[3, 10, 5, 25, 2, 8]]), ("02", [[0]])],
+        "boundary": [
+            ("01-two", [[1, 2]]),
+            ("02-all-equal", [[7, 7, 7]]),
+            ("03-zero-and-max", [[0, 1073741823]]),
+            # 높은 비트가 같은 두 수 — 아래 비트에서 갈린다.
+            ("04-same-high-bits", [[1073741823, 1073741822, 1073741821]]),
+            ("05-powers-of-two", [[1, 2, 4, 8, 16, 32]]),
+            ("06-single", [[42]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(8, 0, 31, salt=8711)]),
+            ("02-random-medium", [randoms(300, 0, 100000, salt=8712)]),
+            ("03-random-wide", [randoms(2000, 0, 1073741823, salt=8713)]),
+            ("04-narrow-range", [randoms(500, 1000000, 1000100, salt=8714)]),
+        ],
+        "performance": [
+            ("01-small", [randoms(5000, 0, 1073741823, salt=8721)]),
+            ("02-medium", [randoms(30000, 0, 1073741823, salt=8722)]),
+            ("03-large", [randoms(100000, 0, 1073741823, salt=8723)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 높은 비트부터 접두사 집합으로 결정한다.
+fun maxXorPair(nums: IntArray): Int {
+    var best = 0
+    var mask = 0
+    val prefixes = HashSet<Int>()
+    for (bit in 29 downTo 0) {
+        mask = mask or (1 shl bit)
+        prefixes.clear()
+        for (x in nums) prefixes.add(x and mask)
+        val candidate = best or (1 shl bit)
+        for (p in prefixes) {
+            if ((candidate xor p) in prefixes) { best = candidate; Drill.write(0, best); break }
+        }
+        Drill.compare(bit, best)
+    }
+    return best
+}
+""",
+    mutants=[
+        ("starts-at-bit-28", "OFF_BY_ONE",
+         "비트 29 를 보지 않는다. 최상위 비트가 갈리는 쌍의 답이 절반이 된다.",
+         """
+fun maxXorPair(nums: IntArray): Int {
+    var best = 0
+    var mask = 0
+    val prefixes = HashSet<Int>()
+    for (bit in 28 downTo 0) {
+        mask = mask or (1 shl bit)
+        prefixes.clear()
+        for (x in nums) prefixes.add(x and mask)
+        val candidate = best or (1 shl bit)
+        for (p in prefixes) if ((candidate xor p) in prefixes) { best = candidate; break }
+    }
+    return best
+}
+"""),
+        ("greedy-max-with-min", "WRONG_ALGORITHM",
+         "최댓값과 최솟값의 XOR 을 답한다.",
+         """
+fun maxXorPair(nums: IntArray): Int {
+    if (nums.size < 2) return 0
+    return nums.max() xor nums.min()
+}
+"""),
+        ("all-pairs--quadratic", "PERFORMANCE",
+         "모든 쌍을 본다. O(n²).",
+         """
+fun maxXorPair(nums: IntArray): Int {
+    var best = 0
+    for (i in nums.indices) for (j in i + 1 until nums.size) {
+        Drill.compare(i, j)
+        val v = nums[i] xor nums[j]
+        if (v > best) best = v
+    }
+    return best
+}
+"""),
+        ("prefix-set-not-rebuilt", "WRONG_BRANCH",
+         "접두사 집합을 첫 비트에서 한 번만 만든다. 아래 비트의 접두사가 집합에 없어 답이 멈춘다.",
+         """
+fun maxXorPair(nums: IntArray): Int {
+    var best = 0
+    var mask = 0
+    val prefixes = HashSet<Int>()
+    for (bit in 29 downTo 0) {
+        mask = mask or (1 shl bit)
+        if (bit == 29) for (x in nums) prefixes.add(x and mask)
+        val candidate = best or (1 shl bit)
+        for (p in prefixes) if ((candidate xor p) in prefixes) { best = candidate; break }
+    }
+    return best
 }
 """),
     ],

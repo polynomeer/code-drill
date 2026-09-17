@@ -1,0 +1,20 @@
+# max-xor-pair 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - bit-manipulation
+  - hash-map
+  - greedy
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - OPTIMIZATION
+  - CONSTRAINTS
+  - COMPLEXITY
+prerequisites:
+  - single-number
+  - count-bits
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "O(30n). 모든 쌍은 O(n²)"

@@ -2192,3 +2192,243 @@ fun earliestSwimTime(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 147. 가장 편한 길 (임계값 이분 탐색 + BFS) ---------------------------------------------------------
+
+def _minimum_effort(heights):
+    from collections import deque
+    rows, cols = len(heights), len(heights[0])
+
+    def reachable(limit):
+        seen = [[False] * cols for _ in range(rows)]
+        seen[0][0] = True
+        queue = deque([(0, 0)])
+        while queue:
+            r, c = queue.popleft()
+            if (r, c) == (rows - 1, cols - 1):
+                return True
+            for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+                if 0 <= nr < rows and 0 <= nc < cols and not seen[nr][nc] and abs(heights[nr][nc] - heights[r][c]) <= limit:
+                    seen[nr][nc] = True
+                    queue.append((nr, nc))
+        return False
+
+    lo, hi = 0, 1_000_000
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if reachable(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+
+def _height_grid(rows, cols, lo, hi, salt):
+    values = randoms(rows * cols, lo, hi, salt=salt)
+    return [values[r * cols:(r + 1) * cols] for r in range(rows)]
+
+
+PROBLEMS.append(Problem(
+    id="minimum-effort-path",
+    title="가장 편한 길",
+    summary="""
+높이 격자 `heights` 가 주어진다. 왼쪽 위 `(0, 0)` 에서 오른쪽 아래까지 상하좌우로 움직인다.
+한 경로의 **수고**는 그 경로에서 인접한 두 칸의 높이 차의 절댓값 중 **최댓값**이다. 가능한 모든
+경로의 수고 중 최솟값을 반환한다.
+""",
+    notes="""
+합이 아니라 최댓값이라 보통의 최단 경로가 아니다. "수고가 `k` 이하인 경로가 있는가"는 높이
+차가 `k` 이하인 간선만으로 BFS 하면 되고, 그 답은 `k` 에 대해 단조라 `k` 를 이분 탐색한다.
+Dijkstra 의 완화를 `max(지금까지, 이 간선)` 으로 바꾸어도 된다. 칸이 하나면 답은 0 이다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 임계값의 범위를 좁혔다
+Drill.write(0, limit)         // 답을 정했다
+""",
+    constraints="""
+- `1 <= rows, cols <= 300`
+- `0 <= heights[r][c] <= 1_000_000`
+""",
+    signature=dict(name="minimumEffortPath", parameters=[("heights", "INT_MATRIX")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_minimum_effort,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[[1, 2, 2], [3, 8, 2], [5, 3, 5]]]), ("02", [[[1, 2, 3], [3, 8, 4], [5, 3, 5]]])],
+        "boundary": [
+            ("01-single-cell", [[[7]]]),
+            ("02-single-row", [[[1, 10, 6, 7, 9, 10, 4, 9]]]),
+            ("03-single-column", [[[3], [9], [4]]]),
+            # 뱀처럼 돌아가는 길이 더 편하다 — 왼쪽으로도 가야 한다.
+            ("04-detour-goes-left", [[[1, 1, 1, 1], [9, 9, 9, 1], [1, 1, 1, 1], [1, 9, 9, 9], [1, 1, 1, 1]]]),
+            ("05-flat", [[[5, 5, 5], [5, 5, 5]]]),
+            ("06-max-difference", [[[0, 1000000], [1000000, 0]]]),
+            ("07-answer-zero-with-wall", [[[1, 1, 9], [9, 1, 9], [9, 1, 1]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_height_grid(4, 5, 0, 20, salt=8761)]),
+            ("02-random-medium", [_height_grid(20, 30, 0, 1000, salt=8762)]),
+            ("03-random-wide", [_height_grid(40, 40, 0, 1000000, salt=8763)]),
+            ("04-narrow-values", [_height_grid(50, 50, 100, 105, salt=8764)]),
+        ],
+        "performance": [
+            ("01-small", [_height_grid(100, 100, 0, 1000000, salt=8771)]),
+            ("02-medium", [_height_grid(200, 200, 0, 1000000, salt=8772)]),
+            ("03-large", [_height_grid(300, 300, 0, 1000000, salt=8773)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 임계값 이분 탐색 + BFS.
+fun minimumEffortPath(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    val seen = BooleanArray(rows * cols)
+    val queue = IntArray(rows * cols)
+    fun reachable(limit: Int): Boolean {
+        seen.fill(false)
+        var head = 0; var tail = 0
+        queue[tail++] = 0; seen[0] = true
+        while (head < tail) {
+            val cell = queue[head++]
+            if (cell == rows * cols - 1) return true
+            val r = cell / cols; val c = cell % cols
+            val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr !in 0 until rows || nc !in 0 until cols) continue
+                val next = nr * cols + nc
+                if (!seen[next] && kotlin.math.abs(heights[nr][nc] - heights[r][c]) <= limit) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        return false
+    }
+    var lo = 0; var hi = 1_000_000
+    while (lo < hi) {
+        val mid = (lo + hi) / 2
+        Drill.compare(lo, hi)
+        if (reachable(mid)) hi = mid else lo = mid + 1
+    }
+    Drill.write(0, lo)
+    return lo
+}
+""",
+    mutants=[
+        ("only-right-and-down", "MISSING_EDGE_CASE",
+         "오른쪽과 아래로만 간다. 돌아가는 길이 더 편할 때 틀린다.",
+         """
+fun minimumEffortPath(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    val seen = BooleanArray(rows * cols)
+    val queue = IntArray(rows * cols)
+    fun reachable(limit: Int): Boolean {
+        seen.fill(false)
+        var head = 0; var tail = 0
+        queue[tail++] = 0; seen[0] = true
+        while (head < tail) {
+            val cell = queue[head++]
+            if (cell == rows * cols - 1) return true
+            val r = cell / cols; val c = cell % cols
+            val dr = intArrayOf(1, 0); val dc = intArrayOf(0, 1)
+            for (k in 0 until 2) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr !in 0 until rows || nc !in 0 until cols) continue
+                val next = nr * cols + nc
+                if (!seen[next] && kotlin.math.abs(heights[nr][nc] - heights[r][c]) <= limit) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        return false
+    }
+    var lo = 0; var hi = 1_000_000
+    while (lo < hi) { val mid = (lo + hi) / 2; if (reachable(mid)) hi = mid else lo = mid + 1 }
+    return lo
+}
+"""),
+        ("sum-of-differences--dijkstra", "WRONG_ALGORITHM",
+         "수고를 최댓값이 아니라 합으로 잰다. 보통의 최단 경로가 된다.",
+         """
+fun minimumEffortPath(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    val dist = LongArray(rows * cols) { Long.MAX_VALUE }
+    val heap = java.util.PriorityQueue<Pair<Long, Int>>(compareBy { it.first })
+    dist[0] = 0; heap.add(0L to 0)
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    var bestMax = 0
+    val maxAlong = IntArray(rows * cols)
+    while (heap.isNotEmpty()) {
+        val (d, cell) = heap.poll()
+        if (d > dist[cell]) continue
+        if (cell == rows * cols - 1) { bestMax = maxAlong[cell]; break }
+        val r = cell / cols; val c = cell % cols
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr !in 0 until rows || nc !in 0 until cols) continue
+            val diff = kotlin.math.abs(heights[nr][nc] - heights[r][c])
+            val next = nr * cols + nc
+            if (d + diff < dist[next]) { dist[next] = d + diff; maxAlong[next] = maxOf(maxAlong[cell], diff); heap.add(dist[next] to next) }
+        }
+    }
+    return bestMax
+}
+"""),
+        ("binary-search-excludes-answer", "OFF_BY_ONE",
+         "탐색이 답을 한 칸 지나친다 — 도달하면 hi = mid - 1.",
+         """
+fun minimumEffortPath(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    val seen = BooleanArray(rows * cols)
+    val queue = IntArray(rows * cols)
+    fun reachable(limit: Int): Boolean {
+        seen.fill(false)
+        var head = 0; var tail = 0
+        queue[tail++] = 0; seen[0] = true
+        while (head < tail) {
+            val cell = queue[head++]
+            if (cell == rows * cols - 1) return true
+            val r = cell / cols; val c = cell % cols
+            val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr !in 0 until rows || nc !in 0 until cols) continue
+                val next = nr * cols + nc
+                if (!seen[next] && kotlin.math.abs(heights[nr][nc] - heights[r][c]) <= limit) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        return false
+    }
+    var lo = 0; var hi = 1_000_000
+    while (lo < hi) { val mid = (lo + hi) / 2; if (reachable(mid)) hi = maxOf(lo, mid - 1) else lo = mid + 1 }
+    return lo
+}
+"""),
+        ("linear-scan-of-threshold", "PERFORMANCE",
+         "임계값을 0 부터 하나씩 올리며 BFS 한다. 답이 크면 수십만 번의 BFS 다.",
+         """
+fun minimumEffortPath(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    val seen = BooleanArray(rows * cols)
+    val queue = IntArray(rows * cols)
+    fun reachable(limit: Int): Boolean {
+        seen.fill(false)
+        var head = 0; var tail = 0
+        queue[tail++] = 0; seen[0] = true
+        while (head < tail) {
+            val cell = queue[head++]
+            if (cell == rows * cols - 1) return true
+            val r = cell / cols; val c = cell % cols
+            val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr !in 0 until rows || nc !in 0 until cols) continue
+                val next = nr * cols + nc
+                if (!seen[next] && kotlin.math.abs(heights[nr][nc] - heights[r][c]) <= limit) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        return false
+    }
+    var limit = 0
+    while (!reachable(limit)) { Drill.compare(limit, limit + 1); limit += 1 }
+    return limit
+}
+"""),
+    ],
+))

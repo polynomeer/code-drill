@@ -1,0 +1,20 @@
+# largest-common-factor-component 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - union-find
+  - number-theory
+  - math
+  - graph
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - OPTIMIZATION
+  - CONSTRAINTS
+prerequisites:
+  - connected-components
+  - prime-factor-sums
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "체 O(M log log M) + 수마다 소인수 O(log). 쌍마다 gcd 는 O(n² log)"

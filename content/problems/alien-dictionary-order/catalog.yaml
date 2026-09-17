@@ -1,0 +1,20 @@
+# alien-dictionary-order 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - string
+  - graph
+  - topological-sort
+  - heap
+competencies:
+  - READING
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - smallest-course-order
+  - detect-cycle-directed
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(전체 글자 수 + 26²). 글자가 26 개라 그래프는 상수"
