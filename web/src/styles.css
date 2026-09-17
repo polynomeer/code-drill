@@ -47,6 +47,11 @@ body {
   align-items: start;
 }
 
+/* hidden 속성은 display: grid 에 진다. 프로젝트 작업 공간이 열려 있는 동안 두 열을 감춘다. */
+.columns[hidden] {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .columns {
     grid-template-columns: 1fr;
@@ -1193,7 +1198,37 @@ table.groups td {
   text-transform: uppercase;
 }
 
-/* 프로젝트형 문제 (11단계). 파일 탭이 편집기 위에 있고, 결과는 케이스가 아니라 테스트다. */
+/* 프로젝트형 문제 (11단계). 파일 탭이 편집기 위에 있고, 결과는 케이스가 아니라 테스트다.
+   열면 두 열 화면을 통째로 대신한다 — 왼쪽에 요구사항과 기록, 오른쪽에 파일·편집기·판정. */
+.project-workspace {
+  margin-top: 16px;
+}
+
+.project-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.project-header h3 {
+  margin: 0;
+}
+
+.project-columns {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(480px, 1.6fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .project-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .project-list {
   list-style: none;
   padding: 0;
@@ -1210,7 +1245,7 @@ table.groups td {
 }
 
 .project-statement {
-  max-height: 260px;
+  max-height: 70vh;
   overflow: auto;
 }
 
@@ -1256,13 +1291,11 @@ table.groups td {
 }
 
 .project-editor {
-  height: 300px;
+  height: 520px;
 }
 
-.project-result {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+.project-result p:first-child {
+  margin-top: 0;
 }
 
 .project-tests {

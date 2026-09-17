@@ -11,6 +11,7 @@ import { useSubmissionEvents } from './features/submissions/useSubmissionEvents'
 import { CoachingPanel } from './features/coaching/CoachingPanel'
 import { ContestsPanel } from './features/contest/ContestsPanel'
 import { ProjectsPanel } from './features/project/ProjectsPanel'
+import { ProjectWorkspace } from './features/project/ProjectWorkspace'
 import { DiscussionPanel } from './features/discussion/DiscussionPanel'
 import { EditorialPanel } from './features/lab/EditorialPanel'
 import { CollectionsPanel } from './features/learning/CollectionsPanel'
@@ -56,7 +57,10 @@ function Drill({ session }: { session: Session }) {
   const [history, setHistory] = useState<Submission[]>([])
   // 대회의 문제 목록에는 프로젝트형 문제도 온다 (11단계). 어느 패널로 열지 여기서 가른다.
   const [projectIds, setProjectIds] = useState<Set<string>>(() => new Set())
-  const [requestedProject, setRequestedProject] = useState<string | null>(null)
+  // 열린 프로젝트. 있으면 두 열 화면 대신 프로젝트 작업 공간을 통째로 그린다 — 파일 여럿과
+  // 긴 요구사항은 목록 아래 패널에 들어가지 않는다.
+  const [openProject, setOpenProject] = useState<string | null>(null)
+  const [projectsJudged, setProjectsJudged] = useState(0)
   useEffect(() => {
     listProjects()
       .then((projects) => setProjectIds(new Set(projects.map((project) => project.id))))
@@ -197,7 +201,17 @@ function Drill({ session }: { session: Session }) {
       {/* 제재는 무엇보다 먼저 보여야 한다 (§8.5). 없으면 아무것도 그리지 않는다. */}
       <SanctionBanner />
 
-      <main className="columns">
+      {openProject && (
+        <main>
+          <ProjectWorkspace
+            id={openProject}
+            onClose={() => setOpenProject(null)}
+            onJudged={() => setProjectsJudged((n) => n + 1)}
+          />
+        </main>
+      )}
+      {/* 프로젝트가 열려 있으면 두 열은 그리지 않는다 — 같은 화면에 작업 공간이 둘이면 어느 것이 내 일인지 헷갈린다. */}
+      <main className="columns" hidden={openProject !== null}>
         <div className="stack">
           {settingsOpen && (
             <AccountSettings session={session} onClose={() => setSettingsOpen(false)} />
@@ -208,12 +222,12 @@ function Drill({ session }: { session: Session }) {
           {/* 처방 아래, 목록 위. 대회 중이면 무엇을 풀지는 대회가 정한다 (§8.4). */}
           <ContestsPanel
             currentProblem={slug}
-            onOpenProblem={(id) => (projectIds.has(id) ? setRequestedProject(id) : selectProblem(id))}
+            onOpenProblem={(id) => (projectIds.has(id) ? setOpenProject(id) : selectProblem(id))}
             refreshKey={history.length}
           />
           <ProblemList selected={slug} onSelect={selectProblem} />
           {/* 목록 아래. 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
-          <ProjectsPanel refreshKey={history.length} requestedId={requestedProject} onRequestHandled={() => setRequestedProject(null)} />
+          <ProjectsPanel refreshKey={history.length + projectsJudged} onOpen={setOpenProject} />
           <section className="panel statement">
             <h3>{problem?.title ?? '문제를 고르세요'}</h3>
             {problem && (
