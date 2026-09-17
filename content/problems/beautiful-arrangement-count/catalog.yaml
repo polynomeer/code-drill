@@ -1,0 +1,17 @@
+# beautiful-arrangement-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - backtracking
+  - recursion
+  - math
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - OPTIMIZATION
+  - COMPLEXITY
+prerequisites:
+  - n-queens-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "가지치기 백트래킹. 순열 전부는 n! 이고 15! 은 1.3 × 10¹²"

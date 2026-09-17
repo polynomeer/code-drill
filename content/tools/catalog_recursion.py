@@ -1568,3 +1568,319 @@ fun differentWaysToCompute(expression: String): IntArray {
 """),
     ],
 ))
+
+
+# --- 151. 아름다운 배열의 수 (가지치기 백트래킹) -------------------------------------------------------
+
+def _beautiful_arrangements(n):
+    memo = {}
+
+    def go(mask, i):
+        if i > n:
+            return 1
+        if mask in memo:
+            return memo[mask]
+        total = 0
+        for v in range(1, n + 1):
+            if not (mask >> v) & 1 and (v % i == 0 or i % v == 0):
+                total += go(mask | (1 << v), i + 1)
+        memo[mask] = total
+        return total
+
+    return go(0, 1)
+
+
+PROBLEMS.append(Problem(
+    id="beautiful-arrangement-count",
+    title="아름다운 배열의 수",
+    summary="""
+`1..n` 의 순열 `perm` (자리는 `1` 부터) 이 **아름답다**는 것은 모든 자리 `i` 에서 `perm[i] % i == 0`
+또는 `i % perm[i] == 0` 인 것이다. 아름다운 순열의 수를 반환한다.
+""",
+    notes="""
+순열 전부는 n! 이다. 자리 `1` 부터 채우며 **그 자리에 올 수 있는 값만** 시도하는 백트래킹은
+가지가 급격히 줄어 `n = 15` 에서도 빠르다. 조건이 자리마다 독립이라 "어떤 값을 썼는가"(비트
+집합)만 상태이고, 같은 집합에서의 답을 기억하면 더 빠르지만 가지치기만으로도 제한 안이다.
+""",
+    drill_doc="""
+Drill.compare(i, v)           // 자리 i 에 값 v 를 시도했다
+Drill.write(0, count)         // 답을 하나 늘렸다
+""",
+    constraints="""
+- `1 <= n <= 15`
+""",
+    signature=dict(name="beautifulArrangementCount", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_beautiful_arrangements,
+    limits={"timeMillis": 1000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [2]), ("02", [1])],
+        "boundary": [
+            ("01-three", [3]),
+            ("02-four", [4]),
+            ("03-prime-seven", [7]),
+            ("04-max", [15]),
+            ("05-fourteen", [14]),
+        ],
+        "hidden": [
+            ("01-six", [6]),
+            ("02-nine", [9]),
+            ("03-eleven", [11]),
+            ("04-thirteen", [13]),
+            ("05-twelve", [12]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 자리마다 가능한 값만 시도하는 백트래킹.
+fun beautifulArrangementCount(n: Int): Int {
+    val used = BooleanArray(n + 1)
+    var count = 0
+    fun go(i: Int) {
+        if (i > n) { count += 1; Drill.write(0, count); return }
+        for (v in 1..n) {
+            if (used[v] || (v % i != 0 && i % v != 0)) continue
+            Drill.compare(i, v)
+            used[v] = true
+            go(i + 1)
+            used[v] = false
+        }
+    }
+    go(1)
+    return count
+}
+""",
+    mutants=[
+        ("checks-only-divides-one-way", "WRONG_BRANCH",
+         "perm[i] % i == 0 만 본다. i % perm[i] == 0 인 배치를 놓친다.",
+         """
+fun beautifulArrangementCount(n: Int): Int {
+    val used = BooleanArray(n + 1)
+    var count = 0
+    fun go(i: Int) {
+        if (i > n) { count += 1; return }
+        for (v in 1..n) {
+            if (used[v] || v % i != 0) continue
+            used[v] = true; go(i + 1); used[v] = false
+        }
+    }
+    go(1)
+    return count
+}
+"""),
+        ("forgets-to-unmark", "MISSING_EDGE_CASE",
+         "되돌아올 때 사용 표시를 지우지 않는다. 첫 가지 뒤의 배치가 전부 사라진다.",
+         """
+fun beautifulArrangementCount(n: Int): Int {
+    val used = BooleanArray(n + 1)
+    var count = 0
+    fun go(i: Int) {
+        if (i > n) { count += 1; return }
+        for (v in 1..n) {
+            if (used[v] || (v % i != 0 && i % v != 0)) continue
+            used[v] = true; go(i + 1)
+        }
+    }
+    go(1)
+    return count
+}
+"""),
+        ("zero-based-positions", "OFF_BY_ONE",
+         "자리를 0 부터 센다. 0 으로 나누는 자리를 피하려 조건이 어긋난다.",
+         """
+fun beautifulArrangementCount(n: Int): Int {
+    val used = BooleanArray(n + 1)
+    var count = 0
+    fun go(i: Int) {
+        if (i >= n) { count += 1; return }
+        for (v in 1..n) {
+            if (used[v] || (i != 0 && v % i != 0 && i % v != 0)) continue
+            used[v] = true; go(i + 1); used[v] = false
+        }
+    }
+    go(0)
+    return count
+}
+"""),
+        ("all-permutations-then-check", "PERFORMANCE",
+         "순열 전부를 만든 뒤 검사한다. 15! 이다.",
+         """
+fun beautifulArrangementCount(n: Int): Int {
+    val perm = IntArray(n + 1)
+    val used = BooleanArray(n + 1)
+    var count = 0
+    fun go(i: Int) {
+        if (i > n) {
+            var ok = true
+            for (p in 1..n) if (perm[p] % p != 0 && p % perm[p] != 0) { ok = false; break }
+            if (ok) count += 1
+            return
+        }
+        for (v in 1..n) {
+            if (used[v]) continue
+            Drill.compare(i, v)
+            used[v] = true; perm[i] = v; go(i + 1); used[v] = false
+        }
+    }
+    go(1)
+    return count
+}
+"""),
+    ],
+))
+
+
+# --- 152. 올바른 IP 나누기의 수 (백트래킹) ---------------------------------------------------------------
+
+def _ip_splits(digits):
+    n = len(digits)
+
+    def valid(piece):
+        if not piece or len(piece) > 3:
+            return False
+        if piece[0] == "0" and len(piece) > 1:
+            return False
+        return int(piece) <= 255
+
+    def go(start, parts):
+        if parts == 4:
+            return 1 if start == n else 0
+        total = 0
+        for length in (1, 2, 3):
+            piece = digits[start:start + length]
+            if start + length <= n and valid(piece):
+                total += go(start + length, parts + 1)
+        return total
+
+    return go(0, 0)
+
+
+PROBLEMS.append(Problem(
+    id="valid-ip-splits-count",
+    title="올바른 IP 나누기의 수",
+    summary="""
+숫자만 있는 문자열 `digits` 를 점 세 개로 나눠 IPv4 주소로 만드는 방법의 수를 반환한다. 각 조각은
+`0..255` 의 정수이고, `0` 이 아닌 조각은 앞에 `0` 이 올 수 없다(`01` 은 안 되고 `0` 은 된다).
+문자열 전부를 써야 하고, 순서를 바꾸지 못한다.
+""",
+    notes="""
+조각은 넷이고 길이는 각 1~3 이라 가지는 3³ = 27 개뿐이다. 자리마다 길이 1·2·3 을 시도하고 조각이
+올바른지 보며 내려가고, 네 조각에서 정확히 끝에 닿았을 때만 하나로 센다. 앞의 `0` 규칙과 남는
+글자를 다 쓰는 규칙이 답을 가른다. 길이가 4 미만이거나 12 초과면 0 이다.
+""",
+    drill_doc="""
+Drill.compare(start, length)  // 조각을 시도했다
+Drill.write(0, count)         // 답을 하나 늘렸다
+""",
+    constraints="""
+- `1 <= digits.length <= 20`, 숫자만
+""",
+    signature=dict(name="validIpSplitsCount", parameters=[("digits", "STRING")], returns="INT"),
+    groups=standard_groups(),
+    reference=_ip_splits,
+    cases={
+        "sample": [("01", ["25525511135"]), ("02", ["0000"])],
+        "boundary": [
+            ("01-too-short", ["123"]),
+            ("02-too-long", ["1234567890123"]),
+            # 앞의 0: "010" 은 안 되고 "0" 은 된다.
+            ("03-leading-zero", ["010010"]),
+            ("04-over-255", ["256256256256"]),
+            ("05-exactly-255", ["255255255255"]),
+            ("06-all-ones", ["1111"]),
+            ("07-many-ways", ["111111"]),
+            ("08-length-twelve-with-zeros", ["100100100100"]),
+        ],
+        "hidden": [
+            ("01-mixed", ["19216801"]),
+            ("02-mixed-zeros", ["10101010"]),
+            ("03-long-small-digits", ["1111111111"]),
+            ("04-all-zeros-eight", ["00000000"]),
+            ("05-borderline", ["2552552552"]),
+            ("06-twelve-nines", ["999999999999"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 길이 1·2·3 을 시도하는 깊이 4 의 백트래킹.
+fun validIpSplitsCount(digits: String): Int {
+    val n = digits.length
+    fun valid(piece: String): Boolean {
+        if (piece.isEmpty() || piece.length > 3) return false
+        if (piece[0] == '0' && piece.length > 1) return false
+        return piece.toInt() <= 255
+    }
+    var count = 0
+    fun go(start: Int, parts: Int) {
+        if (parts == 4) { if (start == n) { count += 1; Drill.write(0, count) }; return }
+        for (length in 1..3) {
+            if (start + length > n) break
+            Drill.compare(start, length)
+            if (valid(digits.substring(start, start + length))) go(start + length, parts + 1)
+        }
+    }
+    go(0, 0)
+    return count
+}
+""",
+    mutants=[
+        ("allows-leading-zero", "MISSING_EDGE_CASE",
+         "앞의 0 을 허용한다. 010 이 조각이 된다.",
+         """
+fun validIpSplitsCount(digits: String): Int {
+    val n = digits.length
+    fun valid(piece: String) = piece.isNotEmpty() && piece.length <= 3 && piece.toInt() <= 255
+    var count = 0
+    fun go(start: Int, parts: Int) {
+        if (parts == 4) { if (start == n) count += 1; return }
+        for (length in 1..3) { if (start + length > n) break; if (valid(digits.substring(start, start + length))) go(start + length, parts + 1) }
+    }
+    go(0, 0)
+    return count
+}
+"""),
+        ("counts-when-four-parts--ignores-leftover", "OFF_BY_ONE",
+         "네 조각이 되면 남은 글자와 무관하게 센다.",
+         """
+fun validIpSplitsCount(digits: String): Int {
+    val n = digits.length
+    fun valid(piece: String): Boolean { if (piece.isEmpty() || piece.length > 3) return false; if (piece[0] == '0' && piece.length > 1) return false; return piece.toInt() <= 255 }
+    var count = 0
+    fun go(start: Int, parts: Int) {
+        if (parts == 4) { count += 1; return }
+        for (length in 1..3) { if (start + length > n) break; if (valid(digits.substring(start, start + length))) go(start + length, parts + 1) }
+    }
+    go(0, 0)
+    return count
+}
+"""),
+        ("strict-255", "OFF_BY_ONE",
+         "255 를 넘지 못한다고 하면서 255 자체도 거른다.",
+         """
+fun validIpSplitsCount(digits: String): Int {
+    val n = digits.length
+    fun valid(piece: String): Boolean { if (piece.isEmpty() || piece.length > 3) return false; if (piece[0] == '0' && piece.length > 1) return false; return piece.toInt() < 255 }
+    var count = 0
+    fun go(start: Int, parts: Int) {
+        if (parts == 4) { if (start == n) count += 1; return }
+        for (length in 1..3) { if (start + length > n) break; if (valid(digits.substring(start, start + length))) go(start + length, parts + 1) }
+    }
+    go(0, 0)
+    return count
+}
+"""),
+        ("rejects-single-zero", "WRONG_BRANCH",
+         "0 으로 시작하는 조각을 전부 거른다. 조각 0 하나도 안 된다고 한다.",
+         """
+fun validIpSplitsCount(digits: String): Int {
+    val n = digits.length
+    fun valid(piece: String): Boolean { if (piece.isEmpty() || piece.length > 3) return false; if (piece[0] == '0') return false; return piece.toInt() <= 255 }
+    var count = 0
+    fun go(start: Int, parts: Int) {
+        if (parts == 4) { if (start == n) count += 1; return }
+        for (length in 1..3) { if (start + length > n) break; if (valid(digits.substring(start, start + length))) go(start + length, parts + 1) }
+    }
+    go(0, 0)
+    return count
+}
+"""),
+    ],
+))

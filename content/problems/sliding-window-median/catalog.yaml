@@ -1,0 +1,21 @@
+# sliding-window-median 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - array
+  - sliding-window
+  - heap
+  - sorting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - IMPLEMENTATION
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - sliding-window-max
+  - kth-largest
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(n log k). 창마다 정렬하면 O(n·k log k)"

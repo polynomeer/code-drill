@@ -3474,3 +3474,246 @@ fun alienDictionaryOrder(words: Array<String>): String {
 """),
     ],
 ))
+
+
+# --- 150. 모든 정점을 지나는 가장 짧은 걸음 (비트마스크 BFS) --------------------------------------------
+
+def _visit_all_nodes(n, edges):
+    from collections import deque
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 2):
+        u, v = edges[i], edges[i + 1]
+        adj[u].append(v)
+        adj[v].append(u)
+    full = (1 << n) - 1
+    if n == 1:
+        return 0
+    dist = [[-1] * n for _ in range(1 << n)]
+    queue = deque()
+    for s in range(n):
+        dist[1 << s][s] = 0
+        queue.append((1 << s, s))
+    while queue:
+        mask, u = queue.popleft()
+        d = dist[mask][u]
+        for v in adj[u]:
+            nm = mask | (1 << v)
+            if dist[nm][v] < 0:
+                if nm == full:
+                    return d + 1
+                dist[nm][v] = d + 1
+                queue.append((nm, v))
+    return -1
+
+
+def _connected_edges(n, extra, salt):
+    """트리 + 여분 간선. 연결을 보장한다."""
+    parents = randoms(n - 1, 0, n - 1, salt=salt)
+    edges = []
+    for i in range(1, n):
+        edges += [parents[i - 1] % i, i]
+    a = randoms(extra, 0, n - 1, salt=salt + 1)
+    b = randoms(extra, 0, n - 1, salt=salt + 2)
+    for i in range(extra):
+        if a[i] != b[i]:
+            edges += [a[i], b[i]]
+    return edges
+
+
+PROBLEMS.append(Problem(
+    id="shortest-path-visiting-all-nodes",
+    title="모든 정점을 지나는 가장 짧은 걸음",
+    summary="""
+정점 `n` 개의 **연결된** 무향 그래프가 간선 목록 `edges = [u1, v1, u2, v2, ...]` 로 주어진다.
+아무 정점에서 시작해 아무 정점에서 끝나며, 정점과 간선을 **다시 지나도 되는** 경로로 모든
+정점을 한 번 이상 방문하는 데 필요한 최소 간선 수를 반환한다. 정점이 하나면 `0` 이다.
+""",
+    notes="""
+방문 순서를 다 세면 n! 이다. 상태를 **(방문한 정점 집합, 지금 정점)** 으로 두면 `2^n · n` 개뿐이고,
+간선 하나가 비용 1 이라 BFS 다. 모든 정점에서 동시에 출발시켜(다중 시작) 집합이 가득 차는 첫 순간의
+거리가 답이다. 정점을 다시 지나도 되니 집합은 커지기만 하고, 같은 (집합, 정점)을 두 번 넣지 않는다.
+""",
+    drill_doc="""
+Drill.compare(mask, node)     // 상태를 꺼냈다
+Drill.write(0, distance)      // 답을 정했다
+""",
+    constraints="""
+- `1 <= n <= 12`, 그래프는 연결돼 있다, 중복 간선이 있을 수 있다
+- `edges.size` 는 짝수, `0 <= u, v < n`, `u != v`
+""",
+    signature=dict(name="shortestPathVisitingAllNodes", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_visit_all_nodes,
+    cases={
+        "sample": [("01", [4, [1, 0, 1, 2, 1, 3]]), ("02", [5, [0, 1, 0, 2, 1, 3, 2, 4]])],
+        "boundary": [
+            ("01-single-node", [1, []]),
+            ("02-two-nodes", [2, [0, 1]]),
+            # 별: 가운데를 세 번 지나야 한다 — 다시 지나도 된다.
+            ("03-star", [5, [0, 1, 0, 2, 0, 3, 0, 4]]),
+            ("04-path", [6, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]]),
+            ("05-complete-triangle", [3, [0, 1, 1, 2, 0, 2]]),
+            ("06-duplicate-edges", [3, [0, 1, 0, 1, 1, 2]]),
+            # 사이클: 한 바퀴 돌 필요 없이 n-1 걸음.
+            ("07-cycle", [6, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [5, _connected_edges(5, 2, salt=8841)]),
+            ("02-random-medium", [8, _connected_edges(8, 4, salt=8843)]),
+            ("03-random-tree", [10, _connected_edges(10, 0, salt=8845)]),
+            ("04-random-dense", [11, _connected_edges(11, 30, salt=8847)]),
+        ],
+        "performance": [
+            ("01-small", [10, _connected_edges(10, 5, salt=8851)]),
+            ("02-medium", [11, _connected_edges(11, 6, salt=8853)]),
+            ("03-large", [12, _connected_edges(12, 8, salt=8855)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). (집합, 정점) 상태의 다중 시작 BFS.
+fun shortestPathVisitingAllNodes(n: Int, edges: IntArray): Int {
+    if (n == 1) return 0
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val full = (1 shl n) - 1
+    val seen = BooleanArray((1 shl n) * n)
+    val queue = IntArray((1 shl n) * n)
+    var head = 0; var tail = 0
+    for (s in 0 until n) { seen[(1 shl s) * n + s] = true; queue[tail++] = (1 shl s) * n + s }
+    var distance = 0
+    while (head < tail) {
+        val levelEnd = tail
+        while (head < levelEnd) {
+            val state = queue[head++]
+            val mask = state / n; val u = state % n
+            Drill.compare(mask, u)
+            for (v in adj[u]) {
+                val nm = mask or (1 shl v)
+                if (nm == full) { Drill.write(0, distance + 1); return distance + 1 }
+                val next = nm * n + v
+                if (!seen[next]) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        distance += 1
+    }
+    return -1
+}
+""",
+    mutants=[
+        ("no-revisit--simple-paths-only", "WRONG_ALGORITHM",
+         "정점을 다시 지나지 못하게 한다. 별 모양에서 답이 없다.",
+         """
+fun shortestPathVisitingAllNodes(n: Int, edges: IntArray): Int {
+    if (n == 1) return 0
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val full = (1 shl n) - 1
+    val seen = BooleanArray((1 shl n) * n)
+    val queue = IntArray((1 shl n) * n)
+    var head = 0; var tail = 0
+    for (s in 0 until n) { seen[(1 shl s) * n + s] = true; queue[tail++] = (1 shl s) * n + s }
+    var distance = 0
+    while (head < tail) {
+        val levelEnd = tail
+        while (head < levelEnd) {
+            val state = queue[head++]
+            val mask = state / n; val u = state % n
+            for (v in adj[u]) {
+                if (mask and (1 shl v) != 0) continue
+                val nm = mask or (1 shl v)
+                if (nm == full) return distance + 1
+                val next = nm * n + v
+                if (!seen[next]) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        distance += 1
+    }
+    return n * n
+}
+"""),
+        ("single-start-from-zero", "WRONG_BRANCH",
+         "정점 0 에서만 출발한다. 시작점을 고를 수 없으니 답이 커진다.",
+         """
+fun shortestPathVisitingAllNodes(n: Int, edges: IntArray): Int {
+    if (n == 1) return 0
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val full = (1 shl n) - 1
+    val seen = BooleanArray((1 shl n) * n)
+    val queue = IntArray((1 shl n) * n)
+    var head = 0; var tail = 0
+    seen[1 * n] = true; queue[tail++] = 1 * n
+    var distance = 0
+    while (head < tail) {
+        val levelEnd = tail
+        while (head < levelEnd) {
+            val state = queue[head++]
+            val mask = state / n; val u = state % n
+            for (v in adj[u]) {
+                val nm = mask or (1 shl v)
+                if (nm == full) return distance + 1
+                val next = nm * n + v
+                if (!seen[next]) { seen[next] = true; queue[tail++] = next }
+            }
+        }
+        distance += 1
+    }
+    return -1
+}
+"""),
+        ("mask-only-state--drops-position", "WRONG_ALGORITHM",
+         "상태를 집합만으로 둔다. 어디 서 있는지를 잊어 이어질 수 없는 걸음을 잇는다.",
+         """
+fun shortestPathVisitingAllNodes(n: Int, edges: IntArray): Int {
+    if (n == 1) return 0
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val full = (1 shl n) - 1
+    val seen = BooleanArray(1 shl n)
+    val queue = IntArray(1 shl n)
+    var head = 0; var tail = 0
+    for (s in 0 until n) { if (!seen[1 shl s]) { seen[1 shl s] = true; queue[tail++] = 1 shl s } }
+    var distance = 0
+    while (head < tail) {
+        val levelEnd = tail
+        while (head < levelEnd) {
+            val mask = queue[head++]
+            for (u in 0 until n) {
+                if (mask and (1 shl u) == 0) continue
+                for (v in adj[u]) {
+                    val nm = mask or (1 shl v)
+                    if (nm == full) return distance + 1
+                    if (!seen[nm]) { seen[nm] = true; queue[tail++] = nm }
+                }
+            }
+        }
+        distance += 1
+    }
+    return -1
+}
+"""),
+        # 가지치기(total >= best 면 중단)를 두면 12 에서도 제한 안에 든다 — 맞는 풀이가 된다. 가지치기 없는 판이다.
+        ("permutation-search--factorial", "PERFORMANCE",
+         "방문 순서 전부를 시도하며 쌍마다 최단 거리를 더한다. 가지치기가 없어 O(n! · n).",
+         """
+fun shortestPathVisitingAllNodes(n: Int, edges: IntArray): Int {
+    if (n == 1) return 0
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val dist = Array(n) { IntArray(n) { -1 } }
+    for (s in 0 until n) {
+        val queue = ArrayDeque<Int>(); dist[s][s] = 0; queue.add(s)
+        while (queue.isNotEmpty()) { val u = queue.removeFirst(); for (v in adj[u]) if (dist[s][v] < 0) { dist[s][v] = dist[s][u] + 1; queue.add(v) } }
+    }
+    var best = Int.MAX_VALUE
+    val used = BooleanArray(n)
+    fun go(last: Int, count: Int, total: Int) {
+        if (count == n) { if (total < best) best = total; return }
+        for (v in 0 until n) if (!used[v]) { Drill.compare(last, v); used[v] = true; go(v, count + 1, total + dist[last][v]); used[v] = false }
+    }
+    for (s in 0 until n) { used[s] = true; go(s, 1, 0); used[s] = false }
+    return best
+}
+"""),
+    ],
+))

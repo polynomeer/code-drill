@@ -1,0 +1,16 @@
+# valid-ip-splits-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - backtracking
+  - recursion
+competencies:
+  - READING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - subset-sum-count
+complexity:
+  time: CONSTANT
+  space: CONSTANT
+  note: "가지 3³ = 27 개. 입력 길이가 20 이하라 상수"

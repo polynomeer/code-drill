@@ -2634,3 +2634,567 @@ fun runningSum(nums: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 148. 창의 중앙값 (힙 둘과 미룬 삭제) -------------------------------------------------------------
+
+def _window_medians(nums, k):
+    import heapq
+    n = len(nums)
+    low, high = [], []          # low: 최대 힙(음수), high: 최소 힙
+    delayed = {}
+    low_size = high_size = 0    # 지워지지 않은 원소 수
+
+    def prune(heap):
+        while heap:
+            x = heap[0] if heap is high else -heap[0]
+            if delayed.get(x, 0):
+                delayed[x] -= 1
+                heapq.heappop(heap)
+            else:
+                break
+
+    def balance():
+        nonlocal low_size, high_size
+        if low_size > high_size + 1:
+            heapq.heappush(high, -heapq.heappop(low)); low_size -= 1; high_size += 1
+            prune(low)
+        elif low_size < high_size:
+            heapq.heappush(low, -heapq.heappop(high)); high_size -= 1; low_size += 1
+            prune(high)
+
+    def add(x):
+        nonlocal low_size, high_size
+        if not low or x <= -low[0]:
+            heapq.heappush(low, -x); low_size += 1
+        else:
+            heapq.heappush(high, x); high_size += 1
+        balance()
+
+    def remove(x):
+        nonlocal low_size, high_size
+        delayed[x] = delayed.get(x, 0) + 1
+        if low and x <= -low[0]:
+            low_size -= 1
+            if x == -low[0]:
+                prune(low)
+        else:
+            high_size -= 1
+            if high and x == high[0]:
+                prune(high)
+        balance()
+
+    out = []
+    for i in range(n):
+        add(nums[i])
+        if i >= k:
+            remove(nums[i - k])
+        if i >= k - 1:
+            out.append(-low[0])
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="sliding-window-median",
+    title="창의 중앙값",
+    summary="""
+정수 배열 `nums` 와 **홀수** `k` 가 주어진다. 길이 `k` 의 창을 왼쪽부터 오른쪽으로 한 칸씩 옮기며,
+창마다의 **중앙값**(정렬했을 때 가운데 값)을 순서대로 담은 배열을 반환한다.
+""",
+    notes="""
+창마다 정렬하면 n·k log k 다. 창을 **작은 절반(최대 힙)과 큰 절반(최소 힙)** 으로 나눠 들고
+있으면 중앙값은 작은 절반의 꼭대기다. 창에서 나가는 원소는 힙 한가운데에 있을 수 있어 바로
+못 지운다 — "지울 것" 으로 적어 두고 꼭대기에 올라왔을 때 걷어 내며, 두 힙의 **살아 있는**
+원소 수로 균형을 잡는다. 정렬된 구조(트리)로 k 번째를 뽑는 것도 같은 O(n log k) 다.
+""",
+    drill_doc="""
+Drill.compare(i, median)      // 창의 중앙값을 냈다
+Drill.write(i, median)        // 답을 적었다
+""",
+    constraints="""
+- `1 <= k <= nums.length <= 100_000`, `k` 는 홀수
+- `-2^31 <= nums[i] <= 2^31 - 1`
+""",
+    signature=dict(name="slidingWindowMedian", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_window_medians,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [[1, 3, -1, -3, 5, 3, 6, 7], 3]), ("02", [[4, 2, 1], 1])],
+        "boundary": [
+            ("01-window-is-whole", [[5, 1, 9, 3, 7], 5]),
+            # 같은 값이 여럿 — 미룬 삭제가 값이 아니라 개수여야 한다.
+            ("02-duplicates", [[2, 2, 2, 1, 2, 2, 3], 3]),
+            ("03-descending", [[9, 8, 7, 6, 5, 4], 3]),
+            ("04-int-extremes", [[2147483647, -2147483648, 0, 2147483647, -2147483648], 3]),
+            # 나가는 원소가 힙 한가운데에 있다.
+            ("05-leaving-from-middle", [[1, 5, 3, 4, 2, 6, 0], 5]),
+            ("06-single-element", [[-4], 1]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -5, 5, salt=8801), 3]),
+            ("02-random-medium", [randoms(500, -100, 100, salt=8802), 7]),
+            ("03-random-wide", [randoms(3000, -2147483648, 2147483647, salt=8803), 101]),
+            ("04-many-duplicates", [randoms(2000, 0, 2, salt=8804), 9]),
+        ],
+        "performance": [
+            ("01-small", [randoms(20000, -1000000, 1000000, salt=8811), 999]),
+            ("02-medium", [randoms(60000, -1000000, 1000000, salt=8812), 5001]),
+            ("03-large", [randoms(100000, -1000000, 1000000, salt=8813), 20001]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최대 힙 + 최소 힙, 미룬 삭제, 살아 있는 수로 균형.
+fun slidingWindowMedian(nums: IntArray, k: Int): IntArray {
+    val low = java.util.PriorityQueue<Int>(compareByDescending { it })
+    val high = java.util.PriorityQueue<Int>()
+    val delayed = HashMap<Int, Int>()
+    var lowSize = 0; var highSize = 0
+    fun prune(heap: java.util.PriorityQueue<Int>) {
+        while (heap.isNotEmpty()) {
+            val top = heap.peek()
+            val pending = delayed[top] ?: 0
+            if (pending == 0) break
+            if (pending == 1) delayed.remove(top) else delayed[top] = pending - 1
+            heap.poll()
+        }
+    }
+    fun balance() {
+        if (lowSize > highSize + 1) { high.add(low.poll()); lowSize -= 1; highSize += 1; prune(low) }
+        else if (lowSize < highSize) { low.add(high.poll()); highSize -= 1; lowSize += 1; prune(high) }
+    }
+    fun add(x: Int) {
+        if (low.isEmpty() || x <= low.peek()) { low.add(x); lowSize += 1 } else { high.add(x); highSize += 1 }
+        balance()
+    }
+    fun remove(x: Int) {
+        delayed[x] = (delayed[x] ?: 0) + 1
+        if (low.isNotEmpty() && x <= low.peek()) { lowSize -= 1; if (x == low.peek()) prune(low) }
+        else { highSize -= 1; if (high.isNotEmpty() && x == high.peek()) prune(high) }
+        balance()
+    }
+    val out = IntArray(nums.size - k + 1)
+    for (i in nums.indices) {
+        add(nums[i])
+        if (i >= k) remove(nums[i - k])
+        if (i >= k - 1) { out[i - k + 1] = low.peek(); Drill.compare(i, out[i - k + 1]); Drill.write(i - k + 1, out[i - k + 1]) }
+    }
+    return out
+}
+""",
+    mutants=[
+        ("balances-by-heap-size--counts-dead", "WRONG_BRANCH",
+         "균형을 살아 있는 수가 아니라 힙의 크기로 잡는다. 지울 것으로 적어 둔 원소가 절반을 부풀린다.",
+         """
+fun slidingWindowMedian(nums: IntArray, k: Int): IntArray {
+    val low = java.util.PriorityQueue<Int>(compareByDescending { it })
+    val high = java.util.PriorityQueue<Int>()
+    val delayed = HashMap<Int, Int>()
+    fun prune(heap: java.util.PriorityQueue<Int>) {
+        while (heap.isNotEmpty()) { val top = heap.peek(); val pending = delayed[top] ?: 0; if (pending == 0) break; if (pending == 1) delayed.remove(top) else delayed[top] = pending - 1; heap.poll() }
+    }
+    fun balance() {
+        if (low.size > high.size + 1) { high.add(low.poll()); prune(low) }
+        else if (low.size < high.size) { low.add(high.poll()); prune(high) }
+    }
+    fun add(x: Int) { if (low.isEmpty() || x <= low.peek()) low.add(x) else high.add(x); balance() }
+    fun remove(x: Int) {
+        delayed[x] = (delayed[x] ?: 0) + 1
+        if (low.isNotEmpty() && x <= low.peek()) { if (x == low.peek()) prune(low) } else { if (high.isNotEmpty() && x == high.peek()) prune(high) }
+        balance()
+    }
+    val out = IntArray(nums.size - k + 1)
+    for (i in nums.indices) { add(nums[i]); if (i >= k) remove(nums[i - k]); if (i >= k - 1) out[i - k + 1] = low.peek() }
+    return out
+}
+"""),
+        ("delayed-as-set--loses-duplicates", "MISSING_EDGE_CASE",
+         "지울 것을 개수가 아니라 집합으로 둔다. 같은 값이 두 번 나가면 하나만 지워진다.",
+         """
+fun slidingWindowMedian(nums: IntArray, k: Int): IntArray {
+    val low = java.util.PriorityQueue<Int>(compareByDescending { it })
+    val high = java.util.PriorityQueue<Int>()
+    val delayed = HashSet<Int>()
+    var lowSize = 0; var highSize = 0
+    fun prune(heap: java.util.PriorityQueue<Int>) {
+        while (heap.isNotEmpty() && delayed.remove(heap.peek())) heap.poll()
+    }
+    fun balance() {
+        if (lowSize > highSize + 1) { high.add(low.poll()); lowSize -= 1; highSize += 1; prune(low) }
+        else if (lowSize < highSize) { low.add(high.poll()); highSize -= 1; lowSize += 1; prune(high) }
+    }
+    fun add(x: Int) { if (low.isEmpty() || x <= low.peek()) { low.add(x); lowSize += 1 } else { high.add(x); highSize += 1 }; balance() }
+    fun remove(x: Int) {
+        delayed.add(x)
+        if (low.isNotEmpty() && x <= low.peek()) { lowSize -= 1; if (x == low.peek()) prune(low) } else { highSize -= 1; if (high.isNotEmpty() && x == high.peek()) prune(high) }
+        balance()
+    }
+    val out = IntArray(nums.size - k + 1)
+    for (i in nums.indices) { add(nums[i]); if (i >= k) remove(nums[i - k]); if (i >= k - 1) out[i - k + 1] = low.peek() }
+    return out
+}
+"""),
+        ("removes-without-pruning-top", "WRONG_BRANCH",
+         "나가는 원소가 꼭대기여도 걷어 내지 않는다. 죽은 원소가 중앙값으로 나온다.",
+         """
+fun slidingWindowMedian(nums: IntArray, k: Int): IntArray {
+    val low = java.util.PriorityQueue<Int>(compareByDescending { it })
+    val high = java.util.PriorityQueue<Int>()
+    val delayed = HashMap<Int, Int>()
+    var lowSize = 0; var highSize = 0
+    fun prune(heap: java.util.PriorityQueue<Int>) {
+        while (heap.isNotEmpty()) { val top = heap.peek(); val pending = delayed[top] ?: 0; if (pending == 0) break; if (pending == 1) delayed.remove(top) else delayed[top] = pending - 1; heap.poll() }
+    }
+    fun balance() {
+        if (lowSize > highSize + 1) { high.add(low.poll()); lowSize -= 1; highSize += 1; prune(low) }
+        else if (lowSize < highSize) { low.add(high.poll()); highSize -= 1; lowSize += 1; prune(high) }
+    }
+    fun add(x: Int) { if (low.isEmpty() || x <= low.peek()) { low.add(x); lowSize += 1 } else { high.add(x); highSize += 1 }; balance() }
+    fun remove(x: Int) {
+        delayed[x] = (delayed[x] ?: 0) + 1
+        if (low.isNotEmpty() && x <= low.peek()) lowSize -= 1 else highSize -= 1
+        balance()
+    }
+    val out = IntArray(nums.size - k + 1)
+    for (i in nums.indices) { add(nums[i]); if (i >= k) remove(nums[i - k]); if (i >= k - 1) out[i - k + 1] = low.peek() }
+    return out
+}
+"""),
+        ("sort-each-window", "PERFORMANCE",
+         "창마다 복사해 정렬한다. O(n·k log k).",
+         """
+fun slidingWindowMedian(nums: IntArray, k: Int): IntArray {
+    val out = IntArray(nums.size - k + 1)
+    for (i in out.indices) {
+        val window = nums.copyOfRange(i, i + k)
+        window.sort()
+        Drill.compare(i, window[k / 2])
+        out[i] = window[k / 2]
+    }
+    return out
+}
+"""),
+    ],
+))
+
+
+# --- 149. 다음 순열 (제자리) -----------------------------------------------------------------------------
+
+def _next_permutation(nums):
+    a = list(nums)
+    i = len(a) - 2
+    while i >= 0 and a[i] >= a[i + 1]:
+        i -= 1
+    if i < 0:
+        a.reverse()
+        return a
+    j = len(a) - 1
+    while a[j] <= a[i]:
+        j -= 1
+    a[i], a[j] = a[j], a[i]
+    a[i + 1:] = reversed(a[i + 1:])
+    return a
+
+
+PROBLEMS.append(Problem(
+    id="next-permutation",
+    title="다음 순열",
+    summary="""
+정수 배열 `nums` 가 주어진다. 같은 원소들로 만들 수 있는 배열들을 사전순으로 늘어놓았을 때
+`nums` **바로 다음** 배열을 반환한다. `nums` 가 마지막(내림차순)이면 처음(오름차순)을 반환한다.
+원소는 중복될 수 있다.
+""",
+    notes="""
+뒤에서부터 처음으로 `a[i] < a[i+1]` 인 자리 `i` 를 찾는다 — 그 뒤는 내림차순이라 더 키울 수 없다.
+`i` 뒤에서 `a[i]` 보다 **큰 것 중 가장 작은**(뒤에서부터 처음으로 큰) 원소와 바꾸고, `i` 뒤를
+뒤집어 오름차순으로 만든다. 중복이 있으면 등호의 방향이 답을 바꾼다 — `a[i] >= a[i+1]` 는
+건너뛰고, 바꿀 상대는 `a[j] > a[i]` 여야 한다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 두 자리를 비교했다
+Drill.swap(i, j)              // 두 자리를 바꿨다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `0 <= nums[i] <= 100`
+""",
+    signature=dict(name="nextPermutation", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    # 제자리 O(n) 이 유일하게 자연스러운 풀이라 자릿수로 지는 오답이 없다 — 성능 그룹을 두지 않는다.
+    groups=standard_groups(),
+    reference=_next_permutation,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [[1, 2, 3]]), ("02", [[3, 2, 1]])],
+        "boundary": [
+            ("01-single", [[5]]),
+            ("02-two-ascending", [[1, 2]]),
+            # 중복: 1,1,2 → 1,2,1 → 2,1,1 → 1,1,2.
+            ("03-duplicates-middle", [[1, 2, 1]]),
+            ("04-duplicates-last", [[2, 1, 1]]),
+            # 바꿀 상대가 같은 값이면 안 된다.
+            ("05-equal-neighbor", [[1, 3, 3, 2]]),
+            ("06-all-equal", [[7, 7, 7]]),
+            ("07-suffix-descending", [[1, 5, 4, 3, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(8, 0, 3, salt=8821)]),
+            ("02-random-medium", [randoms(300, 0, 10, salt=8822)]),
+            ("03-random-wide", [randoms(2000, 0, 100, salt=8823)]),
+            ("04-long-descending-tail", [[1] + list(range(100, 0, -1)) * 20]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 꺾이는 자리, 뒤에서 처음 큰 것과 교환, 뒤집기.
+fun nextPermutation(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = a.size - 2
+    while (i >= 0 && a[i] >= a[i + 1]) { Drill.compare(i, i + 1); i -= 1 }
+    if (i >= 0) {
+        var j = a.size - 1
+        while (a[j] <= a[i]) { Drill.compare(i, j); j -= 1 }
+        val t = a[i]; a[i] = a[j]; a[j] = t
+        Drill.swap(i, j)
+    }
+    var lo = i + 1; var hi = a.size - 1
+    while (lo < hi) { val t = a[lo]; a[lo] = a[hi]; a[hi] = t; Drill.swap(lo, hi); lo += 1; hi -= 1 }
+    return a
+}
+""",
+    mutants=[
+        ("swaps-with-equal--strict-pivot", "OFF_BY_ONE",
+         "꺾이는 자리를 a[i] > a[i+1] 로 찾고 바꿀 상대를 a[j] >= a[i] 로 찾는다. 중복에서 틀린다.",
+         """
+fun nextPermutation(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = a.size - 2
+    while (i >= 0 && a[i] > a[i + 1]) i -= 1
+    if (i >= 0) {
+        var j = a.size - 1
+        while (a[j] < a[i]) j -= 1
+        val t = a[i]; a[i] = a[j]; a[j] = t
+    }
+    var lo = i + 1; var hi = a.size - 1
+    while (lo < hi) { val t = a[lo]; a[lo] = a[hi]; a[hi] = t; lo += 1; hi -= 1 }
+    return a
+}
+"""),
+        ("no-reverse-after-swap", "MISSING_EDGE_CASE",
+         "바꾼 뒤 뒤를 뒤집지 않는다. 다음이 아니라 더 뒤의 순열이 된다.",
+         """
+fun nextPermutation(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = a.size - 2
+    while (i >= 0 && a[i] >= a[i + 1]) i -= 1
+    if (i < 0) { a.reverse(); return a }
+    var j = a.size - 1
+    while (a[j] <= a[i]) j -= 1
+    val t = a[i]; a[i] = a[j]; a[j] = t
+    return a
+}
+"""),
+        ("swaps-with-first-larger-from-left", "WRONG_BRANCH",
+         "i 뒤에서 왼쪽부터 처음으로 큰 원소와 바꾼다. 가장 작은 큰 원소가 아니다.",
+         """
+fun nextPermutation(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = a.size - 2
+    while (i >= 0 && a[i] >= a[i + 1]) i -= 1
+    if (i >= 0) {
+        var j = i + 1
+        while (a[j] <= a[i]) j += 1
+        val t = a[i]; a[i] = a[j]; a[j] = t
+    }
+    var lo = i + 1; var hi = a.size - 1
+    while (lo < hi) { val t = a[lo]; a[lo] = a[hi]; a[hi] = t; lo += 1; hi -= 1 }
+    return a
+}
+"""),
+        ("last-permutation-stays", "MISSING_EDGE_CASE",
+         "내림차순(마지막)이면 그대로 돌려준다. 처음(오름차순)으로 돌아가야 한다.",
+         """
+fun nextPermutation(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = a.size - 2
+    while (i >= 0 && a[i] >= a[i + 1]) i -= 1
+    if (i < 0) return a
+    var j = a.size - 1
+    while (a[j] <= a[i]) j -= 1
+    val t = a[i]; a[i] = a[j]; a[j] = t
+    var lo = i + 1; var hi = a.size - 1
+    while (lo < hi) { val u = a[lo]; a[lo] = a[hi]; a[hi] = u; lo += 1; hi -= 1 }
+    return a
+}
+"""),
+    ],
+))
+
+
+# --- 153. 최댓값과 최솟값의 차가 한도 안인 가장 긴 구간 (단조 덱 둘) --------------------------------------
+
+def _longest_within_limit(nums, limit):
+    from collections import deque
+    max_dq, min_dq = deque(), deque()
+    left = 0
+    best = 0
+    for right, x in enumerate(nums):
+        while max_dq and nums[max_dq[-1]] < x:
+            max_dq.pop()
+        max_dq.append(right)
+        while min_dq and nums[min_dq[-1]] > x:
+            min_dq.pop()
+        min_dq.append(right)
+        while nums[max_dq[0]] - nums[min_dq[0]] > limit:
+            left += 1
+            if max_dq[0] < left:
+                max_dq.popleft()
+            if min_dq[0] < left:
+                min_dq.popleft()
+        best = max(best, right - left + 1)
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="longest-subarray-with-limit",
+    title="차가 한도 안인 가장 긴 구간",
+    summary="""
+정수 배열 `nums` 와 `limit` 가 주어진다. 구간 안의 **최댓값과 최솟값의 차**가 `limit` 이하인
+연속 부분 배열 중 가장 긴 것의 길이를 반환한다. 길이 1 의 구간은 언제나 조건을 만족한다.
+""",
+    notes="""
+구간마다 최댓값·최솟값을 다시 구하면 n² 이다. 창을 오른쪽으로 늘리며 **최댓값의 단조 감소 덱**과
+**최솟값의 단조 증가 덱**을 유지하면 창의 최댓값·최솟값이 각 덱의 앞이고, 차가 한도를 넘는 동안
+왼쪽을 줄이며 덱의 앞이 창 밖으로 나가면 뺀다. 창은 줄어들지 않으니 답은 창의 최대 길이다.
+""",
+    drill_doc="""
+Drill.compare(left, right)    // 창을 봤다
+Drill.write(0, best)          // 답을 늘렸다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `-10^9 <= nums[i] <= 10^9`, `0 <= limit <= 2 · 10^9`
+""",
+    signature=dict(name="longestSubarrayWithLimit", parameters=[("nums", "INT_ARRAY"), ("limit", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_longest_within_limit,
+    cases={
+        "sample": [("01", [[8, 2, 4, 7], 4]), ("02", [[10, 1, 2, 4, 7, 2], 5])],
+        "boundary": [
+            ("01-single", [[5], 0]),
+            ("02-limit-zero-with-run", [[3, 3, 3, 1, 1], 0]),
+            ("03-whole-array", [[1, 2, 3, 4], 3]),
+            # 차의 최댓값 2·10⁹ — Int 안이지만 끝이다.
+            ("04-max-difference-allowed", [[1000000000, -1000000000, 1000000000], 2000000000]),
+            ("05-max-difference-not-allowed", [[1000000000, -1000000000], 1999999999]),
+            # 창을 줄일 때 최댓값 덱의 앞이 나간다.
+            ("06-max-leaves-window", [[9, 1, 2, 3, 4], 3]),
+            ("07-min-leaves-window", [[1, 9, 8, 7, 6], 3]),
+            # 한 칸만 줄이면 되는데 창을 처음부터 다시 시작하면 놓친다.
+            ("08-partial-shrink", [[1, 5, 3, 7, 4], 4]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 0, 9, salt=8861), 3]),
+            ("02-random-medium", [randoms(500, -100, 100, salt=8862), 20]),
+            ("03-random-wide", [randoms(3000, -1000000000, 1000000000, salt=8863), 500000000]),
+            ("04-sorted", [sorted(randoms(1000, 0, 10000, salt=8864)), 100]),
+        ],
+        "performance": [
+            ("01-small", [randoms(20000, 0, 100000, salt=8871), 30000]),
+            ("02-medium", [randoms(60000, 0, 100000, salt=8872), 50000]),
+            ("03-large-nearly-sorted", [sorted(randoms(100000, 0, 1000000000, salt=8873)), 900000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최댓값·최솟값 단조 덱과 줄어들지 않는 창.
+fun longestSubarrayWithLimit(nums: IntArray, limit: Int): Int {
+    val maxDq = ArrayDeque<Int>()
+    val minDq = ArrayDeque<Int>()
+    var left = 0
+    var best = 0
+    for (right in nums.indices) {
+        val x = nums[right]
+        while (maxDq.isNotEmpty() && nums[maxDq.last()] < x) maxDq.removeLast()
+        maxDq.addLast(right)
+        while (minDq.isNotEmpty() && nums[minDq.last()] > x) minDq.removeLast()
+        minDq.addLast(right)
+        while (nums[maxDq.first()].toLong() - nums[minDq.first()] > limit) {
+            left += 1
+            if (maxDq.first() < left) maxDq.removeFirst()
+            if (minDq.first() < left) minDq.removeFirst()
+        }
+        Drill.compare(left, right)
+        if (right - left + 1 > best) { best = right - left + 1; Drill.write(0, best) }
+    }
+    return best
+}
+""",
+    mutants=[
+        # 차는 최대 2·10⁹ 으로 Int 안이라 "Int 로 넘친다" 오답은 동치였고, 최댓값 덱에서 같은 값을 빼는
+        # 것도 맞다(최근 자리가 남는다) — 둘 다 걷어 내고 실제로 틀리는 둘로.
+        ("reset-window-on-violation", "WRONG_ALGORITHM",
+         "한도를 넘으면 창을 지금 자리에서 새로 시작한다. 한 칸만 줄이면 되는 창을 잃는다.",
+         """
+fun longestSubarrayWithLimit(nums: IntArray, limit: Int): Int {
+    val maxDq = ArrayDeque<Int>(); val minDq = ArrayDeque<Int>()
+    var left = 0; var best = 0
+    for (right in nums.indices) {
+        val x = nums[right]
+        while (maxDq.isNotEmpty() && nums[maxDq.last()] < x) maxDq.removeLast(); maxDq.addLast(right)
+        while (minDq.isNotEmpty() && nums[minDq.last()] > x) minDq.removeLast(); minDq.addLast(right)
+        if (nums[maxDq.first()].toLong() - nums[minDq.first()] > limit) { left = right; maxDq.clear(); minDq.clear(); maxDq.addLast(right); minDq.addLast(right) }
+        if (right - left + 1 > best) best = right - left + 1
+    }
+    return best
+}
+"""),
+        ("shrinks-before-adding", "OFF_BY_ONE",
+         "새 원소를 넣기 전에 한도를 검사한다. 새 원소가 한도를 깨도 그 창을 센다.",
+         """
+fun longestSubarrayWithLimit(nums: IntArray, limit: Int): Int {
+    val maxDq = ArrayDeque<Int>(); val minDq = ArrayDeque<Int>()
+    var left = 0; var best = 0
+    for (right in nums.indices) {
+        while (maxDq.isNotEmpty() && minDq.isNotEmpty() && nums[maxDq.first()].toLong() - nums[minDq.first()] > limit) { left += 1; if (maxDq.first() < left) maxDq.removeFirst(); if (minDq.first() < left) minDq.removeFirst() }
+        val x = nums[right]
+        while (maxDq.isNotEmpty() && nums[maxDq.last()] < x) maxDq.removeLast(); maxDq.addLast(right)
+        while (minDq.isNotEmpty() && nums[minDq.last()] > x) minDq.removeLast(); minDq.addLast(right)
+        if (right - left + 1 > best) best = right - left + 1
+    }
+    return best
+}
+"""),
+        ("never-evicts-front", "WRONG_ALGORITHM",
+         "창을 줄여도 덱의 앞을 빼지 않는다. 나간 원소가 최댓값·최솟값으로 남는다.",
+         """
+fun longestSubarrayWithLimit(nums: IntArray, limit: Int): Int {
+    val maxDq = ArrayDeque<Int>(); val minDq = ArrayDeque<Int>()
+    var left = 0; var best = 0
+    for (right in nums.indices) {
+        val x = nums[right]
+        while (maxDq.isNotEmpty() && nums[maxDq.last()] < x) maxDq.removeLast(); maxDq.addLast(right)
+        while (minDq.isNotEmpty() && nums[minDq.last()] > x) minDq.removeLast(); minDq.addLast(right)
+        while (nums[maxDq.first()].toLong() - nums[minDq.first()] > limit && left < right) left += 1
+        if (right - left + 1 > best) best = right - left + 1
+    }
+    return best
+}
+"""),
+        ("rescan-window--quadratic", "PERFORMANCE",
+         "창을 늘릴 때마다 최댓값·최솟값을 다시 훑는다. O(n²).",
+         """
+fun longestSubarrayWithLimit(nums: IntArray, limit: Int): Int {
+    var best = 0
+    for (i in nums.indices) {
+        var lo = nums[i]; var hi = nums[i]
+        for (j in i until nums.size) {
+            Drill.compare(i, j)
+            if (nums[j] < lo) lo = nums[j]
+            if (nums[j] > hi) hi = nums[j]
+            if (hi.toLong() - lo > limit) break
+            if (j - i + 1 > best) best = j - i + 1
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

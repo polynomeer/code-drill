@@ -1,0 +1,20 @@
+# shortest-path-visiting-all-nodes 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - graph
+  - bfs
+  - bit-manipulation
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - CONSTRAINTS
+  - COMPLEXITY
+prerequisites:
+  - shortest-hops
+  - wall-breaking-path
+complexity:
+  time: EXPONENTIAL
+  space: EXPONENTIAL
+  note: "O(2^n · n · deg). n ≤ 12 라 상태 5만 개. 순열 전부는 n!"
