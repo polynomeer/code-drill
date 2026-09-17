@@ -9,6 +9,7 @@ competencies:
   - CONSTRAINTS
   - ALGORITHM_CHOICE
   - CORRECTNESS
+  - IMPLEMENTATION
   - COMPLEXITY
 prerequisites:
   - meeting-rooms
