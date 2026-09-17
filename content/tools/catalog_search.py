@@ -1820,7 +1820,10 @@ Drill.write(q, answer)        // 질의의 답을 적었다
 - `queries.size` 는 3 의 배수이며 질의는 최대 `100_000` 개, `0 <= l <= r < n`
 """,
     signature=dict(name="rangeFrequency", parameters=[("nums", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
-    groups=perf_groups(time_multiplier=0.5),
+    # 공개 뒤 한도(케이스)를 고쳤다 — 판정이 바뀌므로 새 버전이다 (§6.1 공개 후 불변).
+    version=2,
+    # 질의마다 훑기가 전체 검증에서 2.7배에 그쳤다 — 값이 21 가지뿐이라 구간이 짧은 질의가 많다.
+    groups=perf_groups(time_multiplier=0.25),
     reference=_range_frequency,
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
     cases={

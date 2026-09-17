@@ -23,5 +23,5 @@ Drill.write(0, best)          // 답을 늘렸다
 
 ## 제약
 
-- `1 <= nums.length <= 100_000`
+- `1 <= nums.length <= 300_000`
 - `0 <= nums[i] < 2^30`

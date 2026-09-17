@@ -541,10 +541,14 @@ Drill.compare(bit, best)      // 비트 자리를 결정했다
 Drill.write(0, best)          // 답을 늘렸다
 """,
     constraints="""
-- `1 <= nums.length <= 100_000`
+- `1 <= nums.length <= 300_000`
 - `0 <= nums[i] < 2^30`
 """,
     signature=dict(name="maxXorPair", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    # 공개 뒤 한도(케이스)를 고쳤다 — 판정이 바뀌므로 새 버전이다 (§6.1 공개 후 불변).
+    version=2,
+    # 10 만에서는 n² 이 JIT 의 벡터화로 1초 안에 들기도 했다(전체 검증에서 살아남고 혼자 돌리면
+    # 잡혔다 — JIT 의 기분이다). 30 만이면 9 배라 어느 기분에서도 자릿수로 진다.
     groups=perf_groups(time_multiplier=0.5),
     reference=_max_xor,
     cases={
@@ -565,9 +569,9 @@ Drill.write(0, best)          // 답을 늘렸다
             ("04-narrow-range", [randoms(500, 1000000, 1000100, salt=8714)]),
         ],
         "performance": [
-            ("01-small", [randoms(5000, 0, 1073741823, salt=8721)]),
-            ("02-medium", [randoms(30000, 0, 1073741823, salt=8722)]),
-            ("03-large", [randoms(100000, 0, 1073741823, salt=8723)]),
+            ("01-small", [randoms(20000, 0, 1073741823, salt=8721)]),
+            ("02-medium", [randoms(100000, 0, 1073741823, salt=8722)]),
+            ("03-large", [randoms(300000, 0, 1073741823, salt=8723)]),
         ],
     },
     kotlin="""
