@@ -1415,8 +1415,10 @@ def main() -> int:
     status, _ = raw_request("POST", "/projects/inventory-ledger/submissions", {"files": {"a.py": ""}}, {"Authorization": "", "Idempotency-Key": "p-noauth"})
     results.append(check("토큰 없는 프로젝트 제출 거부", status, 401))
     status, projects = raw_request("GET", "/projects", None, {"Authorization": ""})
-    results.append(check("프로젝트 목록은 공개", (status, [p["id"] for p in projects]), (200, ["inventory-ledger"])))
-    results.append(check("  역량 없이 난이도·태그·요약만", (projects[0]["difficulty"], projects[0]["tags"], projects[0]["solved"]), ("MEDIUM", ["queue", "simulation"], False)))
+    # 공개된 프로젝트는 하나가 아니다 — 목록에 있는지와 그 항목의 모양만 본다.
+    ledger = next((p for p in projects if p["id"] == "inventory-ledger"), None)
+    results.append(check("프로젝트 목록은 공개", (status, ledger is not None), (200, True)))
+    results.append(check("  역량 없이 난이도·태그·요약만", (ledger["difficulty"], ledger["tags"], ledger["solved"]), ("MEDIUM", ["queue", "simulation"], False)))
     view = request("GET", "/projects/inventory-ledger")
     results.append(check("상세는 시작 저장소를 준다", sorted(view["files"]), ["ledger/__init__.py", "ledger/inventory.py", "tests/__init__.py", "tests/test_public.py"]))
     results.append(check("  숨은 테스트는 어디에도 없다", any("hidden" in path or "test_hidden" in content for path, content in view["files"].items()) or "hidden" in view["statement"].lower(), False))
@@ -1442,7 +1444,7 @@ def main() -> int:
     results.append(check("  공개 테스트 셋은 이름과 함께", sorted(t["name"] for t in final["tests"]), ["PublicTests.test_receive_then_on_hand", "PublicTests.test_rejects_non_positive_quantity", "PublicTests.test_ship_uses_oldest_lot_first"]))
     results.append(check("  숨은 테스트는 수로만", (final["hiddenPassed"], final["hiddenTotal"], any(t["module"] == "tests.test_hidden" for t in final["tests"])), (10, 10, False)))
     results.append(check("  제출한 파일이 함께 온다", sorted(final["files"]) == sorted(reference), True))
-    results.append(check("목록에 완료 표시", request("GET", "/projects")[0]["solved"], True))
+    results.append(check("목록에 완료 표시", next(p["solved"] for p in request("GET", "/projects") if p["id"] == "inventory-ledger"), True))
 
     # 프로젝트 판정은 실무군 역량의 증거다 (11단계). 알고리즘 칸에는 아무것도 붙지 않는다.
     competencies = {c["competency"]: c for c in request("GET", "/me/competencies")["competencies"]}
@@ -1535,9 +1537,9 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     pcontest = request("POST", "/admin/contests", {"title": "스모크 프로젝트 대회", "problemIds": ["inventory-ledger"],
                                                    "startsAt": (now - timedelta(minutes=1)).isoformat(), "endsAt": (now + timedelta(minutes=10)).isoformat()}, registrar)
-    results.append(check("프로젝트를 문제로 하는 대회를 만들었다", pcontest["problemCount"], 1))
+    results.append(check("프로젝트를 문제로 하는 대회를 만들었다", pcontest["published"], False))
     request("POST", f"/admin/contests/{pcontest['id']}/publish", None, publisher)
-    request("POST", f"/contests/{pcontest['id']}/join")
+    results.append(check("  대회의 문제는 프로젝트다", request("POST", f"/contests/{pcontest['id']}/join")["problemCount"], 1))
     in_contest = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": reference}, {"Idempotency-Key": f"p-contest-{uuid.uuid4()}"})["id"])
     results.append(check("  대회 중의 프로젝트 판정", in_contest["verdict"], "ACCEPTED"))
     pview = request("GET", f"/contests/{pcontest['id']}")

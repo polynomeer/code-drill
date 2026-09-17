@@ -294,6 +294,8 @@ class RejudgeService(
                    ORDER BY p.id DESC LIMIT 1
               ) previous ON true
              WHERE g.rejudge_job_id = ?
+               -- 이전 판정이 없으면 "바뀐" 것이 아니다 — 이력 표가 생기기 전의 제출은 비교할 상대가 없다.
+               AND previous.verdict IS NOT NULL
                AND (previous.verdict IS DISTINCT FROM g.verdict
                     OR previous.score IS DISTINCT FROM g.score)
              ORDER BY g.id
