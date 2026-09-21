@@ -355,7 +355,10 @@ export function ProjectWorkspace({
               >
                 {submitting ? '제출 중…' : '제출'}
               </button>
-              <span className="muted small">공개 테스트({publicTestFiles.join(', ')})와 숨은 테스트를 함께 돌립니다</span>
+              <span className="muted small">
+                공개 테스트({publicTestFiles.join(', ')})와 숨은 테스트를 함께 돌립니다. 테스트를 더 쓰면 그 테스트가 대표 오답을 잡는지도
+                잽니다.
+              </span>
             </div>
           </section>
 
