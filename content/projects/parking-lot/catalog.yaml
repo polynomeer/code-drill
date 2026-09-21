@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - simulation
+  - greedy
+summary: 크기별 자리와 시작한 시간 단위 요금이 있는 주차장을 요구사항대로 구현한다 — 맞는 자리 중 가장 작은 것에 대고, 30분까지는 무료다.
+competencies:
+  - SPECIFICATION

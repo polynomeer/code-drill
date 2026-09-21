@@ -1,0 +1,7 @@
+difficulty: EASY
+tags:
+  - simulation
+  - math
+summary: 수량 할인과 쿠폰이 정해진 순서와 반올림 규칙으로 적용되는 장바구니를 구현한다 — 금액은 정수 원이고 내림이다.
+competencies:
+  - SPECIFICATION
