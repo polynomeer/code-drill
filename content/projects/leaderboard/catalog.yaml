@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - sorting
+  - hash-map
+summary: 동점을 경쟁 순위(1, 2, 2, 4)로 매기는 순위표를 구현한다 — 점수는 누적이고, 같은 점수의 순서는 이름이며, 상위 k 도 같은 규칙이다.
+competencies:
+  - SPECIFICATION
