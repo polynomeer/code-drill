@@ -67,6 +67,7 @@ class ProjectValidator(
         val mutants = loader.mutants(projectId).map { mutant -> evaluate(pkg, suite, mutant) }
         checks += mutationKillRate(mutants)
         checks += tamperGuard(mutants)
+        checks += probeRoom(pkg, mutants)
 
         return report(pkg, checks, mutants)
     }
@@ -172,6 +173,25 @@ class ProjectValidator(
         )
     }
 
+    /**
+     * 결함 검출(실무군 셋째 역량)이 이 문제에서 뜻을 가지려면 **공개 테스트가 못 잡는 오답**이 둘은
+     * 있어야 한다. 공개 테스트가 잡는 오답은 사용자의 몫이 아니라서 시험에서 빠진다 — 전부 빠지면
+     * 이 문제는 그 역량을 재지 못하고, 하나뿐이면 절반 규칙이 "그 하나를 잡았는가"로 줄어든다.
+     * 잡은 테스트의 모듈이 공개 모듈인지로 안다; 실행을 더 하지 않는다.
+     */
+    private fun probeRoom(pkg: ProjectPackage, mutants: List<MutationResult>): List<Check> {
+        val public = pkg.publicModules.toSet()
+        val candidates = mutants.filterNot { it.name.startsWith("tamper") }
+        val room = candidates.filterNot { m -> m.killedBy.any { it.substringBeforeLast('.').substringBeforeLast('.') in public || it.substringBeforeLast('.') in public } }
+        return listOf(
+            if (room.size >= MIN_PROBE_ROOM) {
+                Check.pass("probe-room", "공개 테스트가 못 잡는 오답 ${room.size}개 — 결함 검출의 자리다")
+            } else {
+                Check.fail("probe-room", "공개 테스트가 못 잡는 오답이 ${room.size}개뿐이다 (최소 $MIN_PROBE_ROOM). 공개 테스트를 줄이거나 그 너머의 오답을 더한다")
+            },
+        )
+    }
+
     private fun mutationKillRate(mutants: List<MutationResult>): List<Check> {
         if (mutants.isEmpty()) return listOf(Check.fail("mutation-kill-rate", "mutants/ 가 비어 있다. 대표 오답 없이는 스위트가 무엇을 잡는지 모른다"))
         val alive = mutants.filterNot { it.killed }
@@ -253,6 +273,9 @@ class ProjectValidator(
     }
 
     private companion object {
+        /** 결함 검출을 잴 수 있으려면 공개 테스트 너머의 오답이 이만큼은 있어야 한다. */
+        const val MIN_PROBE_ROOM = 2
+
         // 기준은 알고리즘 문제와 같다. 두 판정기가 해설 길이나 시간 여유를 다르게 재면 안 된다.
         val TAG_LINE = ContentValidator.TAG_LINE
         const val MIN_EDITORIAL = ContentValidator.MIN_EDITORIAL

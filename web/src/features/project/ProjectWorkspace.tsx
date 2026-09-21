@@ -411,6 +411,7 @@ function ProjectResult({ submission }: { submission: ProjectSubmission }) {
  */
 function ProbeResult({ probe }: { probe: ProjectProbeOutcome }) {
   const total = probe.killed.length + probe.survived.length
+  const given = probe.alreadyCaught?.length ?? 0
   if (!probe.referencePassed) {
     return (
       <div className="project-probe">
@@ -422,13 +423,16 @@ function ProbeResult({ probe }: { probe: ProjectProbeOutcome }) {
   return (
     <div className="project-probe">
       <p className="small">
-        <strong className={probe.killed.length * 2 >= total ? 'ok' : 'warn'}>
-          내 테스트가 오답 {total}개 중 {probe.killed.length}개를 잡았습니다
+        <strong className={total > 0 && probe.killed.length * 2 >= total ? 'ok' : 'warn'}>
+          {total === 0
+            ? '공개 테스트가 이미 모든 오답을 잡습니다 — 더 쓴 테스트로 잴 것이 없습니다'
+            : `내 테스트가 오답 ${total}개 중 ${probe.killed.length}개를 잡았습니다`}
         </strong>
       </p>
       {probe.survived.length > 0 && (
         <p className="muted small">놓친 오답: {probe.survived.map((name) => name.replace(/--.*$/, '')).join(', ')}</p>
       )}
+      {given > 0 && <p className="muted small">공개 테스트가 이미 잡는 오답 {given}개는 세지 않았습니다</p>}
     </div>
   )
 }

@@ -112,6 +112,11 @@ class ProjectEngine(
      *
      * 오답을 "잡았다"는 것은 그 판에서 리포트가 전부 통과가 아니라는 것이다 — 단언 실패든, 예외든,
      * 빌드 실패든. 참조에서 되던 테스트가 오답에서 어떤 식으로든 깨졌으면 잡은 것이다.
+     *
+     * 다만 **시작 저장소의 공개 테스트가 이미 잡는 오답은 사용자의 몫이 아니다.** 사용자의 테스트
+     * 파일에는 공개 테스트가 그대로 들어 있으니, 잡힌 오답마다 판을 손대지 않은 채(공개 테스트만으로)
+     * 한 번 더 돌려 그때도 떨어지면 [ProjectProbeOutcome.alreadyCaught] 로 뺀다. 그 실행은 잡힌
+     * 오답에만 든다.
      */
     private fun probe(request: ProjectRequest, workspace: Map<String, String>, bundle: ProbeBundle, sandboxDir: Path): ProjectProbeOutcome? {
         val userTests = workspace.filterKeys(ProjectPackage::isTestModule)
@@ -126,12 +131,17 @@ class ProjectEngine(
         }
         val killed = ArrayList<String>()
         val survived = ArrayList<String>()
+        val alreadyCaught = ArrayList<String>()
         for ((name, files) in bundle.variants) {
             if (name == Probes.REFERENCE) continue
-            val outcome = suite(request, files + userTests, sandboxDir.resolve("probe-" + name.replace(Regex("[^A-Za-z0-9_-]"), "_")))
-            if (outcome.allPassed) survived += name else killed += name
+            val safe = name.replace(Regex("[^A-Za-z0-9_-]"), "_")
+            val outcome = suite(request, files + userTests, sandboxDir.resolve("probe-$safe"))
+            if (outcome.allPassed) { survived += name; continue }
+            // 공개 테스트만으로도 떨어지는가 — 판 그대로(시작 저장소의 테스트가 들어 있다).
+            val baseline = suite(request, files, sandboxDir.resolve("probe-$safe-baseline"))
+            if (baseline.allPassed) killed += name else alreadyCaught += name
         }
-        return ProjectProbeOutcome(referencePassed = true, killed = killed.sorted(), survived = survived.sorted())
+        return ProjectProbeOutcome(referencePassed = true, killed = killed.sorted(), survived = survived.sorted(), alreadyCaught = alreadyCaught.sorted())
     }
 
     /** 판 하나를 빌드하고 돌린 결과. [allPassed] 만이 시험의 답이고 나머지는 사유다. */

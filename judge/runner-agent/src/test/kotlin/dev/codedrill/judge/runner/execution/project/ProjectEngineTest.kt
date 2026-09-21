@@ -131,7 +131,10 @@ class ProjectEngineTest {
 
     private val reference = pkg.starter + loader.reference("inventory-ledger")!!
 
-    /** 부분 로트의 나머지 원가를 묻는 테스트 — partial-lot 과 lifo 는 잡고, 되돌리기·이력 오답은 못 잡는다. */
+    /**
+     * 부분 로트의 나머지 원가를 묻는 테스트. partial-lot 과 lifo 를 떨어뜨리지만 그 둘은 시작 저장소의
+     * 공개 테스트만으로도 떨어진다 — 사용자의 몫이 아니다. 되돌리기·이력 오답은 못 잡는다.
+     */
     private val partialLotTest = """
         import unittest
         from ledger import Ledger
@@ -160,7 +163,8 @@ class ProjectEngineTest {
         assertEquals(Verdict.ACCEPTED, result.verdict)
         val outcome = result.probe!!
         assertTrue(outcome.referencePassed)
-        assertEquals(listOf("lifo--consumes-newest-lot-first", "partial-lot--drops-remainder"), outcome.killed)
+        assertEquals(emptyList(), outcome.killed, "공개 테스트가 이미 잡는 오답은 내 몫이 아니다")
+        assertEquals(listOf("lifo--consumes-newest-lot-first", "partial-lot--drops-remainder"), outcome.alreadyCaught)
         assertEquals(listOf("history--returns-internal-list", "no-rollback--ships-partial-on-shortage"), outcome.survived)
     }
 
@@ -171,7 +175,9 @@ class ProjectEngineTest {
 
         assertTrue(result.probe!!.referencePassed)
         assertEquals(emptyList(), result.probe!!.survived)
-        assertEquals(4, result.probe!!.killed.size)
+        // 공개 테스트가 못 잡던 둘을 잡았다. 나머지 둘은 공개 테스트의 몫이다.
+        assertEquals(listOf("history--returns-internal-list", "no-rollback--ships-partial-on-shortage"), result.probe!!.killed)
+        assertEquals(2, result.probe!!.alreadyCaught.size)
     }
 
     @Test
@@ -195,7 +201,7 @@ class ProjectEngineTest {
 
         assertEquals(Verdict.WRONG_ANSWER, result.verdict)
         assertTrue(result.probe!!.referencePassed)
-        assertTrue("partial-lot--drops-remainder" in result.probe!!.killed)
+        assertTrue("partial-lot--drops-remainder" in result.probe!!.alreadyCaught)
     }
 
     private fun request(id: String, files: Map<String, String>, upload: Boolean = true, probe: BundleRef? = null): ProjectRequest {

@@ -840,6 +840,8 @@ export interface ProjectProbeOutcome {
   killed: string[]
   survived: string[]
   log: string | null
+  /** 공개 테스트만으로도 떨어지는 오답 — 내 몫이 아니라 세지 않는다. */
+  alreadyCaught: string[]
 }
 
 /** 프로젝트형 초안 — 파일 여럿 (§8.1). 버전은 CAS 의 것이다. */

@@ -621,7 +621,8 @@ class ContentValidator(
          * `"0"` 은 이 값을 기록하기 전에 등록된 행을 뜻한다 (V9 migration).
          */
         // 5: JVM 판정이 동기 JIT(-Xbatch) 로 돈다. 시간 여유의 뜻이 바뀌어 모든 보고서를 다시 잰다.
-        const val VALIDATOR_VERSION = "5"
+        // 6: 프로젝트형에 probe-room(공개 테스트 너머의 오답이 둘은 있어야 결함 검출을 잴 수 있다).
+        const val VALIDATOR_VERSION = "6"
 
         /** 해설의 최소 길이. 한 줄짜리 해설은 해설이 아니다. */
         internal const val MIN_EDITORIAL = 200

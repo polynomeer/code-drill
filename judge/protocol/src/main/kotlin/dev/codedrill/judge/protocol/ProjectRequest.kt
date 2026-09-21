@@ -91,6 +91,12 @@ data class ProjectProbeOutcome(
     val survived: List<String>,
     /** 참조 위에서 떨어졌을 때 그 사유 — 사용자의 테스트가 무엇을 잘못 기대했는지. */
     val log: String? = null,
+    /**
+     * 시작 저장소의 공개 테스트만으로도 떨어지는 오답. 사용자의 몫이 아니라 [killed] 에서 뺀다 —
+     * 공개 테스트를 그대로 둔 채 사소한 테스트 하나를 더 쓰면 공개 테스트가 잡던 오답이 전부
+     * "내가 잡은 것"이 되기 때문이다. 처음 스모크가 그것을 보여 줬다.
+     */
+    val alreadyCaught: List<String> = emptyList(),
 )
 
 /** 오브젝트 스토어의 워크스페이스 하나. [Workspaces] 가 모양을 정한다. */
