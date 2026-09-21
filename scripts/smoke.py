@@ -1458,6 +1458,24 @@ def main() -> int:
     results.append(check("테스트를 하나 더 써서 냈다", (with_test["verdict"], len(with_test["tests"])), ("ACCEPTED", 4)))
     writing = request("GET", "/me/competencies/TEST_WRITING")
     results.append(check("  테스트 작성 증거가 섰다", (len(writing), writing[0]["source"], writing[0]["success"]), (1, "PROJECT_TESTS", True)))
+
+    # 더 쓴 테스트는 참조와 대표 오답 위에서 시험된다 (실무군 셋째 역량 — 결함 검출). 잡은 수가
+    # 곧 증거의 성패(절반 이상)이고, 오답의 내용은 어디에도 없다 — 이름과 수뿐이다. 위의 사소한
+    # 테스트(없는 SKU 의 재고는 0)도 오답 둘을 잡는다 — 그 오답들은 모르는 SKU 에서 넘어진다.
+    results.append(check("  참조만 낸 제출은 시험하지 않는다", final["probe"], None))
+    probe = with_test["probe"]
+    total = len(probe["killed"]) + len(probe["survived"])
+    results.append(check("  더 쓴 테스트를 오답 위에서 시험했다", (probe["referencePassed"], total >= 4), (True, True)))
+    detecting = request("GET", "/me/competencies/DEFECT_DETECTION")
+    results.append(check("  결함 검출 증거는 잡은 수의 절반 규칙을 따른다", (len(detecting), detecting[0]["source"], detecting[0]["success"]), (1, "PROJECT_PROBE", len(probe["killed"]) * 2 >= total)))
+    catching = {**reference, "tests/test_mine.py": "import unittest\nfrom ledger import Ledger\n\nclass MineTests(unittest.TestCase):\n    def test_remainder_keeps_its_cost(self):\n        ledger = Ledger()\n        ledger.receive('A', 4, 10)\n        ledger.receive('A', 6, 20)\n        ledger.ship('A', 7)\n        self.assertEqual(3 * 20, ledger.ship('A', 3))\n"}
+    caught = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": catching}, {"Idempotency-Key": f"p-catch-{uuid.uuid4()}"})["id"])
+    results.append(check("로트 나머지를 묻는 테스트는 그 오답을 잡는다", (caught["verdict"], "partial-lot--drops-remainder" in caught["probe"]["killed"], caught["probe"]["referencePassed"]), ("ACCEPTED", True, True)))
+    detecting = request("GET", "/me/competencies/DEFECT_DETECTION")
+    results.append(check("  오답의 절반 이상을 잡으면 결함 검출 성공", (len(detecting), detecting[0]["success"]), (2, True)))
+    results.append(check("  오답의 내용은 어디에도 없다", any("def " in str(v) for v in caught["probe"].values()), False))
+    wrong_test = await_project(request("POST", "/projects/inventory-ledger/submissions", {"files": {**catching, "tests/test_mine.py": catching["tests/test_mine.py"].replace("3 * 20", "3 * 10")}}, {"Idempotency-Key": f"p-wrongtest-{uuid.uuid4()}"})["id"])
+    results.append(check("틀린 것을 기대하는 테스트는 참조에서 떨어진다", (wrong_test["verdict"], wrong_test["probe"]["referencePassed"], "AssertionError" in (wrong_test["probe"]["log"] or "")), ("WRONG_ANSWER", False, True)))
     spec_count_before = None  # 재채점 직전에 잰다 — 그 사이의 오답 제출들도 증거다.
 
     mutant = {**starter, **overlay(project_root / "mutants" / "partial-lot--drops-remainder")}
