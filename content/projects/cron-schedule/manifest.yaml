@@ -1,0 +1,11 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다). 여섯째 Python 프로젝트.
+id: cron-schedule
+version: 1
+title: 분·시 일정식
+language: PYTHON
+statement: statement.md
+
+limits:
+  buildSeconds: 60
+  testSeconds: 120
+  memoryMb: 256

@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - string
+  - simulation
+summary: cron 의 분·시 두 칸을 읽어 다음 실행 시각을 내는 일정식을 구현한다 — 간격은 범위의 시작에서 세고, 다음은 엄격히 뒤이며, 하루가 넘어가면 다음 날이다.
+competencies:
+  - SPECIFICATION
