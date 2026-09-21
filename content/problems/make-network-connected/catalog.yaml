@@ -1,0 +1,17 @@
+# make-network-connected 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - graph
+  - union-find
+  - counting
+competencies:
+  - READING
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - connected-components
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "유니온파인드 상각 O((n + m) α). 사슬이 되면 O(n·m)"

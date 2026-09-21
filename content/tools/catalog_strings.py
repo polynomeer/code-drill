@@ -1220,3 +1220,265 @@ fun minWindow(s: String, t: String): Int {
 """),
     ],
 ))
+
+
+# --- 154. 제목 표기 (규칙 읽기) -------------------------------------------------------------------------
+
+def _title_case(text):
+    out = []
+    start = True
+    for ch in text:
+        if ch == " ":
+            out.append(ch)
+            start = True
+        elif start:
+            out.append(ch.upper())
+            start = False
+        else:
+            out.append(ch.lower())
+    return "".join(out)
+
+
+PROBLEMS.append(Problem(
+    id="title-case",
+    title="제목 표기",
+    summary="""
+영문자와 공백으로 된 문자열 `text` 를 **제목 표기**로 바꿔 반환한다. 단어의 첫 글자는 대문자,
+나머지 글자는 소문자다. 단어는 공백으로 나뉘며, 공백은 개수와 자리를 **그대로** 둔다 — 앞뒤와
+사이의 공백을 합치거나 지우지 않는다.
+""",
+    notes="""
+규칙 셋을 그대로 옮기면 된다: 공백은 그대로, 단어의 첫 글자는 대문자, 그 뒤는 소문자. "단어의
+첫 글자"는 문자열의 처음이거나 바로 앞이 공백인 글자다. `split` 으로 나누면 공백의 개수를
+잃는다 — 글자를 하나씩 보며 "지금이 단어의 시작인가"를 들고 가는 것이 정확하다.
+""",
+    drill_doc="""
+Drill.compare(i, start)       // 글자 i 가 단어의 시작인지 봤다
+Drill.write(i, code)          // 글자를 적었다
+""",
+    constraints="""
+- `0 <= text.length <= 100_000`, 영문자와 공백뿐
+""",
+    signature=dict(name="titleCase", parameters=[("text", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_title_case,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 400000},
+    cases={
+        "sample": [("01", ["hello world"]), ("02", ["tHE qUICK bROWN"])],
+        "boundary": [
+            ("01-empty", [""]),
+            ("02-single-letter", ["a"]),
+            # 앞뒤 공백과 사이의 여러 공백은 그대로.
+            ("03-leading-and-double-spaces", ["  two  spaces "]),
+            ("04-all-upper", ["ALL CAPS HERE"]),
+            ("05-only-spaces", ["   "]),
+            ("06-single-word-mixed", ["mIxEdCaSe"]),
+        ],
+        "hidden": [
+            ("01-sentence", ["the rain in spain stays mainly in the plain"]),
+            ("02-trailing-space", ["end with space "]),
+            ("03-many-words", [" ".join(["wORD"] * 50)]),
+            ("04-long", [("aBc dEf  gHi " * 5000).rstrip(" ")]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 글자마다 "단어의 시작인가"를 들고 간다.
+fun titleCase(text: String): String {
+    val out = StringBuilder(text.length)
+    var start = true
+    for ((i, ch) in text.withIndex()) {
+        Drill.compare(i, if (start) 1 else 0)
+        when {
+            ch == ' ' -> { out.append(ch); start = true }
+            start -> { out.append(ch.uppercaseChar()); start = false }
+            else -> out.append(ch.lowercaseChar())
+        }
+    }
+    return out.toString()
+}
+""",
+    mutants=[
+        ("split-joins-spaces", "WRONG_ALGORITHM",
+         "공백으로 나눠 다시 합친다. 여러 공백과 앞뒤 공백이 사라진다.",
+         """
+fun titleCase(text: String): String =
+    text.split(" ").filter { it.isNotEmpty() }.joinToString(" ") { it.lowercase().replaceFirstChar { c -> c.uppercaseChar() } }
+"""),
+        ("keeps-rest-as-is", "MISSING_EDGE_CASE",
+         "첫 글자만 대문자로 하고 나머지는 그대로 둔다. 소문자로 내려야 한다.",
+         """
+fun titleCase(text: String): String {
+    val out = StringBuilder(text.length)
+    var start = true
+    for (ch in text) {
+        when {
+            ch == ' ' -> { out.append(ch); start = true }
+            start -> { out.append(ch.uppercaseChar()); start = false }
+            else -> out.append(ch)
+        }
+    }
+    return out.toString()
+}
+"""),
+        ("first-letter-only-once", "OFF_BY_ONE",
+         "문자열의 첫 글자만 대문자로 한다. 둘째 단어부터는 소문자다.",
+         """
+fun titleCase(text: String): String {
+    val out = StringBuilder(text.length)
+    for ((i, ch) in text.withIndex()) out.append(if (i == 0) ch.uppercaseChar() else ch.lowercaseChar())
+    return out.toString()
+}
+"""),
+        ("space-does-not-reset", "WRONG_BRANCH",
+         "공백을 지나도 단어의 시작으로 돌아가지 않는다.",
+         """
+fun titleCase(text: String): String {
+    val out = StringBuilder(text.length)
+    var start = true
+    for (ch in text) {
+        when {
+            ch == ' ' -> out.append(ch)
+            start -> { out.append(ch.uppercaseChar()); start = false }
+            else -> out.append(ch.lowercaseChar())
+        }
+    }
+    return out.toString()
+}
+"""),
+    ],
+))
+
+
+# --- 155. 로마 숫자 읽기 (규칙 읽기) -------------------------------------------------------------------
+
+_ROMAN = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+
+
+def _roman_to_integer(text):
+    total = 0
+    for i, ch in enumerate(text):
+        value = _ROMAN[ch]
+        if i + 1 < len(text) and _ROMAN[text[i + 1]] > value:
+            total -= value
+        else:
+            total += value
+    return total
+
+
+def _integer_to_roman(n):
+    out = []
+    for value, symbol in ((1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"), (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")):
+        while n >= value:
+            out.append(symbol)
+            n -= value
+    return "".join(out)
+
+
+PROBLEMS.append(Problem(
+    id="roman-to-integer",
+    title="로마 숫자 읽기",
+    summary="""
+올바른 로마 숫자 문자열 `text` 를 정수로 바꿔 반환한다. 기호는 `I=1, V=5, X=10, L=50, C=100,
+D=500, M=1000` 이고 보통은 큰 것부터 왼쪽에서 오른쪽으로 더한다. 다만 **작은 기호가 큰 기호
+바로 앞에 오면 그 작은 값은 빼는** 것이다 — `IV = 4`, `IX = 9`, `XL = 40`, `XC = 90`, `CD = 400`,
+`CM = 900`. 입력은 그 규칙을 지키는 문자열이다.
+""",
+    notes="""
+규칙 하나면 된다: 기호마다 **다음 기호가 더 크면 빼고, 아니면 더한다.** 여섯 가지 조합을 따로
+외울 필요가 없다 — 그 조합은 규칙에서 나온다. 마지막 기호는 다음이 없으니 늘 더한다.
+""",
+    drill_doc="""
+Drill.compare(i, i + 1)       // 이웃 기호와 크기를 비교했다
+Drill.write(0, total)         // 합을 갱신했다
+""",
+    constraints="""
+- `1 <= text.length <= 15`, 올바른 로마 숫자, 값은 `1..3999`
+""",
+    signature=dict(name="romanToInteger", parameters=[("text", "STRING")], returns="INT"),
+    groups=standard_groups(),
+    reference=_roman_to_integer,
+    cases={
+        "sample": [("01", ["III"]), ("02", ["LVIII"]), ("03", ["MCMXCIV"])],
+        "boundary": [
+            ("01-one", ["I"]),
+            ("02-four", ["IV"]),
+            ("03-nine", ["IX"]),
+            ("04-max", ["MMMCMXCIX"]),
+            # 빼는 쌍이 연달아 온다.
+            ("05-consecutive-subtractions", ["XCIV"]),
+            ("06-thousand", ["M"]),
+            ("07-forty", ["XL"]),
+        ],
+        "hidden": [
+            ("01-random", [_integer_to_roman(1994)]),
+            ("02-random", [_integer_to_roman(2468)]),
+            ("03-random", [_integer_to_roman(3888)]),
+            ("04-random", [_integer_to_roman(444)]),
+            ("05-random", [_integer_to_roman(999)]),
+            ("06-random", [_integer_to_roman(1049)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 다음 기호가 더 크면 빼고, 아니면 더한다.
+fun romanToInteger(text: String): Int {
+    fun value(c: Char) = when (c) { 'I' -> 1; 'V' -> 5; 'X' -> 10; 'L' -> 50; 'C' -> 100; 'D' -> 500; else -> 1000 }
+    var total = 0
+    for (i in text.indices) {
+        val v = value(text[i])
+        if (i + 1 < text.length) Drill.compare(i, i + 1)
+        total += if (i + 1 < text.length && value(text[i + 1]) > v) -v else v
+        Drill.write(0, total)
+    }
+    return total
+}
+""",
+    mutants=[
+        ("adds-everything", "WRONG_ALGORITHM",
+         "빼는 규칙이 없다. IV 가 6 이 된다.",
+         """
+fun romanToInteger(text: String): Int {
+    fun value(c: Char) = when (c) { 'I' -> 1; 'V' -> 5; 'X' -> 10; 'L' -> 50; 'C' -> 100; 'D' -> 500; else -> 1000 }
+    return text.sumOf { value(it) }
+}
+"""),
+        ("subtracts-when-next-is-equal-or-larger", "OFF_BY_ONE",
+         "다음 기호가 같아도 뺀다. III 가 1 이 된다.",
+         """
+fun romanToInteger(text: String): Int {
+    fun value(c: Char) = when (c) { 'I' -> 1; 'V' -> 5; 'X' -> 10; 'L' -> 50; 'C' -> 100; 'D' -> 500; else -> 1000 }
+    var total = 0
+    for (i in text.indices) {
+        val v = value(text[i])
+        total += if (i + 1 < text.length && value(text[i + 1]) >= v) -v else v
+    }
+    return total
+}
+"""),
+        ("only-i-subtracts", "MISSING_EDGE_CASE",
+         "I 앞에서만 빼는 규칙을 적용한다. XL·XC·CD·CM 을 놓친다.",
+         """
+fun romanToInteger(text: String): Int {
+    fun value(c: Char) = when (c) { 'I' -> 1; 'V' -> 5; 'X' -> 10; 'L' -> 50; 'C' -> 100; 'D' -> 500; else -> 1000 }
+    var total = 0
+    for (i in text.indices) {
+        val v = value(text[i])
+        total += if (text[i] == 'I' && i + 1 < text.length && value(text[i + 1]) > v) -v else v
+    }
+    return total
+}
+"""),
+        ("compares-with-previous", "WRONG_BRANCH",
+         "이전 기호와 비교해 뺀다. 빼야 할 것은 앞의 작은 기호인데 뒤의 큰 기호를 뺀다.",
+         """
+fun romanToInteger(text: String): Int {
+    fun value(c: Char) = when (c) { 'I' -> 1; 'V' -> 5; 'X' -> 10; 'L' -> 50; 'C' -> 100; 'D' -> 500; else -> 1000 }
+    var total = 0
+    for (i in text.indices) {
+        val v = value(text[i])
+        total += if (i > 0 && value(text[i - 1]) < v) -v else v
+    }
+    return total
+}
+"""),
+    ],
+))

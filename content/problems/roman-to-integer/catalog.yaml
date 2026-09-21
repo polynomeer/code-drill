@@ -1,0 +1,16 @@
+# roman-to-integer 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - math
+  - simulation
+competencies:
+  - READING
+  - MODELING
+  - CORRECTNESS
+prerequisites:
+  - title-case
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "기호마다 이웃 하나와 비교"

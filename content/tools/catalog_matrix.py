@@ -2432,3 +2432,123 @@ fun minimumEffortPath(heights: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 156. 정렬된 격자의 음수 개수 (계단 훑기) ---------------------------------------------------------
+
+def _count_negatives(grid):
+    rows, cols = len(grid), len(grid[0])
+    count = 0
+    col = cols - 1
+    for r in range(rows):
+        while col >= 0 and grid[r][col] < 0:
+            col -= 1
+        count += cols - 1 - col
+    return count
+
+
+def _sorted_desc_grid(rows, cols, lo, hi, salt):
+    values = sorted(randoms(rows * cols, lo, hi, salt=salt), reverse=True)
+    # 행마다 내림차순, 열마다 내림차순이 되게 — 전체 내림차순을 행 우선으로 채우면 둘 다 성립한다.
+    return [values[r * cols:(r + 1) * cols] for r in range(rows)]
+
+
+PROBLEMS.append(Problem(
+    id="count-negatives-sorted-grid",
+    title="정렬된 격자의 음수 개수",
+    summary="""
+각 행과 각 열이 **내림차순**으로 정렬된 정수 격자 `grid` 가 주어진다. 음수의 개수를 반환한다.
+""",
+    notes="""
+전부 세어도 답은 나온다. 정렬을 쓰면 더 적게 본다 — 행은 내림차순이라 음수는 행의 **오른쪽
+끝에 몰려 있고**, 열도 내림차순이라 아래 행의 음수 경계는 윗 행보다 **왼쪽에 있거나 같다.** 그래서
+오른쪽 위에서 시작해 음수면 왼쪽으로, 아니면 아래로 움직이는 계단 한 번(행 + 열)으로 끝난다.
+`0` 은 음수가 아니다.
+""",
+    drill_doc="""
+Drill.compare(r, c)           // 칸을 봤다
+Drill.write(r, count)         // 행의 음수 수를 더했다
+""",
+    constraints="""
+- `1 <= rows, cols <= 100`
+- `-100 <= grid[r][c] <= 100`, 행과 열이 모두 내림차순
+""",
+    signature=dict(name="countNegatives", parameters=[("grid", "INT_MATRIX")], returns="INT"),
+    groups=standard_groups(),
+    reference=_count_negatives,
+    cases={
+        "sample": [("01", [[[4, 3, 2, -1], [3, 2, 1, -1], [1, 1, -1, -2], [-1, -1, -2, -3]]]), ("02", [[[3, 2], [1, 0]]])],
+        "boundary": [
+            ("01-single-negative", [[[-1]]]),
+            ("02-single-positive", [[[5]]]),
+            # 0 은 음수가 아니다.
+            ("03-zeros", [[[1, 0], [0, 0]]]),
+            ("04-all-negative", [[[-1, -2], [-3, -4]]]),
+            ("05-single-row", [[[5, 1, 0, -1, -2]]]),
+            ("06-single-column", [[[3], [0], [-1]]]),
+            # 경계가 행마다 왼쪽으로 크게 움직인다.
+            ("07-staircase", [[[5, 4, 3, 2, 1], [4, 3, -1, -2, -3], [-1, -2, -3, -4, -5]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_sorted_desc_grid(3, 4, -5, 5, salt=8901)]),
+            ("02-random-medium", [_sorted_desc_grid(20, 30, -100, 100, salt=8902)]),
+            ("03-random-max", [_sorted_desc_grid(100, 100, -100, 100, salt=8903)]),
+            ("04-mostly-positive", [_sorted_desc_grid(50, 50, -3, 100, salt=8904)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오른쪽 위에서 시작하는 계단.
+fun countNegatives(grid: Array<IntArray>): Int {
+    val cols = grid[0].size
+    var count = 0
+    var col = cols - 1
+    for (r in grid.indices) {
+        while (col >= 0 && grid[r][col] < 0) { Drill.compare(r, col); col -= 1 }
+        count += cols - 1 - col
+        Drill.write(r, count)
+    }
+    return count
+}
+""",
+    mutants=[
+        ("counts-zero-as-negative", "OFF_BY_ONE",
+         "0 도 센다. 음수는 0 보다 작은 것이다.",
+         """
+fun countNegatives(grid: Array<IntArray>): Int {
+    val cols = grid[0].size
+    var count = 0
+    var col = cols - 1
+    for (r in grid.indices) {
+        while (col >= 0 && grid[r][col] <= 0) col -= 1
+        count += cols - 1 - col
+    }
+    return count
+}
+"""),
+        ("counts-one-per-row", "WRONG_BRANCH",
+         "행마다 음수가 있는지만 보고 하나로 센다.",
+         """
+fun countNegatives(grid: Array<IntArray>): Int {
+    var count = 0
+    for (row in grid) {
+        for (c in row.indices.reversed()) { if (row[c] < 0) { count += 1; break } }
+    }
+    return count
+}
+"""),
+        ("starts-at-top-left", "WRONG_ALGORITHM",
+         "왼쪽 위에서 시작해 음수인 동안 오른쪽으로 간다. 음수는 오른쪽 끝에 몰려 있어 거의 아무것도 세지 못한다.",
+         """
+fun countNegatives(grid: Array<IntArray>): Int {
+    val cols = grid[0].size
+    var count = 0
+    var col = 0
+    for (r in grid.indices) {
+        while (col < cols && grid[r][col] < 0) col += 1
+        count += col
+    }
+    return count
+}
+"""),
+    ],
+))

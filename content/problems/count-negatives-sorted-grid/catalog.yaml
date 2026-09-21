@@ -1,0 +1,15 @@
+# count-negatives-sorted-grid 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - matrix
+  - binary-search
+  - two-pointers
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+prerequisites: []
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "O(행 + 열). 전부 보면 O(행 × 열)"

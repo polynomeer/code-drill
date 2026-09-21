@@ -3717,3 +3717,538 @@ fun shortestPathVisitingAllNodes(n: Int, edges: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 157. 네트워크를 잇는 최소 작업 수 (유니온파인드) --------------------------------------------------
+
+def _make_connected(n, cables):
+    m = len(cables) // 2
+    if m < n - 1:
+        return -1
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    components = n
+    for i in range(m):
+        a, b = find(cables[2 * i]), find(cables[2 * i + 1])
+        if a != b:
+            parent[a] = b
+            components -= 1
+    return components - 1
+
+
+def _cables(n, m, salt):
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    return flat([a[i], b[i]] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="make-network-connected",
+    title="네트워크를 잇는 최소 작업 수",
+    summary="""
+컴퓨터 `n` 대(`0..n-1`)와 케이블 목록 `cables = [a1, b1, a2, b2, ...]` 가 주어진다. 케이블 하나를
+뽑아 다른 두 컴퓨터 사이에 꽂는 것이 **작업 하나**다. 모든 컴퓨터가 서로 이어지게 하는 최소
+작업 수를 반환한다. 케이블이 모자라 불가능하면 `-1`. 같은 쌍의 케이블이 여럿일 수 있다.
+""",
+    notes="""
+`n` 대를 잇는 데 케이블은 최소 `n-1` 개다 — 그보다 적으면 `-1`. 충분하면 답은 **연결 요소 수 − 1**
+이다: 남는 케이블(순환을 만드는 것)은 언제나 요소 수 − 1 개 이상이라 그것으로 요소들을 하나씩
+잇는다. 요소 수는 유니온파인드로 센다 — 케이블마다 두 끝이 이미 같은 무리면 그 케이블이 여분이다.
+""",
+    drill_doc="""
+Drill.compare(a, b)           // 케이블의 두 끝을 봤다
+Drill.write(0, components)    // 무리 수를 줄였다
+""",
+    constraints="""
+- `1 <= n <= 100_000`, `0 <= cables.size / 2 <= 200_000`
+""",
+    signature=dict(name="makeNetworkConnected", parameters=[("n", "INT"), ("cables", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_make_connected,
+    cases={
+        "sample": [("01", [4, [0, 1, 0, 2, 1, 2]]), ("02", [6, [0, 1, 0, 2, 0, 3, 1, 2, 1, 3]])],
+        "boundary": [
+            ("01-single-computer", [1, []]),
+            ("02-two-unconnected-no-cable", [2, []]),
+            ("03-already-connected", [3, [0, 1, 1, 2]]),
+            # 케이블이 n-1 개인데 순환이 있어 모자란다? 아니다 — n-1 개면 요소 수 − 1 만큼 여분이 정확히 있다.
+            ("04-exactly-enough-with-cycle", [4, [0, 1, 1, 0, 2, 3]]),
+            ("05-not-enough", [6, [0, 1, 0, 2, 0, 3, 1, 2]]),
+            # 같은 쌍이 여럿.
+            ("06-duplicate-cables", [3, [0, 1, 0, 1, 0, 1]]),
+            ("07-self-loop-cable", [2, [0, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _cables(8, 7, salt=8911)]),
+            ("02-random-medium", [300, _cables(300, 320, salt=8913)]),
+            ("03-random-sparse", [1000, _cables(1000, 999, salt=8915)]),
+            ("04-random-dense", [500, _cables(500, 3000, salt=8917)]),
+        ],
+        "performance": [
+            ("01-small", [20000, _cables(20000, 30000, salt=8921)]),
+            ("02-medium", [60000, _cables(60000, 100000, salt=8923)]),
+            ("03-large", [100000, _cables(100000, 200000, salt=8925)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 케이블이 모자라면 -1, 아니면 무리 수 − 1.
+fun makeNetworkConnected(n: Int, cables: IntArray): Int {
+    val m = cables.size / 2
+    if (m < n - 1) return -1
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    var components = n
+    for (i in 0 until m) {
+        val a = find(cables[2 * i]); val b = find(cables[2 * i + 1])
+        Drill.compare(cables[2 * i], cables[2 * i + 1])
+        if (a != b) { parent[a] = b; components -= 1; Drill.write(0, components) }
+    }
+    return components - 1
+}
+""",
+    mutants=[
+        ("no-shortage-check", "MISSING_EDGE_CASE",
+         "케이블이 모자라도 무리 수 − 1 을 답한다.",
+         """
+fun makeNetworkConnected(n: Int, cables: IntArray): Int {
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    var components = n
+    for (i in 0 until cables.size / 2) { val a = find(cables[2 * i]); val b = find(cables[2 * i + 1]); if (a != b) { parent[a] = b; components -= 1 } }
+    return components - 1
+}
+"""),
+        ("counts-redundant-cables", "WRONG_ALGORITHM",
+         "여분 케이블 수를 답한다. 필요한 것은 무리 수 − 1 이다.",
+         """
+fun makeNetworkConnected(n: Int, cables: IntArray): Int {
+    val m = cables.size / 2
+    if (m < n - 1) return -1
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    var redundant = 0
+    for (i in 0 until m) { val a = find(cables[2 * i]); val b = find(cables[2 * i + 1]); if (a != b) parent[a] = b else redundant += 1 }
+    return redundant
+}
+"""),
+        ("shortage-uses-n", "OFF_BY_ONE",
+         "케이블이 n 개 미만이면 -1 이라고 한다. n-1 개면 충분하다.",
+         """
+fun makeNetworkConnected(n: Int, cables: IntArray): Int {
+    val m = cables.size / 2
+    if (m < n) return -1
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    var components = n
+    for (i in 0 until m) { val a = find(cables[2 * i]); val b = find(cables[2 * i + 1]); if (a != b) { parent[a] = b; components -= 1 } }
+    return components - 1
+}
+"""),
+        ("find-without-compression--chain", "PERFORMANCE",
+         "경로 압축도 크기 합치기도 없이 항상 a 를 b 아래에 둔다. 사슬이 길어져 O(n²).",
+         """
+fun makeNetworkConnected(n: Int, cables: IntArray): Int {
+    val m = cables.size / 2
+    if (m < n - 1) return -1
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { Drill.compare(r, parent[r]); r = parent[r] }; return r }
+    var components = n
+    for (i in 0 until m) { val a = find(cables[2 * i]); val b = find(cables[2 * i + 1]); if (a != b) { parent[b] = a; components -= 1 } }
+    return components - 1
+}
+"""),
+    ],
+))
+
+
+# --- 158. 색이 번갈아 바뀌는 최단 경로 (상태가 있는 BFS) ------------------------------------------------
+
+def _alternating_paths(n, red, blue):
+    from collections import deque
+    adj = [[[] for _ in range(n)], [[] for _ in range(n)]]  # 0: 빨강, 1: 파랑
+    for color, edges in ((0, red), (1, blue)):
+        for i in range(0, len(edges), 2):
+            adj[color][edges[i]].append(edges[i + 1])
+    INF = float("inf")
+    dist = [[INF] * n for _ in range(2)]
+    dist[0][0] = dist[1][0] = 0
+    queue = deque([(0, 0), (0, 1)])
+    while queue:
+        u, last = queue.popleft()
+        nxt = 1 - last
+        for v in adj[nxt][u]:
+            if dist[nxt][v] == INF:
+                dist[nxt][v] = dist[last][u] + 1
+                queue.append((v, nxt))
+    return [-1 if min(dist[0][v], dist[1][v]) == INF else min(dist[0][v], dist[1][v]) for v in range(n)]
+
+
+def _colored_edges(n, m, salt):
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    return flat([a[i], b[i]] for i in range(m))
+
+
+def _layered(layers, width):
+    """층마다 width 개 정점, 이웃 층은 전부 잇고 색은 층마다 번갈아. 단순 경로가 width^layers 개다 —
+    경로를 열거하는 풀이는 무작위 그래프에서는 빠르고 여기서만 지수다."""
+    red, blue = [], []
+    def node(layer, i): return 1 + (layer - 1) * width + i
+    for layer in range(1, layers + 1):
+        sources = [0] if layer == 1 else [node(layer - 1, i) for i in range(width)]
+        target = red if layer % 2 == 1 else blue
+        for u in sources:
+            for i in range(width):
+                target += [u, node(layer, i)]
+    return 1 + layers * width, red, blue
+
+
+PROBLEMS.append(Problem(
+    id="alternating-color-paths",
+    title="색이 번갈아 바뀌는 최단 경로",
+    summary="""
+정점 `n` 개(`0..n-1`)의 **방향** 그래프에 빨간 간선 `red = [u1, v1, ...]` 과 파란 간선 `blue` 가
+있다. 정점 `0` 에서 출발해 간선의 색이 **번갈아** 바뀌는(빨강-파랑-빨강-… 또는 파랑-빨강-…)
+경로로 각 정점에 이르는 최소 간선 수를 담은 배열을 반환한다. 이를 수 없으면 `-1`. 자기
+자신으로 가는 간선과 같은 간선의 중복이 있을 수 있다.
+""",
+    notes="""
+정점만으로는 상태가 모자란다 — 같은 정점에 빨간 간선으로 왔는지 파란 간선으로 왔는지에 따라
+다음에 쓸 수 있는 간선이 다르다. 상태를 **(정점, 마지막 색)** 으로 두고 BFS 하면 상태가 `2n` 개다.
+`0` 은 두 상태로 동시에 시작하고(첫 간선이 어느 색이든 되니까), 답은 두 상태의 거리 중 작은 것이다.
+정점만 방문 표시하면 한 색으로 먼저 도착한 것이 다른 색으로의 도착을 막아 틀린다.
+""",
+    drill_doc="""
+Drill.compare(u, v)           // 간선을 따라갔다
+Drill.write(v, distance)      // 정점의 거리를 정했다
+""",
+    constraints="""
+- `1 <= n <= 100_000`, 빨강·파랑 간선 각 `0..100_000` 개
+""",
+    signature=dict(name="alternatingColorPaths", parameters=[("n", "INT"), ("red", "INT_ARRAY"), ("blue", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_alternating_paths,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [3, [0, 1, 1, 2], []]), ("02", [3, [0, 1], [2, 1]]), ("03", [3, [0, 1], [1, 2]])],
+        "boundary": [
+            ("01-single-node", [1, [], []]),
+            # 같은 정점을 두 색으로 두 번 지나야 한다.
+            ("02-revisit-with-other-color", [3, [0, 1, 2, 1], [1, 2]]),
+            # 자기 자신으로 가는 간선이 색을 바꾸는 데 쓰인다.
+            ("03-self-loop-switches-color", [3, [0, 0, 0, 1], [0, 0, 1, 2]]),
+            ("04-unreachable", [4, [0, 1], [0, 1]]),
+            ("05-duplicate-edges", [2, [0, 1, 0, 1], []]),
+            # 0 으로 돌아오는 거리는 0 이다.
+            ("06-back-to-start", [2, [0, 1], [1, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [6, _colored_edges(6, 5, salt=8931), _colored_edges(6, 5, salt=8933)]),
+            ("02-random-medium", [200, _colored_edges(200, 300, salt=8935), _colored_edges(200, 300, salt=8937)]),
+            ("03-random-sparse", [2000, _colored_edges(2000, 1500, salt=8939), _colored_edges(2000, 1500, salt=8941)]),
+            ("04-only-red", [50, _colored_edges(50, 200, salt=8943), []]),
+        ],
+        "performance": [
+            ("01-small", [20000, _colored_edges(20000, 20000, salt=8951), _colored_edges(20000, 20000, salt=8953)]),
+            ("02-medium", [60000, _colored_edges(60000, 60000, salt=8955), _colored_edges(60000, 60000, salt=8957)]),
+            ("03-large", [100000, _colored_edges(100000, 100000, salt=8959), _colored_edges(100000, 100000, salt=8961)]),
+            # 무작위 그래프는 경로가 짧아 열거하는 풀이도 빠르다. 층 40 개 × 3 개면 단순 경로가 3^40 개다.
+            ("04-layered-exponential", list(_layered(40, 3))),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). (정점, 마지막 색) 상태의 BFS, 0 은 두 상태로 시작.
+fun alternatingColorPaths(n: Int, red: IntArray, blue: IntArray): IntArray {
+    val adj = Array(2) { Array(n) { ArrayList<Int>() } }
+    for (i in red.indices step 2) adj[0][red[i]].add(red[i + 1])
+    for (i in blue.indices step 2) adj[1][blue[i]].add(blue[i + 1])
+    val dist = Array(2) { IntArray(n) { -1 } }
+    dist[0][0] = 0; dist[1][0] = 0
+    val queue = ArrayDeque<Int>()
+    queue.addLast(0); queue.addLast(1)          // 상태 = 정점 * 2 + 마지막 색
+    while (queue.isNotEmpty()) {
+        val state = queue.removeFirst()
+        val u = state / 2; val last = state % 2; val next = 1 - last
+        for (v in adj[next][u]) {
+            Drill.compare(u, v)
+            if (dist[next][v] < 0) { dist[next][v] = dist[last][u] + 1; Drill.write(v, dist[next][v]); queue.addLast(v * 2 + next) }
+        }
+    }
+    return IntArray(n) { v ->
+        val a = dist[0][v]; val b = dist[1][v]
+        if (a < 0) b else if (b < 0) a else minOf(a, b)
+    }
+}
+""",
+    mutants=[
+        ("visited-by-vertex-only", "WRONG_ALGORITHM",
+         "방문 표시를 정점만으로 한다. 한 색으로 먼저 온 정점을 다른 색으로 다시 지나지 못한다.",
+         """
+fun alternatingColorPaths(n: Int, red: IntArray, blue: IntArray): IntArray {
+    val adj = Array(2) { Array(n) { ArrayList<Int>() } }
+    for (i in red.indices step 2) adj[0][red[i]].add(red[i + 1])
+    for (i in blue.indices step 2) adj[1][blue[i]].add(blue[i + 1])
+    val dist = IntArray(n) { -1 }
+    dist[0] = 0
+    val queue = ArrayDeque<Int>()
+    queue.addLast(0); queue.addLast(1)
+    while (queue.isNotEmpty()) {
+        val state = queue.removeFirst()
+        val u = state / 2; val next = 1 - state % 2
+        for (v in adj[next][u]) if (dist[v] < 0) { dist[v] = dist[u] + 1; queue.addLast(v * 2 + next) }
+    }
+    return dist
+}
+"""),
+        ("starts-with-red-only", "MISSING_EDGE_CASE",
+         "첫 간선을 빨강으로만 시작한다. 파랑으로 시작해야 닿는 정점을 놓친다.",
+         """
+fun alternatingColorPaths(n: Int, red: IntArray, blue: IntArray): IntArray {
+    val adj = Array(2) { Array(n) { ArrayList<Int>() } }
+    for (i in red.indices step 2) adj[0][red[i]].add(red[i + 1])
+    for (i in blue.indices step 2) adj[1][blue[i]].add(blue[i + 1])
+    val dist = Array(2) { IntArray(n) { -1 } }
+    dist[1][0] = 0
+    val queue = ArrayDeque<Int>()
+    queue.addLast(1)
+    while (queue.isNotEmpty()) {
+        val state = queue.removeFirst()
+        val u = state / 2; val last = state % 2; val next = 1 - last
+        for (v in adj[next][u]) if (dist[next][v] < 0) { dist[next][v] = dist[last][u] + 1; queue.addLast(v * 2 + next) }
+    }
+    return IntArray(n) { v -> val a = dist[0][v]; val b = dist[1][v]; if (a < 0) b else if (b < 0) a else minOf(a, b) }
+}
+"""),
+        ("takes-first-state-not-min", "WRONG_BRANCH",
+         "두 상태 중 빨강으로 도착한 거리를 우선 답한다. 파랑이 더 짧아도 그렇다.",
+         """
+fun alternatingColorPaths(n: Int, red: IntArray, blue: IntArray): IntArray {
+    val adj = Array(2) { Array(n) { ArrayList<Int>() } }
+    for (i in red.indices step 2) adj[0][red[i]].add(red[i + 1])
+    for (i in blue.indices step 2) adj[1][blue[i]].add(blue[i + 1])
+    val dist = Array(2) { IntArray(n) { -1 } }
+    dist[0][0] = 0; dist[1][0] = 0
+    val queue = ArrayDeque<Int>()
+    queue.addLast(0); queue.addLast(1)
+    while (queue.isNotEmpty()) {
+        val state = queue.removeFirst()
+        val u = state / 2; val last = state % 2; val next = 1 - last
+        for (v in adj[next][u]) if (dist[next][v] < 0) { dist[next][v] = dist[last][u] + 1; queue.addLast(v * 2 + next) }
+    }
+    return IntArray(n) { v -> if (dist[0][v] >= 0) dist[0][v] else dist[1][v] }
+}
+"""),
+        ("dfs-all-paths", "PERFORMANCE",
+         "번갈아 가는 모든 경로를 DFS 로 열거하며 최솟값을 갱신한다. 지수다.",
+         """
+fun alternatingColorPaths(n: Int, red: IntArray, blue: IntArray): IntArray {
+    val adj = Array(2) { Array(n) { ArrayList<Int>() } }
+    for (i in red.indices step 2) adj[0][red[i]].add(red[i + 1])
+    for (i in blue.indices step 2) adj[1][blue[i]].add(blue[i + 1])
+    val best = IntArray(n) { -1 }
+    best[0] = 0
+    val onPath = BooleanArray(n)
+    fun go(u: Int, last: Int, depth: Int) {
+        for (v in adj[1 - last][u]) {
+            Drill.compare(u, v)
+            if (best[v] < 0 || depth + 1 < best[v]) best[v] = depth + 1
+            if (!onPath[v]) { onPath[v] = true; go(v, 1 - last, depth + 1); onPath[v] = false }
+        }
+    }
+    onPath[0] = true
+    go(0, 0, 0); go(0, 1, 0)
+    return best
+}
+"""),
+    ],
+))
+
+
+# --- 159. DAG 의 가장 긴 경로 (위상 정렬 위 DP) --------------------------------------------------------
+
+def _longest_path_dag(n, edges):
+    from collections import deque
+    adj = [[] for _ in range(n)]
+    indegree = [0] * n
+    for i in range(0, len(edges), 2):
+        adj[edges[i]].append(edges[i + 1])
+        indegree[edges[i + 1]] += 1
+    dist = [0] * n
+    queue = deque(v for v in range(n) if indegree[v] == 0)
+    seen = 0
+    best = 0
+    while queue:
+        u = queue.popleft()
+        seen += 1
+        best = max(best, dist[u])
+        for v in adj[u]:
+            dist[v] = max(dist[v], dist[u] + 1)
+            indegree[v] -= 1
+            if indegree[v] == 0:
+                queue.append(v)
+    return best if seen == n else -1
+
+
+def _dag_edges_forward(n, m, salt):
+    a = randoms(m, 0, n - 2, salt=salt)
+    span = randoms(m, 1, 6, salt=salt + 1)
+    return flat([a[i], min(n - 1, a[i] + span[i])] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="longest-path-in-dag",
+    title="DAG 의 가장 긴 경로",
+    summary="""
+정점 `n` 개(`0..n-1`)의 방향 그래프가 간선 목록 `edges = [u1, v1, ...]` 로 주어진다. 경로의 길이는
+간선 수다. 가장 긴 경로의 길이를 반환한다 — 정점 하나도 길이 `0` 의 경로다. 그래프에 **순환이
+있으면** `-1` 을 반환한다. 중복 간선이 있을 수 있다.
+""",
+    notes="""
+순환이 없으면 가장 긴 경로는 위상 순서로 DP 한 번이다: 정점을 위상 순서로 꺼내며 나가는 간선마다
+`dist[v] = max(dist[v], dist[u] + 1)`. Kahn 의 큐로 꺼낸 정점 수가 `n` 보다 적으면 순환이다 — 두
+질문의 답이 한 번의 훑기에서 같이 나온다. 정점 10만에 사슬이 길 수 있으니 **재귀 DFS 는 스택을
+넘긴다** — 반복으로 쓴다.
+""",
+    drill_doc="""
+Drill.compare(u, v)           // 간선으로 거리를 완화했다
+Drill.write(v, distance)      // 정점의 거리를 정했다
+""",
+    constraints="""
+- `1 <= n <= 100_000`, `0 <= edges.size / 2 <= 200_000`
+""",
+    signature=dict(name="longestPathInDag", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_longest_path_dag,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [4, [0, 1, 1, 2, 2, 3, 0, 3]]), ("02", [3, [0, 1, 1, 2, 2, 0]])],
+        "boundary": [
+            ("01-single-node", [1, []]),
+            ("02-no-edges", [5, []]),
+            ("03-self-loop", [2, [0, 1, 1, 1]]),
+            # 순환이 아닌 정점들이 있어도 어딘가에 순환이 있으면 -1.
+            ("04-cycle-off-to-the-side", [5, [0, 1, 1, 2, 3, 4, 4, 3]]),
+            ("05-duplicate-edges", [3, [0, 1, 0, 1, 1, 2]]),
+            # 긴 경로가 짧은 우회로보다 나중에 발견된다.
+            ("06-long-over-short", [5, [0, 4, 0, 1, 1, 2, 2, 3, 3, 4]]),
+            # 재귀 깊이: 정점 5만 개의 사슬.
+            ("07-deep-chain", [50000, flat([i, i + 1] for i in range(49999))]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _dag_edges_forward(8, 10, salt=8971)]),
+            ("02-random-medium", [300, _dag_edges_forward(300, 600, salt=8973)]),
+            ("03-random-with-cycle", [300, _dag_edges_forward(300, 600, salt=8975) + [299, 0]]),
+            ("04-random-sparse", [5000, _dag_edges_forward(5000, 4000, salt=8977)]),
+        ],
+        "performance": [
+            ("01-small", [20000, _dag_edges_forward(20000, 40000, salt=8981)]),
+            ("02-medium", [60000, _dag_edges_forward(60000, 120000, salt=8983)]),
+            ("03-large-chain", [100000, flat([i, i + 1] for i in range(99999)) + _dag_edges_forward(100000, 100000, salt=8985)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). Kahn 순서로 DP, 다 꺼내지 못하면 순환.
+fun longestPathInDag(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val dist = IntArray(n)
+    val queue = IntArray(n)
+    var head = 0; var tail = 0
+    for (v in 0 until n) if (indegree[v] == 0) queue[tail++] = v
+    var best = 0
+    while (head < tail) {
+        val u = queue[head++]
+        if (dist[u] > best) best = dist[u]
+        for (v in adj[u]) {
+            Drill.compare(u, v)
+            if (dist[u] + 1 > dist[v]) { dist[v] = dist[u] + 1; Drill.write(v, dist[v]) }
+            indegree[v] -= 1
+            if (indegree[v] == 0) queue[tail++] = v
+        }
+    }
+    return if (tail == n) best else -1
+}
+""",
+    mutants=[
+        ("no-cycle-check", "MISSING_EDGE_CASE",
+         "다 꺼냈는지 보지 않는다. 순환이 있어도 답을 낸다.",
+         """
+fun longestPathInDag(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val dist = IntArray(n); val queue = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (indegree[v] == 0) queue[tail++] = v
+    var best = 0
+    while (head < tail) { val u = queue[head++]; if (dist[u] > best) best = dist[u]; for (v in adj[u]) { if (dist[u] + 1 > dist[v]) dist[v] = dist[u] + 1; indegree[v] -= 1; if (indegree[v] == 0) queue[tail++] = v } }
+    return best
+}
+"""),
+        ("relaxes-first-visit-only", "WRONG_BRANCH",
+         "정점의 거리를 처음 닿을 때만 정한다. 더 긴 경로가 나중에 와도 갱신하지 않는다.",
+         """
+fun longestPathInDag(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val dist = IntArray(n) { -1 }; val queue = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (indegree[v] == 0) { queue[tail++] = v; dist[v] = 0 }
+    var best = 0
+    while (head < tail) { val u = queue[head++]; if (dist[u] > best) best = dist[u]; for (v in adj[u]) { if (dist[v] < 0) dist[v] = dist[u] + 1; indegree[v] -= 1; if (indegree[v] == 0) queue[tail++] = v } }
+    return if (tail == n) best else -1
+}
+"""),
+        ("recursive-dfs--stack-overflow", "WRONG_ALGORITHM",
+         "재귀 DFS 로 기억하며 푼다. 답은 맞지만 5만 개 사슬에서 스택이 넘친다.",
+         """
+fun longestPathInDag(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) adj[edges[i]].add(edges[i + 1])
+    val memo = IntArray(n) { -1 }
+    val state = IntArray(n)  // 0 미방문, 1 방문 중, 2 끝
+    var cyclic = false
+    fun go(u: Int): Int {
+        if (state[u] == 1) { cyclic = true; return 0 }
+        if (state[u] == 2) return memo[u]
+        state[u] = 1
+        var best = 0
+        for (v in adj[u]) { Drill.compare(u, v); best = maxOf(best, go(v) + 1) }
+        state[u] = 2; memo[u] = best
+        return best
+    }
+    var answer = 0
+    for (v in 0 until n) answer = maxOf(answer, go(v))
+    return if (cyclic) -1 else answer
+}
+"""),
+        ("bfs-from-every-source--quadratic", "PERFORMANCE",
+         "진입 차수 0 인 정점마다 따로 가장 긴 경로를 훑는다. 사슬 + 여분 간선에서 O(n·m).",
+         """
+fun longestPathInDag(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    // 순환 검사는 Kahn 으로.
+    val deg = indegree.copyOf(); val queue = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (deg[v] == 0) queue[tail++] = v
+    while (head < tail) { val u = queue[head++]; for (v in adj[u]) { deg[v] -= 1; if (deg[v] == 0) queue[tail++] = v } }
+    if (tail != n) return -1
+    var best = 0
+    for (s in 0 until n) {
+        if (indegree[s] != 0) continue
+        val dist = IntArray(n) { -1 }; dist[s] = 0
+        val q = ArrayDeque<Int>(); q.addLast(s)
+        while (q.isNotEmpty()) { val u = q.removeFirst(); if (dist[u] > best) best = dist[u]; for (v in adj[u]) { Drill.compare(u, v); if (dist[u] + 1 > dist[v]) { dist[v] = dist[u] + 1; q.addLast(v) } } }
+    }
+    return best
+}
+"""),
+    ],
+))

@@ -1533,3 +1533,139 @@ fun totientSum(n: Int): Int {
 """),
     ],
 ))
+
+
+# --- 160. 큰 n 의 피보나치 (빠른 두 배 공식) -----------------------------------------------------------
+
+_FIB_MOD = 1_000_000_007
+
+
+def _fib_mod(n):
+    def go(k):
+        if k == 0:
+            return (0, 1)
+        a, b = go(k // 2)
+        c = a * (2 * b - a) % _FIB_MOD
+        d = (a * a + b * b) % _FIB_MOD
+        return (d, (c + d) % _FIB_MOD) if k % 2 else (c, d)
+    return go(n)[0]
+
+
+PROBLEMS.append(Problem(
+    id="fibonacci-mod",
+    title="큰 n 의 피보나치",
+    summary="""
+`F(0) = 0`, `F(1) = 1`, `F(k) = F(k-1) + F(k-2)` 일 때 `F(n)` 을 `1_000_000_007` 로 나눈 나머지를
+반환한다. `n` 은 `2 · 10^9` 까지다.
+""",
+    notes="""
+`n` 번 더하는 것은 20 억 번이라 안 된다. `F(2k) = F(k) · (2F(k+1) − F(k))`, `F(2k+1) = F(k)² + F(k+1)²`
+의 **두 배 공식**으로 `n` 을 절반씩 줄이면 log n 번이다. 2×2 행렬 거듭제곱도 같은 답이다. 곱은
+`(10⁹)²` 이라 `Long` 이어야 하고, `2F(k+1) − F(k)` 는 나머지 뒤에 음수가 될 수 있어 다시 더한다.
+""",
+    drill_doc="""
+Drill.compare(k, 0)           // k 를 절반으로 줄였다
+Drill.write(0, value)         // F(k) 를 정했다
+""",
+    constraints="""
+- `0 <= n <= 2_000_000_000`
+""",
+    signature=dict(name="fibonacciMod", parameters=[("n", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_fib_mod,
+    cases={
+        "sample": [("01", [10]), ("02", [1])],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-two", [2]),
+            # 나머지를 처음 넘는 자리 근처.
+            ("03-forty-five", [45]),
+            ("04-forty-six", [46]),
+            ("05-hundred", [100]),
+            # 2F(k+1) − F(k) 가 나머지 뒤에 음수가 되는 k 가 지나간다.
+            ("06-negative-intermediate", [1000]),
+            ("07-power-of-two", [1073741824]),
+        ],
+        "hidden": [
+            ("01-small", [77]),
+            ("02-medium", [123456]),
+            ("03-large", [987654321]),
+            ("04-odd-large", [1999999999]),
+            ("05-max", [2000000000]),
+        ],
+        "performance": [
+            ("01-small", [30000000]),
+            ("02-medium", [300000000]),
+            ("03-max", [2000000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 빠른 두 배 공식, 비트를 위에서부터.
+fun fibonacciMod(n: Int): Int {
+    val mod = 1_000_000_007L
+    var a = 0L; var b = 1L   // F(k), F(k+1), k = 0
+    for (bit in 30 downTo 0) {
+        Drill.compare(bit, 0)
+        val c = a * ((2 * b - a + mod) % mod) % mod     // F(2k)
+        val d = (a * a + b * b) % mod                    // F(2k+1)
+        if ((n shr bit) and 1 == 1) { a = d; b = (c + d) % mod } else { a = c; b = d }
+        Drill.write(0, a.toInt())
+    }
+    return a.toInt()
+}
+""",
+    mutants=[
+        ("int-multiplication--overflows", "WRONG_BRANCH",
+         "곱을 Int 로 한다. (10⁹)² 이 넘친다.",
+         """
+fun fibonacciMod(n: Int): Int {
+    val mod = 1_000_000_007
+    var a = 0; var b = 1
+    for (bit in 30 downTo 0) {
+        val c = (a.toLong() * ((2L * b - a + mod) % mod) % mod).toInt()
+        val d = ((a * a) % mod + (b * b) % mod) % mod
+        if ((n shr bit) and 1 == 1) { a = d; b = (c + d) % mod } else { a = c; b = d }
+    }
+    return a
+}
+"""),
+        ("negative-after-mod", "MISSING_EDGE_CASE",
+         "2F(k+1) − F(k) 가 음수여도 그대로 곱한다. 음수 나머지가 답에 남는다.",
+         """
+fun fibonacciMod(n: Int): Int {
+    val mod = 1_000_000_007L
+    var a = 0L; var b = 1L
+    for (bit in 30 downTo 0) {
+        val c = a * ((2 * b - a) % mod) % mod
+        val d = (a * a + b * b) % mod
+        if ((n shr bit) and 1 == 1) { a = d; b = (c + d) % mod } else { a = c; b = d }
+    }
+    return a.toInt()
+}
+"""),
+        ("off-by-one-index", "OFF_BY_ONE",
+         "F(n+1) 을 답한다.",
+         """
+fun fibonacciMod(n: Int): Int {
+    val mod = 1_000_000_007L
+    var a = 0L; var b = 1L
+    for (bit in 30 downTo 0) {
+        val c = a * ((2 * b - a + mod) % mod) % mod
+        val d = (a * a + b * b) % mod
+        if ((n shr bit) and 1 == 1) { a = d; b = (c + d) % mod } else { a = c; b = d }
+    }
+    return b.toInt()
+}
+"""),
+        ("linear-loop", "PERFORMANCE",
+         "n 번 더한다. 20 억 번이다.",
+         """
+fun fibonacciMod(n: Int): Int {
+    val mod = 1_000_000_007L
+    var a = 0L; var b = 1L
+    for (k in 0 until n) { Drill.compare(k, 0); val t = (a + b) % mod; a = b; b = t }
+    return a.toInt()
+}
+"""),
+    ],
+))

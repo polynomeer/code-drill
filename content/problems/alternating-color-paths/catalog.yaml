@@ -1,0 +1,18 @@
+# alternating-color-paths 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - bfs
+  - shortest-path
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - shortest-hops
+  - wall-breaking-path
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "상태 2n 개 위의 BFS, O(n + m)"

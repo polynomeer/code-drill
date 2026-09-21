@@ -1,0 +1,19 @@
+# longest-path-in-dag 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - topological-sort
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CONSTRAINTS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - critical-path
+  - detect-cycle-directed
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "Kahn 한 번, O(n + m). 출발점마다 다시 훑으면 O(n · m)"
