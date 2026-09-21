@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - hash-map
+  - binary-search
+summary: 쓰기마다 버전이 오르고 어느 버전의 값이든 다시 읽을 수 있는 키-값 저장소를 구현한다 — 삭제는 지우는 것이 아니라 기록이고, 되감기는 새 버전이다.
+competencies:
+  - SPECIFICATION

@@ -1,0 +1,11 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다). 셋째 Kotlin 프로젝트.
+id: versioned-store
+version: 1
+title: 버전이 있는 키-값 저장소
+language: KOTLIN
+statement: statement.md
+
+limits:
+  buildSeconds: 120
+  testSeconds: 120
+  memoryMb: 256
