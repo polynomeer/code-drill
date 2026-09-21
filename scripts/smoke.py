@@ -1465,7 +1465,7 @@ def main() -> int:
     results.append(check("  참조만 낸 제출은 시험하지 않는다", final["probe"], None))
     probe = with_test["probe"]
     total = len(probe["killed"]) + len(probe["survived"])
-    results.append(check("  더 쓴 테스트를 오답 위에서 시험했다", (probe["referencePassed"], total >= 4), (True, True)))
+    results.append(check("  더 쓴 테스트를 오답 위에서 시험했다", (probe["referencePassed"], total + len(probe["alreadyCaught"]) >= 4), (True, True)))
     detecting = request("GET", "/me/competencies/DEFECT_DETECTION")
     results.append(check("  결함 검출 증거는 잡은 수의 절반 규칙을 따른다", (len(detecting), detecting[0]["source"], detecting[0]["success"]), (1, "PROJECT_PROBE", len(probe["killed"]) * 2 >= total)))
     # 공개 테스트가 이미 잡는 오답(로트 나머지·후입선출)은 사용자의 몫이 아니다. 재고 부족의 되돌리기를
@@ -1548,7 +1548,9 @@ def main() -> int:
     raw_request("POST", f"/admin/rejudges/{preal['id']}/approve", None, approver)
     status, dispatched = raw_request("POST", f"/admin/rejudges/{preal['id']}/dispatch", None, operator)
     results.append(check("프로젝트 단위 재채점 실행", (status, dispatched["targets"] >= 3), (202, True)))
-    report = await_rejudge(preal["id"], operator, timeout=TIMEOUT * 3)
+    # 대상은 이 프로젝트의 종료된 제출 전부다 — 스모크가 돌 때마다 늘고, 더 쓴 테스트가 있는 제출은
+    # 시험판까지 다시 돈다. 기다리는 시간은 대상 수에 비례해야 한다; 고정 한도는 세 번째 완주에서 넘쳤다.
+    report = await_rejudge(preal["id"], operator, timeout=TIMEOUT * 3 + dispatched["targets"] * 10)
     results.append(check("  전부 돌아왔고 바뀐 판정은 없다", (report["job"]["status"], len(report["changes"])), ("COMPLETED", 0)))
     rejudged = request("GET", f"/projects/submissions/{accepted['id']}")
     results.append(check("  revision 이 올랐고 판정은 같다", (rejudged["revision"], rejudged["verdict"], rejudged["hiddenPassed"]), (2, "ACCEPTED", 10)))
