@@ -1,0 +1,20 @@
+# smallest-range-covering-lists 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - heap
+  - two-pointers
+  - sorting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - EDGE_CASES
+  - OPTIMIZATION
+prerequisites:
+  - merge-k-sorted
+  - min-window-substring
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "O(N log k). 매 걸음 k 개를 훑으면 O(N·k)"

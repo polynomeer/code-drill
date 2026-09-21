@@ -3198,3 +3198,493 @@ fun longestSubarrayWithLimit(nums: IntArray, limit: Int): Int {
 """),
     ],
 ))
+
+
+# --- 163. 모든 목록을 덮는 가장 짧은 구간 (k 포인터 + 힙) ------------------------------------------------
+
+def _smallest_range(values, sizes):
+    import heapq
+    lists = []
+    start = 0
+    for size in sizes:
+        lists.append(values[start:start + size])
+        start += size
+    heap = [(lst[0], i, 0) for i, lst in enumerate(lists)]
+    heapq.heapify(heap)
+    current_max = max(lst[0] for lst in lists)
+    best = (lists[0][0], lists[0][0] + 10 ** 12)
+    while True:
+        low, i, j = heap[0]
+        if current_max - low < best[1] - best[0]:
+            best = (low, current_max)
+        if j + 1 == len(lists[i]):
+            break
+        heapq.heapreplace(heap, (lists[i][j + 1], i, j + 1))
+        current_max = max(current_max, lists[i][j + 1])
+    return [best[0], best[1]]
+
+
+def _interleaved_lists(k, size):
+    """목록 i 가 i, i+k, i+2k, … — 어느 목록도 먼저 끝나지 않아 포인터가 N 번 다 움직인다. 무작위 목록은
+    값이 작은 목록이 금세 끝나 몇천 걸음에 멈춘다."""
+    values = []
+    for i in range(k):
+        values += [i + k * j for j in range(size)]
+    return values, [size] * k
+
+
+def _sorted_lists(k, size, lo, hi, salt):
+    values = []
+    sizes = []
+    for i in range(k):
+        chunk = sorted(randoms(size, lo, hi, salt=salt + i))
+        values += chunk
+        sizes.append(size)
+    return values, sizes
+
+
+PROBLEMS.append(Problem(
+    id="smallest-range-covering-lists",
+    title="모든 목록을 덮는 가장 짧은 구간",
+    summary="""
+오름차순으로 정렬된 정수 목록 `k` 개가 하나의 배열 `values` 에 이어 붙어 있고, `sizes[i]` 는 `i`
+번째 목록의 길이다. **모든 목록에서 하나 이상의 원소**를 담는 가장 짧은 구간 `[lo, hi]` 를 `[lo, hi]`
+로 반환한다. 길이가 같으면 `lo` 가 작은 것을 고른다.
+""",
+    notes="""
+목록마다 포인터를 하나씩 두고 **가장 작은 값을 가진 포인터를 앞으로 미는** 것이 답이다. 지금 포인터들이
+가리키는 값들의 `[min, max]` 는 모든 목록을 덮는 구간이고, 그 구간을 줄이는 유일한 길은 `min` 을
+키우는 것이다 — `max` 는 줄일 수 없다. `min` 은 최소 힙이 주고, `max` 는 지금까지 밀어 넣은 값의
+최댓값이다. 어느 목록의 포인터가 끝에 닿으면 더 줄일 수 없다.
+""",
+    drill_doc="""
+Drill.compare(lo, hi)         // 구간을 봤다
+Drill.write(0, length)        // 답을 줄였다
+""",
+    constraints="""
+- `1 <= k <= 10_000`, `1 <= sizes[i] <= 50`, `values.length <= 100_000`
+- `-10^5 <= values[i] <= 10^5`, 목록마다 오름차순
+""",
+    signature=dict(name="smallestRangeCoveringLists", parameters=[("values", "INT_ARRAY"), ("sizes", "INT_ARRAY")], returns="INT_ARRAY"),
+    # 매 걸음 k 개를 훑는 오답은 N·k 다. 무작위 목록은 값이 작은 목록이 금세 끝나 몇천 걸음에 멈추므로
+    # 어느 목록도 먼저 끝나지 않는 엇갈린 목록(만 개 × 열 개 = 10⁹)이 있어야 진다.
+    groups=perf_groups(time_multiplier=0.15),
+    reference=_smallest_range,
+    cases={
+        "sample": [("01", [[4, 10, 15, 24, 26, 0, 9, 12, 20, 5, 18, 22, 30], [5, 4, 4]]), ("02", [[1, 2, 3, 1, 2, 3, 1, 2, 3], [3, 3, 3]])],
+        "boundary": [
+            ("01-single-list", [[7, 8, 9], [3]]),
+            ("02-single-elements", [[5, 1, 9], [1, 1, 1]]),
+            # 같은 길이면 lo 가 작은 것.
+            ("03-tie-prefers-lower", [[1, 4, 2, 5], [2, 2]]),
+            ("04-shared-value", [[3, 3, 3], [1, 1, 1]]),
+            ("05-negatives", [[-5, -1, -3, 0, -4, 2], [2, 2, 2]]),
+            # 답이 마지막 원소들에 있다 — 끝까지 밀어야 한다.
+            ("06-answer-at-the-end", [[0, 100, 50, 101, 80, 102], [2, 2, 2]]),
+            ("07-disjoint-lists", [[1, 2, 10, 11, 20, 21], [2, 2, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", list(_sorted_lists(3, 4, 0, 20, salt=9041))),
+            ("02-random-medium", list(_sorted_lists(20, 10, -1000, 1000, salt=9045))),
+            ("03-random-wide", list(_sorted_lists(100, 30, -100000, 100000, salt=9071))),
+            ("04-uneven-sizes", [[1, 5, 9, 13, 17, 21, 25, 29, 2, 30, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], [8, 2, 15]]),
+        ],
+        "performance": [
+            ("01-small", list(_sorted_lists(2000, 10, -100000, 100000, salt=9201))),
+            ("02-medium-interleaved", list(_interleaved_lists(5000, 10))),
+            ("03-large-interleaved", list(_interleaved_lists(10000, 10))),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최소 힙이 min 을, 누적 최댓값이 max 를 준다.
+fun smallestRangeCoveringLists(values: IntArray, sizes: IntArray): IntArray {
+    val k = sizes.size
+    val start = IntArray(k)
+    for (i in 1 until k) start[i] = start[i - 1] + sizes[i - 1]
+    val pointer = IntArray(k)
+    val heap = java.util.PriorityQueue<Int>(compareBy { values[start[it] + pointer[it]] })
+    var currentMax = Int.MIN_VALUE
+    for (i in 0 until k) { heap.add(i); currentMax = maxOf(currentMax, values[start[i]]) }
+    var bestLo = 0; var bestHi = 0; var bestLength = Long.MAX_VALUE
+    while (true) {
+        val i = heap.poll()
+        val low = values[start[i] + pointer[i]]
+        Drill.compare(low, currentMax)
+        if (currentMax.toLong() - low < bestLength) { bestLength = currentMax.toLong() - low; bestLo = low; bestHi = currentMax; Drill.write(0, bestLength.toInt()) }
+        if (pointer[i] + 1 == sizes[i]) break
+        pointer[i] += 1
+        currentMax = maxOf(currentMax, values[start[i] + pointer[i]])
+        heap.add(i)
+    }
+    return intArrayOf(bestLo, bestHi)
+}
+""",
+    mutants=[
+        ("tie-takes-later", "OFF_BY_ONE",
+         "같은 길이면 나중 것으로 바꾼다. lo 가 작은 것을 골라야 한다.",
+         """
+fun smallestRangeCoveringLists(values: IntArray, sizes: IntArray): IntArray {
+    val k = sizes.size
+    val start = IntArray(k)
+    for (i in 1 until k) start[i] = start[i - 1] + sizes[i - 1]
+    val pointer = IntArray(k)
+    val heap = java.util.PriorityQueue<Int>(compareBy { values[start[it] + pointer[it]] })
+    var currentMax = Int.MIN_VALUE
+    for (i in 0 until k) { heap.add(i); currentMax = maxOf(currentMax, values[start[i]]) }
+    var bestLo = 0; var bestHi = 0; var bestLength = Long.MAX_VALUE
+    while (true) {
+        val i = heap.poll()
+        val low = values[start[i] + pointer[i]]
+        if (currentMax.toLong() - low <= bestLength) { bestLength = currentMax.toLong() - low; bestLo = low; bestHi = currentMax }
+        if (pointer[i] + 1 == sizes[i]) break
+        pointer[i] += 1
+        currentMax = maxOf(currentMax, values[start[i] + pointer[i]])
+        heap.add(i)
+    }
+    return intArrayOf(bestLo, bestHi)
+}
+"""),
+        ("stops-before-checking-last", "MISSING_EDGE_CASE",
+         "포인터가 끝에 닿으면 그 상태의 구간을 보지 않고 멈춘다. 답이 끝에 있으면 놓친다.",
+         """
+fun smallestRangeCoveringLists(values: IntArray, sizes: IntArray): IntArray {
+    val k = sizes.size
+    val start = IntArray(k)
+    for (i in 1 until k) start[i] = start[i - 1] + sizes[i - 1]
+    val pointer = IntArray(k)
+    val heap = java.util.PriorityQueue<Int>(compareBy { values[start[it] + pointer[it]] })
+    var currentMax = Int.MIN_VALUE
+    for (i in 0 until k) { heap.add(i); currentMax = maxOf(currentMax, values[start[i]]) }
+    var bestLo = 0; var bestHi = 0; var bestLength = Long.MAX_VALUE
+    while (true) {
+        val i = heap.poll()
+        val low = values[start[i] + pointer[i]]
+        if (pointer[i] + 1 == sizes[i]) break
+        if (currentMax.toLong() - low < bestLength) { bestLength = currentMax.toLong() - low; bestLo = low; bestHi = currentMax }
+        pointer[i] += 1
+        currentMax = maxOf(currentMax, values[start[i] + pointer[i]])
+        heap.add(i)
+    }
+    return intArrayOf(bestLo, bestHi)
+}
+"""),
+        ("max-not-tracked", "WRONG_BRANCH",
+         "구간의 위 끝을 힙의 최댓값이 아니라 방금 밀어 넣은 값으로 둔다.",
+         """
+fun smallestRangeCoveringLists(values: IntArray, sizes: IntArray): IntArray {
+    val k = sizes.size
+    val start = IntArray(k)
+    for (i in 1 until k) start[i] = start[i - 1] + sizes[i - 1]
+    val pointer = IntArray(k)
+    val heap = java.util.PriorityQueue<Int>(compareBy { values[start[it] + pointer[it]] })
+    var currentMax = Int.MIN_VALUE
+    for (i in 0 until k) { heap.add(i); currentMax = maxOf(currentMax, values[start[i]]) }
+    var bestLo = 0; var bestHi = 0; var bestLength = Long.MAX_VALUE
+    while (true) {
+        val i = heap.poll()
+        val low = values[start[i] + pointer[i]]
+        if (currentMax.toLong() - low < bestLength) { bestLength = currentMax.toLong() - low; bestLo = low; bestHi = currentMax }
+        if (pointer[i] + 1 == sizes[i]) break
+        pointer[i] += 1
+        currentMax = values[start[i] + pointer[i]]
+        heap.add(i)
+    }
+    return intArrayOf(bestLo, bestHi)
+}
+"""),
+        ("scan-min-each-step", "PERFORMANCE",
+         "힙 대신 매 걸음 k 개 포인터를 훑어 최솟값을 찾는다. O(N·k).",
+         """
+fun smallestRangeCoveringLists(values: IntArray, sizes: IntArray): IntArray {
+    val k = sizes.size
+    val start = IntArray(k)
+    for (i in 1 until k) start[i] = start[i - 1] + sizes[i - 1]
+    val pointer = IntArray(k)
+    var bestLo = 0; var bestHi = 0; var bestLength = Long.MAX_VALUE
+    while (true) {
+        var minI = 0; var low = Int.MAX_VALUE; var high = Int.MIN_VALUE
+        for (i in 0 until k) {
+            val v = values[start[i] + pointer[i]]
+            Drill.compare(i, v)
+            if (v < low) { low = v; minI = i }
+            if (v > high) high = v
+        }
+        if (high.toLong() - low < bestLength) { bestLength = high.toLong() - low; bestLo = low; bestHi = high }
+        if (pointer[minI] + 1 == sizes[minI]) break
+        pointer[minI] += 1
+    }
+    return intArrayOf(bestLo, bestHi)
+}
+"""),
+    ],
+))
+
+
+# --- 164. 제자리 런-길이 압축 ---------------------------------------------------------------------------
+
+def _compress_in_place(chars):
+    out = []
+    i = 0
+    while i < len(chars):
+        j = i
+        while j < len(chars) and chars[j] == chars[i]:
+            j += 1
+        out.append(chars[i])
+        if j - i > 1:
+            out += list(str(j - i))
+        i = j
+    return "".join(out)
+
+
+PROBLEMS.append(Problem(
+    id="run-length-compress",
+    title="제자리 런-길이 압축",
+    summary="""
+영문 소문자 문자열 `text` 를 압축한다. 같은 글자가 연달아 `n` 번 나오면 그 글자 하나 뒤에 `n` 을
+십진수로 붙이되, **한 번 나온 글자에는 숫자를 붙이지 않는다.** `"aabcccc"` → `"a2bc4"`. 압축한
+문자열을 반환한다. 압축이 원문보다 길어져도 규칙대로 낸다.
+""",
+    notes="""
+글자 배열 위에서 **읽는 자리와 쓰는 자리**를 따로 두면 추가 배열 없이 된다 — 쓰는 자리는 읽는
+자리를 앞지르지 못한다(글자 하나에 최소 한 칸을 쓰고, 숫자는 글자 수보다 짧다). 연속한 구간의 길이를
+세고, 글자를 쓰고, 길이가 2 이상이면 그 십진 표기를 자리마다 쓴다. 10 이상은 두 자리 이상이라
+숫자를 문자열로 바꿔 한 글자씩 쓴다.
+""",
+    drill_doc="""
+Drill.compare(read, write)    // 읽는 자리와 쓰는 자리를 봤다
+Drill.write(write, code)      // 한 글자를 썼다
+""",
+    constraints="""
+- `1 <= text.length <= 200_000`, 소문자
+""",
+    signature=dict(name="runLengthCompress", parameters=[("text", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_compress_in_place,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 400000},
+    cases={
+        "sample": [("01", ["aabcccc"]), ("02", ["abc"])],
+        "boundary": [
+            ("01-single", ["a"]),
+            ("02-two-same", ["aa"]),
+            # 길이 10 이상은 두 자리.
+            ("03-ten", ["aaaaaaaaaa"]),
+            ("04-twelve-then-one", ["aaaaaaaaaaaab"]),
+            ("05-alternating", ["ababab"]),
+            ("06-hundred", ["a" * 100]),
+            ("07-long-then-short-runs", ["a" * 11 + "bb" + "c"]),
+        ],
+        "hidden": [
+            ("01-random-small", ["".join("ab"[v] for v in randoms(12, 0, 1, salt=9101))]),
+            ("02-random-runs", ["".join("abc"[v % 3] * (v % 7 + 1) for v in randoms(60, 0, 20, salt=9102))]),
+            ("03-random-letters", ["".join(chr(97 + v) for v in randoms(500, 0, 25, salt=9103))]),
+            ("04-long-runs", ["".join(chr(97 + v % 26) * (v * 7 % 1000 + 1) for v in randoms(200, 0, 25, salt=9104))]),
+            ("05-max-single-run", ["z" * 200000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 읽는 자리와 쓰는 자리 둘로 제자리.
+fun runLengthCompress(text: String): String {
+    val chars = text.toCharArray()
+    var read = 0
+    var write = 0
+    while (read < chars.size) {
+        val ch = chars[read]
+        var end = read
+        while (end < chars.size && chars[end] == ch) end += 1
+        Drill.compare(read, write)
+        chars[write++] = ch
+        Drill.write(write - 1, ch.code)
+        if (end - read > 1) for (d in (end - read).toString()) { chars[write++] = d; Drill.write(write - 1, d.code) }
+        read = end
+    }
+    return String(chars, 0, write)
+}
+""",
+    mutants=[
+        ("writes-count-for-single", "OFF_BY_ONE",
+         "한 번 나온 글자에도 1 을 붙인다.",
+         """
+fun runLengthCompress(text: String): String {
+    val chars = text.toCharArray()
+    var read = 0; var write = 0
+    while (read < chars.size) {
+        val ch = chars[read]; var end = read
+        while (end < chars.size && chars[end] == ch) end += 1
+        chars[write++] = ch
+        for (d in (end - read).toString()) chars[write++] = d
+        read = end
+    }
+    return String(chars, 0, write)
+}
+"""),
+        ("single-digit-count", "MISSING_EDGE_CASE",
+         "길이를 한 자리로만 쓴다. 10 이상이 깨진다.",
+         """
+fun runLengthCompress(text: String): String {
+    val chars = text.toCharArray()
+    var read = 0; var write = 0
+    while (read < chars.size) {
+        val ch = chars[read]; var end = read
+        while (end < chars.size && chars[end] == ch) end += 1
+        chars[write++] = ch
+        if (end - read > 1) chars[write++] = ('0' + (end - read) % 10)
+        read = end
+    }
+    return String(chars, 0, write)
+}
+"""),
+        ("counts-total-not-run", "WRONG_ALGORITHM",
+         "연속한 구간이 아니라 그 글자의 전체 개수를 붙인다.",
+         """
+fun runLengthCompress(text: String): String {
+    val counts = IntArray(26)
+    for (ch in text) counts[ch - 'a'] += 1
+    val out = StringBuilder()
+    var i = 0
+    while (i < text.length) {
+        val ch = text[i]
+        var end = i
+        while (end < text.length && text[end] == ch) end += 1
+        out.append(ch)
+        if (counts[ch - 'a'] > 1) out.append(counts[ch - 'a'])
+        i = end
+    }
+    return out.toString()
+}
+"""),
+        ("last-run-dropped", "OFF_BY_ONE",
+         "마지막 구간을 쓰지 않는다 — 구간의 끝을 다음 글자가 바뀔 때만 감지한다.",
+         """
+fun runLengthCompress(text: String): String {
+    val out = StringBuilder()
+    var run = 1
+    for (i in 1 until text.length) {
+        if (text[i] == text[i - 1]) { run += 1; continue }
+        out.append(text[i - 1]); if (run > 1) out.append(run)
+        run = 1
+    }
+    return out.toString()
+}
+"""),
+    ],
+))
+
+
+# --- 165. 정렬된 배열에서 두 번까지만 남기기 (제자리) ---------------------------------------------------
+
+def _keep_at_most_twice(nums):
+    out = []
+    for x in nums:
+        if len(out) < 2 or out[-2] != x:
+            out.append(x)
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="remove-duplicates-at-most-twice",
+    title="정렬된 배열에서 두 번까지만 남기기",
+    summary="""
+오름차순으로 정렬된 정수 배열 `nums` 에서 같은 값이 **최대 두 번**만 남도록 지운 배열을 순서
+그대로 반환한다. 추가 배열 없이 제자리에서 앞으로 당겨 쓰는 것이 이 문제의 뜻이다.
+""",
+    notes="""
+쓰는 자리 `write` 를 두고 원소를 하나씩 보며, `write < 2` 이거나 `nums[write − 2] != x` 이면 쓴다.
+정렬돼 있으니 두 칸 앞의 값과 다르다는 것이 곧 "이 값이 아직 두 번 미만 나왔다"는 것이다. 바로 앞과
+비교하면 한 번만 남기는 문제가 되고, 세 칸 앞과 비교하면 세 번이 남는다.
+""",
+    drill_doc="""
+Drill.compare(read, write)    // 읽는 자리와 쓰는 자리를 봤다
+Drill.write(write, value)     // 값을 당겨 썼다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`, 오름차순
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="removeDuplicatesAtMostTwice", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_keep_at_most_twice,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [[1, 1, 1, 2, 2, 3]]), ("02", [[0, 0, 1, 1, 1, 1, 2, 3, 3]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-two-same", [[4, 4]]),
+            ("03-three-same", [[4, 4, 4]]),
+            ("04-all-distinct", [[1, 2, 3, 4]]),
+            ("05-all-same-long", [[9] * 10]),
+            ("06-negative-and-int-edges", [[-2147483648, -2147483648, -2147483648, 2147483647, 2147483647, 2147483647]]),
+            # 두 칸 앞과 비교해야 한다 — 바로 앞과 비교하면 한 번만 남는다.
+            ("07-pairs", [[1, 1, 2, 2, 3, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [sorted(randoms(10, 0, 3, salt=9111))]),
+            ("02-random-medium", [sorted(randoms(500, 0, 50, salt=9112))]),
+            ("03-random-wide", [sorted(randoms(3000, -1000000000, 1000000000, salt=9113))]),
+            ("04-long-runs", [sorted(randoms(100000, 0, 20, salt=9114))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 두 칸 앞과 비교하며 당겨 쓴다.
+fun removeDuplicatesAtMostTwice(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var write = 0
+    for (read in a.indices) {
+        Drill.compare(read, write)
+        if (write < 2 || a[write - 2] != a[read]) { a[write] = a[read]; Drill.write(write, a[read]); write += 1 }
+    }
+    return a.copyOf(write)
+}
+""",
+    mutants=[
+        ("compares-previous--keeps-once", "OFF_BY_ONE",
+         "바로 앞과 비교한다. 한 번만 남는다.",
+         """
+fun removeDuplicatesAtMostTwice(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var write = 0
+    for (read in a.indices) if (write < 1 || a[write - 1] != a[read]) { a[write] = a[read]; write += 1 }
+    return a.copyOf(write)
+}
+"""),
+        ("compares-three-back--keeps-thrice", "OFF_BY_ONE",
+         "세 칸 앞과 비교한다. 세 번이 남는다.",
+         """
+fun removeDuplicatesAtMostTwice(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var write = 0
+    for (read in a.indices) if (write < 3 || a[write - 3] != a[read]) { a[write] = a[read]; write += 1 }
+    return a.copyOf(write)
+}
+"""),
+        # "원본의 두 칸 앞과 비교"는 동치였다 — 정렬된 입력에서는 원본의 두 칸 앞이 같으면 쓴 자리의 두 칸 앞도 같다.
+        ("count-never-resets", "WRONG_BRANCH",
+         "값이 바뀌어도 개수를 0 으로 돌리지 않는다. 처음 둘만 남는다.",
+         """
+fun removeDuplicatesAtMostTwice(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var write = 0
+    var count = 0
+    for (read in a.indices) {
+        count += 1
+        if (count <= 2) { a[write] = a[read]; write += 1 }
+    }
+    return a.copyOf(write)
+}
+"""),
+        ("counts-run-then-drops-all-extra", "WRONG_ALGORITHM",
+         "세 번 이상 나온 값은 아예 지운다.",
+         """
+fun removeDuplicatesAtMostTwice(nums: IntArray): IntArray {
+    val out = ArrayList<Int>()
+    var i = 0
+    while (i < nums.size) {
+        var j = i
+        while (j < nums.size && nums[j] == nums[i]) j += 1
+        if (j - i <= 2) for (t in i until j) out.add(nums[t])
+        i = j
+    }
+    return out.toIntArray()
+}
+"""),
+    ],
+))

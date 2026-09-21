@@ -1,0 +1,19 @@
+# car-fleet-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - sorting
+  - monotonic-stack
+  - simulation
+competencies:
+  - MODELING
+  - READING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - asteroid-collision
+  - meeting-rooms
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "정렬 O(n log n) 뒤 한 번 훑기"

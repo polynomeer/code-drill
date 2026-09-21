@@ -1,0 +1,16 @@
+# run-length-compress 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - in-place
+  - two-pointers
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - remove-duplicates-sorted
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "읽는 자리와 쓰는 자리 둘로 제자리"

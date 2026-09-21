@@ -2552,3 +2552,454 @@ fun countNegatives(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 161. 지형에 고이는 물 (2차원, 힙으로 바깥부터) ------------------------------------------------------
+
+def _trap_2d(heights):
+    import heapq
+    rows, cols = len(heights), len(heights[0])
+    if rows < 3 or cols < 3:
+        return 0
+    seen = [[False] * cols for _ in range(rows)]
+    heap = []
+    for r in range(rows):
+        for c in (0, cols - 1):
+            if not seen[r][c]:
+                seen[r][c] = True
+                heapq.heappush(heap, (heights[r][c], r, c))
+    for c in range(cols):
+        for r in (0, rows - 1):
+            if not seen[r][c]:
+                seen[r][c] = True
+                heapq.heappush(heap, (heights[r][c], r, c))
+    water = 0
+    while heap:
+        level, r, c = heapq.heappop(heap)
+        for nr, nc in ((r + 1, c), (r - 1, c), (r, c + 1), (r, c - 1)):
+            if 0 <= nr < rows and 0 <= nc < cols and not seen[nr][nc]:
+                seen[nr][nc] = True
+                water += max(0, level - heights[nr][nc])
+                heapq.heappush(heap, (max(level, heights[nr][nc]), nr, nc))
+    return water
+
+
+def _terrain(rows, cols, lo, hi, salt):
+    values = randoms(rows * cols, lo, hi, salt=salt)
+    return [values[r * cols:(r + 1) * cols] for r in range(rows)]
+
+
+def _bowl(n, rim, floor):
+    return [[rim if r in (0, n - 1) or c in (0, n - 1) else floor for c in range(n)] for r in range(n)]
+
+
+PROBLEMS.append(Problem(
+    id="trapping-rain-water-2d",
+    title="지형에 고이는 물",
+    summary="""
+높이 격자 `heights` 에 비가 온다. 물은 상하좌우로 흐르고 격자의 **가장자리 밖으로** 빠져나간다.
+다 흐른 뒤 격자 위에 고여 있는 물의 총량(칸마다 고인 높이의 합)을 반환한다.
+""",
+    notes="""
+1차원의 "양쪽 최대 중 작은 것"이 2차원에서는 "밖으로 나가는 모든 길 중 가장 낮은 고개"다. 그것은
+**바깥에서 안으로** 채우면 나온다: 가장자리 칸을 전부 최소 힙에 넣고, 가장 낮은 칸부터 꺼내 이웃을
+본다 — 이웃이 지금 수위보다 낮으면 그 차이만큼 물이 고이고, 이웃은 `max(수위, 이웃 높이)` 로 힙에
+들어간다. 한 칸이 한 번씩 들어가니 O(RC log RC) 다.
+""",
+    drill_doc="""
+Drill.compare(r, c)           // 칸을 꺼냈다
+Drill.write(0, water)         // 물을 더했다
+""",
+    constraints="""
+- `1 <= rows, cols <= 200`
+- `0 <= heights[r][c] <= 20_000`
+""",
+    signature=dict(name="trappingRainWater2d", parameters=[("heights", "INT_MATRIX")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_trap_2d,
+    cases={
+        "sample": [("01", [[[1, 4, 3, 1, 3, 2], [3, 2, 1, 3, 2, 4], [2, 3, 3, 2, 3, 1]]]), ("02", [[[3, 3, 3], [3, 1, 3], [3, 3, 3]]])],
+        "boundary": [
+            ("01-too-thin", [[[5, 1, 5]]]),
+            ("02-two-rows", [[[5, 1, 5], [5, 1, 5]]]),
+            ("03-flat", [[[2, 2, 2], [2, 2, 2], [2, 2, 2]]]),
+            # 테두리에 낮은 곳이 하나 — 물은 그 고개 높이까지만 고인다.
+            ("04-leaky-rim", [[[5, 5, 5, 5], [5, 1, 1, 5], [5, 1, 1, 5], [5, 5, 2, 5]]]),
+            # 안쪽에 더 높은 봉우리 — 물이 고이는 칸과 아닌 칸이 섞인다.
+            ("05-inner-peak", [[[9, 9, 9, 9, 9], [9, 1, 9, 1, 9], [9, 1, 9, 1, 9], [9, 9, 9, 9, 9]]]),
+            ("06-deep-bowl", [_bowl(5, 20000, 0)]),
+            # 안이 바깥보다 높으면 아무것도 안 고인다.
+            ("07-hill", [[[1, 1, 1], [1, 9, 1], [1, 1, 1]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_terrain(5, 6, 0, 9, salt=9001)]),
+            ("02-random-medium", [_terrain(20, 25, 0, 100, salt=9002)]),
+            ("03-random-wide", [_terrain(40, 40, 0, 20000, salt=9003)]),
+            # 물이 계단처럼 흐른다 — 바깥에서 안으로 채워야 맞다.
+            ("04-nested-bowls", [[[8, 8, 8, 8, 8, 8, 8], [8, 2, 2, 2, 2, 2, 8], [8, 2, 6, 6, 6, 2, 8], [8, 2, 6, 0, 6, 2, 8], [8, 2, 6, 6, 6, 2, 8], [8, 2, 2, 2, 2, 2, 8], [8, 8, 8, 8, 8, 8, 8]]]),
+        ],
+        "performance": [
+            ("01-small", [_terrain(60, 60, 0, 20000, salt=9011)]),
+            ("02-medium", [_terrain(120, 120, 0, 20000, salt=9012)]),
+            ("03-large", [_terrain(200, 200, 0, 20000, salt=9013)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 가장자리에서 시작하는 최소 힙.
+fun trappingRainWater2d(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    if (rows < 3 || cols < 3) return 0
+    val seen = BooleanArray(rows * cols)
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    fun push(level: Int, r: Int, c: Int) { if (!seen[r * cols + c]) { seen[r * cols + c] = true; heap.add(longArrayOf(level.toLong(), r.toLong(), c.toLong())) } }
+    for (r in 0 until rows) { push(heights[r][0], r, 0); push(heights[r][cols - 1], r, cols - 1) }
+    for (c in 0 until cols) { push(heights[0][c], 0, c); push(heights[rows - 1][c], rows - 1, c) }
+    var water = 0L
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val level = top[0].toInt(); val r = top[1].toInt(); val c = top[2].toInt()
+        Drill.compare(r, c)
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr !in 0 until rows || nc !in 0 until cols || seen[nr * cols + nc]) continue
+            if (heights[nr][nc] < level) { water += level - heights[nr][nc]; Drill.write(0, water.toInt()) }
+            push(maxOf(level, heights[nr][nc]), nr, nc)
+        }
+    }
+    return water.toInt()
+}
+""",
+    mutants=[
+        ("pushes-own-height-not-level", "WRONG_BRANCH",
+         "이웃을 수위가 아니라 자기 높이로 힙에 넣는다. 안쪽 낮은 칸의 수위가 새어 물이 적게 잡힌다.",
+         """
+fun trappingRainWater2d(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    if (rows < 3 || cols < 3) return 0
+    val seen = BooleanArray(rows * cols)
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    fun push(level: Int, r: Int, c: Int) { if (!seen[r * cols + c]) { seen[r * cols + c] = true; heap.add(longArrayOf(level.toLong(), r.toLong(), c.toLong())) } }
+    for (r in 0 until rows) { push(heights[r][0], r, 0); push(heights[r][cols - 1], r, cols - 1) }
+    for (c in 0 until cols) { push(heights[0][c], 0, c); push(heights[rows - 1][c], rows - 1, c) }
+    var water = 0L
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val level = top[0].toInt(); val r = top[1].toInt(); val c = top[2].toInt()
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr !in 0 until rows || nc !in 0 until cols || seen[nr * cols + nc]) continue
+            if (heights[nr][nc] < level) water += level - heights[nr][nc]
+            push(heights[nr][nc], nr, nc)
+        }
+    }
+    return water.toInt()
+}
+"""),
+        ("row-wise-1d", "WRONG_ALGORITHM",
+         "행마다 1차원 빗물 문제를 풀어 더한다. 물은 위아래로도 새어 나간다.",
+         """
+fun trappingRainWater2d(heights: Array<IntArray>): Int {
+    val rows = heights.size
+    if (rows < 3) return 0
+    var water = 0
+    for (r in 1 until rows - 1) {
+        val row = heights[r]
+        var lo = 0; var hi = row.size - 1; var leftMax = 0; var rightMax = 0
+        while (lo < hi) {
+            if (row[lo] < row[hi]) { leftMax = maxOf(leftMax, row[lo]); water += leftMax - row[lo]; lo += 1 }
+            else { rightMax = maxOf(rightMax, row[hi]); water += rightMax - row[hi]; hi -= 1 }
+        }
+    }
+    return water
+}
+"""),
+        ("fifo-queue-not-heap", "WRONG_ALGORITHM",
+         "최소 힙 대신 보통 큐로 바깥부터 훑는다. 가장 낮은 고개부터 보지 않아 수위가 틀린다.",
+         """
+fun trappingRainWater2d(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    if (rows < 3 || cols < 3) return 0
+    val seen = BooleanArray(rows * cols)
+    val queue = ArrayDeque<IntArray>()
+    fun push(level: Int, r: Int, c: Int) { if (!seen[r * cols + c]) { seen[r * cols + c] = true; queue.addLast(intArrayOf(level, r, c)) } }
+    for (r in 0 until rows) { push(heights[r][0], r, 0); push(heights[r][cols - 1], r, cols - 1) }
+    for (c in 0 until cols) { push(heights[0][c], 0, c); push(heights[rows - 1][c], rows - 1, c) }
+    var water = 0L
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (queue.isNotEmpty()) {
+        val top = queue.removeFirst(); val level = top[0]; val r = top[1]; val c = top[2]
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr !in 0 until rows || nc !in 0 until cols || seen[nr * cols + nc]) continue
+            if (heights[nr][nc] < level) water += level - heights[nr][nc]
+            push(maxOf(level, heights[nr][nc]), nr, nc)
+        }
+    }
+    return water.toInt()
+}
+"""),
+        ("bfs-per-cell--quadratic", "PERFORMANCE",
+         "칸마다 밖으로 나가는 가장 낮은 고개를 따로 찾는다. O((RC)²).",
+         """
+fun trappingRainWater2d(heights: Array<IntArray>): Int {
+    val rows = heights.size; val cols = heights[0].size
+    if (rows < 3 || cols < 3) return 0
+    var water = 0L
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    for (sr in 1 until rows - 1) for (sc in 1 until cols - 1) {
+        // 이 칸에서 밖으로 나가는 길들의 최댓값의 최솟값 — 수위를 낮은 것부터 올려 가며 닿는지 본다.
+        val heap = java.util.PriorityQueue<IntArray>(compareBy { it[0] })
+        val seen = BooleanArray(rows * cols)
+        heap.add(intArrayOf(heights[sr][sc], sr, sc)); seen[sr * cols + sc] = true
+        var pass = 0
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val level = maxOf(pass, top[0]); val r = top[1]; val c = top[2]
+            Drill.compare(r, c)
+            pass = level
+            if (r == 0 || c == 0 || r == rows - 1 || c == cols - 1) break
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr !in 0 until rows || nc !in 0 until cols || seen[nr * cols + nc]) continue
+                seen[nr * cols + nc] = true; heap.add(intArrayOf(heights[nr][nc], nr, nc))
+            }
+        }
+        water += maxOf(0, pass - heights[sr][sc])
+    }
+    return water.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 162. 체리 줍기 (두 사람이 동시에 — 3차원 DP) --------------------------------------------------------
+
+def _cherry_pickup(grid):
+    n = len(grid)
+    NEG = float("-inf")
+    # dp[r1][r2]: 걸음 수 t 에서 사람 1 이 (r1, t-r1), 사람 2 가 (r2, t-r2) 에 있을 때의 최대.
+    dp = [[NEG] * n for _ in range(n)]
+    dp[0][0] = grid[0][0]
+    if grid[0][0] < 0:
+        return 0
+    for t in range(1, 2 * n - 1):
+        nxt = [[NEG] * n for _ in range(n)]
+        for r1 in range(max(0, t - n + 1), min(n, t + 1)):
+            c1 = t - r1
+            if grid[r1][c1] < 0:
+                continue
+            for r2 in range(max(0, t - n + 1), min(n, t + 1)):
+                c2 = t - r2
+                if grid[r2][c2] < 0:
+                    continue
+                best = NEG
+                for pr1 in (r1 - 1, r1):
+                    for pr2 in (r2 - 1, r2):
+                        if 0 <= pr1 < n and 0 <= pr2 < n and dp[pr1][pr2] > best:
+                            best = dp[pr1][pr2]
+                if best == NEG:
+                    continue
+                gain = grid[r1][c1] + (grid[r2][c2] if r1 != r2 else 0)
+                nxt[r1][r2] = best + gain
+        dp = nxt
+    return max(0, dp[n - 1][n - 1]) if dp[n - 1][n - 1] != NEG else 0
+
+
+def _cherry_grid(n, salt, thorn_pct=15, cherry_pct=40):
+    values = randoms(n * n, 0, 99, salt=salt)
+    grid = [[(-1 if v < thorn_pct else 1 if v < thorn_pct + cherry_pct else 0) for v in values[r * n:(r + 1) * n]] for r in range(n)]
+    grid[0][0] = 0
+    grid[n - 1][n - 1] = 0
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="cherry-pickup",
+    title="체리 줍기",
+    summary="""
+`n × n` 격자의 칸은 `0`(빈 칸), `1`(체리 하나), `-1`(가시 — 못 지나간다)이다. `(0, 0)` 에서 오른쪽·
+아래로만 움직여 `(n-1, n-1)` 에 간 뒤, 다시 왼쪽·위로만 움직여 `(0, 0)` 으로 돌아온다. 지나는 칸의
+체리는 줍고 그 칸은 `0` 이 된다. 주울 수 있는 체리의 최대 수를 반환한다. 갈 길이 없으면 `0`.
+""",
+    notes="""
+갔다가 돌아오는 것은 **두 사람이 동시에 출발해 같은 걸음 수로 내려가는 것**과 같다 — 돌아오는
+길을 뒤집으면 또 하나의 내려가는 길이다. 걸음 수 `t` 에서 두 사람의 행 `r1, r2` 만 알면 열은
+`t − r` 로 정해지니 상태는 `(t, r1, r2)` 이고 O(n³) 이다. 같은 칸에 있으면 체리는 한 번만 센다.
+왕복을 따로 최적화하면(내려가며 최대로 줍고, 남은 격자에서 돌아오며 최대로) 틀린다.
+""",
+    drill_doc="""
+Drill.compare(r1, r2)         // 두 사람의 자리를 봤다
+Drill.write(t, best)          // 걸음 수의 최대를 정했다
+""",
+    constraints="""
+- `1 <= n <= 60`
+- `grid[r][c]` 는 `-1, 0, 1`, `grid[0][0]` 과 `grid[n-1][n-1]` 은 `-1` 이 아니다
+""",
+    signature=dict(name="cherryPickup", parameters=[("grid", "INT_MATRIX")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_cherry_pickup,
+    cases={
+        "sample": [("01", [[[0, 1, -1], [1, 0, -1], [1, 1, 1]]]), ("02", [[[1, 1, -1], [1, -1, 1], [-1, 1, 1]]])],
+        "boundary": [
+            ("01-single", [[[0]]]),
+            ("02-single-cherry", [[[1]]]),
+            ("03-two-by-two", [[[0, 1], [1, 0]]]),
+            # 따로 최적화하면 틀린다 — 내려갈 때 최대로 주우면 돌아올 길이 빈다.
+            ("04-greedy-fails", [[[1, 1, 1, 0, 0], [0, 0, 1, 0, 1], [1, 0, 1, 0, 0], [0, 0, 1, 0, 0], [0, 0, 1, 1, 1]]]),
+            ("05-blocked", [[[0, -1], [-1, 0]]]),
+            ("06-all-cherries", [[[1, 1, 1], [1, 1, 1], [1, 1, 1]]]),
+            # 같은 칸을 둘이 지나면 한 번만.
+            ("07-single-corridor", [[[1, -1, -1], [1, -1, -1], [1, 1, 1]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_cherry_grid(5, salt=9021)]),
+            ("02-random-medium", [_cherry_grid(12, salt=9022)]),
+            ("03-random-sparse-thorns", [_cherry_grid(20, salt=9023, thorn_pct=5)]),
+            ("04-random-many-thorns", [_cherry_grid(15, salt=9024, thorn_pct=35)]),
+        ],
+        "performance": [
+            ("01-small", [_cherry_grid(30, salt=9031, thorn_pct=5)]),
+            ("02-medium", [_cherry_grid(45, salt=9032, thorn_pct=5)]),
+            ("03-large", [_cherry_grid(60, salt=9033, thorn_pct=3)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 걸음 수마다 (r1, r2) 표.
+fun cherryPickup(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] < 0) return 0
+    val neg = Int.MIN_VALUE / 2
+    var dp = Array(n) { IntArray(n) { neg } }
+    dp[0][0] = grid[0][0]
+    for (t in 1 until 2 * n - 1) {
+        val next = Array(n) { IntArray(n) { neg } }
+        val lo = maxOf(0, t - n + 1); val hi = minOf(n - 1, t)
+        for (r1 in lo..hi) {
+            val c1 = t - r1
+            if (grid[r1][c1] < 0) continue
+            for (r2 in lo..hi) {
+                val c2 = t - r2
+                if (grid[r2][c2] < 0) continue
+                var best = neg
+                for (p1 in r1 - 1..r1) for (p2 in r2 - 1..r2) if (p1 >= 0 && p2 >= 0 && dp[p1][p2] > best) best = dp[p1][p2]
+                if (best == neg) continue
+                Drill.compare(r1, r2)
+                next[r1][r2] = best + grid[r1][c1] + (if (r1 != r2) grid[r2][c2] else 0)
+            }
+        }
+        dp = next
+        Drill.write(t, maxOf(0, dp[minOf(n - 1, t)][minOf(n - 1, t)]))
+    }
+    return maxOf(0, dp[n - 1][n - 1])
+}
+""",
+    mutants=[
+        ("counts-shared-cell-twice", "OFF_BY_ONE",
+         "두 사람이 같은 칸에 있어도 체리를 두 번 센다.",
+         """
+fun cherryPickup(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] < 0) return 0
+    val neg = Int.MIN_VALUE / 2
+    var dp = Array(n) { IntArray(n) { neg } }
+    dp[0][0] = grid[0][0]
+    for (t in 1 until 2 * n - 1) {
+        val next = Array(n) { IntArray(n) { neg } }
+        val lo = maxOf(0, t - n + 1); val hi = minOf(n - 1, t)
+        for (r1 in lo..hi) { val c1 = t - r1; if (grid[r1][c1] < 0) continue
+            for (r2 in lo..hi) { val c2 = t - r2; if (grid[r2][c2] < 0) continue
+                var best = neg
+                for (p1 in r1 - 1..r1) for (p2 in r2 - 1..r2) if (p1 >= 0 && p2 >= 0 && dp[p1][p2] > best) best = dp[p1][p2]
+                if (best == neg) continue
+                next[r1][r2] = best + grid[r1][c1] + grid[r2][c2]
+            }
+        }
+        dp = next
+    }
+    return maxOf(0, dp[n - 1][n - 1])
+}
+"""),
+        ("two-greedy-passes", "WRONG_ALGORITHM",
+         "내려가며 최대로 줍고, 남은 격자에서 돌아오며 최대로 줍는다. 합이 최대가 아니다.",
+         """
+fun cherryPickup(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val neg = Int.MIN_VALUE / 2
+    val g = Array(n) { grid[it].copyOf() }
+    fun bestPath(): Int {
+        val dp = Array(n) { IntArray(n) { neg } }
+        if (g[0][0] < 0) return 0
+        dp[0][0] = g[0][0]
+        for (r in 0 until n) for (c in 0 until n) {
+            if (g[r][c] < 0 || (r == 0 && c == 0)) continue
+            val up = if (r > 0) dp[r - 1][c] else neg
+            val left = if (c > 0) dp[r][c - 1] else neg
+            val b = maxOf(up, left)
+            if (b > neg) dp[r][c] = b + g[r][c]
+        }
+        if (dp[n - 1][n - 1] <= neg) return 0
+        // 경로를 되짚어 체리를 지운다.
+        var r = n - 1; var c = n - 1
+        while (r > 0 || c > 0) {
+            g[r][c] = 0
+            val up = if (r > 0) dp[r - 1][c] else neg
+            val left = if (c > 0) dp[r][c - 1] else neg
+            if (up >= left) r -= 1 else c -= 1
+        }
+        g[0][0] = 0
+        return dp[n - 1][n - 1]
+    }
+    val first = bestPath()
+    if (first == 0 && g[n - 1][n - 1] < 0) return 0
+    return first + bestPath()
+}
+"""),
+        ("thorn-treated-as-empty", "MISSING_EDGE_CASE",
+         "가시를 빈 칸으로 본다. 못 지나가는 길로 간다.",
+         """
+fun cherryPickup(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val neg = Int.MIN_VALUE / 2
+    var dp = Array(n) { IntArray(n) { neg } }
+    dp[0][0] = maxOf(0, grid[0][0])
+    for (t in 1 until 2 * n - 1) {
+        val next = Array(n) { IntArray(n) { neg } }
+        val lo = maxOf(0, t - n + 1); val hi = minOf(n - 1, t)
+        for (r1 in lo..hi) { val c1 = t - r1
+            for (r2 in lo..hi) { val c2 = t - r2
+                var best = neg
+                for (p1 in r1 - 1..r1) for (p2 in r2 - 1..r2) if (p1 >= 0 && p2 >= 0 && dp[p1][p2] > best) best = dp[p1][p2]
+                if (best == neg) continue
+                next[r1][r2] = best + maxOf(0, grid[r1][c1]) + (if (r1 != r2) maxOf(0, grid[r2][c2]) else 0)
+            }
+        }
+        dp = next
+    }
+    return maxOf(0, dp[n - 1][n - 1])
+}
+"""),
+        # 좌표 넷으로 기억하는 판은 60⁴ = 1.3 × 10⁷ 상태라 1초 안에 들어 살아남았다 — 기억이 없는 판이다.
+        ("no-memo--exponential", "PERFORMANCE",
+         "두 사람의 자리를 기억하지 않고 재귀한다. 4^(2n) 이다.",
+         """
+fun cherryPickup(grid: Array<IntArray>): Int {
+    val n = grid.size
+    val neg = Int.MIN_VALUE / 2
+    fun go(r1: Int, c1: Int, r2: Int, c2: Int): Int {
+        if (r1 >= n || c1 >= n || r2 >= n || c2 >= n || grid[r1][c1] < 0 || grid[r2][c2] < 0) return neg
+        if (r1 == n - 1 && c1 == n - 1) return grid[r1][c1]
+        Drill.compare(r1, r2)
+        var best = neg
+        for (d1 in 0..1) for (d2 in 0..1) {
+            val v = go(r1 + d1, c1 + 1 - d1, r2 + d2, c2 + 1 - d2)
+            if (v > best) best = v
+        }
+        val gain = grid[r1][c1] + (if (r1 != r2 || c1 != c2) grid[r2][c2] else 0)
+        return if (best == neg) neg else best + gain
+    }
+    return maxOf(0, go(0, 0, 0, 0))
+}
+"""),
+    ],
+))

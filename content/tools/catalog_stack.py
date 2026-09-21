@@ -1732,3 +1732,150 @@ fun sumOfSubarrayMinimums(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 166. 차량 무리의 수 (정렬 + 단조 스택) --------------------------------------------------------------
+
+def _car_fleets(target, positions, speeds):
+    cars = sorted(zip(positions, speeds), reverse=True)
+    fleets = 0
+    slowest = -1.0
+    for pos, speed in cars:
+        time = (target - pos) / speed
+        if time > slowest:
+            fleets += 1
+            slowest = time
+    return fleets
+
+
+def _cars(n, target, salt):
+    positions = list(dict.fromkeys(randoms(n * 2, 0, target - 1, salt=salt)))[:n]
+    speeds = randoms(len(positions), 1, 100, salt=salt + 1)
+    return target, positions, speeds
+
+
+PROBLEMS.append(Problem(
+    id="car-fleet-count",
+    title="차량 무리의 수",
+    summary="""
+한 차선 도로의 목적지가 `target` 이다. 차 `i` 는 `positions[i]` 에서 출발해 초당 `speeds[i]` 로
+목적지를 향해 달린다(출발 위치는 서로 다르다). 앞차를 **추월할 수 없다** — 따라잡으면 앞차의 속도로
+바로 뒤에 붙어 한 **무리**가 되어 함께 간다. 목적지에 닿을 때의 무리의 수를 반환한다. 목적지에서
+정확히 따라잡아도 같은 무리다.
+""",
+    notes="""
+목적지에 가까운 차부터 본다. 각 차가 혼자 달렸을 때 걸리는 시간 `(target − pos) / speed` 를 재면,
+뒤차의 시간이 앞차의 시간보다 **작거나 같으면** 앞차를 따라잡아 그 무리에 든다 — 그 무리의 시간은
+앞차(가장 느린 것)의 시간이다. 시간이 더 크면 새 무리다. 위치로 내림차순 정렬한 뒤 한 번 훑으며
+"지금 무리의 시간"만 들고 가면 되고, 그것은 스택에 시간을 쌓다 작은 것을 흡수하는 것과 같다.
+""",
+    drill_doc="""
+Drill.compare(i, fleets)      // 차를 봤다
+Drill.write(0, fleets)        // 무리를 하나 늘렸다
+""",
+    constraints="""
+- `1 <= positions.length <= 100_000`, `positions.length == speeds.length`
+- `0 <= positions[i] < target <= 10^6`, `1 <= speeds[i] <= 100`, 위치는 서로 다르다
+""",
+    signature=dict(name="carFleetCount", parameters=[("target", "INT"), ("positions", "INT_ARRAY"), ("speeds", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_car_fleets,
+    cases={
+        "sample": [("01", [12, [10, 8, 0, 5, 3], [2, 4, 1, 1, 3]]), ("02", [10, [3], [3]])],
+        "boundary": [
+            ("01-two-cars-catch-up", [10, [0, 5], [10, 1]]),
+            ("02-two-cars-never", [10, [0, 5], [1, 10]]),
+            # 목적지에서 정확히 따라잡는다 — 같은 무리.
+            ("03-meet-exactly-at-target", [10, [0, 5], [2, 1]]),
+            ("04-all-same-speed", [100, [0, 10, 20, 30], [5, 5, 5, 5]]),
+            # 뒤차가 빨라도 그 앞의 앞차가 느리면 결국 한 무리.
+            ("05-chain-absorbs", [100, [0, 50, 90], [100, 20, 1]]),
+            ("06-unsorted-input", [100, [90, 10, 50], [1, 100, 2]]),
+            # 정수 나눗셈으로 시간을 재면 같아 보인다.
+            ("07-fractional-times", [10, [0, 1], [3, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", list(_cars(6, 50, salt=9121))),
+            ("02-random-medium", list(_cars(300, 10000, salt=9123))),
+            ("03-random-wide", list(_cars(3000, 1000000, salt=9125))),
+            ("04-close-times", [1000000, [0, 1, 2, 3, 4, 5], [7, 7, 7, 7, 7, 7]]),
+        ],
+        "performance": [
+            ("01-small", list(_cars(20000, 1000000, salt=9131))),
+            ("02-medium", list(_cars(60000, 1000000, salt=9133))),
+            ("03-large", list(_cars(100000, 1000000, salt=9135))),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 위치 내림차순으로 시간을 보며 무리를 센다.
+fun carFleetCount(target: Int, positions: IntArray, speeds: IntArray): Int {
+    val order = positions.indices.sortedByDescending { positions[it] }
+    var fleets = 0
+    var slowest = -1.0
+    for (i in order) {
+        val time = (target - positions[i]).toDouble() / speeds[i]
+        Drill.compare(i, fleets)
+        if (time > slowest) { fleets += 1; slowest = time; Drill.write(0, fleets) }
+    }
+    return fleets
+}
+""",
+    mutants=[
+        ("integer-division-time", "WRONG_BRANCH",
+         "시간을 정수 나눗셈으로 잰다. 소수점이 갈라야 할 무리가 합쳐진다.",
+         """
+fun carFleetCount(target: Int, positions: IntArray, speeds: IntArray): Int {
+    val order = positions.indices.sortedByDescending { positions[it] }
+    var fleets = 0
+    var slowest = -1L
+    for (i in order) {
+        val time = ((target - positions[i]) / speeds[i]).toLong()
+        if (time > slowest) { fleets += 1; slowest = time }
+    }
+    return fleets
+}
+"""),
+        ("strict-catch-up--equal-time-splits", "OFF_BY_ONE",
+         "시간이 같으면 다른 무리로 센다. 목적지에서 정확히 따라잡으면 같은 무리다.",
+         """
+fun carFleetCount(target: Int, positions: IntArray, speeds: IntArray): Int {
+    val order = positions.indices.sortedByDescending { positions[it] }
+    var fleets = 0
+    var slowest = -1.0
+    for (i in order) {
+        val time = (target - positions[i]).toDouble() / speeds[i]
+        if (time >= slowest) { fleets += 1; slowest = time }
+    }
+    return fleets
+}
+"""),
+        ("input-order-not-sorted", "MISSING_EDGE_CASE",
+         "위치로 정렬하지 않고 입력 순서로 본다.",
+         """
+fun carFleetCount(target: Int, positions: IntArray, speeds: IntArray): Int {
+    var fleets = 0
+    var slowest = -1.0
+    for (i in positions.indices) {
+        val time = (target - positions[i]).toDouble() / speeds[i]
+        if (time > slowest) { fleets += 1; slowest = time }
+    }
+    return fleets
+}
+"""),
+        ("compares-with-previous-car-only", "WRONG_ALGORITHM",
+         "바로 앞 차의 시간과만 비교한다. 무리의 시간(가장 느린 것)이 아니라 앞차 자신의 시간이라 사슬 흡수를 놓친다.",
+         """
+fun carFleetCount(target: Int, positions: IntArray, speeds: IntArray): Int {
+    val order = positions.indices.sortedByDescending { positions[it] }
+    var fleets = 0
+    var previous = -1.0
+    for (i in order) {
+        val time = (target - positions[i]).toDouble() / speeds[i]
+        if (time > previous) fleets += 1
+        previous = time
+    }
+    return fleets
+}
+"""),
+    ],
+))
