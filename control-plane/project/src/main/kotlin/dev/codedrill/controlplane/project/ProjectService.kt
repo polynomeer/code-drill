@@ -246,7 +246,7 @@ class ProjectService(
 
         val recorded = repository.recordJudgement(
             id, revision, message.executionId, message.verdict, message.score, message.log, message.tests,
-            message.hiddenPassed, message.hiddenTotal, pending?.jobId, apply,
+            message.hiddenPassed, message.hiddenTotal, pending?.jobId, apply, message.probe,
         )
         if (recorded == 0) return false
 
@@ -257,7 +257,7 @@ class ProjectService(
         if (apply) {
             repository.applyJudgement(
                 id, revision, message.executionId, message.verdict, message.score, message.log, message.tests,
-                message.hiddenPassed, message.hiddenTotal,
+                message.hiddenPassed, message.hiddenTotal, message.probe,
             )
             log.info("프로젝트 판정 완료: {} → {} ({}점, 숨은 {}/{}, revision {})", id, message.verdict, message.score, message.hiddenPassed, message.hiddenTotal, revision)
         }
@@ -346,6 +346,7 @@ class ProjectService(
                 submittedAt = submission.createdAt,
                 addedTests = added,
                 addedTestsPassed = message.tests.isNotEmpty() && message.tests.all { it.passed },
+                probe = message.probe?.let { ProjectLearningSignals.Probe(it.referencePassed, it.killed.size, it.killed.size + it.survived.size) },
             )
         }.onFailure { log.warn("프로젝트 판정을 증거로 잇지 못했다: {} ({})", id, it.message) }
     }

@@ -206,6 +206,16 @@ enum class Competency(val group: CompetencyGroup, val label: String) {
      * 제출에서 사용자가 시작 저장소보다 테스트를 더 썼고 그것이 통과했는가가 증거다.
      */
     TEST_WRITING(CompetencyGroup.ENGINEERING, "테스트 작성"),
+
+    /**
+     * 쓴 테스트가 실제로 결함을 잡기 (12단계 — 실무군 셋째).
+     *
+     * [TEST_WRITING] 은 "테스트를 썼고 자기 구현에서 통과했다"이고, 이것은 그 테스트를 문제의
+     * 대표 오답 위에서 돌려 **떨어뜨리는가**다. 통과만 하는 테스트는 아무것도 잡지 못하는
+     * 테스트일 수 있다. 참조 구현 위에서는 통과하고 오답의 절반 이상을 떨어뜨렸는가가 증거다.
+     * 더 쓴 테스트가 없으면 증거가 없다 — 안 쓴 것은 못 쓰는 것의 증거가 아니다.
+     */
+    DEFECT_DETECTION(CompetencyGroup.ENGINEERING, "결함 검출"),
     ;
 
     /** 프로젝트형 문제만 달 수 있는 역량인가. 저작 검증이 이 경계를 지킨다. */

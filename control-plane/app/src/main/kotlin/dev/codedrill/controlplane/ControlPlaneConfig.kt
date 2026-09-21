@@ -287,9 +287,12 @@ class ControlPlaneConfig {
      */
     @Bean
     fun projectLearningSignals(service: CompetencyService, contests: ContestService) =
-        ProjectLearningSignals { userId, projectId, submissionId, accepted, score, submittedAt, addedTests, addedTestsPassed ->
+        ProjectLearningSignals { userId, projectId, submissionId, accepted, score, submittedAt, addedTests, addedTestsPassed, probe ->
             runCatching { contests.judged(userId, projectId, score, accepted, submittedAt) }
-            service.projectJudged(userId, projectId, submissionId, accepted, addedTests, addedTestsPassed)
+            service.projectJudged(
+                userId, projectId, submissionId, accepted, addedTests, addedTestsPassed,
+                probe?.let { CompetencyService.Probe(it.referencePassed, it.killed, it.total) },
+            )
         }
 
     @Bean

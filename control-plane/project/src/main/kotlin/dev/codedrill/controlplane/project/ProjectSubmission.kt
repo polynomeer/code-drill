@@ -1,5 +1,6 @@
 package dev.codedrill.controlplane.project
 
+import dev.codedrill.judge.protocol.ProjectProbeOutcome
 import dev.codedrill.judge.protocol.ProjectTestOutcome
 import dev.codedrill.judge.protocol.Verdict
 import java.time.Instant
@@ -28,6 +29,8 @@ data class ProjectSubmission(
     val tests: List<ProjectTestOutcome> = emptyList(),
     val hiddenPassed: Int? = null,
     val hiddenTotal: Int? = null,
+    /** 사용자의 테스트가 오답을 잡았는가. 시험하지 않았으면 null (실무군 셋째 역량). */
+    val probe: ProjectProbeOutcome? = null,
     val createdAt: Instant = Instant.now(),
     val completedAt: Instant? = null,
     val version: Int = 0,
@@ -54,6 +57,7 @@ data class ProjectSubmissionResponse(
     val tests: List<ProjectTestOutcome>,
     val hiddenPassed: Int?,
     val hiddenTotal: Int?,
+    val probe: ProjectProbeOutcome?,
     val createdAt: Instant,
     val completedAt: Instant?,
     val revision: Int,
@@ -72,6 +76,7 @@ data class ProjectSubmissionResponse(
             tests = submission.tests,
             hiddenPassed = submission.hiddenPassed,
             hiddenTotal = submission.hiddenTotal,
+            probe = submission.probe,
             createdAt = submission.createdAt,
             completedAt = submission.completedAt,
             revision = submission.revision,

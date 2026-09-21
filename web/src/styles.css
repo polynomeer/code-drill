@@ -1298,6 +1298,12 @@ table.groups td {
   margin-top: 0;
 }
 
+.project-probe {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
 .project-tests {
   list-style: none;
   padding: 0;

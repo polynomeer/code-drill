@@ -34,11 +34,64 @@ data class ProjectRequest(
     /** 숨은 테스트. 오케스트레이터가 올렸다. 키는 패키지 digest 다. */
     val suite: BundleRef,
     val limits: ProjectLimits,
+    /**
+     * 사용자의 테스트를 시험할 판들 — 참조 구현과 대표 오답 (12단계 실무군 셋째 역량, [Probes]).
+     * 오케스트레이터가 올렸다. 없으면 시험하지 않는다. 있어도 Runner 는 사용자가 시작 저장소보다
+     * 테스트를 더 썼을 때만 돌린다 — 안 쓴 테스트는 잴 것이 없다.
+     */
+    val probe: BundleRef? = null,
 ) {
     companion object {
         const val SCHEMA_VERSION = "1.0"
     }
 }
+
+/**
+ * "사용자의 테스트가 오답을 잡는가"를 재는 판 (실무군 셋째 역량 — 결함 검출).
+ *
+ * 숨은 스위트가 사용자의 **구현**을 시험한다면, 이것은 사용자의 **테스트**를 시험한다. 참조 구현
+ * 위에서는 통과해야 하고(틀린 것을 맞다고 하는 테스트는 테스트가 아니다), 대표 오답 위에서는
+ * 하나라도 떨어져야 그 오답을 잡은 것이다. 오답의 내용은 사용자에게 절대 나가지 않는다 — Runner
+ * 가 돌리고 이름과 결과만 돌아온다.
+ *
+ * tamper 오답은 판에 넣지 않는다. 그것은 테스트가 아니라 가드가 잡는 것이다.
+ */
+object Probes {
+
+    const val REFERENCE = "reference"
+
+    private val json = ObjectMapper().registerKotlinModule()
+
+    fun probeKey(packageDigest: String) = "probes/$packageDigest.json"
+
+    fun encode(bundle: ProbeBundle): ByteArray = json.writeValueAsBytes(
+        bundle.copy(starterTests = bundle.starterTests.toSortedMap(), variants = bundle.variants.toSortedMap().mapValues { it.value.toSortedMap() }),
+    )
+
+    fun decode(bytes: ByteArray): ProbeBundle = json.readValue(bytes)
+}
+
+/**
+ * 시험판 하나의 묶음. [variants] 의 키는 [Probes.REFERENCE] 또는 오답 이름이고 값은 **완성된**
+ * 워크스페이스(시작 저장소 위에 그 판을 덮은 것)다. [starterTests] 는 시작 저장소의 테스트 파일 —
+ * 사용자가 그보다 더 썼는지를 Runner 가 가린다.
+ */
+data class ProbeBundle(
+    val starterTests: Map<String, String>,
+    val variants: Map<String, Map<String, String>>,
+)
+
+/** 시험판의 결과. 오답의 내용은 없고 이름과 잡았는지만 있다. */
+data class ProjectProbeOutcome(
+    /** 사용자의 테스트가 참조 구현 위에서 전부 통과했는가. 아니면 아래 둘은 뜻이 없다. */
+    val referencePassed: Boolean,
+    /** 사용자의 테스트가 떨어뜨린 오답. */
+    val killed: List<String>,
+    /** 사용자의 테스트가 통과시킨 오답. */
+    val survived: List<String>,
+    /** 참조 위에서 떨어졌을 때 그 사유 — 사용자의 테스트가 무엇을 잘못 기대했는지. */
+    val log: String? = null,
+)
 
 /** 오브젝트 스토어의 워크스페이스 하나. [Workspaces] 가 모양을 정한다. */
 data class WorkspaceRef(val key: String, val digest: String)
@@ -144,6 +197,8 @@ data class ProjectResult(
     val buildMillis: Long,
     val testMillis: Long,
     override val resultDigest: String,
+    /** 사용자의 테스트를 시험한 결과. 시험할 판이 없거나 더 쓴 테스트가 없으면 null. */
+    val probe: ProjectProbeOutcome? = null,
 ) : LeasedResult
 
 /** 테스트 하나의 결과. [module] 로 공개·숨은 것을 가른다. */
@@ -186,4 +241,6 @@ data class ProjectCompleted(
     val tests: List<ProjectTestOutcome>,
     val hiddenPassed: Int,
     val hiddenTotal: Int,
+    /** 사용자의 테스트가 오답을 잡았는가 (실무군 셋째 역량). 시험하지 않았으면 null. */
+    val probe: ProjectProbeOutcome? = null,
 )

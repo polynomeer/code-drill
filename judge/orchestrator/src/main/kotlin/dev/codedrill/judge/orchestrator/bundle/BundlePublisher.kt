@@ -3,8 +3,11 @@ package dev.codedrill.judge.orchestrator.bundle
 import dev.codedrill.judge.protocol.BundleRef
 import dev.codedrill.judge.protocol.Bundles
 import dev.codedrill.judge.protocol.RequestedGroup
+import dev.codedrill.judge.protocol.ProbeBundle
+import dev.codedrill.judge.protocol.Probes
 import dev.codedrill.judge.protocol.Workspaces
 import dev.codedrill.platform.problempackage.ProblemPackage
+import dev.codedrill.platform.problempackage.ProjectMutant
 import dev.codedrill.platform.problempackage.ProjectPackage
 import dev.codedrill.platform.storage.BlobStore
 import org.slf4j.LoggerFactory
@@ -43,6 +46,28 @@ class BundlePublisher(
      */
     fun ensureSuite(pkg: ProjectPackage): BundleRef =
         ensure(Workspaces.suiteKey(pkg.packageDigest), Workspaces.encode(pkg.hidden), "숨은 스위트")
+
+    /**
+     * 사용자의 테스트를 시험할 판 (실무군 셋째 역량, [Probes]). 참조와 오답을 시작 저장소 위에
+     * 덮어 **완성된 워크스페이스**로 올린다 — Runner 가 덮는 법을 알 필요가 없다. tamper 오답은
+     * 뺀다: 테스트가 아니라 가드가 잡는 것이다. 참조가 없으면 null — 시험할 기준이 없다.
+     *
+     * 키는 패키지 digest 다. 참조·오답은 digest 밖이라 바뀌어도 키가 같지만, [ensure] 가 주기마다
+     * 내용을 대조해 다르면 다시 올린다.
+     */
+    fun ensureProbe(pkg: ProjectPackage, reference: Map<String, String>?, mutants: List<ProjectMutant>): BundleRef? {
+        if (reference == null) return null
+        val variants = linkedMapOf(Probes.REFERENCE to pkg.starter + reference)
+        for (mutant in mutants) {
+            if (mutant.name.startsWith("tamper")) continue
+            variants[mutant.name] = pkg.starter + mutant.overlay
+        }
+        val bundle = ProbeBundle(
+            starterTests = pkg.starter.filterKeys(ProjectPackage::isTestModule),
+            variants = variants,
+        )
+        return ensure(Probes.probeKey(pkg.packageDigest), Probes.encode(bundle), "시험판")
+    }
 
     private fun ensure(key: String, bytes: ByteArray, what: String): BundleRef {
         val digest = Bundles.digest(bytes)

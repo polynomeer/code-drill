@@ -71,6 +71,7 @@ class CompetencyService(
         accepted: Boolean,
         addedTests: Int,
         addedTestsPassed: Boolean,
+        probe: Probe? = null,
     ) {
         val competencies = projects?.let { loader ->
             runCatching { loader.load(projectId).catalog.competencies }.getOrNull()
@@ -87,7 +88,23 @@ class CompetencyService(
                 detail = if (addedTestsPassed) "테스트 ${addedTests}개를 더 썼고 통과했다" else "테스트 ${addedTests}개를 더 썼는데 통과하지 못했다",
             )
         }
+        // 시험은 더 쓴 테스트가 있을 때만 돈다. 오답이 하나도 없는 문제(total 0)는 잴 것이 없다.
+        if (probe != null && probe.total > 0) {
+            val enough = probe.referencePassed && probe.killed * 2 >= probe.total
+            record(
+                userId, listOf(Competency.DEFECT_DETECTION), EvidenceSource.PROJECT_PROBE, enough, projectId,
+                reference = submissionId,
+                detail = when {
+                    !probe.referencePassed -> "더 쓴 테스트가 참조 구현에서 떨어졌다 — 틀린 것을 기대한다"
+                    enough -> "더 쓴 테스트가 오답 ${probe.total}개 중 ${probe.killed}개를 잡았다"
+                    else -> "더 쓴 테스트가 오답 ${probe.total}개 중 ${probe.killed}개만 잡았다"
+                },
+            )
+        }
     }
+
+    /** 사용자의 테스트를 오답 위에서 시험한 결과. 조립 지점이 Project 모듈의 것을 옮겨 준다. */
+    data class Probe(val referencePassed: Boolean, val killed: Int, val total: Int)
 
     /**
      * 도움 단계 → 증거 무게 (PRD §3.4, FR-806).

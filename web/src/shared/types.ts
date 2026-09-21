@@ -566,6 +566,7 @@ export type EvidenceSource =
   | 'ARENA'
   | 'PROJECT'
   | 'PROJECT_TESTS'
+  | 'PROJECT_PROBE'
 
 export const LEVEL_LABEL: Record<MasteryLevel, string> = {
   UNMEASURED: '아직 재지 않음',
@@ -610,6 +611,7 @@ export const COMPETENCY_LABEL: Record<string, string> = {
   AI_COLLABORATION: 'AI 협업',
   SPECIFICATION: '요구사항 충실',
   TEST_WRITING: '테스트 작성',
+  DEFECT_DETECTION: '결함 검출',
 }
 
 export const SOURCE_LABEL: Record<EvidenceSource, string> = {
@@ -622,6 +624,7 @@ export const SOURCE_LABEL: Record<EvidenceSource, string> = {
   ARENA: '아레나',
   PROJECT: '프로젝트 판정',
   PROJECT_TESTS: '프로젝트에서 쓴 테스트',
+  PROJECT_PROBE: '내 테스트가 잡은 오답',
 }
 
 export interface MasteryView {
@@ -823,11 +826,20 @@ export interface ProjectSubmission {
   tests: ProjectTestOutcome[]
   hiddenPassed: number | null
   hiddenTotal: number | null
+  /** 더 쓴 테스트를 오답 위에서 시험한 결과. 시험하지 않았으면 null. 오답의 내용은 없고 이름뿐이다. */
+  probe: ProjectProbeOutcome | null
   createdAt: string
   completedAt: string | null
   /** 재채점마다 오른다. 1 이면 사용자가 낸 그대로의 판정이다. */
   revision: number
   files: Record<string, string> | null
+}
+
+export interface ProjectProbeOutcome {
+  referencePassed: boolean
+  killed: string[]
+  survived: string[]
+  log: string | null
 }
 
 /** 프로젝트형 초안 — 파일 여럿 (§8.1). 버전은 CAS 의 것이다. */

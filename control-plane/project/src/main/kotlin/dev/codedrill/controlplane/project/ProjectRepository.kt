@@ -2,6 +2,7 @@ package dev.codedrill.controlplane.project
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import dev.codedrill.judge.protocol.ProjectProbeOutcome
 import dev.codedrill.judge.protocol.ProjectTestOutcome
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.platform.messaging.OutboxEvent
@@ -104,13 +105,15 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         hiddenTotal: Int,
         rejudgeJobId: UUID?,
         applied: Boolean,
+        probe: ProjectProbeOutcome? = null,
     ): Int = jdbc.update(
         """
-        INSERT INTO project_judgement (submission_id, revision, execution_id, verdict, score, log, tests, hidden_passed, hidden_total, rejudge_job_id, applied)
-        VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)
+        INSERT INTO project_judgement (submission_id, revision, execution_id, verdict, score, log, tests, hidden_passed, hidden_total, rejudge_job_id, applied, probe)
+        VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?::jsonb)
         ON CONFLICT (execution_id) DO NOTHING
         """.trimIndent(),
         id, revision, executionId, verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, rejudgeJobId, applied,
+        probe?.let(json::writeValueAsString),
     )
 
     /** 현재 판정을 갈아 끼운다. 최초 판정은 종착으로 옮기고, 재채점은 revision 을 올린다. */
@@ -124,15 +127,16 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         tests: List<ProjectTestOutcome>,
         hiddenPassed: Int,
         hiddenTotal: Int,
+        probe: ProjectProbeOutcome? = null,
     ): Boolean = jdbc.update(
         """
         UPDATE project_submission
            SET status = 'COMPLETED', verdict = ?, score = ?, log = ?, tests = ?::jsonb,
-               hidden_passed = ?, hidden_total = ?, execution_id = ?, revision = ?,
+               hidden_passed = ?, hidden_total = ?, probe = ?::jsonb, execution_id = ?, revision = ?,
                completed_at = coalesce(completed_at, now()), version = version + 1
          WHERE id = ?
         """.trimIndent(),
-        verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, executionId, revision, id,
+        verdict.name, score, log, json.writeValueAsString(tests), hiddenPassed, hiddenTotal, probe?.let(json::writeValueAsString), executionId, revision, id,
     ) == 1
 
     fun judgements(id: UUID): List<ProjectJudgement> = jdbc.query(
@@ -266,6 +270,7 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         tests = rs.getString("tests")?.let { json.readValue<List<ProjectTestOutcome>>(it) }.orEmpty(),
         hiddenPassed = rs.getObject("hidden_passed") as Int?,
         hiddenTotal = rs.getObject("hidden_total") as Int?,
+        probe = rs.getString("probe")?.let { json.readValue<ProjectProbeOutcome>(it) },
         createdAt = rs.getTimestamp("created_at").toInstant(),
         completedAt = rs.getTimestamp("completed_at")?.toInstant(),
         version = rs.getInt("version"),

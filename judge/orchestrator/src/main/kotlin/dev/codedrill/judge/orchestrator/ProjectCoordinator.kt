@@ -108,6 +108,8 @@ class ProjectCoordinator(
                 tests = public,
                 hiddenPassed = hidden.count { it.passed },
                 hiddenTotal = hidden.size,
+                // 오답의 이름은 나가도 된다 — 내용이 아니다. 무엇을 잡고 무엇을 놓쳤는지가 곧 피드백이다.
+                probe = result.probe,
             ),
         )
     }
@@ -162,6 +164,8 @@ class ProjectCoordinator(
         workspace = origin.workspace,
         suite = suites.ensureSuite(pkg),
         limits = pkg.manifest.limits,
+        // 참조·오답은 패키지 밖이라 따로 읽는다. 없으면 시험하지 않는다.
+        probe = suites.ensureProbe(pkg, packages.reference(origin.projectId), packages.mutants(origin.projectId)),
     )
 
     private fun packageOf(result: ProjectResult): ProjectPackage {

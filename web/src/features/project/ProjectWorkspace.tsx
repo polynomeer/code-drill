@@ -9,7 +9,7 @@ import {
   submitProject,
 } from '../../api/client'
 import { DIFFICULTY_LABEL, VERDICT_LABEL } from '../../shared/types'
-import type { ProjectDraft, ProjectSubmission, ProjectView } from '../../shared/types'
+import type { ProjectDraft, ProjectProbeOutcome, ProjectSubmission, ProjectView } from '../../shared/types'
 import { SaveIndicator } from '../workspace/Workspace'
 import { useDraftSync } from '../workspace/useDraftSync'
 
@@ -400,6 +400,35 @@ function ProjectResult({ submission }: { submission: ProjectSubmission }) {
           숨은 테스트 {submission.hiddenPassed}/{submission.hiddenTotal} 통과 — 이름과 사유는 보이지 않습니다
         </p>
       )}
+      {submission.probe && <ProbeResult probe={submission.probe} />}
     </section>
+  )
+}
+
+/**
+ * 더 쓴 테스트가 오답을 잡았는가 (실무군 셋째 역량). 오답의 이름은 무엇을 놓쳤는지의 힌트고,
+ * 내용은 오지 않는다. 참조에서 떨어졌으면 그 사유가 곧 "내 테스트가 무엇을 잘못 기대했나"다.
+ */
+function ProbeResult({ probe }: { probe: ProjectProbeOutcome }) {
+  const total = probe.killed.length + probe.survived.length
+  if (!probe.referencePassed) {
+    return (
+      <div className="project-probe">
+        <p className="warn small">내가 더 쓴 테스트가 정답 구현에서 떨어졌습니다 — 틀린 것을 기대하고 있습니다.</p>
+        {probe.log && <pre className="compile-log">{probe.log}</pre>}
+      </div>
+    )
+  }
+  return (
+    <div className="project-probe">
+      <p className="small">
+        <strong className={probe.killed.length * 2 >= total ? 'ok' : 'warn'}>
+          내 테스트가 오답 {total}개 중 {probe.killed.length}개를 잡았습니다
+        </strong>
+      </p>
+      {probe.survived.length > 0 && (
+        <p className="muted small">놓친 오답: {probe.survived.map((name) => name.replace(/--.*$/, '')).join(', ')}</p>
+      )}
+    </div>
   )
 }

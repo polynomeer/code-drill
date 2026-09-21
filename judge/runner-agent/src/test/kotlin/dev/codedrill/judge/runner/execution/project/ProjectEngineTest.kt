@@ -3,11 +3,14 @@ package dev.codedrill.judge.runner.execution.project
 import dev.codedrill.judge.protocol.BundleRef
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Language
+import dev.codedrill.judge.protocol.ProbeBundle
+import dev.codedrill.judge.protocol.Probes
 import dev.codedrill.judge.protocol.ProjectRequest
 import dev.codedrill.judge.protocol.Verdict
 import dev.codedrill.judge.protocol.WorkspaceRef
 import dev.codedrill.judge.protocol.Workspaces
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
+import dev.codedrill.platform.problempackage.ProjectPackage
 import dev.codedrill.platform.problempackage.ProjectPackageLoader
 import dev.codedrill.platform.storage.DirectoryBlobStore
 import java.nio.file.Path
@@ -114,7 +117,88 @@ class ProjectEngineTest {
         assertEquals(mapOf("a/b.py" to "x"), Workspaces.validate(mapOf(" a/b.py " to "x")))
     }
 
-    private fun request(id: String, files: Map<String, String>, upload: Boolean = true): ProjectRequest {
+    // --- 사용자의 테스트를 시험한다 (실무군 셋째 역량) ---
+
+    private val probeBytes = Probes.encode(
+        ProbeBundle(
+            starterTests = pkg.starter.filterKeys(ProjectPackage::isTestModule),
+            variants = mapOf(Probes.REFERENCE to pkg.starter + loader.reference("inventory-ledger")!!) +
+                loader.mutants("inventory-ledger").filterNot { it.name.startsWith("tamper") }.associate { it.name to pkg.starter + it.overlay },
+        ),
+    )
+    private val probe = BundleRef(Probes.probeKey(pkg.packageDigest), Workspaces.digest(probeBytes))
+        .also { store.put(it.key, probeBytes, Workspaces.CONTENT_TYPE, it.digest) }
+
+    private val reference = pkg.starter + loader.reference("inventory-ledger")!!
+
+    /** 부분 로트의 나머지 원가를 묻는 테스트 — partial-lot 과 lifo 는 잡고, 되돌리기·이력 오답은 못 잡는다. */
+    private val partialLotTest = """
+        import unittest
+        from ledger import Ledger
+
+        class MineTests(unittest.TestCase):
+            def test_remainder_keeps_its_cost(self):
+                ledger = Ledger()
+                ledger.receive("A", 4, 10)
+                ledger.receive("A", 6, 20)
+                ledger.ship("A", 7)
+                self.assertEqual(3 * 20, ledger.ship("A", 3))
+    """.trimIndent()
+
+    @Test
+    fun `더 쓴 테스트가 없으면 시험하지 않는다`() {
+        val result = engine.execute(request("probe-none", reference, probe = probe))
+
+        assertEquals(Verdict.ACCEPTED, result.verdict)
+        assertEquals(null, result.probe)
+    }
+
+    @Test
+    fun `더 쓴 테스트를 참조와 오답 위에서 돌려 잡은 것을 센다`() {
+        val result = engine.execute(request("probe-mine", reference + ("tests/test_mine.py" to partialLotTest), probe = probe))
+
+        assertEquals(Verdict.ACCEPTED, result.verdict)
+        val outcome = result.probe!!
+        assertTrue(outcome.referencePassed)
+        assertEquals(listOf("lifo--consumes-newest-lot-first", "partial-lot--drops-remainder"), outcome.killed)
+        assertEquals(listOf("history--returns-internal-list", "no-rollback--ships-partial-on-shortage"), outcome.survived)
+    }
+
+    @Test
+    fun `숨은 테스트를 그대로 더 쓰면 오답 전부를 잡는다`() {
+        val hidden = pkg.hidden.entries.first { it.key.endsWith(".py") && it.key.contains("test_") }
+        val result = engine.execute(request("probe-hidden", reference + ("tests/test_mine.py" to hidden.value), probe = probe))
+
+        assertTrue(result.probe!!.referencePassed)
+        assertEquals(emptyList(), result.probe!!.survived)
+        assertEquals(4, result.probe!!.killed.size)
+    }
+
+    @Test
+    fun `참조에서 떨어지는 테스트는 아무것도 잡지 못한다`() {
+        val wrong = partialLotTest.replace("3 * 20", "3 * 10")
+        val result = engine.execute(request("probe-wrong", reference + ("tests/test_mine.py" to wrong), probe = probe))
+
+        // 틀린 테스트는 자기 제출도 떨어뜨린다 — 판정은 그대로 오답이고, 시험은 그 위에 따로 붙는다.
+        assertEquals(Verdict.WRONG_ANSWER, result.verdict)
+        val outcome = result.probe!!
+        assertEquals(false, outcome.referencePassed)
+        assertTrue(outcome.killed.isEmpty() && outcome.survived.isEmpty())
+        assertTrue(outcome.log!!.contains("test_remainder_keeps_its_cost"), outcome.log)
+    }
+
+    @Test
+    fun `시험은 사용자의 테스트만 들이고 구현은 들이지 않는다`() {
+        // 사용자의 구현이 오답이어도, 그 테스트는 참조·오답 위에서 돈다.
+        val mutant = loader.mutants("inventory-ledger").first { it.name.startsWith("partial-lot") }
+        val result = engine.execute(request("probe-impl", pkg.starter + mutant.overlay + ("tests/test_mine.py" to partialLotTest), probe = probe))
+
+        assertEquals(Verdict.WRONG_ANSWER, result.verdict)
+        assertTrue(result.probe!!.referencePassed)
+        assertTrue("partial-lot--drops-remainder" in result.probe!!.killed)
+    }
+
+    private fun request(id: String, files: Map<String, String>, upload: Boolean = true, probe: BundleRef? = null): ProjectRequest {
         val bytes = Workspaces.encode(files)
         val ref = WorkspaceRef(Workspaces.workspaceKey(id), Workspaces.digest(bytes))
         if (upload) store.put(ref.key, bytes, Workspaces.CONTENT_TYPE, ref.digest)
@@ -130,6 +214,7 @@ class ProjectEngineTest {
             workspace = ref,
             suite = suite,
             limits = pkg.manifest.limits,
+            probe = probe,
         )
     }
 

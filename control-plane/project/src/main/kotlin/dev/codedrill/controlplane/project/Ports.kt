@@ -40,10 +40,15 @@ fun interface ProjectLearningSignals {
         submittedAt: java.time.Instant,
         addedTests: Int,
         addedTestsPassed: Boolean,
+        /** 사용자의 테스트를 오답 위에서 시험한 결과. 시험하지 않았으면 null (실무군 셋째 역량). */
+        probe: Probe?,
     )
 
+    /** 참조 위에서 통과했는가, 오답 몇 개 중 몇 개를 잡았는가. 이름은 화면의 것이라 여기 없다. */
+    data class Probe(val referencePassed: Boolean, val killed: Int, val total: Int)
+
     companion object {
-        val NONE = ProjectLearningSignals { _, _, _, _, _, _, _, _ -> }
+        val NONE = ProjectLearningSignals { _, _, _, _, _, _, _, _, _ -> }
     }
 }
 
