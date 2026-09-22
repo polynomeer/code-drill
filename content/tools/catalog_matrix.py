@@ -3003,3 +3003,206 @@ fun cherryPickup(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 171. 8 방향 격자의 최단 경로 (BFS) ------------------------------------------------------------------
+
+def _shortest_clear_path(grid):
+    from collections import deque
+    n = len(grid)
+    if grid[0][0] or grid[n - 1][n - 1]:
+        return -1
+    dist = [[0] * n for _ in range(n)]
+    dist[0][0] = 1
+    queue = deque([(0, 0)])
+    while queue:
+        r, c = queue.popleft()
+        if (r, c) == (n - 1, n - 1):
+            return dist[r][c]
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 0 and dist[nr][nc] == 0:
+                    dist[nr][nc] = dist[r][c] + 1
+                    queue.append((nr, nc))
+    return -1
+
+
+def _open_grid(n, block_pct, salt):
+    values = randoms(n * n, 0, 99, salt=salt)
+    grid = [[1 if v < block_pct else 0 for v in values[r * n:(r + 1) * n]] for r in range(n)]
+    grid[0][0] = 0
+    grid[n - 1][n - 1] = 0
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="shortest-clear-path",
+    title="8 방향 격자의 최단 경로",
+    summary="""
+`n × n` 격자의 칸은 `0`(빈 칸) 또는 `1`(막힘)이다. `(0, 0)` 에서 `(n-1, n-1)` 까지 빈 칸만 밟으며
+**8 방향**(대각선 포함)으로 움직이는 가장 짧은 경로의 **칸 수**(시작과 끝 포함)를 반환한다. 길이
+없으면 `-1`.
+""",
+    notes="""
+간선의 비용이 전부 1 이라 BFS 다. 처음 닿았을 때의 거리가 최단이니 큐에 넣을 때 거리를 적고, 목적지를
+꺼내는 순간 답이다. 시작이나 끝이 막혀 있으면 `-1` 이고, 칸이 하나면 `1` 이다. 대각선을 빼면 답이
+길어지고, 방문 표시를 꺼낼 때 하면 같은 칸이 큐에 여러 번 들어간다.
+""",
+    drill_doc="""
+Drill.compare(r, c)           // 칸을 꺼냈다
+Drill.write(0, distance)      // 목적지의 거리를 정했다
+""",
+    constraints="""
+- `1 <= n <= 300`
+- `grid[r][c]` 는 `0` 또는 `1`
+""",
+    signature=dict(name="shortestClearPath", parameters=[("grid", "INT_MATRIX")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_shortest_clear_path,
+    cases={
+        "sample": [("01", [[[0, 1], [1, 0]]]), ("02", [[[0, 0, 0], [1, 1, 0], [1, 1, 0]]])],
+        "boundary": [
+            ("01-single-open", [[[0]]]),
+            ("02-single-blocked", [[[1]]]),
+            ("03-start-blocked", [[[1, 0], [0, 0]]]),
+            ("04-end-blocked", [[[0, 0], [0, 1]]]),
+            ("05-no-path", [[[0, 1, 0], [1, 1, 0], [0, 0, 0]]]),
+            # 대각선이 있어야 짧다.
+            ("06-diagonal-shortcut", [[[0, 0, 0], [0, 0, 0], [0, 0, 0]]]),
+            # 돌아가는 길 — 위로도 가야 한다.
+            ("07-detour", [[[0, 0, 0, 0, 0], [1, 1, 1, 1, 0], [0, 0, 0, 0, 0], [0, 1, 1, 1, 1], [0, 0, 0, 0, 0]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_open_grid(5, 30, salt=9351)]),
+            ("02-random-medium", [_open_grid(25, 30, salt=9352)]),
+            ("03-random-dense", [_open_grid(40, 45, salt=9353)]),
+            ("04-random-sparse", [_open_grid(60, 10, salt=9354)]),
+        ],
+        "performance": [
+            ("01-small", [_open_grid(100, 20, salt=9361)]),
+            ("02-medium", [_open_grid(200, 20, salt=9362)]),
+            ("03-large", [_open_grid(300, 15, salt=9363)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 8 방향 BFS, 넣을 때 거리를 적는다.
+fun shortestClearPath(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] != 0 || grid[n - 1][n - 1] != 0) return -1
+    val dist = IntArray(n * n)
+    val queue = IntArray(n * n)
+    var head = 0; var tail = 0
+    dist[0] = 1; queue[tail++] = 0
+    while (head < tail) {
+        val cell = queue[head++]
+        val r = cell / n; val c = cell % n
+        Drill.compare(r, c)
+        if (cell == n * n - 1) { Drill.write(0, dist[cell]); return dist[cell] }
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr !in 0 until n || nc !in 0 until n || grid[nr][nc] != 0) continue
+            val next = nr * n + nc
+            if (dist[next] == 0) { dist[next] = dist[cell] + 1; queue[tail++] = next }
+        }
+    }
+    return -1
+}
+""",
+    mutants=[
+        ("four-directions", "WRONG_ALGORITHM",
+         "상하좌우만 움직인다. 대각선이 없어 길이 길어지거나 끊긴다.",
+         """
+fun shortestClearPath(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] != 0 || grid[n - 1][n - 1] != 0) return -1
+    val dist = IntArray(n * n); val queue = IntArray(n * n); var head = 0; var tail = 0
+    dist[0] = 1; queue[tail++] = 0
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (head < tail) {
+        val cell = queue[head++]; val r = cell / n; val c = cell % n
+        if (cell == n * n - 1) return dist[cell]
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr !in 0 until n || nc !in 0 until n || grid[nr][nc] != 0) continue
+            val next = nr * n + nc
+            if (dist[next] == 0) { dist[next] = dist[cell] + 1; queue[tail++] = next }
+        }
+    }
+    return -1
+}
+"""),
+        ("counts-steps-not-cells", "OFF_BY_ONE",
+         "간선 수를 답한다. 칸 수는 하나 더 많다.",
+         """
+fun shortestClearPath(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] != 0 || grid[n - 1][n - 1] != 0) return -1
+    val dist = IntArray(n * n) { -1 }; val queue = IntArray(n * n); var head = 0; var tail = 0
+    dist[0] = 0; queue[tail++] = 0
+    while (head < tail) {
+        val cell = queue[head++]; val r = cell / n; val c = cell % n
+        if (cell == n * n - 1) return dist[cell]
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr !in 0 until n || nc !in 0 until n || grid[nr][nc] != 0) continue
+            val next = nr * n + nc
+            if (dist[next] < 0) { dist[next] = dist[cell] + 1; queue[tail++] = next }
+        }
+    }
+    return -1
+}
+"""),
+        ("end-not-checked", "MISSING_EDGE_CASE",
+         "끝 칸이 막혀 있어도 그리로 들어간다.",
+         """
+fun shortestClearPath(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] != 0) return -1
+    val dist = IntArray(n * n); val queue = IntArray(n * n); var head = 0; var tail = 0
+    dist[0] = 1; queue[tail++] = 0
+    while (head < tail) {
+        val cell = queue[head++]; val r = cell / n; val c = cell % n
+        if (cell == n * n - 1) return dist[cell]
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr !in 0 until n || nc !in 0 until n) continue
+            val next = nr * n + nc
+            if (grid[nr][nc] != 0 && next != n * n - 1) continue
+            if (dist[next] == 0) { dist[next] = dist[cell] + 1; queue[tail++] = next }
+        }
+    }
+    return -1
+}
+"""),
+        ("dfs-all-paths", "PERFORMANCE",
+         "모든 경로를 DFS 로 열거하며 최솟값을 갱신한다. 지수다.",
+         """
+fun shortestClearPath(grid: Array<IntArray>): Int {
+    val n = grid.size
+    if (grid[0][0] != 0 || grid[n - 1][n - 1] != 0) return -1
+    var best = Int.MAX_VALUE
+    val onPath = BooleanArray(n * n)
+    fun go(r: Int, c: Int, depth: Int) {
+        if (depth >= best) return
+        if (r == n - 1 && c == n - 1) { best = depth; return }
+        for (dr in -1..1) for (dc in -1..1) {
+            if (dr == 0 && dc == 0) continue
+            val nr = r + dr; val nc = c + dc
+            if (nr !in 0 until n || nc !in 0 until n || grid[nr][nc] != 0 || onPath[nr * n + nc]) continue
+            Drill.compare(nr, nc)
+            onPath[nr * n + nc] = true; go(nr, nc, depth + 1); onPath[nr * n + nc] = false
+        }
+    }
+    onPath[0] = true
+    go(0, 0, 1)
+    return if (best == Int.MAX_VALUE) -1 else best
+}
+"""),
+    ],
+))

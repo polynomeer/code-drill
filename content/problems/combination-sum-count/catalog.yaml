@@ -1,0 +1,18 @@
+# combination-sum-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - backtracking
+  - recursion
+  - dynamic-programming
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - OPTIMIZATION
+  - READING
+prerequisites:
+  - coin-change-min
+  - subset-sum-count
+complexity:
+  time: QUADRATIC
+  space: QUADRATIC
+  note: "상태 (후보 자리, 남은 합) — O(n · target). 기억 없이는 지수"

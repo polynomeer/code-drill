@@ -1669,3 +1669,142 @@ fun fibonacciMod(n: Int): Int {
 """),
     ],
 ))
+
+
+# --- 170. 몫의 합 (같은 몫을 묶어) ------------------------------------------------------------------------
+
+_FLOOR_MOD = 1_000_000_007
+
+
+def _floor_sum(n):
+    total = 0
+    i = 1
+    while i <= n:
+        q = n // i
+        j = n // q
+        total += q * (j - i + 1)
+        i = j + 1
+    return total % _FLOOR_MOD
+
+
+PROBLEMS.append(Problem(
+    id="sum-of-floor-divisions",
+    title="몫의 합",
+    summary="""
+양의 정수 `n` 에 대해 `⌊n/1⌋ + ⌊n/2⌋ + ... + ⌊n/n⌋` 을 `1_000_000_007` 로 나눈 나머지를 반환한다.
+""",
+    notes="""
+`n` 번 나누는 것은 10 억이라 안 된다. 몫 `⌊n/i⌋` 는 `i` 가 커질수록 작아지고 **같은 값이 구간으로
+이어진다** — 몫이 `q` 인 `i` 의 마지막은 `⌊n/q⌋` 다. 구간마다 `q × 길이` 를 더하면 구간의 수가
+`2√n` 개라 O(√n) 이다. 합은 `n log n` 규모라 `Long` 이다.
+""",
+    drill_doc="""
+Drill.compare(i, j)           // 같은 몫의 구간을 잡았다
+Drill.write(0, total)         // 더했다
+""",
+    constraints="""
+- `1 <= n <= 1_000_000_000`
+""",
+    signature=dict(name="sumOfFloorDivisions", parameters=[("n", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_floor_sum,
+    cases={
+        "sample": [("01", [5]), ("02", [1])],
+        "boundary": [
+            ("01-two", [2]),
+            ("02-ten", [10]),
+            # 완전제곱수 — 구간 경계가 √n 에 정확히 걸린다.
+            ("03-perfect-square", [100]),
+            ("04-square-minus-one", [99]),
+            ("05-prime", [1000003]),
+            # 합이 Int 를 넘는다: 10⁸ × ln 10⁸ ≈ 1.9 × 10⁹.
+            ("06-sum-exceeds-int", [100000000]),
+        ],
+        "hidden": [
+            ("01-small", [37]),
+            ("02-medium", [123456]),
+            ("03-large", [987654321]),
+            ("04-max", [1000000000]),
+        ],
+        "performance": [
+            ("01-small", [50000000]),
+            ("02-medium", [300000000]),
+            ("03-max", [1000000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 같은 몫의 구간을 한 번에.
+fun sumOfFloorDivisions(n: Int): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    var i = 1L
+    while (i <= n) {
+        val q = n / i
+        val j = n / q
+        Drill.compare(i.toInt(), j.toInt())
+        total = (total + q % mod * ((j - i + 1) % mod)) % mod
+        Drill.write(0, total.toInt())
+        i = j + 1
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("int-sum--overflows", "WRONG_BRANCH",
+         "합을 Int 로 더하고 끝에서 나머지를 취한다. 10⁸ 에서 넘친다.",
+         """
+fun sumOfFloorDivisions(n: Int): Int {
+    var total = 0
+    var i = 1L
+    while (i <= n) {
+        val q = n / i
+        val j = n / q
+        total += (q * (j - i + 1)).toInt()
+        i = j + 1
+    }
+    return total % 1_000_000_007
+}
+"""),
+        # 끝을 하나 덜 잡는 판은 다음 구간이 같은 몫으로 이어 받아 합이 같았다 — 동치. 하나 더 잡는 판이다.
+        ("block-end-off-by-one", "OFF_BY_ONE",
+         "구간의 끝을 ⌊n/q⌋ + 1 로 잡는다. 다음 구간의 첫 i 에 큰 몫을 준다.",
+         """
+fun sumOfFloorDivisions(n: Int): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    var i = 1L
+    while (i <= n) {
+        val q = n / i
+        val j = minOf(n.toLong(), n / q + 1)
+        total = (total + q % mod * ((j - i + 1) % mod)) % mod
+        i = j + 1
+    }
+    return total.toInt()
+}
+"""),
+        ("only-up-to-sqrt", "MISSING_EDGE_CASE",
+         "i 를 √n 까지만 돈다. 그 뒤의 작은 몫들이 빠진다.",
+         """
+fun sumOfFloorDivisions(n: Int): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    var i = 1L
+    while (i * i <= n) {
+        total = (total + n / i) % mod
+        i += 1
+    }
+    return total.toInt()
+}
+"""),
+        ("linear-loop", "PERFORMANCE",
+         "n 번 나눈다. 10 억 번이다.",
+         """
+fun sumOfFloorDivisions(n: Int): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    for (i in 1..n) { Drill.compare(i, n); total = (total + n / i) % mod }
+    return total.toInt()
+}
+"""),
+    ],
+))

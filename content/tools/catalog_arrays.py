@@ -3688,3 +3688,305 @@ fun removeDuplicatesAtMostTwice(nums: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 167. 서로 다른 값이 정확히 k 개인 구간의 수 (창 둘의 차) --------------------------------------------
+
+def _exactly_k_distinct(nums, k):
+    def at_most(limit):
+        counts = {}
+        left = 0
+        total = 0
+        for right, x in enumerate(nums):
+            counts[x] = counts.get(x, 0) + 1
+            while len(counts) > limit:
+                y = nums[left]
+                counts[y] -= 1
+                if counts[y] == 0:
+                    del counts[y]
+                left += 1
+            total += right - left + 1
+        return total
+    return at_most(k) - at_most(k - 1)
+
+
+PROBLEMS.append(Problem(
+    id="subarrays-with-k-distinct",
+    title="서로 다른 값이 정확히 k 개인 구간의 수",
+    summary="""
+정수 배열 `nums` 와 `k` 가 주어진다. 서로 다른 값이 **정확히** `k` 개인 연속 부분 배열의 수를 반환한다.
+""",
+    notes="""
+"정확히 k" 는 창으로 바로 세기 어렵다 — 오른쪽을 늘리면 구간이 조건을 벗어났다가 다시 들어오기 때문이다.
+"**k 개 이하**" 는 창으로 센다: 오른쪽마다 종류가 `k` 를 넘지 않을 때까지 왼쪽을 줄이면 그 창의 모든
+끝이 답이라 `right − left + 1` 을 더한다. 정확히 `k` 는 `이하 k − 이하 k−1` 이다. 답은 `Int` 를 넘지
+않지만 n(n+1)/2 는 조심해서 본다 — n ≤ 2·10⁴ 면 2·10⁸ 이다.
+""",
+    drill_doc="""
+Drill.compare(left, right)    // 창을 봤다
+Drill.write(0, total)         // 세었다
+""",
+    constraints="""
+- `1 <= nums.length <= 60_000` (답은 `Int` 안이다)
+- `1 <= nums[i] <= nums.length`, `1 <= k <= nums.length`
+""",
+    signature=dict(name="subarraysWithKDistinct", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    # n² 오답이 6 만에서 2.1배였다 — 답이 Int 안이어야 해서 n 을 못 키우니 한도를 조인다.
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_exactly_k_distinct,
+    cases={
+        "sample": [("01", [[1, 2, 1, 2, 3], 2]), ("02", [[1, 2, 1, 3, 4], 3])],
+        "boundary": [
+            ("01-single", [[1], 1]),
+            ("02-all-same-k1", [[2, 2, 2, 2], 1]),
+            ("03-all-distinct-k1", [[1, 2, 3, 4], 1]),
+            ("04-k-larger-than-kinds", [[1, 2, 1], 3]),
+            # 창이 늘었다 줄었다 하며 정확히 k 를 오간다.
+            ("05-oscillating", [[1, 2, 1, 2, 1, 2], 2]),
+            ("06-k-equals-length", [[1, 2, 3], 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 1, 4, salt=9301), 2]),
+            ("02-random-medium", [randoms(500, 1, 10, salt=9302), 4]),
+            ("03-random-wide", [randoms(3000, 1, 3000, salt=9303), 50]),
+            ("04-few-kinds", [randoms(2000, 1, 3, salt=9304), 3]),
+        ],
+        "performance": [
+            # 종류가 k 를 넘지 않는 입력이어야 n² 오답의 안쪽 반복이 끊기지 않는다.
+            ("01-small", [randoms(10000, 1, 10, salt=9311), 10]),
+            ("02-medium", [randoms(30000, 1, 10, salt=9312), 10]),
+            ("03-large", [randoms(60000, 1, 10, salt=9313), 10]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 이하 k − 이하 k−1.
+fun subarraysWithKDistinct(nums: IntArray, k: Int): Int {
+    fun atMost(limit: Int): Long {
+        val counts = IntArray(nums.size + 1)
+        var kinds = 0; var left = 0; var total = 0L
+        for (right in nums.indices) {
+            if (counts[nums[right]]++ == 0) kinds += 1
+            while (kinds > limit) { if (--counts[nums[left]] == 0) kinds -= 1; left += 1 }
+            Drill.compare(left, right)
+            total += right - left + 1
+        }
+        return total
+    }
+    val answer = atMost(k) - atMost(k - 1)
+    Drill.write(0, answer.toInt())
+    return answer.toInt()
+}
+""",
+    mutants=[
+        ("counts-at-most-k", "WRONG_ALGORITHM",
+         "k 개 이하인 구간을 센다. 정확히 k 가 아니다.",
+         """
+fun subarraysWithKDistinct(nums: IntArray, k: Int): Int {
+    val counts = IntArray(nums.size + 1)
+    var kinds = 0; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        if (counts[nums[right]]++ == 0) kinds += 1
+        while (kinds > k) { if (--counts[nums[left]] == 0) kinds -= 1; left += 1 }
+        total += right - left + 1
+    }
+    return total.toInt()
+}
+"""),
+        ("adds-one-per-window", "OFF_BY_ONE",
+         "창마다 하나만 센다. 창 안의 모든 끝이 답이다.",
+         """
+fun subarraysWithKDistinct(nums: IntArray, k: Int): Int {
+    fun atMost(limit: Int): Long {
+        val counts = IntArray(nums.size + 1)
+        var kinds = 0; var left = 0; var total = 0L
+        for (right in nums.indices) {
+            if (counts[nums[right]]++ == 0) kinds += 1
+            while (kinds > limit) { if (--counts[nums[left]] == 0) kinds -= 1; left += 1 }
+            if (right >= left) total += 1
+        }
+        return total
+    }
+    return (atMost(k) - atMost(k - 1)).toInt()
+}
+"""),
+        ("kinds-not-decremented", "WRONG_BRANCH",
+         "왼쪽을 줄일 때 종류 수를 줄이지 않는다. 창이 다시 늘지 못한다.",
+         """
+fun subarraysWithKDistinct(nums: IntArray, k: Int): Int {
+    fun atMost(limit: Int): Long {
+        val counts = IntArray(nums.size + 1)
+        var kinds = 0; var left = 0; var total = 0L
+        for (right in nums.indices) {
+            if (counts[nums[right]]++ == 0) kinds += 1
+            while (kinds > limit && left <= right) { counts[nums[left]] -= 1; left += 1 }
+            total += right - left + 1
+        }
+        return total
+    }
+    return (atMost(k) - atMost(k - 1)).toInt()
+}
+"""),
+        ("all-subarrays--quadratic", "PERFORMANCE",
+         "모든 구간의 종류를 센다. O(n²).",
+         """
+fun subarraysWithKDistinct(nums: IntArray, k: Int): Int {
+    var total = 0
+    val counts = IntArray(nums.size + 1)
+    for (i in nums.indices) {
+        counts.fill(0)
+        var kinds = 0
+        for (j in i until nums.size) {
+            Drill.compare(i, j)
+            if (counts[nums[j]]++ == 0) kinds += 1
+            if (kinds > k) break
+            if (kinds == k) total += 1
+        }
+    }
+    return total
+}
+"""),
+    ],
+))
+
+
+# --- 168. 곱이 k 미만인 구간의 수 (창, Long) ----------------------------------------------------------------
+
+def _product_less_than_k(nums, k):
+    if k <= 1:
+        return 0
+    product = 1
+    left = 0
+    total = 0
+    for right, x in enumerate(nums):
+        product *= x
+        while product >= k:
+            product //= nums[left]
+            left += 1
+        total += right - left + 1
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="subarray-product-less-than-k",
+    title="곱이 k 미만인 구간의 수",
+    summary="""
+양의 정수 배열 `nums` 와 `k` 가 주어진다. 원소의 곱이 `k` **미만**인 연속 부분 배열의 수를 반환한다.
+""",
+    notes="""
+값이 전부 양수라 곱은 오른쪽을 늘리면 커지고 왼쪽을 줄이면 작아진다 — 창이 된다. 오른쪽마다 곱이
+`k` 이상인 동안 왼쪽을 줄이고 `right − left + 1` 을 더한다. 곱은 창 안에서만 유지되어 `k · 최댓값`
+을 넘지 않지만 그것이 이미 `Int` 를 넘는다 — `Long` 이다. `k ≤ 1` 이면 답은 0 이다(곱은 1 이상).
+""",
+    drill_doc="""
+Drill.compare(left, right)    // 창을 봤다
+Drill.write(0, total)         // 세었다
+""",
+    constraints="""
+- `1 <= nums.length <= 60_000`, `1 <= nums[i] <= 1000` (답은 `Int` 안이다: n(n+1)/2 < 2³¹)
+- `0 <= k <= 10^9`
+""",
+    signature=dict(name="subarrayProductLessThanK", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    # n² 오답이 6 만에서 1.8배였다 — 답이 Int 안이어야 해서 n 을 못 키우니 한도를 조인다.
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_product_less_than_k,
+    cases={
+        "sample": [("01", [[10, 5, 2, 6], 100]), ("02", [[1, 2, 3], 0])],
+        "boundary": [
+            ("01-k-one", [[1, 1, 1], 1]),
+            ("02-k-two-all-ones", [[1, 1, 1], 2]),
+            ("03-single-too-big", [[1000], 1000]),
+            # 곱이 Int 를 넘는 순간이 창 안에서 온다: 1000 × 1000 × 1000 × 1000.
+            ("04-product-exceeds-int", [[1000, 1000, 1000, 1000], 1000000000]),
+            ("05-exact-boundary", [[2, 5], 10]),
+            ("06-ones-everywhere", [[1, 1, 5, 1, 1], 5]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 5, salt=9321), 20]),
+            ("02-random-medium", [randoms(500, 1, 10, salt=9322), 1000]),
+            ("03-random-wide", [randoms(3000, 1, 1000, salt=9323), 1000000000]),
+            ("04-many-ones", [randoms(2000, 1, 2, salt=9324), 8]),
+        ],
+        "performance": [
+            ("01-small", [randoms(20000, 1, 3, salt=9331), 1000000000]),
+            ("02-medium", [randoms(40000, 1, 2, salt=9332), 1000000000]),
+            ("03-large", [[1] * 60000, 1000000000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 곱을 Long 으로 유지하는 창.
+fun subarrayProductLessThanK(nums: IntArray, k: Int): Int {
+    if (k <= 1) return 0
+    var product = 1L; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        product *= nums[right]
+        while (product >= k) { product /= nums[left]; left += 1 }
+        Drill.compare(left, right)
+        total += right - left + 1
+        Drill.write(0, total.toInt())
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("int-product--overflows", "WRONG_BRANCH",
+         "곱을 Int 로 둔다. 1000⁴ 에서 넘친다.",
+         """
+fun subarrayProductLessThanK(nums: IntArray, k: Int): Int {
+    if (k <= 1) return 0
+    var product = 1; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        product *= nums[right]
+        while (product >= k) { product /= nums[left]; left += 1 }
+        total += right - left + 1
+    }
+    return total.toInt()
+}
+"""),
+        ("less-or-equal", "OFF_BY_ONE",
+         "곱이 k 이하인 구간을 센다. 미만이어야 한다.",
+         """
+fun subarrayProductLessThanK(nums: IntArray, k: Int): Int {
+    if (k < 1) return 0
+    var product = 1L; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        product *= nums[right]
+        while (product > k) { product /= nums[left]; left += 1 }
+        total += right - left + 1
+    }
+    return total.toInt()
+}
+"""),
+        # "k ≤ 1 을 따로 보지 않는다"는 왼쪽이 오른쪽을 넘지 않게만 막으면 0 이 나와 동치였다.
+        ("window-length-off-by-one", "OFF_BY_ONE",
+         "창의 길이를 right − left 로 센다. 원소 하나짜리 구간이 빠진다.",
+         """
+fun subarrayProductLessThanK(nums: IntArray, k: Int): Int {
+    if (k <= 1) return 0
+    var product = 1L; var left = 0; var total = 0L
+    for (right in nums.indices) {
+        product *= nums[right]
+        while (product >= k) { product /= nums[left]; left += 1 }
+        total += right - left
+    }
+    return total.toInt()
+}
+"""),
+        ("all-subarrays--quadratic", "PERFORMANCE",
+         "모든 구간의 곱을 본다. O(n²) — 1 이 많으면 끊기지도 않는다.",
+         """
+fun subarrayProductLessThanK(nums: IntArray, k: Int): Int {
+    var total = 0
+    for (i in nums.indices) {
+        var product = 1L
+        for (j in i until nums.size) {
+            Drill.compare(i, j)
+            product *= nums[j]
+            if (product >= k) break
+            total += 1
+        }
+    }
+    return total
+}
+"""),
+    ],
+))

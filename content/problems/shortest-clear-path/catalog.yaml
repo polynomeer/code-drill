@@ -1,0 +1,19 @@
+# shortest-clear-path 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - bfs
+  - queue
+  - shortest-path
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - READING
+prerequisites:
+  - shortest-hops
+  - island-count
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "BFS O(n²). 경로 열거는 지수"

@@ -1886,3 +1886,155 @@ fun validIpSplitsCount(digits: String): Int {
 """),
     ],
 ))
+
+
+# --- 172. 합이 목표인 조합의 수 (재사용, 순서 무관) -----------------------------------------------------
+
+def _combination_sum_count(candidates, target):
+    candidates = sorted(set(candidates))
+    memo = {}
+
+    def go(i, remaining):
+        if remaining == 0:
+            return 1
+        if i == len(candidates) or remaining < 0:
+            return 0
+        key = (i, remaining)
+        if key in memo:
+            return memo[key]
+        total = go(i + 1, remaining) + go(i, remaining - candidates[i])
+        memo[key] = total
+        return total
+
+    return go(0, target)
+
+
+PROBLEMS.append(Problem(
+    id="combination-sum-count",
+    title="합이 목표인 조합의 수",
+    summary="""
+서로 다른 양의 정수 `candidates` 와 `target` 이 주어진다. `candidates` 의 수를 **몇 번이든 다시 써서**
+합이 `target` 이 되는 조합의 수를 반환한다. 순서만 다른 것은 같은 조합이다 — `2+3` 과 `3+2` 는 하나.
+""",
+    notes="""
+순서를 세지 않으려면 **후보를 정한 순서로만** 고른다: `i` 번째 후보부터 보되, "이 후보를 하나 더 쓴다"
+(`i` 그대로, 남은 합에서 뺀다)와 "이 후보는 그만 쓴다"(`i + 1`) 둘로 갈린다. 남은 합이 0 이면 하나,
+음수거나 후보가 끝나면 0 이다. 상태 `(i, 남은 합)` 을 기억하면 `n × target` 이다 — 기억 없는 백트래킹은
+`target = 500` 에서 지수다.
+""",
+    drill_doc="""
+Drill.compare(i, remaining)   // 상태를 봤다
+Drill.write(0, count)         // 조합을 하나 셌다
+""",
+    constraints="""
+- `1 <= candidates.length <= 20`, `1 <= candidates[i] <= 200`, 서로 다르다
+- `1 <= target <= 500`, 답은 `Int` 안이다
+""",
+    signature=dict(name="combinationSumCount", parameters=[("candidates", "INT_ARRAY"), ("target", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_combination_sum_count,
+    limits={"timeMillis": 1000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[2, 3, 6, 7], 7]), ("02", [[2, 3, 5], 8])],
+        "boundary": [
+            ("01-single-candidate-divides", [[3], 9]),
+            ("02-single-candidate-not", [[3], 10]),
+            ("03-target-below-all", [[5, 7], 4]),
+            # 순서만 다른 것은 하나 — 순열로 세면 다르다.
+            ("04-order-does-not-matter", [[1, 2], 3]),
+            ("05-target-equals-candidate", [[4, 6], 4]),
+            ("06-ones", [[1], 500]),
+        ],
+        "hidden": [
+            ("01-random-small", [sorted(set(randoms(4, 1, 9, salt=9371))), 15]),
+            ("02-random-medium", [sorted(set(randoms(8, 1, 30, salt=9372))), 100]),
+            # 답이 Int 안이어야 한다 — 후보 열 개에 목표 120 이면 2.4 × 10⁷, 스무 개에 300 이면 1.5 × 10⁸.
+            ("03-many-small-candidates", [[1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 120]),
+            ("04-large-target-few-candidates", [[7, 11, 13, 17, 19], 500]),
+            ("05-twenty-candidates", [list(range(11, 31)), 300]),
+            ("06-eight-candidates", [[2, 3, 4, 5, 6, 7, 8, 9], 250]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). (후보 자리, 남은 합) 을 기억하는 재귀.
+fun combinationSumCount(candidates: IntArray, target: Int): Int {
+    val sorted = candidates.sorted()
+    val memo = Array(sorted.size) { IntArray(target + 1) { -1 } }
+    fun go(i: Int, remaining: Int): Int {
+        if (remaining == 0) { Drill.write(0, 1); return 1 }
+        if (i == sorted.size || remaining < 0) return 0
+        if (memo[i][remaining] >= 0) return memo[i][remaining]
+        Drill.compare(i, remaining)
+        val total = go(i + 1, remaining) + go(i, remaining - sorted[i])
+        memo[i][remaining] = total
+        return total
+    }
+    return go(0, target)
+}
+""",
+    mutants=[
+        ("counts-permutations", "WRONG_ALGORITHM",
+         "순서를 구분해 센다. 2+3 과 3+2 가 둘이 된다.",
+         """
+fun combinationSumCount(candidates: IntArray, target: Int): Int {
+    val ways = IntArray(target + 1)
+    ways[0] = 1
+    for (t in 1..target) for (c in candidates) if (c <= t) ways[t] += ways[t - c]
+    return ways[target]
+}
+"""),
+        ("uses-each-once", "MISSING_EDGE_CASE",
+         "후보를 한 번씩만 쓴다. 다시 쓸 수 있어야 한다.",
+         """
+fun combinationSumCount(candidates: IntArray, target: Int): Int {
+    val sorted = candidates.sorted()
+    val memo = Array(sorted.size) { IntArray(target + 1) { -1 } }
+    fun go(i: Int, remaining: Int): Int {
+        if (remaining == 0) return 1
+        if (i == sorted.size || remaining < 0) return 0
+        if (memo[i][remaining] >= 0) return memo[i][remaining]
+        val total = go(i + 1, remaining) + go(i + 1, remaining - sorted[i])
+        memo[i][remaining] = total
+        return total
+    }
+    return go(0, target)
+}
+"""),
+        ("stops-at-first-fit", "WRONG_BRANCH",
+         "남은 합이 0 이 되는 가지를 찾으면 그 후보를 더 시도하지 않는다.",
+         """
+fun combinationSumCount(candidates: IntArray, target: Int): Int {
+    val sorted = candidates.sorted()
+    var count = 0
+    fun go(i: Int, remaining: Int) {
+        if (remaining == 0) { count += 1; return }
+        for (j in i until sorted.size) {
+            if (sorted[j] > remaining) break
+            go(j, remaining - sorted[j])
+            if (remaining - sorted[j] == 0) return
+        }
+    }
+    go(0, target)
+    return count
+}
+"""),
+        ("no-memo--exponential", "PERFORMANCE",
+         "상태를 기억하지 않는다. target 500 에 후보 열 개면 지수다.",
+         """
+fun combinationSumCount(candidates: IntArray, target: Int): Int {
+    val sorted = candidates.sorted()
+    var count = 0
+    fun go(i: Int, remaining: Int) {
+        if (remaining == 0) { count += 1; return }
+        for (j in i until sorted.size) {
+            if (sorted[j] > remaining) break
+            Drill.compare(j, remaining)
+            go(j, remaining - sorted[j])
+        }
+    }
+    go(0, target)
+    return count
+}
+"""),
+    ],
+))

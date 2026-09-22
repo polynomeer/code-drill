@@ -1,0 +1,17 @@
+# subarray-product-less-than-k 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - sliding-window
+  - two-pointers
+competencies:
+  - MODELING
+  - CONSTRAINTS
+  - EDGE_CASES
+  - OPTIMIZATION
+prerequisites:
+  - min-subarray-len
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "창 O(n). 모든 구간은 O(n²)"

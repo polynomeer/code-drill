@@ -1,0 +1,17 @@
+# sum-of-floor-divisions 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - math
+  - number-theory
+competencies:
+  - MODELING
+  - CONSTRAINTS
+  - OPTIMIZATION
+  - CORRECTNESS
+prerequisites:
+  - integer-square-root
+  - totient-sum
+complexity:
+  time: LINEARITHMIC
+  space: CONSTANT
+  note: "O(√n). n 번 나누면 10⁹"

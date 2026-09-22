@@ -650,3 +650,108 @@ fun maxXorPair(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 169. 구간의 비트 AND (공통 접두사) ------------------------------------------------------------------
+
+def _range_and(left, right):
+    shift = 0
+    while left != right:
+        left >>= 1
+        right >>= 1
+        shift += 1
+    return left << shift
+
+
+PROBLEMS.append(Problem(
+    id="bitwise-and-of-range",
+    title="구간의 비트 AND",
+    summary="""
+`left <= right` 인 두 정수가 주어진다. `left` 부터 `right` 까지 모든 정수의 비트 AND 를 반환한다.
+""",
+    notes="""
+구간을 다 곱하면 20 억 번이다. 어떤 비트 자리가 구간 안에서 한 번이라도 0 이면 결과의 그 자리는 0
+이고, 연속한 정수는 낮은 자리부터 뒤집히니 `left` 와 `right` 가 갈리는 자리 아래는 전부 0 이 된다.
+답은 두 수의 **공통 이진 접두사**다 — 두 수가 같아질 때까지 오른쪽으로 밀고, 민 만큼 되돌린다.
+""",
+    drill_doc="""
+Drill.compare(left, right)    // 두 수를 비교했다
+Drill.write(0, shift)         // 한 자리 밀었다
+""",
+    constraints="""
+- `0 <= left <= right <= 2^31 - 1`
+""",
+    signature=dict(name="bitwiseAndOfRange", parameters=[("left", "INT"), ("right", "INT")], returns="INT"),
+    # 구간을 도는 오답은 10 억 번의 AND 로 1초 안에 들었고 200ms 에서도 1.9배였다 — 정답은 비트 31 개라
+    # 한도를 100ms 로 조인다.
+    groups=perf_groups(time_multiplier=0.05),
+    reference=_range_and,
+    cases={
+        "sample": [("01", [5, 7]), ("02", [1, 2147483647])],
+        "boundary": [
+            ("01-same", [9, 9]),
+            ("02-zero-to-zero", [0, 0]),
+            ("03-zero-to-one", [0, 1]),
+            ("04-max-alone", [2147483647, 2147483647]),
+            # 2 의 거듭제곱 경계를 지나면 전부 0.
+            ("05-crosses-power-of-two", [7, 8]),
+            ("06-adjacent-even-odd", [8, 9]),
+            ("07-large-close", [2147483640, 2147483647]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(1, 0, 20, salt=9341)[0], randoms(1, 20, 40, salt=9342)[0]]),
+            ("02-random-medium", [1000000, 1000100]),
+            ("03-random-wide", [123456789, 123456800]),
+            ("04-far-apart", [12345, 1000000000]),
+        ],
+        "performance": [
+            # 결과가 0 이 되는 순간 끊는 오답을 잡으려면 AND 가 0 이 되지 않는 긴 구간이어야 한다 — 2³⁰ 이상은 전부 2³⁰ 비트를 갖는다.
+            ("01-small", [1073741824, 1173741824]),
+            ("02-medium", [1073741824, 1573741824]),
+            ("03-large", [1073741824, 2147483647]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 같아질 때까지 밀고 되돌린다.
+fun bitwiseAndOfRange(left: Int, right: Int): Int {
+    var lo = left; var hi = right; var shift = 0
+    while (lo != hi) { Drill.compare(lo, hi); lo = lo ushr 1; hi = hi ushr 1; shift += 1; Drill.write(0, shift) }
+    return lo shl shift
+}
+""",
+    mutants=[
+        ("and-of-endpoints", "WRONG_ALGORITHM",
+         "양 끝만 AND 한다. 사이의 수가 비트를 끈다.",
+         """
+fun bitwiseAndOfRange(left: Int, right: Int): Int = left and right
+"""),
+        ("forgets-to-shift-back", "MISSING_EDGE_CASE",
+         "같아질 때까지 밀고 되돌리지 않는다.",
+         """
+fun bitwiseAndOfRange(left: Int, right: Int): Int {
+    var lo = left; var hi = right
+    while (lo != hi) { lo = lo ushr 1; hi = hi ushr 1 }
+    return lo
+}
+"""),
+        ("signed-shift-on-max", "OFF_BY_ONE",
+         "되돌릴 때 한 자리 덜 민다.",
+         """
+fun bitwiseAndOfRange(left: Int, right: Int): Int {
+    var lo = left; var hi = right; var shift = 0
+    while (lo != hi) { lo = lo ushr 1; hi = hi ushr 1; shift += 1 }
+    return if (shift == 0) lo else lo shl (shift - 1)
+}
+"""),
+        ("loop-over-range", "PERFORMANCE",
+         "구간을 하나씩 AND 한다. 20 억 번이다.",
+         """
+fun bitwiseAndOfRange(left: Int, right: Int): Int {
+    var result = left
+    var i = left
+    while (i < right) { i += 1; Drill.compare(i, right); result = result and i; if (result == 0) break }
+    return result
+}
+"""),
+    ],
+))

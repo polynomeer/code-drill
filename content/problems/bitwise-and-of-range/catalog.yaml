@@ -1,0 +1,16 @@
+# bitwise-and-of-range 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - bit-manipulation
+  - math
+competencies:
+  - MODELING
+  - CONSTRAINTS
+  - CORRECTNESS
+prerequisites:
+  - count-bits
+  - power-of-two
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT
+  note: "비트 수만큼. 구간을 돌면 20 억"
