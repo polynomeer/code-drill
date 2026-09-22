@@ -1,0 +1,15 @@
+# pivot-index 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - array
+  - prefix-sum
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+prerequisites:
+  - running-sum
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "전체 합 한 번, 왼쪽 합 누적"

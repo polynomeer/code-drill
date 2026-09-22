@@ -1879,3 +1879,170 @@ fun carFleetCount(target: Int, positions: IntArray, speeds: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 176. 중첩 문자열 풀기 (스택 둘) ------------------------------------------------------------------------
+
+def _decode_nested(text):
+    count_stack = []
+    string_stack = []
+    current = []
+    number = 0
+    for ch in text:
+        if ch.isdigit():
+            number = number * 10 + int(ch)
+        elif ch == "[":
+            count_stack.append(number)
+            string_stack.append(current)
+            current = []
+            number = 0
+        elif ch == "]":
+            repeat = count_stack.pop()
+            previous = string_stack.pop()
+            current = previous + current * repeat
+        else:
+            current.append(ch)
+    return "".join(current)
+
+
+PROBLEMS.append(Problem(
+    id="decode-nested-string",
+    title="중첩 문자열 풀기",
+    summary="""
+`k[문자열]` 은 문자열을 `k` 번 반복한다는 뜻이고 안에 또 `k[...]` 가 올 수 있다. 소문자·숫자·대괄호로
+된 올바른 부호 `text` 를 풀어 반환한다. `3[a2[c]]` → `accaccacc`. 숫자는 여러 자리일 수 있다.
+""",
+    notes="""
+`[` 를 만날 때까지 모은 **숫자**와 **지금까지의 문자열**을 스택에 밀고, `]` 에서 꺼내 "이전 문자열 +
+지금 문자열 × 숫자" 로 잇는다. 숫자는 한 자리가 아니다 — `12[a]` 는 12 번이다. 반복을 문자열 연결로
+하면 결과가 길 때 제곱이지만 이 제약(결과 ≤ 10 만 글자)에서는 상관없다.
+""",
+    drill_doc="""
+Drill.compare(depth, count)   // 괄호를 열었다
+Drill.write(0, length)        // 문자열을 이었다
+""",
+    constraints="""
+- `1 <= text.length <= 200`, 올바른 부호, `1 <= k <= 300`
+- 풀어낸 문자열은 `100_000` 글자 이하
+""",
+    signature=dict(name="decodeNestedString", parameters=[("text", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_decode_nested,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 400000},
+    cases={
+        "sample": [("01", ["3[a2[c]]"]), ("02", ["2[abc]3[cd]ef"])],
+        "boundary": [
+            ("01-no-brackets", ["abc"]),
+            ("02-single-repeat", ["1[x]"]),
+            # 여러 자리 숫자.
+            ("03-multi-digit", ["12[a]"]),
+            ("04-nested-three", ["2[a3[b4[c]]]"]),
+            # 괄호 앞뒤의 글자.
+            ("05-text-around", ["ab2[cd]ef"]),
+            ("06-sibling-groups", ["2[a]2[b]2[c]"]),
+            ("07-max-repeat", ["300[z]"]),
+        ],
+        "hidden": [
+            ("01-mixed", ["3[a]2[bc]"]),
+            ("02-deep", ["2[2[2[2[2[x]]]]]"]),
+            ("03-digits-in-middle", ["a10[b]c"]),
+            ("04-long-output", ["100[10[ab]]"]),
+            ("05-many-siblings", ["1[a]2[b]3[c]4[d]5[e]6[f]7[g]8[h]9[i]10[j]"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 숫자 스택과 문자열 스택.
+fun decodeNestedString(text: String): String {
+    val counts = ArrayDeque<Int>()
+    val strings = ArrayDeque<StringBuilder>()
+    var current = StringBuilder()
+    var number = 0
+    for (ch in text) {
+        when {
+            ch.isDigit() -> number = number * 10 + (ch - '0')
+            ch == '[' -> { Drill.compare(counts.size, number); counts.addLast(number); strings.addLast(current); current = StringBuilder(); number = 0 }
+            ch == ']' -> {
+                val repeat = counts.removeLast()
+                val previous = strings.removeLast()
+                val piece = current.toString()
+                repeat(repeat) { previous.append(piece) }
+                current = previous
+                Drill.write(0, current.length)
+            }
+            else -> current.append(ch)
+        }
+    }
+    return current.toString()
+}
+""",
+    mutants=[
+        ("single-digit-count", "MISSING_EDGE_CASE",
+         "숫자를 한 자리로만 읽는다. 12[a] 가 2 번이 된다.",
+         """
+fun decodeNestedString(text: String): String {
+    val counts = ArrayDeque<Int>(); val strings = ArrayDeque<StringBuilder>()
+    var current = StringBuilder(); var number = 0
+    for (ch in text) {
+        when {
+            ch.isDigit() -> number = ch - '0'
+            ch == '[' -> { counts.addLast(number); strings.addLast(current); current = StringBuilder(); number = 0 }
+            ch == ']' -> { val repeat = counts.removeLast(); val previous = strings.removeLast(); val piece = current.toString(); repeat(repeat) { previous.append(piece) }; current = previous }
+            else -> current.append(ch)
+        }
+    }
+    return current.toString()
+}
+"""),
+        ("drops-text-before-bracket", "WRONG_BRANCH",
+         "괄호를 열 때 지금까지의 문자열을 버린다. ab2[cd] 에서 ab 가 사라진다.",
+         """
+fun decodeNestedString(text: String): String {
+    val counts = ArrayDeque<Int>(); val strings = ArrayDeque<StringBuilder>()
+    var current = StringBuilder(); var number = 0
+    for (ch in text) {
+        when {
+            ch.isDigit() -> number = number * 10 + (ch - '0')
+            ch == '[' -> { counts.addLast(number); strings.addLast(StringBuilder()); current = StringBuilder(); number = 0 }
+            ch == ']' -> { val repeat = counts.removeLast(); val previous = strings.removeLast(); val piece = current.toString(); repeat(repeat) { previous.append(piece) }; current = previous }
+            else -> current.append(ch)
+        }
+    }
+    return current.toString()
+}
+"""),
+        ("repeats-one-less", "OFF_BY_ONE",
+         "k − 1 번 반복한다.",
+         """
+fun decodeNestedString(text: String): String {
+    val counts = ArrayDeque<Int>(); val strings = ArrayDeque<StringBuilder>()
+    var current = StringBuilder(); var number = 0
+    for (ch in text) {
+        when {
+            ch.isDigit() -> number = number * 10 + (ch - '0')
+            ch == '[' -> { counts.addLast(number); strings.addLast(current); current = StringBuilder(); number = 0 }
+            ch == ']' -> { val repeat = counts.removeLast(); val previous = strings.removeLast(); val piece = current.toString(); repeat(repeat - 1) { previous.append(piece) }; current = previous }
+            else -> current.append(ch)
+        }
+    }
+    return current.toString()
+}
+"""),
+        ("number-not-reset", "WRONG_BRANCH",
+         "괄호를 연 뒤 숫자를 0 으로 되돌리지 않는다. 다음 숫자가 앞 숫자에 이어 붙는다.",
+         """
+fun decodeNestedString(text: String): String {
+    val counts = ArrayDeque<Int>(); val strings = ArrayDeque<StringBuilder>()
+    var current = StringBuilder(); var number = 0
+    for (ch in text) {
+        when {
+            ch.isDigit() -> number = number * 10 + (ch - '0')
+            ch == '[' -> { counts.addLast(number); strings.addLast(current); current = StringBuilder() }
+            ch == ']' -> { val repeat = counts.removeLast(); val previous = strings.removeLast(); val piece = current.toString(); repeat(repeat) { previous.append(piece) }; current = previous }
+            else -> current.append(ch)
+        }
+    }
+    return current.toString()
+}
+"""),
+    ],
+))

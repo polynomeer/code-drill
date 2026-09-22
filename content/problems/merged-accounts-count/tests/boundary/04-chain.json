@@ -1,0 +1,1 @@
+{"args": [["p:a@x,b@x", "p:c@x,d@x", "p:b@x,c@x"]], "expected": 1}

@@ -1,0 +1,19 @@
+# prerequisite-queries 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - topological-sort
+  - bit-manipulation
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CONSTRAINTS
+  - OPTIMIZATION
+prerequisites:
+  - smallest-course-order
+  - longest-path-in-dag
+complexity:
+  time: QUADRATIC
+  space: QUADRATIC
+  note: "도달 집합 O(m · n/64), 질의 O(1). 질의마다 DFS 는 O(q · (n + m))"

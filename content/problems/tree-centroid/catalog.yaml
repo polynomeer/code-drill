@@ -1,0 +1,18 @@
+# tree-centroid 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - tree
+  - dfs
+  - dynamic-programming
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - subtree-sizes
+  - tree-diameter
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "서브트리 크기 한 번, 정점마다 O(자식 수)"

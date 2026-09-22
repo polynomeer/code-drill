@@ -1,0 +1,19 @@
+# merged-accounts-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - union-find
+  - hash-map
+  - string
+  - graph
+competencies:
+  - MODELING
+  - READING
+  - CORRECTNESS
+  - OPTIMIZATION
+prerequisites:
+  - connected-components
+  - anagram-groups
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "이메일마다 union 한 번, 상각 O(E α). 쌍마다 비교하면 O(n²)"

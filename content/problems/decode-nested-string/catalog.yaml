@@ -1,0 +1,17 @@
+# decode-nested-string 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - stack
+  - recursion
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - bracket-balance
+  - evaluate-rpn
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "입력과 출력 길이에 선형"

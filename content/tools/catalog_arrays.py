@@ -5,7 +5,7 @@
 엉성하다는 뜻이다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms, shuffled
+from author import Problem, standard_groups, perf_groups, randoms, shuffled, flat
 
 PROBLEMS = []
 
@@ -3986,6 +3986,271 @@ fun subarrayProductLessThanK(nums: IntArray, k: Int): Int {
         }
     }
     return total
+}
+"""),
+    ],
+))
+
+
+# --- 174. 균형점 (왼쪽 합 = 오른쪽 합) ---------------------------------------------------------------------
+
+def _pivot_index(nums):
+    total = sum(nums)
+    left = 0
+    for i, x in enumerate(nums):
+        if left == total - left - x:
+            return i
+        left += x
+    return -1
+
+
+PROBLEMS.append(Problem(
+    id="pivot-index",
+    title="균형점",
+    summary="""
+정수 배열 `nums` 에서 **왼쪽 원소들의 합과 오른쪽 원소들의 합이 같은** 가장 왼쪽 자리를 반환한다.
+자기 자신은 어느 쪽에도 들지 않는다. 맨 왼쪽 자리의 왼쪽 합과 맨 오른쪽 자리의 오른쪽 합은 `0` 이다.
+없으면 `-1`.
+""",
+    notes="""
+자리마다 양쪽을 더하면 n² 이다. 전체 합을 한 번 구해 두면 자리 `i` 의 오른쪽 합은 `전체 − 왼쪽 − nums[i]`
+라 왼쪽 합만 누적하며 한 번에 본다. 합은 `Int` 안이지만(원소 1000 × 10 만) 음수가 섞여 있으니 "합이 0
+이면 없다" 같은 지름길은 없다.
+""",
+    drill_doc="""
+Drill.compare(i, left)        // 자리의 왼쪽 합을 봤다
+Drill.write(0, index)         // 답을 정했다
+""",
+    constraints="""
+- `1 <= nums.length <= 100_000`
+- `-1000 <= nums[i] <= 1000`
+""",
+    signature=dict(name="pivotIndex", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_pivot_index,
+    cases={
+        "sample": [("01", [[1, 7, 3, 6, 5, 6]]), ("02", [[1, 2, 3]])],
+        "boundary": [
+            ("01-single", [[5]]),
+            # 맨 왼쪽: 왼쪽 합 0, 오른쪽 합 0.
+            ("02-leftmost", [[2, -1, 1]]),
+            ("03-rightmost", [[1, -1, 2]]),
+            ("04-all-zero", [[0, 0, 0]]),
+            ("05-negatives", [[-1, -1, -1, -1, -1, 0]]),
+            # 둘 이상이면 가장 왼쪽.
+            ("06-multiple", [[0, 0, 0, 0]]),
+            ("07-none", [[1, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, -5, 5, salt=9421)]),
+            ("02-random-medium", [randoms(300, -50, 50, salt=9422)]),
+            ("03-random-wide", [randoms(5000, -1000, 1000, salt=9423)]),
+            ("04-pivot-at-end", [randoms(999, -1000, 1000, salt=9424) + [10**9]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 전체 합에서 왼쪽 합을 빼며 한 번.
+fun pivotIndex(nums: IntArray): Int {
+    var total = 0L
+    for (x in nums) total += x
+    var left = 0L
+    for (i in nums.indices) {
+        Drill.compare(i, left.toInt())
+        if (left == total - left - nums[i]) { Drill.write(0, i); return i }
+        left += nums[i]
+    }
+    return -1
+}
+""",
+    mutants=[
+        ("includes-self-on-left", "OFF_BY_ONE",
+         "자기 자신을 왼쪽 합에 넣고 비교한다.",
+         """
+fun pivotIndex(nums: IntArray): Int {
+    var total = 0L
+    for (x in nums) total += x
+    var left = 0L
+    for (i in nums.indices) {
+        left += nums[i]
+        if (left == total - left) return i
+    }
+    return -1
+}
+"""),
+        ("skips-first-index", "MISSING_EDGE_CASE",
+         "맨 왼쪽 자리는 보지 않는다. 왼쪽 합 0 도 합이다.",
+         """
+fun pivotIndex(nums: IntArray): Int {
+    var total = 0L
+    for (x in nums) total += x
+    var left = nums[0].toLong()
+    for (i in 1 until nums.size) {
+        if (left == total - left - nums[i]) return i
+        left += nums[i]
+    }
+    return -1
+}
+"""),
+        ("returns-last-match", "WRONG_BRANCH",
+         "가장 오른쪽 균형점을 돌려준다.",
+         """
+fun pivotIndex(nums: IntArray): Int {
+    var total = 0L
+    for (x in nums) total += x
+    var left = 0L
+    var found = -1
+    for (i in nums.indices) {
+        if (left == total - left - nums[i]) found = i
+        left += nums[i]
+    }
+    return found
+}
+"""),
+        ("zero-total-shortcut", "WRONG_ALGORITHM",
+         "전체 합이 0 이면 -1 이라고 지름길을 둔다. 음수가 있으면 틀린다.",
+         """
+fun pivotIndex(nums: IntArray): Int {
+    var total = 0L
+    for (x in nums) total += x
+    if (total == 0L && nums.size > 1) return -1
+    var left = 0L
+    for (i in nums.indices) {
+        if (left == total - left - nums[i]) return i
+        left += nums[i]
+    }
+    return -1
+}
+"""),
+    ],
+))
+
+
+# --- 175. 구간 더하기 뒤의 배열 (차분 배열) ------------------------------------------------------------------
+
+def _apply_range_updates(n, updates):
+    diff = [0] * (n + 1)
+    for i in range(0, len(updates), 3):
+        l, r, v = updates[i], updates[i + 1], updates[i + 2]
+        diff[l] += v
+        diff[r + 1] -= v
+    out = []
+    running = 0
+    for i in range(n):
+        running += diff[i]
+        out.append(running)
+    return out
+
+
+def _updates(n, m, salt):
+    a = randoms(m, 0, n - 1, salt=salt)
+    b = randoms(m, 0, n - 1, salt=salt + 1)
+    v = randoms(m, -1000, 1000, salt=salt + 2)
+    return flat([min(a[i], b[i]), max(a[i], b[i]), v[i]] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="apply-range-updates",
+    title="구간 더하기 뒤의 배열",
+    summary="""
+길이 `n` 의 0 배열에 갱신 `updates = [l1, r1, v1, l2, r2, v2, ...]` 를 차례로 적용한다 — 각각 `l..r`
+(양 끝 포함)의 모든 원소에 `v` 를 더한다. 끝난 뒤의 배열을 반환한다.
+""",
+    notes="""
+갱신마다 구간을 훑으면 `n × 갱신 수` 다. **차분 배열**은 갱신 하나를 두 칸으로 바꾼다 — `diff[l] += v`,
+`diff[r+1] −= v`. 끝나면 차분의 누적합이 배열이다. `r + 1` 이 배열 끝을 넘을 수 있으니 차분은 한 칸
+길다. 합은 `Int` 안이다(1000 × 10 만).
+""",
+    drill_doc="""
+Drill.write(l, v)             // 차분에 적었다
+Drill.compare(i, running)     // 누적합을 냈다
+""",
+    constraints="""
+- `1 <= n <= 100_000`, 갱신 `0..100_000` 개
+- `0 <= l <= r < n`, `-1000 <= v <= 1000`
+""",
+    signature=dict(name="applyRangeUpdates", parameters=[("n", "INT"), ("updates", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_apply_range_updates,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [5, [1, 3, 2, 2, 4, 3, 0, 2, -2]]), ("02", [3, []])],
+        "boundary": [
+            ("01-single-cell", [1, [0, 0, 7]]),
+            # r 이 마지막 자리 — 차분의 r+1 이 배열 밖이다.
+            ("02-to-the-end", [4, [2, 3, 5]]),
+            ("03-whole-range", [4, [0, 3, 1, 0, 3, 1]]),
+            ("04-overlapping", [6, [0, 2, 1, 1, 4, 10, 2, 5, 100]]),
+            ("05-negative-cancels", [3, [0, 2, 5, 0, 2, -5]]),
+            ("06-point-updates", [5, [1, 1, 1, 3, 3, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _updates(8, 5, salt=9431)]),
+            ("02-random-medium", [300, _updates(300, 200, salt=9434)]),
+            ("03-random-wide", [5000, _updates(5000, 3000, salt=9437)]),
+            ("04-many-on-few", [10, _updates(10, 500, salt=9440)]),
+        ],
+        "performance": [
+            ("01-small", [20000, _updates(20000, 20000, salt=9451)]),
+            ("02-medium", [60000, _updates(60000, 60000, salt=9454)]),
+            ("03-large", [100000, _updates(100000, 100000, salt=9457)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 차분 두 칸, 누적합 한 번.
+fun applyRangeUpdates(n: Int, updates: IntArray): IntArray {
+    val diff = IntArray(n + 1)
+    for (i in updates.indices step 3) {
+        val l = updates[i]; val r = updates[i + 1]; val v = updates[i + 2]
+        diff[l] += v; diff[r + 1] -= v
+        Drill.write(l, v)
+    }
+    val out = IntArray(n)
+    var running = 0
+    for (i in 0 until n) { running += diff[i]; out[i] = running; Drill.compare(i, running) }
+    return out
+}
+""",
+    mutants=[
+        ("subtracts-at-r-not-r-plus-one", "OFF_BY_ONE",
+         "차분을 r 에서 뺀다. 구간의 마지막 원소가 빠진다.",
+         """
+fun applyRangeUpdates(n: Int, updates: IntArray): IntArray {
+    val diff = IntArray(n + 1)
+    for (i in updates.indices step 3) { diff[updates[i]] += updates[i + 2]; diff[updates[i + 1]] -= updates[i + 2] }
+    val out = IntArray(n); var running = 0
+    for (i in 0 until n) { running += diff[i]; out[i] = running }
+    return out
+}
+"""),
+        ("diff-array-too-short", "MISSING_EDGE_CASE",
+         "차분 배열을 n 칸으로 둔다. r 이 마지막이면 배열 밖을 쓴다.",
+         """
+fun applyRangeUpdates(n: Int, updates: IntArray): IntArray {
+    val diff = IntArray(n)
+    for (i in updates.indices step 3) { diff[updates[i]] += updates[i + 2]; diff[updates[i + 1] + 1] -= updates[i + 2] }
+    val out = IntArray(n); var running = 0
+    for (i in 0 until n) { running += diff[i]; out[i] = running }
+    return out
+}
+"""),
+        ("forgets-prefix-sum", "WRONG_ALGORITHM",
+         "차분을 그대로 돌려준다. 누적합을 안 한다.",
+         """
+fun applyRangeUpdates(n: Int, updates: IntArray): IntArray {
+    val diff = IntArray(n + 1)
+    for (i in updates.indices step 3) { diff[updates[i]] += updates[i + 2]; diff[updates[i + 1] + 1] -= updates[i + 2] }
+    return diff.copyOf(n)
+}
+"""),
+        ("loops-each-range", "PERFORMANCE",
+         "갱신마다 구간을 훑는다. O(n × 갱신 수).",
+         """
+fun applyRangeUpdates(n: Int, updates: IntArray): IntArray {
+    val out = IntArray(n)
+    for (i in updates.indices step 3) {
+        for (j in updates[i]..updates[i + 1]) { Drill.compare(j, i); out[j] += updates[i + 2] }
+    }
+    return out
 }
 """),
     ],

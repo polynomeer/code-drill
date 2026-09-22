@@ -1,0 +1,1 @@
+{"args": ["2[a3[b4[c]]]"], "expected": "abccccbccccbccccabccccbccccbcccc"}

@@ -4252,3 +4252,394 @@ fun longestPathInDag(n: Int, edges: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 177. 계정 합치기 (이메일로 잇는 유니온파인드) ---------------------------------------------------------
+
+def _merged_accounts(accounts):
+    owner = {}
+    parent = list(range(len(accounts)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i, entry in enumerate(accounts):
+        _, _, emails = entry.partition(":")
+        for email in emails.split(","):
+            if email in owner:
+                a, b = find(owner[email]), find(i)
+                if a != b:
+                    parent[a] = b
+            else:
+                owner[email] = i
+    return len({find(i) for i in range(len(accounts))})
+
+
+def _account_entries(people, per_person, shared, salt):
+    """사람마다 이메일 몇 개씩 계정을 만들고, 일부 계정이 다른 계정의 이메일을 함께 갖게 한다."""
+    entries = []
+    picks = randoms(people * per_person * 3, 0, 10 ** 6, salt=salt)
+    k = 0
+    for p in range(people):
+        for _ in range(per_person):
+            emails = [f"u{p}_{picks[k] % 5}@x.io", f"u{p}_{picks[k + 1] % 5}@x.io"]
+            k += 2
+            entries.append(f"p{p}:" + ",".join(dict.fromkeys(emails)))
+    links = randoms(shared * 2, 0, people - 1, salt=salt + 1)
+    for s in range(shared):
+        a, b = links[2 * s], links[2 * s + 1]
+        entries.append(f"p{a}:u{a}_0@x.io,u{b}_0@x.io")
+    return shuffled(entries, salt=salt + 2)
+
+
+PROBLEMS.append(Problem(
+    id="merged-accounts-count",
+    title="계정 합치기",
+    summary="""
+계정 목록 `accounts` 가 주어진다. 항목 하나는 `"이름:이메일1,이메일2,..."` 다. **같은 이메일을 가진
+두 계정은 같은 사람**의 것이고, 같은 사람의 계정을 모두 합친다(이름이 같아도 이메일이 안 겹치면 다른
+사람이다). 합친 뒤의 사람 수를 반환한다.
+""",
+    notes="""
+계정을 정점, 같은 이메일을 간선으로 보면 사람은 연결 요소다. 이메일마다 "처음 본 계정"을 기억해 두고,
+다시 보이면 그 계정과 지금 계정을 유니온파인드로 합친다. 이름은 아무 역할이 없다 — 이름으로 합치면
+동명이인이 한 사람이 되고, 이름으로 나누면 한 사람이 둘이 된다.
+""",
+    drill_doc="""
+Drill.compare(a, b)           // 두 계정을 합쳤다
+Drill.write(0, count)         // 사람 수를 셌다
+""",
+    constraints="""
+- `1 <= accounts.length <= 50_000`, 항목마다 이메일 `1..10` 개, 전체 이메일 `200_000` 개 이하
+""",
+    signature=dict(name="mergedAccountsCount", parameters=[("accounts", "STRING_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_merged_accounts,
+    cases={
+        "sample": [("01", [["john:j@a.io,jj@a.io", "john:jj@a.io,j3@a.io", "mary:m@a.io"]]), ("02", [["a:x@y", "a:z@y"]])],
+        "boundary": [
+            ("01-single", [["ann:a@b"]]),
+            # 같은 이름, 다른 이메일 — 다른 사람.
+            ("02-same-name-different-people", [["kim:k1@a", "kim:k2@a"]]),
+            # 다른 이름, 같은 이메일 — 같은 사람 (이름은 오타일 수 있다).
+            ("03-different-name-same-email", [["kim:k@a", "kin:k@a"]]),
+            # 사슬로 이어진다: a-b, b-c.
+            ("04-chain", [["p:a@x,b@x", "p:c@x,d@x", "p:b@x,c@x"]]),
+            ("05-all-one-person", [["p:a@x", "p:a@x,b@x", "p:b@x,c@x", "p:c@x"]]),
+            ("06-duplicate-email-in-one-entry", [["p:a@x,a@x", "q:b@x"]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_account_entries(4, 2, 1, salt=9461)]),
+            ("02-random-medium", [_account_entries(50, 3, 10, salt=9464)]),
+            ("03-random-many-links", [_account_entries(200, 2, 150, salt=9467)]),
+            ("04-no-links", [_account_entries(100, 1, 0, salt=9470)]),
+        ],
+        "performance": [
+            ("01-small", [_account_entries(2000, 2, 500, salt=9481)]),
+            ("02-medium", [_account_entries(8000, 2, 2000, salt=9484)]),
+            ("03-large", [_account_entries(20000, 2, 8000, salt=9487)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 이메일 → 처음 본 계정, 다시 보이면 union.
+fun mergedAccountsCount(accounts: Array<String>): Int {
+    val n = accounts.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val owner = HashMap<String, Int>()
+    for (i in 0 until n) {
+        val emails = accounts[i].substringAfter(':').split(',')
+        for (email in emails) {
+            val seen = owner[email]
+            if (seen == null) owner[email] = i
+            else { val a = find(seen); val b = find(i); Drill.compare(a, b); if (a != b) parent[a] = b }
+        }
+    }
+    var count = 0
+    for (i in 0 until n) if (find(i) == i) count += 1
+    Drill.write(0, count)
+    return count
+}
+""",
+    mutants=[
+        ("merges-by-name", "WRONG_ALGORITHM",
+         "이름이 같으면 합친다. 동명이인이 한 사람이 된다.",
+         """
+fun mergedAccountsCount(accounts: Array<String>): Int {
+    val n = accounts.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val owner = HashMap<String, Int>()
+    for (i in 0 until n) {
+        val name = accounts[i].substringBefore(':')
+        val seen = owner[name]
+        if (seen == null) owner[name] = i else { val a = find(seen); val b = find(i); if (a != b) parent[a] = b }
+        for (email in accounts[i].substringAfter(':').split(',')) { val s = owner[email]; if (s == null) owner[email] = i else { val a = find(s); val b = find(i); if (a != b) parent[a] = b } }
+    }
+    var count = 0
+    for (i in 0 until n) if (find(i) == i) count += 1
+    return count
+}
+"""),
+        ("requires-same-name-to-merge", "WRONG_BRANCH",
+         "이메일이 같아도 이름이 다르면 합치지 않는다.",
+         """
+fun mergedAccountsCount(accounts: Array<String>): Int {
+    val n = accounts.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val owner = HashMap<String, Int>()
+    for (i in 0 until n) {
+        val name = accounts[i].substringBefore(':')
+        for (email in accounts[i].substringAfter(':').split(',')) {
+            val seen = owner[email]
+            if (seen == null) owner[email] = i
+            else if (accounts[seen].substringBefore(':') == name) { val a = find(seen); val b = find(i); if (a != b) parent[a] = b }
+        }
+    }
+    var count = 0
+    for (i in 0 until n) if (find(i) == i) count += 1
+    return count
+}
+"""),
+        ("owner-overwritten", "MISSING_EDGE_CASE",
+         "이메일의 주인을 볼 때마다 덮어쓰고 합치지는 않는다. 사슬이 끊긴다.",
+         """
+fun mergedAccountsCount(accounts: Array<String>): Int {
+    val n = accounts.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val owner = HashMap<String, Int>()
+    for (i in 0 until n) {
+        var merged = false
+        for (email in accounts[i].substringAfter(':').split(',')) {
+            val seen = owner[email]
+            if (seen != null && !merged) { val a = find(seen); val b = find(i); if (a != b) parent[a] = b; merged = true }
+            owner[email] = i
+        }
+    }
+    var count = 0
+    for (i in 0 until n) if (find(i) == i) count += 1
+    return count
+}
+"""),
+        ("pairwise-comparison", "PERFORMANCE",
+         "계정 쌍마다 이메일이 겹치는지 본다. O(n² × 이메일).",
+         """
+fun mergedAccountsCount(accounts: Array<String>): Int {
+    val n = accounts.size
+    val emails = accounts.map { it.substringAfter(':').split(',').toHashSet() }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    for (i in 0 until n) for (j in i + 1 until n) {
+        Drill.compare(i, j)
+        if (emails[i].any { it in emails[j] }) { val a = find(i); val b = find(j); if (a != b) parent[a] = b }
+    }
+    var count = 0
+    for (i in 0 until n) if (find(i) == i) count += 1
+    return count
+}
+"""),
+    ],
+))
+
+
+# --- 178. 선수 관계 질의 (위상 순서의 도달 집합) ---------------------------------------------------------
+
+def _prerequisite_queries(n, edges, queries):
+    from collections import deque
+    adj = [[] for _ in range(n)]
+    indegree = [0] * n
+    for i in range(0, len(edges), 2):
+        adj[edges[i]].append(edges[i + 1])
+        indegree[edges[i + 1]] += 1
+    order = []
+    queue = deque(v for v in range(n) if indegree[v] == 0)
+    while queue:
+        u = queue.popleft()
+        order.append(u)
+        for v in adj[u]:
+            indegree[v] -= 1
+            if indegree[v] == 0:
+                queue.append(v)
+    reach = [0] * n  # 비트 집합: reach[v] 의 비트 u 가 켜져 있으면 u 에서 v 로 갈 수 있다.
+    # 위상 순서로 앞에서부터: v 의 도달원 = 모든 직전 정점 u 의 도달원 ∪ {u}
+    incoming = [[] for _ in range(n)]
+    for i in range(0, len(edges), 2):
+        incoming[edges[i + 1]].append(edges[i])
+    for v in order:
+        bits = 0
+        for u in incoming[v]:
+            bits |= reach[u] | (1 << u)
+        reach[v] = bits
+    out = []
+    for i in range(0, len(queries), 2):
+        u, v = queries[i], queries[i + 1]
+        out.append(1 if (reach[v] >> u) & 1 else 0)
+    return out
+
+
+def _dag_forward(n, m, salt):
+    a = randoms(m, 0, n - 2, salt=salt)
+    span = randoms(m, 1, 8, salt=salt + 1)
+    return flat([a[i], min(n - 1, a[i] + span[i])] for i in range(m))
+
+
+def _pairs(n, q, salt):
+    a = randoms(q, 0, n - 1, salt=salt)
+    b = randoms(q, 0, n - 1, salt=salt + 1)
+    return flat([a[i], b[i]] for i in range(q))
+
+
+def _backward_pairs(n, q, salt):
+    """앞쪽 정점 `u` 에서 그보다 앞의 `v` 를 묻는다 — 간선이 앞으로만 가는 그래프에서는 전부 0 이다. 질의마다
+    탐색하는 풀이는 못 찾고 `u` 뒤의 그래프를 끝까지 뒤진다; 무작위 질의는 절반이 금방 찾아 끝나 오답이 빨랐고,
+    `u` 가 무작위면 평균 절반만 뒤져 1.3배로 겨우 졌다."""
+    a = randoms(q, 1, 100, salt=salt)
+    b = randoms(q, 0, 100, salt=salt + 1)
+    return flat([a[i], b[i] % a[i]] for i in range(q))
+
+
+PROBLEMS.append(Problem(
+    id="prerequisite-queries",
+    title="선수 관계 질의",
+    summary="""
+과목 `n` 개(`0..n-1`)와 선수 관계 `edges = [a1, b1, ...]` ("`a` 를 들어야 `b` 를 들을 수 있다", 순환
+없음)가 주어진다. 질의 `queries = [u1, v1, ...]` 마다 **`u` 가 `v` 의 (직접이든 간접이든) 선수 과목인가**를
+`1`/`0` 으로 담은 배열을 반환한다. `u == v` 는 `0` 이다.
+""",
+    notes="""
+질의마다 DFS 하면 질의 수 × 그래프 크기다. 질의가 많으니 **도달 관계를 미리 다 만든다** — 정점 `v` 에
+"어떤 정점에서 올 수 있는가"를 비트 집합으로 두면, 위상 순서로 `v` 의 집합 = 직전 정점들의 집합 ∪ 직전
+정점들이다. 비트 집합은 `n/64` 워드라 전체가 `n²/64` 이고 질의는 O(1) 이다.
+""",
+    drill_doc="""
+Drill.compare(u, v)           // 도달 집합을 합쳤다
+Drill.write(q, answer)        // 질의에 답했다
+""",
+    constraints="""
+- `1 <= n <= 2_000`, 간선 `0..10_000` 개(순환 없음), 질의 `0..100_000` 개
+""",
+    signature=dict(name="prerequisiteQueries", parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_prerequisite_queries,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [3, [0, 1, 1, 2], [0, 2, 2, 0, 0, 1]]), ("02", [2, [], [0, 1, 1, 0]])],
+        "boundary": [
+            ("01-self", [1, [], [0, 0]]),
+            # 간접 선수: 사슬의 끝.
+            ("02-long-chain", [5, [0, 1, 1, 2, 2, 3, 3, 4], [0, 4, 4, 0, 1, 3]]),
+            # 여러 길로 닿는다 — 한 번만 답한다.
+            ("03-diamond", [4, [0, 1, 0, 2, 1, 3, 2, 3], [0, 3, 1, 2]]),
+            ("04-no-queries", [3, [0, 1], []]),
+            # 방향이 중요하다.
+            ("05-direction", [3, [0, 1, 1, 2], [2, 0, 1, 0, 2, 1]]),
+            ("06-duplicate-edges", [2, [0, 1, 0, 1], [0, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _dag_forward(8, 10, salt=9501), _pairs(8, 20, salt=9503)]),
+            ("02-random-medium", [200, _dag_forward(200, 500, salt=9505), _pairs(200, 500, salt=9507)]),
+            ("03-random-sparse", [1000, _dag_forward(1000, 1000, salt=9509), _pairs(1000, 2000, salt=9511)]),
+            ("04-random-dense", [500, _dag_forward(500, 5000, salt=9513), _pairs(500, 5000, salt=9515)]),
+        ],
+        "performance": [
+            ("01-small", [1000, _dag_forward(1000, 5000, salt=9521), _pairs(1000, 30000, salt=9523)]),
+            ("02-medium", [2000, _dag_forward(2000, 10000, salt=9525), _backward_pairs(2000, 60000, salt=9527)]),
+            ("03-large", [2000, _dag_forward(2000, 10000, salt=9529), _backward_pairs(2000, 100000, salt=9531)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 위상 순서로 도달원 비트 집합을 합친다.
+fun prerequisiteQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val adj = Array(n) { ArrayList<Int>() }
+    val incoming = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); incoming[edges[i + 1]].add(edges[i]); indegree[edges[i + 1]] += 1 }
+    val order = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (indegree[v] == 0) order[tail++] = v
+    while (head < tail) { val u = order[head++]; for (v in adj[u]) { indegree[v] -= 1; if (indegree[v] == 0) order[tail++] = v } }
+    val words = (n + 63) / 64
+    val reach = Array(n) { LongArray(words) }
+    for (idx in 0 until n) {
+        val v = order[idx]
+        for (u in incoming[v]) {
+            Drill.compare(u, v)
+            val ru = reach[u]; val rv = reach[v]
+            for (w in 0 until words) rv[w] = rv[w] or ru[w]
+            rv[u / 64] = rv[u / 64] or (1L shl (u % 64))
+        }
+    }
+    val out = IntArray(queries.size / 2)
+    for (q in out.indices) {
+        val u = queries[2 * q]; val v = queries[2 * q + 1]
+        out[q] = if ((reach[v][u / 64] ushr (u % 64)) and 1L == 1L) 1 else 0
+        Drill.write(q, out[q])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("direct-edges-only", "WRONG_ALGORITHM",
+         "직접 선수 관계만 본다. 간접 선수를 놓친다.",
+         """
+fun prerequisiteQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val direct = HashSet<Long>()
+    for (i in edges.indices step 2) direct.add(edges[i].toLong() * n + edges[i + 1])
+    return IntArray(queries.size / 2) { q -> if (queries[2 * q].toLong() * n + queries[2 * q + 1] in direct) 1 else 0 }
+}
+"""),
+        ("reversed-direction", "WRONG_BRANCH",
+         "방향을 거꾸로 답한다 — v 가 u 의 선수인가.",
+         """
+fun prerequisiteQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val adj = Array(n) { ArrayList<Int>() }
+    val incoming = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); incoming[edges[i + 1]].add(edges[i]); indegree[edges[i + 1]] += 1 }
+    val order = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (indegree[v] == 0) order[tail++] = v
+    while (head < tail) { val u = order[head++]; for (v in adj[u]) { indegree[v] -= 1; if (indegree[v] == 0) order[tail++] = v } }
+    val words = (n + 63) / 64
+    val reach = Array(n) { LongArray(words) }
+    for (idx in 0 until n) { val v = order[idx]; for (u in incoming[v]) { val ru = reach[u]; val rv = reach[v]; for (w in 0 until words) rv[w] = rv[w] or ru[w]; rv[u / 64] = rv[u / 64] or (1L shl (u % 64)) } }
+    return IntArray(queries.size / 2) { q -> val u = queries[2 * q]; val v = queries[2 * q + 1]; if ((reach[u][v / 64] ushr (v % 64)) and 1L == 1L) 1 else 0 }
+}
+"""),
+        ("input-order-not-topological", "MISSING_EDGE_CASE",
+         "정점을 번호 순으로 처리한다. 간선이 번호 역순이면 도달 집합이 덜 찬다.",
+         """
+fun prerequisiteQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val incoming = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) incoming[edges[i + 1]].add(edges[i])
+    val words = (n + 63) / 64
+    val reach = Array(n) { LongArray(words) }
+    for (v in n - 1 downTo 0) { for (u in incoming[v]) { val ru = reach[u]; val rv = reach[v]; for (w in 0 until words) rv[w] = rv[w] or ru[w]; rv[u / 64] = rv[u / 64] or (1L shl (u % 64)) } }
+    return IntArray(queries.size / 2) { q -> val u = queries[2 * q]; val v = queries[2 * q + 1]; if ((reach[v][u / 64] ushr (u % 64)) and 1L == 1L) 1 else 0 }
+}
+"""),
+        ("dfs-per-query", "PERFORMANCE",
+         "질의마다 DFS 한다. O(질의 × (n + m)).",
+         """
+fun prerequisiteQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) adj[edges[i]].add(edges[i + 1])
+    val seen = IntArray(n) { -1 }
+    val stack = IntArray(n + edges.size / 2 + 1)
+    return IntArray(queries.size / 2) { q ->
+        val u = queries[2 * q]; val v = queries[2 * q + 1]
+        var found = false
+        var top = 0; stack[top++] = u; seen[u] = q
+        while (top > 0 && !found) {
+            val x = stack[--top]
+            for (y in adj[x]) { Drill.compare(x, y); if (y == v) { found = true; break }; if (seen[y] != q) { seen[y] = q; stack[top++] = y } }
+        }
+        if (found) 1 else 0
+    }
+}
+"""),
+    ],
+))

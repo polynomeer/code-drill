@@ -1801,3 +1801,149 @@ fun pathSumCount(parent: IntArray, values: IntArray, target: Int): Int {
 """),
     ],
 ))
+
+
+# --- 173. 트리의 중심 (가장 큰 조각을 가장 작게) -----------------------------------------------------------
+
+def _tree_centroid(parent):
+    n = len(parent)
+    size = _subtree_sizes(parent)
+    children = [[] for _ in range(n)]
+    for v in range(1, n):
+        children[parent[v]].append(v)
+    best = None
+    for v in range(n):
+        largest = n - size[v]
+        for c in children[v]:
+            largest = max(largest, size[c])
+        if best is None or largest < best[0] or (largest == best[0] and v < best[1]):
+            best = (largest, v)
+    return best[1]
+
+
+PROBLEMS.append(Problem(
+    id="tree-centroid",
+    title="트리의 중심",
+    summary="""
+정점 `n` 개의 트리가 `parent` 배열로 주어진다 (`parent[i] < i`, 루트는 `-1`). 정점 하나를 지우면 트리가
+여러 조각으로 갈라진다. **가장 큰 조각의 크기가 가장 작아지는** 정점을 반환한다. 여럿이면 번호가 작은
+것. 정점이 하나면 `0`.
+""",
+    notes="""
+정점 `v` 를 지우면 조각은 `v` 의 자식 서브트리들과 "나머지"(`n − size[v]`)다. 서브트리 크기는 깊은
+정점부터 부모에 더해 한 번에 나오고(`parent[i] < i` 라 뒤에서 앞으로 돌면 된다), 정점마다 자식들의
+크기와 나머지 중 최댓값을 보면 O(n) 이다. 나머지 조각을 빼먹으면 루트가 늘 중심이 된다.
+""",
+    drill_doc="""
+Drill.compare(v, largest)     // 정점의 가장 큰 조각을 봤다
+Drill.write(0, best)          // 답을 갱신했다
+""",
+    constraints="""
+- `1 <= n <= 100_000`, `parent[i] < i`, 루트는 `-1`
+""",
+    signature=dict(name="treeCentroid", parameters=[("parent", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_tree_centroid,
+    cases={
+        "sample": [("01", [[-1, 0, 0, 1, 1, 2, 2]]), ("02", [[-1, 0, 1, 2, 3]])],
+        "boundary": [
+            ("01-single", [[-1]]),
+            ("02-two", [[-1, 0]]),
+            # 별: 가운데가 중심.
+            ("03-star", [[-1, 0, 0, 0, 0, 0]]),
+            # 사슬(짝수): 가운데 둘 중 작은 번호.
+            ("04-chain-even", [[-1, 0, 1, 2, 3, 4]]),
+            # 나머지 조각을 빼먹으면 루트를 답한다 — 루트 아래 긴 사슬.
+            ("05-root-is-not-centroid", [[-1, 0, 1, 2, 3, 4, 5, 6, 7]]),
+            # 두 무거운 가지 사이의 정점.
+            ("06-two-heavy-branches", [[-1, 0, 0, 1, 1, 1, 2, 2, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(10, salt=9401)]),
+            ("02-random-medium", [_random_parents(300, salt=9402)]),
+            ("03-random-large", [_random_parents(5000, salt=9403)]),
+            ("04-chain-then-fan", [_deep_chain_then_fan_parents(400)]),
+        ],
+        "performance": [
+            ("01-small", [_random_parents(20000, salt=9411)]),
+            ("02-medium", [_deep_chain_then_fan_parents(60000)]),
+            ("03-large", [_random_parents(100000, salt=9413)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 서브트리 크기 한 번, 정점마다 조각의 최댓값.
+fun treeCentroid(parent: IntArray): Int {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    for (v in n - 1 downTo 1) size[parent[v]] += size[v]
+    // 자식 서브트리 중 가장 큰 것.
+    val largestChild = IntArray(n)
+    for (v in 1 until n) if (size[v] > largestChild[parent[v]]) largestChild[parent[v]] = size[v]
+    var best = -1; var bestLargest = Int.MAX_VALUE
+    for (v in 0 until n) {
+        val largest = maxOf(largestChild[v], n - size[v])
+        Drill.compare(v, largest)
+        if (largest < bestLargest) { bestLargest = largest; best = v; Drill.write(0, v) }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("ignores-rest-of-tree", "MISSING_EDGE_CASE",
+         "나머지 조각(n − size[v])을 보지 않는다. 루트가 늘 중심이 된다.",
+         """
+fun treeCentroid(parent: IntArray): Int {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    for (v in n - 1 downTo 1) size[parent[v]] += size[v]
+    val largestChild = IntArray(n)
+    for (v in 1 until n) if (size[v] > largestChild[parent[v]]) largestChild[parent[v]] = size[v]
+    var best = -1; var bestLargest = Int.MAX_VALUE
+    for (v in 0 until n) { val largest = largestChild[v]; if (largest < bestLargest) { bestLargest = largest; best = v } }
+    return best
+}
+"""),
+        ("ties-take-larger-index", "OFF_BY_ONE",
+         "같으면 번호가 큰 것을 고른다.",
+         """
+fun treeCentroid(parent: IntArray): Int {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    for (v in n - 1 downTo 1) size[parent[v]] += size[v]
+    val largestChild = IntArray(n)
+    for (v in 1 until n) if (size[v] > largestChild[parent[v]]) largestChild[parent[v]] = size[v]
+    var best = -1; var bestLargest = Int.MAX_VALUE
+    for (v in 0 until n) { val largest = maxOf(largestChild[v], n - size[v]); if (largest <= bestLargest) { bestLargest = largest; best = v } }
+    return best
+}
+"""),
+        ("sums-children-instead-of-max", "WRONG_ALGORITHM",
+         "자식 서브트리 크기의 합(= size − 1)을 조각으로 본다. 조각은 하나씩이다.",
+         """
+fun treeCentroid(parent: IntArray): Int {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    for (v in n - 1 downTo 1) size[parent[v]] += size[v]
+    var best = -1; var bestLargest = Int.MAX_VALUE
+    for (v in 0 until n) { val largest = maxOf(size[v] - 1, n - size[v]); if (largest < bestLargest) { bestLargest = largest; best = v } }
+    return best
+}
+"""),
+        ("recomputes-sizes-per-vertex", "PERFORMANCE",
+         "정점마다 서브트리 크기를 다시 센다. O(n²).",
+         """
+fun treeCentroid(parent: IntArray): Int {
+    val n = parent.size
+    var best = -1; var bestLargest = Int.MAX_VALUE
+    for (v in 0 until n) {
+        val size = IntArray(n) { 1 }
+        for (u in n - 1 downTo 1) { Drill.compare(v, u); size[parent[u]] += size[u] }
+        var largest = n - size[v]
+        for (u in 1 until n) if (parent[u] == v && size[u] > largest) largest = size[u]
+        if (largest < bestLargest) { bestLargest = largest; best = v }
+    }
+    return best
+}
+"""),
+    ],
+))

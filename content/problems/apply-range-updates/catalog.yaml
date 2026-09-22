@@ -1,0 +1,16 @@
+# apply-range-updates 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - array
+  - prefix-sum
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - OPTIMIZATION
+prerequisites:
+  - running-sum
+  - range-sum-queries
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "갱신마다 O(1), 누적합 한 번. 갱신마다 훑으면 O(n × 갱신)"
