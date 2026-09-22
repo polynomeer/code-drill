@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - string
+  - simulation
+summary: 따옴표·이스케이프·줄바꿈 규칙을 지키는 CSV 를 읽고 쓴다 — 따옴표 안의 쉼표와 줄바꿈은 값이고, 따옴표는 두 번 적으며, 쓸 때는 필요한 값만 감싼다.
+competencies:
+  - SPECIFICATION
