@@ -1,0 +1,7 @@
+difficulty: HARD
+tags:
+  - string
+  - dynamic-programming
+summary: 공통 조상과 두 갈래를 줄 단위로 병합한다 — 한쪽만 바뀐 구간은 그쪽을, 양쪽이 같게 바뀐 구간은 한 번만, 다르게 바뀐 구간은 충돌 표시로.
+competencies:
+  - SPECIFICATION
