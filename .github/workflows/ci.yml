@@ -48,7 +48,11 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+      # 액션의 입력은 defaults.run.working-directory 를 따르지 않는다. 판을 저장소 뿌리에서
+      # 찾으므로 web/package.json 을 가리켜 줘야 거기 적힌 pnpm 버전을 읽는다.
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
