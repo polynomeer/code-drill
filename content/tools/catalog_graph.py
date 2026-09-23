@@ -2458,6 +2458,12 @@ def _smallest_order(n, prereqs):
     return order if len(order) == n else []
 
 
+def _descending_chain(n):
+    """n-1 → n-2 → … → 0 사슬. 들을 수 있는 과목이 늘 번호가 가장 큰 하나뿐이라, 매번 0 부터
+    훑어 찾는 오답이 걸음마다 거의 n 칸을 걷는다 — 무작위 그래프에서는 금세 찾아 끊겼다."""
+    return flat([i + 1, i] for i in range(n - 2, -1, -1))
+
+
 def _dag_pairs(n, m, salt):
     # 큰 번호 → 작은 번호로만 간선을 두어 순환이 없게 한다. 사전순이 시험되도록 방향을 뒤집는다.
     a = randoms(m, 0, n - 1, salt=salt)
@@ -2467,6 +2473,9 @@ def _dag_pairs(n, m, salt):
 
 PROBLEMS.append(Problem(
     id="smallest-course-order",
+    # v2: 내림차순으로 강제되는 사슬을 성능 케이스로 더했다. 무작위 그래프에서는 들을 수 있는
+    # 과목을 금세 찾아, 매번 전부 훑는 오답이 CI 머신에서 한도의 2.4배에 그쳤다 (§12.1 재현성).
+    version=2,
     title="사전순 수강 순서",
     summary="""
 과목이 `0` 부터 `n-1` 까지 있고 `prereqs` 는 `[a1, b1, a2, b2, ...]` 로 "`a` 를 들은 뒤에야
@@ -2495,7 +2504,7 @@ Drill.edge("c1", "c4")        // 선수 하나를 지웠다
         parameters=[("n", "INT"), ("prereqs", "INT_ARRAY")],
         returns="INT_ARRAY",
     ),
-    groups=perf_groups(),
+    groups=perf_groups(time_multiplier=0.5),
     reference=_smallest_order,
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
     cases={
@@ -2525,6 +2534,7 @@ Drill.edge("c1", "c4")        // 선수 하나를 지웠다
             ("01-small", [3000, _dag_pairs(3000, 9000, salt=8131)]),
             ("02-medium", [20000, _dag_pairs(20000, 60000, salt=8135)]),
             ("03-large", [100000, _dag_pairs(100000, 200000, salt=8139)]),
+            ("04-descending-chain", [100000, _descending_chain(100000)]),
         ],
     },
     kotlin="""

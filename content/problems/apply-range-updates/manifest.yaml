@@ -2,14 +2,14 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: apply-range-updates
-version: 1
+version: 2
 title: 구간 더하기 뒤의 배열
 statement: statement.md
 
 limits:
   timeMillis: 2000
   memoryMb: 256
-  outputBytes: 2000000
+  outputBytes: 8000000
 
 # 함수형 풀이. Runner 가 이 시그니처로 하네스를 생성한다 (§5.3 prepare).
 signature:

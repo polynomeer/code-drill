@@ -1921,6 +1921,9 @@ def _min_subarray_len(nums, target):
 
 PROBLEMS.append(Problem(
     id="min-subarray-len",
+    # v2: 안쪽 반복이 끊기지 않는 성능 케이스를 더했다. 목표에 금세 닿는 입력에서는 두 겹
+    # 풀이가 CI 머신에서 한도의 2.5배에 그쳤다 (§12.1 재현성).
+    version=2,
     title="합이 목표 이상인 가장 짧은 구간",
     summary="""
 **양의 정수** 배열 `nums` 와 `target` 이 주어진다. 합이 `target` **이상**인 연속 구간 중
@@ -1944,7 +1947,7 @@ Drill.write(0, best)          // 지금까지의 최소 길이
 """,
     signature=dict(name="minSubarrayLen", parameters=[("nums", "INT_ARRAY"), ("target", "INT")],
                    returns="INT"),
-    groups=perf_groups(),
+    groups=perf_groups(time_multiplier=0.5),
     reference=_min_subarray_len,
     cases={
         "sample": [
@@ -1972,6 +1975,9 @@ Drill.write(0, best)          // 지금까지의 최소 길이
             ("01-small", [randoms(20000, 1, 100, salt=4305), 300000]),
             ("02-medium", [randoms(100000, 1, 100, salt=4306), 2000000]),
             ("03-large", [randoms(200000, 1, 10, salt=4307), 500000]),
+            # 목표가 전체 합 바로 아래다 — 첫 자리 말고는 끝까지 더해도 닿지 못해,
+            # 시작점마다 더하는 오답의 안쪽 반복이 한 번도 끊기지 않는다.
+            ("04-never-reaches", [randoms(200000, 1, 10, salt=4309), sum(randoms(200000, 1, 10, salt=4309)) - 3]),
         ],
     },
     kotlin="""
@@ -4141,6 +4147,13 @@ def _apply_range_updates(n, updates):
     return out
 
 
+def _full_span_updates(n, m, salt):
+    """전 구간을 덮는 갱신 — 갱신마다 구간을 훑는 오답이 n × 갱신 수를 그대로 다 돈다.
+    무작위 구간은 평균 길이가 n/3 이라 CI 머신에서 한도의 2.3배밖에 못 넘겼다."""
+    v = randoms(m, -1000, 1000, salt=salt)
+    return flat([0, n - 1, v[i]] for i in range(m))
+
+
 def _updates(n, m, salt):
     a = randoms(m, 0, n - 1, salt=salt)
     b = randoms(m, 0, n - 1, salt=salt + 1)
@@ -4150,6 +4163,9 @@ def _updates(n, m, salt):
 
 PROBLEMS.append(Problem(
     id="apply-range-updates",
+    # v2: 전 구간을 덮는 성능 케이스를 더했다. 무작위 구간은 평균 길이가 n/3 이라 갱신마다
+    # 훑는 오답이 CI 머신에서 한도의 2.3배에 그쳤다 (§12.1 재현성).
+    version=2,
     title="구간 더하기 뒤의 배열",
     summary="""
 길이 `n` 의 0 배열에 갱신 `updates = [l1, r1, v1, l2, r2, v2, ...]` 를 차례로 적용한다 — 각각 `l..r`
@@ -4171,7 +4187,8 @@ Drill.compare(i, running)     // 누적합을 냈다
     signature=dict(name="applyRangeUpdates", parameters=[("n", "INT"), ("updates", "INT_ARRAY")], returns="INT_ARRAY"),
     groups=perf_groups(time_multiplier=0.5),
     reference=_apply_range_updates,
-    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    # 출력 한도는 그룹의 케이스들이 나눠 쓴다 — 십만 칸짜리 성능 케이스가 넷이면 2MB 로는 모자란다.
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
     cases={
         "sample": [("01", [5, [1, 3, 2, 2, 4, 3, 0, 2, -2]]), ("02", [3, []])],
         "boundary": [
@@ -4193,6 +4210,7 @@ Drill.compare(i, running)     // 누적합을 냈다
             ("01-small", [20000, _updates(20000, 20000, salt=9451)]),
             ("02-medium", [60000, _updates(60000, 60000, salt=9454)]),
             ("03-large", [100000, _updates(100000, 100000, salt=9457)]),
+            ("04-full-span", [100000, _full_span_updates(100000, 100000, salt=9460)]),
         ],
     },
     kotlin="""
