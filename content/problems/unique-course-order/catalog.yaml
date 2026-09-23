@@ -1,0 +1,17 @@
+# unique-course-order 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - topological-sort
+  - queue
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - minimum-semesters
+  - smallest-course-order
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "Kahn 한 번, 걸음마다 큐 크기를 본다"

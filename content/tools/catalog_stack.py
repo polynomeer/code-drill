@@ -2046,3 +2046,178 @@ fun decodeNestedString(text: String): String {
 """),
     ],
 ))
+
+
+# --- 182. 132 패턴 ------------------------------------------------------------
+
+def _pattern_132(nums):
+    stack = []
+    third = None
+    for x in reversed(nums):
+        if third is not None and x < third:
+            return 1
+        while stack and stack[-1] < x:
+            third = stack.pop()
+        stack.append(x)
+    return 0
+
+
+def _strictly_decreasing(count, salt):
+    """132 패턴이 없는 긴 입력 — 느린 풀이가 중간에 빠져나가지 못한다."""
+    steps = randoms(count, 1, 5, salt=salt)
+    value = 1_000_000_000
+    out = []
+    for step in steps:
+        out.append(value)
+        value -= step
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="pattern-132",
+    title="132 패턴",
+    summary="""
+정수 배열 `nums` 에 `i < j < k` 이면서 `nums[i] < nums[k] < nums[j]` 인 세 자리가 있으면 `1`, 없으면 `0` 을
+반환한다. 작은 값 하나, 가장 큰 값, 그 사이의 값이 이 순서로 나타나는가를 묻는 것이다.
+""",
+    notes="""
+`j` 를 정해 놓고 양쪽을 뒤지면 두 겹이다. **오른쪽에서 왼쪽으로** 한 번만 훑는다 — 스택에는 아직 `nums[j]`
+후보인 값들을 두고, 스택에서 밀려난 값 중 가장 큰 것을 "세 번째 값"으로 기억한다. 밀려났다는 것은 그보다 큰
+값이 왼쪽에 있다는 뜻이고, 그 값이 곧 `nums[j]` 다. 이제 `nums[i]` 는 기억한 값보다 작기만 하면 된다.
+
+밀려나는 값이 여러 개면 **마지막 것**이 남아야 한다. 가장 큰 것을 세 번째 값으로 두어야 `nums[i]` 의 자리가
+넓어진다.
+""",
+    drill_doc="""
+Drill.push(value)             // nums[j] 후보로 밀어 넣었다
+Drill.pop(value)              // 더 큰 값에 밀려났다 — 세 번째 값 후보
+""",
+    constraints="""
+- `1 <= nums.length <= 200_000`, `-1_000_000_000 <= nums[i] <= 1_000_000_000`
+""",
+    signature=dict(name="hasPattern132", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_pattern_132,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[1, 2, 3, 4]]), ("02", [[3, 1, 4, 2]])],
+        "boundary": [
+            ("01-too-short", [[1, 2]]),
+            ("02-exact-three", [[1, 3, 2]]),
+            # 같은 값은 "사이"가 아니다. 셋 다 달라야 한다.
+            ("03-equal-values", [[1, 2, 2]]),
+            # 세 번째 값과 같은 값은 사이가 아니다 — 여기서 <= 로 쓴 풀이가 갈린다.
+            ("03b-equals-third", [[1, 2, 1]]),
+            ("04-all-same", [[5, 5, 5, 5]]),
+            # 밀려나는 값이 둘 — 마지막 것을 세 번째 값으로 남겨야 한다.
+            ("05-two-pops", [[4, 100, 3, 5]]),
+            ("06-needs-largest-popped", [[25, 100, 30, 20]]),
+            ("07-decreasing", [[9, 7, 5, 3]]),
+            ("08-negatives", [[-5, -1, -3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 0, 9, salt=9681)]),
+            ("02-random-medium", [randoms(300, 0, 50, salt=9683)]),
+            ("03-random-wide", [randoms(1000, -1000000000, 1000000000, salt=9685)]),
+            ("04-sorted-up", [sorted(randoms(500, 0, 100000, salt=9687))]),
+            ("05-sorted-down", [sorted(randoms(500, 0, 100000, salt=9689), reverse=True)]),
+        ],
+        "performance": [
+            ("01-decreasing", [_strictly_decreasing(50000, salt=9691)]),
+            ("02-decreasing-large", [_strictly_decreasing(200000, salt=9693)]),
+            ("03-increasing-large", [sorted(_strictly_decreasing(200000, salt=9695))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오른쪽에서 왼쪽으로, 밀려난 값 중 가장 큰 것을 기억한다.
+fun hasPattern132(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    var third = Int.MIN_VALUE
+    var hasThird = false
+    for (i in nums.indices.reversed()) {
+        val x = nums[i]
+        if (hasThird && x < third) return 1
+        while (top > 0 && stack[top - 1] < x) {
+            third = stack[--top]
+            hasThird = true
+            Drill.pop(third)
+        }
+        stack[top++] = x
+        Drill.push(x)
+    }
+    return 0
+}
+""",
+    mutants=[
+        ("allows-equal", "WRONG_BRANCH",
+         "세 값이 같아도 패턴으로 친다. 사이에 있는 값은 양끝과 달라야 한다.",
+         """
+fun hasPattern132(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    var third = Int.MIN_VALUE
+    var hasThird = false
+    for (i in nums.indices.reversed()) {
+        val x = nums[i]
+        if (hasThird && x <= third) return 1
+        while (top > 0 && stack[top - 1] < x) { third = stack[--top]; hasThird = true }
+        stack[top++] = x
+    }
+    return 0
+}
+"""),
+        ("keeps-first-pop", "WRONG_ALGORITHM",
+         "밀려난 값 중 처음 것을 세 번째 값으로 삼는다. 더 큰 값이 밀려나도 갱신하지 않아 놓친다.",
+         """
+fun hasPattern132(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    var third = Int.MIN_VALUE
+    var hasThird = false
+    for (i in nums.indices.reversed()) {
+        val x = nums[i]
+        if (hasThird && x < third) return 1
+        while (top > 0 && stack[top - 1] < x) {
+            val popped = stack[--top]
+            if (!hasThird) { third = popped; hasThird = true }
+        }
+        stack[top++] = x
+    }
+    return 0
+}
+"""),
+        ("pops-only-once", "OFF_BY_ONE",
+         "한 값이 여럿을 밀어내는 자리에서 하나만 꺼낸다. 스택에 더 작은 값이 남아 뒤가 어긋난다.",
+         """
+fun hasPattern132(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    var third = Int.MIN_VALUE
+    var hasThird = false
+    for (i in nums.indices.reversed()) {
+        val x = nums[i]
+        if (hasThird && x < third) return 1
+        if (top > 0 && stack[top - 1] < x) { third = stack[--top]; hasThird = true }
+        stack[top++] = x
+    }
+    return 0
+}
+"""),
+        ("quadratic-pairs", "PERFORMANCE",
+         "가운데 값을 하나씩 정하고 오른쪽을 전부 훑는다. O(n^2).",
+         """
+fun hasPattern132(nums: IntArray): Int {
+    var smallest = Int.MAX_VALUE
+    for (j in nums.indices) {
+        if (j > 0 && nums[j - 1] < smallest) smallest = nums[j - 1]
+        for (k in j + 1 until nums.size) {
+            Drill.compare(j, k)
+            if (smallest < nums[k] && nums[k] < nums[j]) return 1
+        }
+    }
+    return 0
+}
+"""),
+    ],
+))

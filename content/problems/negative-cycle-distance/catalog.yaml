@@ -1,0 +1,18 @@
+# negative-cycle-distance 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - shortest-path
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CONSTRAINTS
+  - EDGE_CASES
+prerequisites:
+  - cheapest-paths
+  - cheapest-with-stops
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "간선 전체를 n-1 번 훑는다 — O(n*m)"

@@ -3206,3 +3206,161 @@ fun shortestClearPath(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 184. 0 이 있는 행과 열 지우기 -------------------------------------------
+
+def _zero_out_rows_and_columns(grid):
+    rows = len(grid)
+    cols = len(grid[0]) if rows else 0
+    zero_rows = {r for r in range(rows) if any(grid[r][c] == 0 for c in range(cols))}
+    zero_cols = {c for c in range(cols) if any(grid[r][c] == 0 for r in range(rows))}
+    return [
+        [0 if r in zero_rows or c in zero_cols else grid[r][c] for c in range(cols)]
+        for r in range(rows)
+    ]
+
+
+def _grid_with_zeros(rows, cols, zeros, salt):
+    values = randoms(rows * cols, 1, 99, salt=salt)
+    grid = [values[r * cols:(r + 1) * cols] for r in range(rows)]
+    spots = randoms(zeros * 2, 0, max(rows, cols) - 1, salt=salt + 1)
+    for i in range(zeros):
+        grid[spots[2 * i] % rows][spots[2 * i + 1] % cols] = 0
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="zero-out-rows-and-columns",
+    title="0 이 있는 행과 열 지우기",
+    summary="""
+격자 `grid` 에서 값이 `0` 인 칸이 하나라도 있는 **행과 열을 통째로 0** 으로 만든 격자를 반환한다.
+원래의 `0` 을 기준으로 한 번에 정한다 — 지우면서 생긴 `0` 은 새 기준이 되지 않는다.
+""",
+    notes="""
+만나는 자리에서 바로 0 을 채우면 **그 0 이 다시 기준이 되어** 격자 전체로 번진다. 어느 행과 어느 열을
+지울지 먼저 다 정하고 나서 채워야 한다.
+
+표시를 담을 자리는 격자 안에 있다 — **첫 행과 첫 열을 표시판으로 쓰면** 추가 공간이 상수로 준다. 다만
+첫 행·첫 열 자신이 0 을 갖고 있었는지는 표시판을 덮어쓰기 전에 따로 기억해 두고, 본문을 다 채운 **뒤에**
+처리해야 한다.
+""",
+    drill_doc="""
+Drill.write(index, value)     // 행 우선 번호 index 칸을 0 으로 만들었다
+""",
+    constraints="""
+- `1 <= 행 <= 200`, `1 <= 열 <= 200`, 모든 행의 길이는 같다
+- `0 <= grid[r][c] <= 1_000_000`
+""",
+    signature=dict(name="zeroOutRowsAndColumns", parameters=[("grid", "INT_MATRIX")], returns="INT_MATRIX"),
+    groups=standard_groups(),
+    reference=_zero_out_rows_and_columns,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [[[1, 2, 3], [4, 0, 6], [7, 8, 9]]]),
+            ("02", [[[1, 2], [3, 4]]]),
+        ],
+        "boundary": [
+            ("01-single-cell-zero", [[[0]]]),
+            ("02-single-cell-nonzero", [[[7]]]),
+            # 첫 행에만 0 이 있다 — 표시판을 그대로 두면 격자 전체가 지워진다.
+            ("03-zero-in-first-row", [[[1, 0, 3], [4, 5, 6], [7, 8, 9]]]),
+            ("04-zero-in-first-column", [[[1, 2, 3], [0, 5, 6], [7, 8, 9]]]),
+            ("05-corner-zero", [[[0, 2, 3], [4, 5, 6], [7, 8, 9]]]),
+            # 직사각형 — 행과 열을 맞바꾼 구현이 여기서 갈린다.
+            ("06-wide", [[[1, 2, 3, 4], [5, 0, 7, 8]]]),
+            ("07-tall", [[[1, 2], [3, 4], [0, 6], [7, 8]]]),
+            ("08-all-zero", [[[0, 0], [0, 0]]]),
+            ("09-no-zero", [[[1, 2], [3, 4], [5, 6]]]),
+            # 번지면 안 된다 — 지우면서 생긴 0 은 기준이 아니다.
+            ("10-spread-check", [[[1, 1, 1], [1, 0, 1], [1, 1, 1]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_grid_with_zeros(5, 5, 2, salt=9721)]),
+            ("02-random-wide", [_grid_with_zeros(8, 20, 5, salt=9723)]),
+            ("03-random-tall", [_grid_with_zeros(30, 6, 7, salt=9725)]),
+            ("04-random-dense-zeros", [_grid_with_zeros(40, 40, 60, salt=9727)]),
+            ("05-random-no-zeros", [_grid_with_zeros(25, 25, 0, salt=9729)]),
+            ("06-random-large", [_grid_with_zeros(200, 200, 30, salt=9731)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 첫 행·첫 열을 표시판으로 쓰고, 그 둘은 맨 마지막에 처리한다.
+fun zeroOutRowsAndColumns(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    var firstRowHasZero = false
+    var firstColumnHasZero = false
+    for (c in 0 until cols) if (grid[0][c] == 0) firstRowHasZero = true
+    for (r in 0 until rows) if (grid[r][0] == 0) firstColumnHasZero = true
+    for (r in 1 until rows) for (c in 1 until cols) if (grid[r][c] == 0) { grid[r][0] = 0; grid[0][c] = 0 }
+    for (r in 1 until rows) for (c in 1 until cols) {
+        if (grid[r][0] == 0 || grid[0][c] == 0) { grid[r][c] = 0; Drill.write(r * cols + c, 0) }
+    }
+    if (firstRowHasZero) for (c in 0 until cols) grid[0][c] = 0
+    if (firstColumnHasZero) for (r in 0 until rows) grid[r][0] = 0
+    return grid
+}
+""",
+    mutants=[
+        ("writes-while-scanning", "WRONG_ALGORITHM",
+         "0 을 만나는 자리에서 바로 행과 열을 채운다. 채운 0 이 다시 기준이 되어 번진다.",
+         """
+fun zeroOutRowsAndColumns(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    for (r in 0 until rows) for (c in 0 until cols) {
+        if (grid[r][c] == 0) {
+            for (cc in 0 until cols) grid[r][cc] = 0
+            for (rr in 0 until rows) grid[rr][c] = 0
+        }
+    }
+    return grid
+}
+"""),
+        ("first-row-cleared-early", "MISSING_EDGE_CASE",
+         "표시판으로 쓴 첫 행과 첫 열을 본문보다 먼저 지운다. 표시가 사라지기 전에 번진다.",
+         """
+fun zeroOutRowsAndColumns(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    var firstRowHasZero = false
+    var firstColumnHasZero = false
+    for (c in 0 until cols) if (grid[0][c] == 0) firstRowHasZero = true
+    for (r in 0 until rows) if (grid[r][0] == 0) firstColumnHasZero = true
+    for (r in 1 until rows) for (c in 1 until cols) if (grid[r][c] == 0) { grid[r][0] = 0; grid[0][c] = 0 }
+    if (firstRowHasZero) for (c in 0 until cols) grid[0][c] = 0
+    if (firstColumnHasZero) for (r in 0 until rows) grid[r][0] = 0
+    for (r in 1 until rows) for (c in 1 until cols) if (grid[r][0] == 0 || grid[0][c] == 0) grid[r][c] = 0
+    return grid
+}
+"""),
+        ("rows-only", "WRONG_BRANCH",
+         "0 이 있는 행만 지우고 열은 그대로 둔다.",
+         """
+fun zeroOutRowsAndColumns(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val zeroRow = BooleanArray(rows)
+    for (r in 0 until rows) for (c in 0 until cols) if (grid[r][c] == 0) zeroRow[r] = true
+    for (r in 0 until rows) if (zeroRow[r]) for (c in 0 until cols) grid[r][c] = 0
+    return grid
+}
+"""),
+        ("forgets-first-column-flag", "MISSING_EDGE_CASE",
+         "표시판으로 쓴 첫 열이 원래 0 을 갖고 있었는지 기억하지 않는다. 첫 열의 0 만 살아남는다.",
+         """
+fun zeroOutRowsAndColumns(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    var firstRowHasZero = false
+    for (c in 0 until cols) if (grid[0][c] == 0) firstRowHasZero = true
+    for (r in 1 until rows) for (c in 1 until cols) if (grid[r][c] == 0) { grid[r][0] = 0; grid[0][c] = 0 }
+    for (r in 1 until rows) for (c in 1 until cols) if (grid[r][0] == 0 || grid[0][c] == 0) grid[r][c] = 0
+    if (firstRowHasZero) for (c in 0 until cols) grid[0][c] = 0
+    return grid
+}
+"""),
+    ],
+))

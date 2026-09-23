@@ -4643,3 +4643,662 @@ fun prerequisiteQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 179. 음수 간선이 있는 최단 거리 (벨만-포드) -----------------------------------------------------------
+
+def _shortest_with_negatives(n, edges):
+    from collections import deque
+    inf = 1_000_000_000
+    dist = [inf] * n
+    dist[0] = 0
+    for _ in range(n - 1):
+        changed = False
+        for i in range(0, len(edges), 3):
+            a, b, w = edges[i], edges[i + 1], edges[i + 2]
+            if dist[a] != inf and dist[a] + w < dist[b]:
+                dist[b] = dist[a] + w
+                changed = True
+        if not changed:
+            break
+    # n-1 번 뒤에도 줄어드는 간선의 끝은 음수 순환의 영향 안이다. 거기서 갈 수 있는 곳도 전부.
+    tainted = [False] * n
+    for i in range(0, len(edges), 3):
+        a, b, w = edges[i], edges[i + 1], edges[i + 2]
+        if dist[a] != inf and dist[a] + w < dist[b]:
+            tainted[b] = True
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        adj[edges[i]].append(edges[i + 1])
+    queue = deque(v for v in range(n) if tainted[v])
+    while queue:
+        u = queue.popleft()
+        for v in adj[u]:
+            if not tainted[v]:
+                tainted[v] = True
+                queue.append(v)
+    return [-1_000_000_000 if tainted[v] else dist[v] for v in range(n)]
+
+
+def _reversed_chain(n, salt, low=-100, high=100):
+    """0→1→…→n-1 사슬을 끝에서부터 적는다. 완화 순서가 거꾸로라 라운드를 n-1 번 다 돌아야 한다."""
+    w = randoms(n - 1, low, high, salt=salt)
+    return flat([i, i + 1, w[i]] for i in range(n - 2, -1, -1))
+
+
+def _forward_edges(n, m, salt, low=-100, high=100):
+    """앞으로만 가는 간선 — 순환이 없으니 음수 간선을 마음껏 섞어도 답이 유한하다."""
+    a = randoms(m, 0, n - 2, salt=salt)
+    span = randoms(m, 1, 30, salt=salt + 1)
+    w = randoms(m, low, high, salt=salt + 2)
+    return flat([a[i], min(n - 1, a[i] + span[i]), w[i]] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="negative-cycle-distance",
+    title="음수 간선이 있는 최단 거리",
+    summary="""
+정점 `n` 개(`0..n-1`)와 방향 간선 `edges = [a1, b1, w1, ...]` (`a` 에서 `b` 로, 가중치 `w` 는 음수일 수 있다)가
+주어진다. 정점 `0` 에서 각 정점까지의 **최단 거리** 배열을 반환한다.
+
+- 닿을 수 없는 정점은 `1000000000`
+- 아무리 줄여도 하한이 없는 정점(음수 순환을 지나 올 수 있는 정점)은 `-1000000000`
+""",
+    notes="""
+음수 간선이 있으면 "가장 가까운 것부터 확정한다"는 가정이 깨진다 — 나중에 더 싼 길이 나타날 수 있다. 대신
+**모든 간선을 n-1 번 훑어 완화**한다. 단순 경로는 간선을 n-1 개 넘게 쓸 수 없으니, 그래도 줄어드는 간선이
+남아 있다면 그 끝은 음수 순환의 영향 안이다. 영향은 **거기서 갈 수 있는 곳으로 퍼진다.**
+""",
+    drill_doc="""
+Drill.write(v, dist)          // v 의 거리를 줄였다
+Drill.visit(v, 0)             // 음수 순환의 영향을 v 로 퍼뜨렸다
+""",
+    constraints="""
+- `1 <= n <= 3_000`, 간선 `0..10_000` 개, `-1000 <= w <= 1000`
+- 자기 자신으로 가는 간선과 같은 쌍의 간선이 여럿 있을 수 있다
+""",
+    signature=dict(name="shortestWithNegatives", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT_ARRAY"),
+    # 모든 쌍을 구하는 오답은 n^3 인데, 안쪽 반복이 단순해 JIT 가 벡터화한다 — 2000 정점에서 한도의 1.5배도
+    # 못 됐다. 정점을 3000 으로 올리고 성능 그룹의 시계를 조여 자릿수로 지게 했다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_shortest_with_negatives,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [
+            ("01", [3, [0, 1, 5, 1, 2, -2]]),
+            ("02", [3, [0, 1, 1, 1, 0, -3]]),
+        ],
+        "boundary": [
+            ("01-single", [1, []]),
+            # 닿을 수 없는 정점은 그대로 둔다 — 무한대에서 완화하면 안 된다.
+            ("02-unreachable-with-negative-edge", [4, [0, 1, 5, 2, 3, -4]]),
+            # 나중에 나타나는 더 싼 길. 확정하고 넘어가면 놓친다.
+            ("03-late-improvement", [3, [0, 1, 2, 0, 2, 3, 2, 1, -2]]),
+            ("04-negative-cycle-unreachable", [4, [0, 1, 1, 2, 3, -5, 3, 2, -5]]),
+            ("05-cycle-taints-downstream", [4, [0, 1, 1, 1, 2, -3, 2, 1, 1, 2, 3, 7]]),
+            ("06-negative-self-loop", [2, [0, 0, -1, 0, 1, 3]]),
+            # 합이 0 인 순환은 음수 순환이 아니다.
+            ("07-zero-cycle", [2, [0, 1, 1, 1, 0, -1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _forward_edges(8, 15, salt=9601)]),
+            ("02-random-medium", [200, _forward_edges(200, 600, salt=9603)]),
+            ("03-random-sparse", [1000, _forward_edges(1000, 1200, salt=9605)]),
+            # 뒤로 가는 큰 음수 간선 하나가 순환을 만든다. 영향이 어디까지 퍼지나.
+            ("04-with-negative-cycle", [300, _forward_edges(300, 900, salt=9607) + [150, 100, -900, 100, 150, 1]]),
+            ("05-all-negative", [400, _forward_edges(400, 1200, salt=9609, low=-1000, high=-1)]),
+        ],
+        "performance": [
+            ("01-chain", [1500, _reversed_chain(1500, salt=9611) + _forward_edges(1500, 2000, salt=9613)]),
+            ("02-long-chain", [3000, _reversed_chain(3000, salt=9615) + _forward_edges(3000, 1000, salt=9617)]),
+            ("03-dense", [3000, _forward_edges(3000, 10000, salt=9619)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 벨만-포드 n-1 라운드 + 음수 순환의 영향 전파.
+// 거리는 Long 으로 센다 — 음수 순환 위에서는 Int 를 넘길 수 있고, 그 값들은 어차피 하한 없음으로 덮인다.
+fun shortestWithNegatives(n: Int, edges: IntArray): IntArray {
+    val inf = 1_000_000_000L
+    val dist = LongArray(n) { inf }
+    dist[0] = 0L
+    for (round in 0 until n - 1) {
+        var changed = false
+        for (i in edges.indices step 3) {
+            val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+            if (dist[a] != inf && dist[a] + w < dist[b]) {
+                dist[b] = dist[a] + w
+                Drill.write(b, dist[b].toInt())
+                changed = true
+            }
+        }
+        if (!changed) break
+    }
+    val tainted = BooleanArray(n)
+    for (i in edges.indices step 3) {
+        val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+        if (dist[a] != inf && dist[a] + w < dist[b]) tainted[b] = true
+    }
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 3) adj[edges[i]].add(edges[i + 1])
+    val queue = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (tainted[v]) queue[tail++] = v
+    while (head < tail) {
+        val u = queue[head++]
+        for (v in adj[u]) if (!tainted[v]) { tainted[v] = true; Drill.visit(v, 0); queue[tail++] = v }
+    }
+    return IntArray(n) { v -> if (tainted[v]) -1_000_000_000 else dist[v].toInt() }
+}
+""",
+    mutants=[
+        ("dijkstra-with-negatives", "WRONG_ALGORITHM",
+         "가장 가까운 정점부터 확정한다. 음수 간선이 나중에 더 싼 길을 만들면 놓친다.",
+         """
+fun shortestWithNegatives(n: Int, edges: IntArray): IntArray {
+    val inf = 1_000_000_000
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (i in edges.indices step 3) adj[edges[i]].add(intArrayOf(edges[i + 1], edges[i + 2]))
+    val dist = IntArray(n) { inf }
+    dist[0] = 0
+    val done = BooleanArray(n)
+    repeat(n) {
+        var best = -1
+        for (v in 0 until n) if (!done[v] && dist[v] != inf && (best == -1 || dist[v] < dist[best])) best = v
+        if (best == -1) return@repeat
+        done[best] = true
+        for (e in adj[best]) if (dist[best] + e[1] < dist[e[0]]) dist[e[0]] = dist[best] + e[1]
+    }
+    return dist
+}
+"""),
+        ("relaxes-from-unreachable", "MISSING_EDGE_CASE",
+         "닿을 수 없는 정점에서도 완화한다. 무한대에 가중치를 더해 닿지 않는 곳에 거리가 생긴다.",
+         """
+fun shortestWithNegatives(n: Int, edges: IntArray): IntArray {
+    val inf = 1_000_000_000L
+    val dist = LongArray(n) { inf }
+    dist[0] = 0L
+    for (round in 0 until n - 1) {
+        var changed = false
+        for (i in edges.indices step 3) {
+            val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+            if (dist[a] + w < dist[b]) { dist[b] = dist[a] + w; changed = true }
+        }
+        if (!changed) break
+    }
+    val tainted = BooleanArray(n)
+    for (i in edges.indices step 3) {
+        val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+        if (dist[a] + w < dist[b]) tainted[b] = true
+    }
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 3) adj[edges[i]].add(edges[i + 1])
+    val queue = IntArray(n); var head = 0; var tail = 0
+    for (v in 0 until n) if (tainted[v]) queue[tail++] = v
+    while (head < tail) { val u = queue[head++]; for (v in adj[u]) if (!tainted[v]) { tainted[v] = true; queue[tail++] = v } }
+    return IntArray(n) { v -> if (tainted[v]) -1_000_000_000 else dist[v].toInt() }
+}
+"""),
+        ("no-taint-propagation", "WRONG_BRANCH",
+         "음수 순환에 직접 걸린 정점만 하한 없음으로 적는다. 그 뒤로 이어지는 정점은 놓친다.",
+         """
+fun shortestWithNegatives(n: Int, edges: IntArray): IntArray {
+    val inf = 1_000_000_000L
+    val dist = LongArray(n) { inf }
+    dist[0] = 0L
+    for (round in 0 until n - 1) {
+        var changed = false
+        for (i in edges.indices step 3) {
+            val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+            if (dist[a] != inf && dist[a] + w < dist[b]) { dist[b] = dist[a] + w; changed = true }
+        }
+        if (!changed) break
+    }
+    val tainted = BooleanArray(n)
+    for (i in edges.indices step 3) {
+        val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+        if (dist[a] != inf && dist[a] + w < dist[b]) tainted[b] = true
+    }
+    return IntArray(n) { v -> if (tainted[v]) -1_000_000_000 else dist[v].toInt() }
+}
+"""),
+        ("all-pairs-floyd", "PERFORMANCE",
+         "모든 쌍의 최단 거리를 구하고 0 번 행만 쓴다. O(n^3) 이라 정점이 늘면 무너진다.",
+         """
+fun shortestWithNegatives(n: Int, edges: IntArray): IntArray {
+    val inf = 1_000_000_000L
+    val d = Array(n) { r -> LongArray(n) { c -> if (r == c) 0L else inf } }
+    for (i in edges.indices step 3) {
+        val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+        if (w < d[a][b]) d[a][b] = w.toLong()
+    }
+    for (k in 0 until n) for (r in 0 until n) {
+        val drk = d[r][k]
+        if (drk == inf) continue
+        val dk = d[k]
+        val dr = d[r]
+        for (c in 0 until n) { val v = drk + dk[c]; if (dk[c] != inf && v < dr[c]) dr[c] = v }
+    }
+    val out = IntArray(n)
+    for (v in 0 until n) {
+        var lower = false
+        for (k in 0 until n) if (d[0][k] != inf && d[k][k] < 0 && d[k][v] != inf) lower = true
+        out[v] = if (lower) -1_000_000_000 else if (d[0][v] >= inf) 1_000_000_000 else d[0][v].toInt()
+    }
+    return out
+}
+"""),
+    ],
+))
+
+
+# --- 180. 위상 순서가 유일한가 -----------------------------------------------------------------------
+
+def _unique_course_order(n, edges):
+    from collections import deque
+    adj = [[] for _ in range(n)]
+    indegree = [0] * n
+    for i in range(0, len(edges), 2):
+        adj[edges[i]].append(edges[i + 1])
+        indegree[edges[i + 1]] += 1
+    queue = deque(v for v in range(n) if indegree[v] == 0)
+    seen = 0
+    while queue:
+        if len(queue) > 1:
+            return 0
+        u = queue.popleft()
+        seen += 1
+        for v in adj[u]:
+            indegree[v] -= 1
+            if indegree[v] == 0:
+                queue.append(v)
+    return 1 if seen == n else 0
+
+
+def _chain_edges(n, salt):
+    """사슬 0→1→…→n-1 을 섞어서 적는다. 순서는 유일하다."""
+    return flat(shuffled([[i, i + 1] for i in range(n - 1)], salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="unique-course-order",
+    title="수강 순서가 하나뿐인가",
+    summary="""
+과목 `n` 개(`0..n-1`)와 선수 관계 `edges = [a1, b1, ...]` ("`a` 를 들어야 `b` 를 들을 수 있다")가 주어진다.
+**모든 과목을 한 학기에 하나씩 듣는 순서가 정확히 하나뿐인가**를 `1`/`0` 으로 반환한다.
+순서가 아예 없으면(선수 관계에 순환이 있으면) `0` 이다.
+""",
+    notes="""
+순서를 다 세어 볼 필요는 없다. 위상 정렬을 한 걸음씩 진행하며 **지금 들을 수 있는 과목이 몇 개인가**만 보면
+된다. 두 개 이상이면 그 자리에서 갈라지니 순서가 여럿이고, 끝까지 늘 하나였다면 순서는 하나다. 마지막에
+처리한 과목 수가 `n` 이 아니면 순환이다.
+""",
+    drill_doc="""
+Drill.enqueue(v)              // 들을 수 있게 된 과목
+Drill.dequeue(v)              // 이번 학기에 들은 과목
+""",
+    constraints="""
+- `1 <= n <= 200_000`, 간선 `0..400_000` 개
+- 같은 쌍의 간선이 여럿 있을 수 있고, 자기 자신으로 가는 간선은 없다
+""",
+    signature=dict(name="uniqueCourseOrder", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_unique_course_order,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [3, [0, 1, 1, 2]]), ("02", [3, [0, 1, 0, 2]])],
+        "boundary": [
+            ("01-single", [1, []]),
+            ("02-two-independent", [2, []]),
+            ("03-cycle", [3, [0, 1, 1, 2, 2, 0]]),
+            # 갈라졌다 다시 모인다 — 가운데에서 둘 중 아무거나 먼저 들을 수 있다.
+            ("04-diamond", [4, [0, 1, 0, 2, 1, 3, 2, 3]]),
+            ("05-duplicate-edges", [2, [0, 1, 0, 1]]),
+            # 마지막 한 과목만 떨어져 있다.
+            ("06-isolated-tail", [3, [0, 1]]),
+            # 순환이 사슬 뒤에 숨어 있다.
+            ("07-chain-then-cycle", [5, [0, 1, 1, 2, 2, 3, 3, 4, 4, 2]]),
+        ],
+        "hidden": [
+            ("01-chain-small", [10, _chain_edges(10, salt=9621)]),
+            ("02-chain-with-extra", [10, _chain_edges(10, salt=9623) + [0, 5, 2, 7]]),
+            ("03-random-small", [12, _dag_forward(12, 20, salt=9625)]),
+            ("04-random-medium", [500, _dag_forward(500, 1500, salt=9627)]),
+            ("05-two-chains", [20, _chain_edges(10, salt=9629) + flat([[i, i + 1] for i in range(10, 19)])]),
+        ],
+        "performance": [
+            ("01-chain", [100000, _chain_edges(100000, salt=9631)]),
+            ("02-long-chain", [200000, _chain_edges(200000, salt=9633)]),
+            ("03-chain-with-shortcuts", [200000, _chain_edges(200000, salt=9635) + _dag_forward(200000, 200000, salt=9637)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). Kahn 을 돌리며 큐에 둘 이상이 들어오는 순간 갈라진다.
+fun uniqueCourseOrder(n: Int, edges: IntArray): Int {
+    val head = IntArray(n) { -1 }
+    val next = IntArray(edges.size / 2)
+    val to = IntArray(edges.size / 2)
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) {
+        val e = i / 2
+        to[e] = edges[i + 1]; next[e] = head[edges[i]]; head[edges[i]] = e
+        indegree[edges[i + 1]] += 1
+    }
+    val queue = IntArray(n); var front = 0; var back = 0
+    for (v in 0 until n) if (indegree[v] == 0) { queue[back++] = v; Drill.enqueue(v) }
+    var seen = 0
+    while (front < back) {
+        if (back - front > 1) return 0
+        val u = queue[front++]
+        Drill.dequeue(u)
+        seen += 1
+        var e = head[u]
+        while (e != -1) {
+            val v = to[e]
+            indegree[v] -= 1
+            if (indegree[v] == 0) { queue[back++] = v; Drill.enqueue(v) }
+            e = next[e]
+        }
+    }
+    return if (seen == n) 1 else 0
+}
+""",
+    mutants=[
+        ("ignores-queue-size", "WRONG_ALGORITHM",
+         "순서가 있는지만 보고 하나뿐인지는 보지 않는다. 갈라지는 자리가 있어도 1 이다.",
+         """
+fun uniqueCourseOrder(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val queue = IntArray(n); var front = 0; var back = 0
+    for (v in 0 until n) if (indegree[v] == 0) queue[back++] = v
+    var seen = 0
+    while (front < back) {
+        val u = queue[front++]; seen += 1
+        for (v in adj[u]) { indegree[v] -= 1; if (indegree[v] == 0) queue[back++] = v }
+    }
+    return if (seen == n) 1 else 0
+}
+"""),
+        ("checks-only-first-step", "WRONG_BRANCH",
+         "시작할 수 있는 과목이 하나인지만 보고 그 뒤로 갈라지는 자리는 보지 않는다.",
+         """
+fun uniqueCourseOrder(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    var roots = 0
+    for (v in 0 until n) if (indegree[v] == 0) roots += 1
+    if (roots != 1) return 0
+    val queue = IntArray(n); var front = 0; var back = 0
+    for (v in 0 until n) if (indegree[v] == 0) queue[back++] = v
+    var seen = 0
+    while (front < back) {
+        val u = queue[front++]; seen += 1
+        for (v in adj[u]) { indegree[v] -= 1; if (indegree[v] == 0) queue[back++] = v }
+    }
+    return if (seen == n) 1 else 0
+}
+"""),
+        ("ignores-cycle", "MISSING_EDGE_CASE",
+         "순환을 보지 않는다. 처리하지 못한 과목이 남아도 갈라지지만 않았으면 1 이다.",
+         """
+fun uniqueCourseOrder(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val queue = IntArray(n); var front = 0; var back = 0
+    for (v in 0 until n) if (indegree[v] == 0) queue[back++] = v
+    while (front < back) {
+        if (back - front > 1) return 0
+        val u = queue[front++]
+        for (v in adj[u]) { indegree[v] -= 1; if (indegree[v] == 0) queue[back++] = v }
+    }
+    return 1
+}
+"""),
+        ("scan-all-edges-per-pair", "PERFORMANCE",
+         "위상 순서를 하나 구한 뒤 이웃한 두 과목마다 간선 배열을 처음부터 훑는다. O(n*m).",
+         """
+fun uniqueCourseOrder(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val order = IntArray(n); var front = 0; var back = 0
+    for (v in 0 until n) if (indegree[v] == 0) order[back++] = v
+    while (front < back) {
+        val u = order[front++]
+        for (v in adj[u]) { indegree[v] -= 1; if (indegree[v] == 0) order[back++] = v }
+    }
+    if (back != n) return 0
+    for (i in 0 until n - 1) {
+        var linked = false
+        for (j in edges.indices step 2) {
+            Drill.compare(order[i], order[i + 1])
+            if (edges[j] == order[i] && edges[j + 1] == order[i + 1]) { linked = true; break }
+        }
+        if (!linked) return 0
+    }
+    return 1
+}
+"""),
+    ],
+))
+
+
+# --- 181. 간선을 지워 가며 세는 연결 요소 (거꾸로 처리) -----------------------------------------------
+
+def _components_after_removals(n, edges, removals):
+    m = len(edges) // 2
+    removed = [False] * m
+    for index in removals:
+        removed[index] = True
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    count = n
+
+    def union(a, b):
+        nonlocal count
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+            count -= 1
+
+    for i in range(m):
+        if not removed[i]:
+            union(edges[2 * i], edges[2 * i + 1])
+    out = [count]
+    for index in reversed(removals):
+        union(edges[2 * index], edges[2 * index + 1])
+        out.append(count)
+    out.reverse()
+    return out
+
+
+def _random_graph(n, m, salt):
+    a = randoms(m, 0, n - 1, salt=salt)
+    span = randoms(m, 1, n - 1, salt=salt + 1)
+    return flat([a[i], (a[i] + span[i]) % n] for i in range(m))
+
+
+PROBLEMS.append(Problem(
+    id="components-after-removals",
+    title="간선을 지워 가며 세는 연결 요소",
+    summary="""
+정점 `n` 개(`0..n-1`)와 무방향 간선 `edges = [a1, b1, ...]` 가 주어진다. `removals` 는 지울 간선의 **번호**를
+지우는 순서대로 담은 배열이다(번호는 `edges` 에서의 순서 `0..간선수-1`, 서로 다르다).
+
+연결 요소의 개수를 `removals.length + 1` 개 반환한다 — 아무것도 지우지 않은 처음 상태부터, 매 제거 직후까지.
+""",
+    notes="""
+유니온 파인드는 **합칠 수는 있어도 쪼갤 수는 없다.** 지우는 순서대로 따라가면 매번 처음부터 다시 만들어야 한다.
+
+거꾸로 보면 제거는 추가가 된다. 지울 간선을 모두 뺀 **마지막 상태**를 먼저 만들고, 지운 역순으로 하나씩
+되살리며 세면 각 시점의 답이 한 번씩 나온다. 마지막에 뒤집어 돌려준다.
+""",
+    drill_doc="""
+Drill.match(a, b)             // 두 정점을 같은 무리로 합쳤다
+Drill.write(t, count)         // t 시점의 연결 요소 수
+""",
+    constraints="""
+- `1 <= n <= 100_000`, 간선 `0..200_000` 개, 지우는 간선 `0..간선 수` 개
+- 간선은 서로 다른 두 정점을 잇고, 같은 쌍이 여럿 있을 수 있다
+""",
+    signature=dict(
+        name="componentsAfterRemovals",
+        parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("removals", "INT_ARRAY")],
+        returns="INT_ARRAY",
+    ),
+    groups=perf_groups(),
+    reference=_components_after_removals,
+    # 출력 한도는 그룹의 케이스들이 나눠 쓴다 — 한 케이스가 1MB 면 셋이 2MB 를 넘는다.
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 1, 2, 2, 3], [1, 0]]),
+            ("02", [3, [0, 1, 1, 2], []]),
+        ],
+        "boundary": [
+            ("01-single-vertex", [1, [], []]),
+            ("02-remove-all", [3, [0, 1, 1, 2], [0, 1]]),
+            # 같은 쌍의 간선이 둘. 하나를 지워도 아직 붙어 있다.
+            ("03-parallel-edges", [2, [0, 1, 0, 1], [0, 1]]),
+            # 순환 위의 간선은 지워도 요소 수가 그대로다.
+            ("04-cycle", [3, [0, 1, 1, 2, 2, 0], [0, 1, 2]]),
+            ("05-remove-out-of-order", [5, [0, 1, 1, 2, 2, 3, 3, 4], [2, 0, 3]]),
+            ("06-isolated-vertices", [4, [0, 1], [0]]),
+            ("07-no-edges-no-removals", [3, [], []]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _random_graph(8, 12, salt=9641), [3, 0, 7, 1]]),
+            ("02-random-medium", [200, _random_graph(200, 400, salt=9643), shuffled(range(0, 400, 3), salt=9645)]),
+            ("03-sparse", [1000, _random_graph(1000, 700, salt=9647), shuffled(range(0, 700, 2), salt=9649)]),
+            ("04-dense", [300, _random_graph(300, 2000, salt=9651), shuffled(range(2000), salt=9653)]),
+            ("05-remove-none", [500, _random_graph(500, 800, salt=9655), []]),
+        ],
+        "performance": [
+            ("01-medium", [50000, _random_graph(50000, 60000, salt=9661), shuffled(range(60000), salt=9663)]),
+            ("02-large", [100000, _random_graph(100000, 150000, salt=9665), shuffled(range(150000), salt=9667)]),
+            ("03-sparse-large", [100000, _random_graph(100000, 120000, salt=9669), shuffled(range(0, 120000, 2), salt=9671)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 남은 간선으로 마지막 상태를 만들고, 지운 역순으로 되살린다.
+fun componentsAfterRemovals(n: Int, edges: IntArray, removals: IntArray): IntArray {
+    val m = edges.size / 2
+    val removed = BooleanArray(m)
+    for (index in removals) removed[index] = true
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int {
+        var x = start
+        while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }
+        return x
+    }
+    var count = n
+    fun union(a: Int, b: Int) {
+        val ra = find(a); val rb = find(b)
+        if (ra != rb) { parent[ra] = rb; count -= 1; Drill.match(a, b) }
+    }
+    for (i in 0 until m) if (!removed[i]) union(edges[2 * i], edges[2 * i + 1])
+    val out = IntArray(removals.size + 1)
+    out[removals.size] = count
+    for (t in removals.size - 1 downTo 0) {
+        val index = removals[t]
+        union(edges[2 * index], edges[2 * index + 1])
+        out[t] = count
+        Drill.write(t, count)
+    }
+    return out
+}
+""",
+    mutants=[
+        ("keeps-removed-edges", "WRONG_ALGORITHM",
+         "마지막 상태를 만들 때 지울 간선까지 합친다. 어느 시점에서도 개수가 줄지 않는다.",
+         """
+fun componentsAfterRemovals(n: Int, edges: IntArray, removals: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    var count = n
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) { parent[ra] = rb; count -= 1 } }
+    for (i in 0 until edges.size / 2) union(edges[2 * i], edges[2 * i + 1])
+    val out = IntArray(removals.size + 1)
+    out[removals.size] = count
+    for (t in removals.size - 1 downTo 0) { val index = removals[t]; union(edges[2 * index], edges[2 * index + 1]); out[t] = count }
+    return out
+}
+"""),
+        ("forward-not-reversed", "WRONG_BRANCH",
+         "되살리는 순서대로 답을 적는다. 시간이 거꾸로 실려 나간다.",
+         """
+fun componentsAfterRemovals(n: Int, edges: IntArray, removals: IntArray): IntArray {
+    val m = edges.size / 2
+    val removed = BooleanArray(m)
+    for (index in removals) removed[index] = true
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    var count = n
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) { parent[ra] = rb; count -= 1 } }
+    for (i in 0 until m) if (!removed[i]) union(edges[2 * i], edges[2 * i + 1])
+    val out = IntArray(removals.size + 1)
+    out[0] = count
+    for (t in removals.indices) {
+        val index = removals[removals.size - 1 - t]
+        union(edges[2 * index], edges[2 * index + 1])
+        out[t + 1] = count
+    }
+    return out
+}
+"""),
+        ("drops-initial-state", "OFF_BY_ONE",
+         "제거 직후의 개수만 돌려주고 처음 상태를 빼먹는다.",
+         """
+fun componentsAfterRemovals(n: Int, edges: IntArray, removals: IntArray): IntArray {
+    val m = edges.size / 2
+    val removed = BooleanArray(m)
+    for (index in removals) removed[index] = true
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    var count = n
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) { parent[ra] = rb; count -= 1 } }
+    for (i in 0 until m) if (!removed[i]) union(edges[2 * i], edges[2 * i + 1])
+    val out = IntArray(removals.size)
+    if (removals.isNotEmpty()) out[removals.size - 1] = count
+    for (t in removals.size - 2 downTo 0) {
+        val index = removals[t + 1]
+        union(edges[2 * index], edges[2 * index + 1])
+        out[t] = count
+    }
+    return out
+}
+"""),
+        ("rebuild-each-step", "PERFORMANCE",
+         "시점마다 유니온 파인드를 새로 만들고 남은 간선을 전부 합친다. O(지운 수 * 간선 수).",
+         """
+fun componentsAfterRemovals(n: Int, edges: IntArray, removals: IntArray): IntArray {
+    val m = edges.size / 2
+    val out = IntArray(removals.size + 1)
+    val removed = BooleanArray(m)
+    for (t in 0..removals.size) {
+        val parent = IntArray(n) { it }
+        var count = n
+        fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+        for (i in 0 until m) {
+            if (removed[i]) continue
+            Drill.compare(edges[2 * i], edges[2 * i + 1])
+            val ra = find(edges[2 * i]); val rb = find(edges[2 * i + 1])
+            if (ra != rb) { parent[ra] = rb; count -= 1 }
+        }
+        out[t] = count
+        if (t < removals.size) removed[removals[t]] = true
+    }
+    return out
+}
+"""),
+    ],
+))

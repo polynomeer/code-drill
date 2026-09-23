@@ -1,0 +1,17 @@
+# zero-out-rows-and-columns 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - matrix
+  - in-place
+  - simulation
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - rotate-grid
+  - game-of-life-step
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "격자를 두 번 훑는다. 표시는 첫 행과 첫 열에"

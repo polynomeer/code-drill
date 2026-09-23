@@ -1,6 +1,6 @@
 """수학·비트 (역량: 성질을 찾아 계산을 줄이기)."""
 
-from author import Problem, standard_groups, perf_groups, randoms
+from author import Problem, standard_groups, perf_groups, randoms, flat
 
 PROBLEMS = []
 MOD = 1_000_000_007
@@ -1804,6 +1804,207 @@ fun sumOfFloorDivisions(n: Int): Int {
     var total = 0L
     for (i in 1..n) { Drill.compare(i, n); total = (total + n / i) % mod }
     return total.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 183. 이항계수를 소수로 나눈 나머지 ---------------------------------------
+
+def _binomial_mod(queries):
+    if not queries:
+        return []
+    limit = max(queries[i] for i in range(0, len(queries), 2))
+    fact = [1] * (limit + 1)
+    for i in range(1, limit + 1):
+        fact[i] = fact[i - 1] * i % MOD
+    inverse = [1] * (limit + 1)
+    inverse[limit] = pow(fact[limit], MOD - 2, MOD)
+    for i in range(limit, 0, -1):
+        inverse[i - 1] = inverse[i] * i % MOD
+    out = []
+    for i in range(0, len(queries), 2):
+        n, k = queries[i], queries[i + 1]
+        out.append(0 if k > n else fact[n] * inverse[k] % MOD * inverse[n - k] % MOD)
+    return out
+
+
+def _binomial_queries(count, high, salt):
+    n = randoms(count, 0, high, salt=salt)
+    k = randoms(count, 0, high, salt=salt + 1)
+    return flat([n[i], k[i] % (n[i] + 1)] for i in range(count))
+
+
+PROBLEMS.append(Problem(
+    id="binomial-mod-prime",
+    title="이항계수를 소수로 나눈 나머지",
+    summary="""
+질의 `queries = [n1, k1, n2, k2, ...]` 마다 서로 다른 `n` 개에서 `k` 개를 고르는 경우의 수를
+`1000000007` 로 나눈 나머지를 담은 배열을 반환한다. `k > n` 이면 `0` 이다.
+""",
+    notes="""
+경우의 수는 `n! / (k! * (n-k)!)` 인데 나머지 세계에는 나눗셈이 없다. `1000000007` 은 소수이므로 **거듭제곱이
+나눗셈을 대신한다** — 페르마 소정리로 `x` 의 역원은 `x^(p-2)` 다.
+
+질의마다 팩토리얼을 새로 곱하면 질의 수 × `n` 이다. 팩토리얼과 그 역원을 **가장 큰 `n` 까지 한 번만** 만들어
+두면 질의 하나가 곱셈 두 번이 된다. 역원도 거꾸로 한 번에 훑으면 거듭제곱 한 번으로 전부 나온다.
+""",
+    drill_doc="""
+Drill.write(q, value)         // 질의 q 의 답
+""",
+    constraints="""
+- 질의 `1..100_000` 개, `0 <= n <= 200_000`, `0 <= k <= 200_000`
+""",
+    signature=dict(name="binomialMod", parameters=[("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_binomial_mod,
+    # 출력 한도는 그룹의 케이스들이 나눠 쓴다 — 십만 개씩 세 케이스면 3MB 다.
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [("01", [[5, 2, 5, 0, 5, 5]]), ("02", [[10, 3, 4, 7]])],
+        "boundary": [
+            ("01-zero-choose-zero", [[0, 0]]),
+            ("02-k-greater-than-n", [[3, 4, 0, 1, 7, 100]]),
+            ("03-symmetry", [[100, 1, 100, 99, 100, 50]]),
+            # 나머지를 넘는 첫 자리 — 나눗셈으로 풀면 여기서 갈린다.
+            ("04-just-over-mod", [[40, 20, 41, 20]]),
+            ("05-max-n", [[200000, 100000, 200000, 199999, 200000, 0]]),
+            ("06-k-equals-n", [[12345, 12345]]),
+            ("07-single-query", [[2, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_binomial_queries(30, 20, salt=9701)]),
+            ("02-random-medium", [_binomial_queries(500, 2000, salt=9703)]),
+            ("03-random-large-n", [_binomial_queries(500, 200000, salt=9705)]),
+            ("04-small-k", [flat([n, 2] for n in randoms(500, 2, 200000, salt=9707))]),
+            ("05-k-over-n", [flat([n, n + 1] for n in randoms(200, 0, 1000, salt=9709))]),
+        ],
+        "performance": [
+            ("01-many-queries", [_binomial_queries(30000, 50000, salt=9711)]),
+            ("02-large-n", [_binomial_queries(100000, 200000, salt=9713)]),
+            ("03-max-n-repeated", [flat([200000, k] for k in randoms(100000, 0, 200000, salt=9715))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 팩토리얼과 역팩토리얼을 한 번 만들고 질의는 곱셈 둘.
+fun binomialMod(queries: IntArray): IntArray {
+    val mod = 1_000_000_007L
+    var limit = 0
+    for (i in queries.indices step 2) if (queries[i] > limit) limit = queries[i]
+    val fact = LongArray(limit + 1)
+    fact[0] = 1L
+    for (i in 1..limit) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exponent: Long): Long {
+        var result = 1L; var b = base % mod; var e = exponent
+        while (e > 0) { if (e and 1L == 1L) result = result * b % mod; b = b * b % mod; e = e shr 1 }
+        return result
+    }
+    val inverse = LongArray(limit + 1)
+    inverse[limit] = power(fact[limit], mod - 2)
+    for (i in limit downTo 1) inverse[i - 1] = inverse[i] * i % mod
+    val out = IntArray(queries.size / 2)
+    for (q in out.indices) {
+        val n = queries[2 * q]; val k = queries[2 * q + 1]
+        out[q] = if (k > n) 0 else (fact[n] * inverse[k] % mod * inverse[n - k] % mod).toInt()
+        Drill.write(q, out[q])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("integer-division", "WRONG_ALGORITHM",
+         "나머지를 취한 값끼리 나눈다. 나머지 세계에는 나눗셈이 없어 나머지가 한 번 접히는 순간 어긋난다.",
+         """
+fun binomialMod(queries: IntArray): IntArray {
+    val mod = 1_000_000_007L
+    var limit = 0
+    for (i in queries.indices step 2) if (queries[i] > limit) limit = queries[i]
+    val fact = LongArray(limit + 1)
+    fact[0] = 1L
+    for (i in 1..limit) fact[i] = fact[i - 1] * i % mod
+    val out = IntArray(queries.size / 2)
+    for (q in out.indices) {
+        val n = queries[2 * q]; val k = queries[2 * q + 1]
+        out[q] = if (k > n) 0 else (fact[n] / (fact[k] * fact[n - k] % mod) % mod).toInt()
+    }
+    return out
+}
+"""),
+        ("fermat-off-by-one", "OFF_BY_ONE",
+         "역원의 지수를 p-1 로 쓴다. 그 거듭제곱은 언제나 1 이라 나누지 않은 값이 나온다.",
+         """
+fun binomialMod(queries: IntArray): IntArray {
+    val mod = 1_000_000_007L
+    var limit = 0
+    for (i in queries.indices step 2) if (queries[i] > limit) limit = queries[i]
+    val fact = LongArray(limit + 1)
+    fact[0] = 1L
+    for (i in 1..limit) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exponent: Long): Long {
+        var result = 1L; var b = base % mod; var e = exponent
+        while (e > 0) { if (e and 1L == 1L) result = result * b % mod; b = b * b % mod; e = e shr 1 }
+        return result
+    }
+    val inverse = LongArray(limit + 1)
+    inverse[limit] = power(fact[limit], mod - 1)
+    for (i in limit downTo 1) inverse[i - 1] = inverse[i] * i % mod
+    val out = IntArray(queries.size / 2)
+    for (q in out.indices) {
+        val n = queries[2 * q]; val k = queries[2 * q + 1]
+        out[q] = if (k > n) 0 else (fact[n] * inverse[k] % mod * inverse[n - k] % mod).toInt()
+    }
+    return out
+}
+"""),
+        ("no-k-over-n-guard", "MISSING_EDGE_CASE",
+         "고를 개수가 가진 개수보다 많은 질의를 따로 보지 않는다. 없는 자리를 읽는다.",
+         """
+fun binomialMod(queries: IntArray): IntArray {
+    val mod = 1_000_000_007L
+    var limit = 0
+    for (i in queries.indices step 2) if (queries[i] > limit) limit = queries[i]
+    val fact = LongArray(limit + 1)
+    fact[0] = 1L
+    for (i in 1..limit) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exponent: Long): Long {
+        var result = 1L; var b = base % mod; var e = exponent
+        while (e > 0) { if (e and 1L == 1L) result = result * b % mod; b = b * b % mod; e = e shr 1 }
+        return result
+    }
+    val inverse = LongArray(limit + 1)
+    inverse[limit] = power(fact[limit], mod - 2)
+    for (i in limit downTo 1) inverse[i - 1] = inverse[i] * i % mod
+    val out = IntArray(queries.size / 2)
+    for (q in out.indices) {
+        val n = queries[2 * q]; val k = queries[2 * q + 1]
+        out[q] = (fact[n] * inverse[k] % mod * inverse[n - k] % mod).toInt()
+    }
+    return out
+}
+"""),
+        ("factorial-per-query", "PERFORMANCE",
+         "질의마다 팩토리얼을 처음부터 다시 곱한다. 질의 수 × n.",
+         """
+fun binomialMod(queries: IntArray): IntArray {
+    val mod = 1_000_000_007L
+    fun power(base: Long, exponent: Long): Long {
+        var result = 1L; var b = base % mod; var e = exponent
+        while (e > 0) { if (e and 1L == 1L) result = result * b % mod; b = b * b % mod; e = e shr 1 }
+        return result
+    }
+    val out = IntArray(queries.size / 2)
+    for (q in out.indices) {
+        val n = queries[2 * q]; val k = queries[2 * q + 1]
+        if (k > n) { out[q] = 0; continue }
+        var top = 1L
+        for (i in 1..n) { top = top * i % mod; Drill.compare(q, i) }
+        var bottom = 1L
+        for (i in 1..k) bottom = bottom * i % mod
+        for (i in 1..n - k) bottom = bottom * i % mod
+        out[q] = (top * power(bottom, mod - 2) % mod).toInt()
+    }
+    return out
 }
 """),
     ],

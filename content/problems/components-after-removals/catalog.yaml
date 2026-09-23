@@ -1,0 +1,18 @@
+# components-after-removals 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - union-find
+  - array
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - OPTIMIZATION
+  - CORRECTNESS
+prerequisites:
+  - connected-components
+  - islands-after-each
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "거꾸로 한 번 — 간선과 질의에 대해 거의 선형"

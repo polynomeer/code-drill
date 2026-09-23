@@ -1,0 +1,17 @@
+# pattern-132 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - stack
+  - monotonic-stack
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+prerequisites:
+  - next-greater-distance
+  - container-water
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "오른쪽에서 왼쪽으로 한 번, 각 값은 한 번 밀려난다"
