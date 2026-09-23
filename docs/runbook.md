@@ -81,6 +81,12 @@ Alertmanager `http://localhost:9093`.
 브로커를 되살리면 아웃박스가 스스로 재발행한다. 손으로 재발행하지 않는다 — 같은
 이벤트를 두 번 밀게 되고, 멱등성이 흡수하더라도 원인 추적이 어려워진다.
 
+**브로커가 죽으면 `/actuator/health` 는 DOWN 을 내지 않고 매달린다.** 액추에이터의
+RabbitMQ 지표가 연결을 새로 맺어 보고, 그 시도가 타임아웃까지 요청 스레드를 붙잡는다
+(스레드 덤프에서 `RabbitHealthIndicator.doHealthCheck` → `CachingConnectionFactory`).
+그러니 **헬스체크 타임아웃을 "앱이 죽었다"로 읽지 않는다** — 프로세스는 살아 있고
+브로커가 없는 것일 수 있다. 앱을 재기동하기 전에 위 1번부터 확인한다.
+
 ### dead-letter
 
 **증상**: `judge.*.dead` 큐에 메시지가 쌓인다. 그 제출들은 SYSTEM_ERROR 로 끝나 있다.
