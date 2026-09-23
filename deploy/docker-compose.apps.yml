@@ -22,8 +22,8 @@ services:
   # 오브젝트 스토어의 버킷과 신원 (§8.3, §11.2). 스토어가 뜬 뒤 한 번 돌고 끝난다.
   # 비밀 둘은 밖에서 준다 — 오케스트레이터(읽기·쓰기)와 Runner 노드(읽기)의 것이다.
   storage-init:
-    # 서버 이미지에 mc 가 들어 있다. 이미지를 하나 더 받지 않는다.
-    image: minio/minio:latest
+    # 서버 이미지에 mc 가 들어 있다. 이미지를 하나 더 받지 않는다. 출처와 태그는 위 compose 와 같다.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     profiles: ["apps"]
     entrypoint: ["/bin/sh", "/init.sh"]
     environment:

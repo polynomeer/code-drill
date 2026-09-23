@@ -54,7 +54,10 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio:latest
+    # Docker Hub 의 minio/minio 는 더 이상 받을 수 없다(pull access denied) — 이미 받아 둔
+    # 머신에서만 뜨고 새 머신에서는 스택이 통째로 안 선다. quay 의 같은 이미지를 태그까지
+    # 고정해 쓴다. latest 였던 유일한 이미지이기도 했다.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: codedrill
