@@ -1919,3 +1919,285 @@ fun rangeFrequency(nums: IntArray, queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 190. 건물의 윤곽선 (분할 정복) -------------------------------------------
+
+def _skyline(buildings):
+    count = len(buildings) // 3
+
+    def merge(left, right):
+        out = []
+        i = j = 0
+        hl = hr = 0
+        while i < len(left) and j < len(right):
+            if left[i][0] < right[j][0]:
+                x, hl = left[i]
+                i += 1
+            elif left[i][0] > right[j][0]:
+                x, hr = right[j]
+                j += 1
+            else:
+                x = left[i][0]
+                hl = left[i][1]
+                hr = right[j][1]
+                i += 1
+                j += 1
+            height = max(hl, hr)
+            if not out or out[-1][1] != height:
+                out.append((x, height))
+        for rest in (left[i:], right[j:]):
+            for x, height in rest:
+                if not out or out[-1][1] != height:
+                    out.append((x, height))
+        return out
+
+    def solve(lo, hi):
+        if lo == hi:
+            return [(buildings[3 * lo], buildings[3 * lo + 2]), (buildings[3 * lo + 1], 0)]
+        mid = (lo + hi) // 2
+        return merge(solve(lo, mid), solve(mid + 1, hi))
+
+    if count == 0:
+        return []
+    return flat([x, h] for x, h in solve(0, count - 1))
+
+
+def _random_buildings(count, span, height, salt):
+    left = randoms(count, 1, span, salt=salt)
+    width = randoms(count, 1, max(2, span // 50), salt=salt + 1)
+    tall = randoms(count, 1, height, salt=salt + 2)
+    return flat([left[i], left[i] + width[i], tall[i]] for i in range(count))
+
+
+PROBLEMS.append(Problem(
+    id="skyline-outline",
+    title="건물의 윤곽선",
+    summary="""
+건물들이 `buildings = [l1, r1, h1, l2, r2, h2, ...]` 로 주어진다. 건물 하나는 `x` 가 `l` 이상 `r` **미만**인
+구간에 높이 `h` 로 서 있다. 겹쳐 선 건물들을 멀리서 봤을 때의 **윤곽선**을 `[x1, h1, x2, h2, ...]` 로
+반환한다 — 높이가 바뀌는 자리의 `x` 와 그 자리부터의 높이이고, `x` 가 커지는 순서다. 마지막 높이는 `0` 이다.
+
+같은 높이가 이어지는 점은 넣지 않는다. 건물이 없으면 빈 배열이다.
+""",
+    notes="""
+윤곽선 둘을 합치는 일은 **정렬된 두 목록을 훑는 것**이다 — `x` 가 작은 쪽을 꺼내 그쪽 높이를 갱신하고,
+두 높이 중 큰 값이 그 자리의 높이다. 직전 높이와 같으면 점을 넣지 않는다.
+
+합칠 수 있으면 나눌 수 있다. 건물 하나의 윤곽선은 `[(l, h), (r, 0)]` 이고, 절반씩 나눠 푼 뒤 합치면
+`n log n` 이다. 좌표마다 모든 건물을 훑으면 `n²` 이다.
+""",
+    drill_doc="""
+Drill.write(x, height)        // 윤곽선에 점을 찍었다
+Drill.compare(left, right)    // 두 윤곽선의 다음 점을 견줬다
+""",
+    constraints="""
+- 건물 `0..50_000` 개, `1 <= l < r <= 1_000_000_000`, `1 <= h <= 1_000_000_000`
+""",
+    signature=dict(name="skyline", parameters=[("buildings", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_skyline,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 16000000},
+    cases={
+        "sample": [
+            ("01", [[1, 3, 3, 2, 4, 4]]),
+            ("02", [[1, 5, 2]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-single", [[2, 9, 10]]),
+            # 나란히 붙은 같은 높이 — 점이 둘이 아니라 하나다.
+            ("03-touching-same-height", [[1, 3, 5, 3, 6, 5]]),
+            ("04-nested", [[1, 10, 3, 3, 5, 9]]),
+            ("05-identical", [[1, 4, 7, 1, 4, 7]]),
+            # 한 건물이 다른 건물을 완전히 덮는다.
+            ("06-covering", [[1, 10, 9, 2, 3, 4]]),
+            ("07-adjacent-gap", [[1, 2, 5, 4, 6, 5]]),
+            ("08-same-left", [[1, 5, 3, 1, 9, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_buildings(8, 30, 20, salt=9861)]),
+            ("02-random-medium", [_random_buildings(200, 1000, 1000, salt=9863)]),
+            ("03-random-wide", [_random_buildings(500, 1000000000, 1000000000, salt=9865)]),
+            ("04-staircase", [flat([i, i + 2, i] for i in range(1, 300))]),
+            ("05-same-height", [flat([i, i + 3, 50] for i in range(1, 200))]),
+        ],
+        "performance": [
+            ("01-medium", [_random_buildings(10000, 1000000, 1000000, salt=9871)]),
+            ("02-large", [_random_buildings(50000, 1000000000, 1000000000, salt=9873)]),
+            ("03-staircase-large", [flat([i, i + 2, 50000 - i] for i in range(1, 50000))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 절반씩 풀고 두 윤곽선을 훑어 합친다.
+fun skyline(buildings: IntArray): IntArray {
+    val count = buildings.size / 3
+    if (count == 0) return IntArray(0)
+
+    fun merge(left: ArrayList<IntArray>, right: ArrayList<IntArray>): ArrayList<IntArray> {
+        val out = ArrayList<IntArray>()
+        var i = 0; var j = 0; var hl = 0; var hr = 0
+        fun push(x: Int, h: Int) { if (out.isEmpty() || out[out.size - 1][1] != h) { out.add(intArrayOf(x, h)); Drill.write(x, h) } }
+        while (i < left.size && j < right.size) {
+            Drill.compare(left[i][0], right[j][0])
+            val x: Int
+            if (left[i][0] < right[j][0]) { x = left[i][0]; hl = left[i][1]; i += 1 }
+            else if (left[i][0] > right[j][0]) { x = right[j][0]; hr = right[j][1]; j += 1 }
+            else { x = left[i][0]; hl = left[i][1]; hr = right[j][1]; i += 1; j += 1 }
+            push(x, if (hl > hr) hl else hr)
+        }
+        while (i < left.size) { push(left[i][0], left[i][1]); i += 1 }
+        while (j < right.size) { push(right[j][0], right[j][1]); j += 1 }
+        return out
+    }
+
+    fun solve(lo: Int, hi: Int): ArrayList<IntArray> {
+        if (lo == hi) {
+            val one = ArrayList<IntArray>(2)
+            one.add(intArrayOf(buildings[3 * lo], buildings[3 * lo + 2]))
+            one.add(intArrayOf(buildings[3 * lo + 1], 0))
+            return one
+        }
+        val mid = (lo + hi) / 2
+        return merge(solve(lo, mid), solve(mid + 1, hi))
+    }
+
+    val points = solve(0, count - 1)
+    val out = IntArray(points.size * 2)
+    for (k in points.indices) { out[2 * k] = points[k][0]; out[2 * k + 1] = points[k][1] }
+    return out
+}
+""",
+    mutants=[
+        ("keeps-equal-heights", "MISSING_EDGE_CASE",
+         "직전 높이와 같아도 점을 찍는다. 윤곽선은 높이가 바뀌는 자리만 담는다.",
+         """
+fun skyline(buildings: IntArray): IntArray {
+    val count = buildings.size / 3
+    if (count == 0) return IntArray(0)
+    fun merge(left: ArrayList<IntArray>, right: ArrayList<IntArray>): ArrayList<IntArray> {
+        val out = ArrayList<IntArray>()
+        var i = 0; var j = 0; var hl = 0; var hr = 0
+        while (i < left.size && j < right.size) {
+            val x: Int
+            if (left[i][0] < right[j][0]) { x = left[i][0]; hl = left[i][1]; i += 1 }
+            else if (left[i][0] > right[j][0]) { x = right[j][0]; hr = right[j][1]; j += 1 }
+            else { x = left[i][0]; hl = left[i][1]; hr = right[j][1]; i += 1; j += 1 }
+            out.add(intArrayOf(x, if (hl > hr) hl else hr))
+        }
+        while (i < left.size) { out.add(left[i]); i += 1 }
+        while (j < right.size) { out.add(right[j]); j += 1 }
+        return out
+    }
+    fun solve(lo: Int, hi: Int): ArrayList<IntArray> {
+        if (lo == hi) {
+            val one = ArrayList<IntArray>(2)
+            one.add(intArrayOf(buildings[3 * lo], buildings[3 * lo + 2]))
+            one.add(intArrayOf(buildings[3 * lo + 1], 0))
+            return one
+        }
+        val mid = (lo + hi) / 2
+        return merge(solve(lo, mid), solve(mid + 1, hi))
+    }
+    val points = solve(0, count - 1)
+    val out = IntArray(points.size * 2)
+    for (k in points.indices) { out[2 * k] = points[k][0]; out[2 * k + 1] = points[k][1] }
+    return out
+}
+"""),
+        ("equal-x-takes-one-side", "WRONG_BRANCH",
+         "두 윤곽선의 x 가 같을 때 한쪽만 꺼낸다. 다른 쪽의 높이 변화가 한 점 늦게 반영된다.",
+         """
+fun skyline(buildings: IntArray): IntArray {
+    val count = buildings.size / 3
+    if (count == 0) return IntArray(0)
+    fun merge(left: ArrayList<IntArray>, right: ArrayList<IntArray>): ArrayList<IntArray> {
+        val out = ArrayList<IntArray>()
+        var i = 0; var j = 0; var hl = 0; var hr = 0
+        fun push(x: Int, h: Int) { if (out.isEmpty() || out[out.size - 1][1] != h) out.add(intArrayOf(x, h)) }
+        while (i < left.size && j < right.size) {
+            val x: Int
+            if (left[i][0] <= right[j][0]) { x = left[i][0]; hl = left[i][1]; i += 1 }
+            else { x = right[j][0]; hr = right[j][1]; j += 1 }
+            push(x, if (hl > hr) hl else hr)
+        }
+        while (i < left.size) { push(left[i][0], left[i][1]); i += 1 }
+        while (j < right.size) { push(right[j][0], right[j][1]); j += 1 }
+        return out
+    }
+    fun solve(lo: Int, hi: Int): ArrayList<IntArray> {
+        if (lo == hi) {
+            val one = ArrayList<IntArray>(2)
+            one.add(intArrayOf(buildings[3 * lo], buildings[3 * lo + 2]))
+            one.add(intArrayOf(buildings[3 * lo + 1], 0))
+            return one
+        }
+        val mid = (lo + hi) / 2
+        return merge(solve(lo, mid), solve(mid + 1, hi))
+    }
+    val points = solve(0, count - 1)
+    val out = IntArray(points.size * 2)
+    for (k in points.indices) { out[2 * k] = points[k][0]; out[2 * k + 1] = points[k][1] }
+    return out
+}
+"""),
+        ("right-edge-inclusive", "OFF_BY_ONE",
+         "건물이 오른쪽 끝 좌표까지 서 있다고 본다. 구간은 오른쪽이 열려 있다.",
+         """
+fun skyline(buildings: IntArray): IntArray {
+    val count = buildings.size / 3
+    if (count == 0) return IntArray(0)
+    fun merge(left: ArrayList<IntArray>, right: ArrayList<IntArray>): ArrayList<IntArray> {
+        val out = ArrayList<IntArray>()
+        var i = 0; var j = 0; var hl = 0; var hr = 0
+        fun push(x: Int, h: Int) { if (out.isEmpty() || out[out.size - 1][1] != h) out.add(intArrayOf(x, h)) }
+        while (i < left.size && j < right.size) {
+            val x: Int
+            if (left[i][0] < right[j][0]) { x = left[i][0]; hl = left[i][1]; i += 1 }
+            else if (left[i][0] > right[j][0]) { x = right[j][0]; hr = right[j][1]; j += 1 }
+            else { x = left[i][0]; hl = left[i][1]; hr = right[j][1]; i += 1; j += 1 }
+            push(x, if (hl > hr) hl else hr)
+        }
+        while (i < left.size) { push(left[i][0], left[i][1]); i += 1 }
+        while (j < right.size) { push(right[j][0], right[j][1]); j += 1 }
+        return out
+    }
+    fun solve(lo: Int, hi: Int): ArrayList<IntArray> {
+        if (lo == hi) {
+            val one = ArrayList<IntArray>(2)
+            one.add(intArrayOf(buildings[3 * lo], buildings[3 * lo + 2]))
+            one.add(intArrayOf(buildings[3 * lo + 1] + 1, 0))
+            return one
+        }
+        val mid = (lo + hi) / 2
+        return merge(solve(lo, mid), solve(mid + 1, hi))
+    }
+    val points = solve(0, count - 1)
+    val out = IntArray(points.size * 2)
+    for (k in points.indices) { out[2 * k] = points[k][0]; out[2 * k + 1] = points[k][1] }
+    return out
+}
+"""),
+        ("scan-every-coordinate", "PERFORMANCE",
+         "좌표마다 모든 건물을 훑어 그 자리의 높이를 구한다. O(n^2).",
+         """
+fun skyline(buildings: IntArray): IntArray {
+    val count = buildings.size / 3
+    if (count == 0) return IntArray(0)
+    val xs = java.util.TreeSet<Int>()
+    for (i in 0 until count) { xs.add(buildings[3 * i]); xs.add(buildings[3 * i + 1]) }
+    val out = ArrayList<Int>()
+    var last = -1
+    for (x in xs) {
+        var best = 0
+        for (i in 0 until count) {
+            Drill.compare(x, i)
+            if (buildings[3 * i] <= x && x < buildings[3 * i + 1] && buildings[3 * i + 2] > best) best = buildings[3 * i + 2]
+        }
+        if (best != last) { out.add(x); out.add(best); last = best }
+    }
+    return IntArray(out.size) { out[it] }
+}
+"""),
+    ],
+))

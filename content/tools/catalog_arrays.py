@@ -4273,3 +4273,158 @@ fun applyRangeUpdates(n: Int, updates: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 186. 빠진 첫 양의 정수 (제자리 자리 맞추기) ---------------------------------------------------
+
+def _first_missing_positive(nums):
+    seen = set(nums)
+    n = len(nums)
+    for candidate in range(1, n + 2):
+        if candidate not in seen:
+            return candidate
+    return n + 1
+
+
+PROBLEMS.append(Problem(
+    id="first-missing-positive",
+    title="빠진 첫 양의 정수",
+    summary="""
+정수 배열 `nums` 에서 **나타나지 않는 가장 작은 양의 정수**를 반환한다. 음수와 0 과 중복이 섞여 있을 수
+있고, 정렬돼 있지 않다.
+""",
+    notes="""
+길이가 `n` 이면 답은 반드시 `1..n+1` 안에 있다 — 그 밖의 값은 답을 밀어낼 수 없다. 그래서 **범위 밖의 값은
+볼 필요가 없고**, 볼 값은 `n` 개뿐이다.
+
+배열 자신을 표로 쓴다. 값 `v` 가 `1..n` 이면 `v` 를 `v-1` 번 자리로 보내는 맞바꾸기를 자리마다 반복한다.
+보낼 자리에 이미 같은 값이 있으면 멈춘다 — 안 그러면 중복에서 영원히 맞바꾼다. 다 맞춘 뒤 `i+1` 이 아닌
+첫 자리가 답이고, 없으면 `n+1` 이다.
+""",
+    drill_doc="""
+Drill.swap(i, j)              // 값을 제자리로 보냈다
+Drill.visit(i, value)         // 자리와 값이 맞는지 확인했다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`, `-1_000_000_000 <= nums[i] <= 1_000_000_000`
+""",
+    signature=dict(name="firstMissingPositive", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    # 후보마다 배열을 훑는 오답의 안쪽 반복은 정수 비교뿐이라 JIT 가 벡터화한다 — 이십만 개
+    # 순열에서도 한도의 1.8배에 그쳤다. 정답이 한도의 2% 를 쓰므로 성능 그룹의 시계를 조인다.
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_first_missing_positive,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[3, 4, -1, 1]]), ("02", [[1, 2, 0]])],
+        "boundary": [
+            ("01-single-one", [[1]]),
+            ("02-single-other", [[2]]),
+            # 1..n 이 꽉 차 있으면 답은 n+1 이다.
+            ("03-full", [[1, 2, 3, 4]]),
+            ("04-duplicates", [[1, 1, 2, 2]]),
+            ("05-all-negative", [[-3, -1, -7]]),
+            ("06-out-of-range-values", [[1000000000, -1000000000, 2]]),
+            ("07-reverse-sorted", [[5, 4, 3, 2, 1]]),
+            ("08-zeros", [[0, 0, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, -5, 25, salt=9761)]),
+            ("02-random-medium", [randoms(2000, -1000, 3000, salt=9763)]),
+            ("03-dense-permutation", [shuffled(range(1, 3001), salt=9765)]),
+            ("04-permutation-with-hole", [shuffled([v for v in range(1, 3001) if v != 1500], salt=9767) + [7000]]),
+            ("05-wide-values", [randoms(3000, -1000000000, 1000000000, salt=9769)]),
+        ],
+        "performance": [
+            ("01-permutation", [shuffled(range(1, 100001), salt=9771)]),
+            # 1..n 이 꽉 차 있어 답이 마지막에야 나온다 — 후보마다 배열을 훑는 풀이가 안 끊긴다.
+            ("02-full-large", [shuffled(range(1, 200001), salt=9773)]),
+            ("03-random-large", [randoms(200000, -1000000000, 1000000000, salt=9775)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 값 v 를 v-1 번 자리로 보내고, 자리와 값이 어긋난 첫 곳을 찾는다.
+fun firstMissingPositive(nums: IntArray): Int {
+    val n = nums.size
+    for (i in 0 until n) {
+        while (nums[i] in 1..n && nums[nums[i] - 1] != nums[i]) {
+            val target = nums[i] - 1
+            val temp = nums[target]
+            nums[target] = nums[i]
+            nums[i] = temp
+            Drill.swap(i, target)
+        }
+    }
+    for (i in 0 until n) {
+        Drill.visit(i, nums[i])
+        if (nums[i] != i + 1) return i + 1
+    }
+    return n + 1
+}
+""",
+    mutants=[
+        ("no-duplicate-guard", "MISSING_EDGE_CASE",
+         "보낼 자리에 같은 값이 이미 있는지 보지 않는다. 중복이 있으면 두 자리를 영원히 맞바꾼다.",
+         """
+fun firstMissingPositive(nums: IntArray): Int {
+    val n = nums.size
+    for (i in 0 until n) {
+        while (nums[i] in 1..n && nums[i] != i + 1) {
+            val target = nums[i] - 1
+            val temp = nums[target]
+            nums[target] = nums[i]
+            nums[i] = temp
+        }
+    }
+    for (i in 0 until n) if (nums[i] != i + 1) return i + 1
+    return n + 1
+}
+"""),
+        ("starts-at-zero", "OFF_BY_ONE",
+         "0 부터 세어 자리와 값을 맞춘다. 양의 정수만 세는 문제다.",
+         """
+fun firstMissingPositive(nums: IntArray): Int {
+    val n = nums.size
+    for (i in 0 until n) {
+        while (nums[i] in 0 until n && nums[nums[i]] != nums[i]) {
+            val target = nums[i]
+            val temp = nums[target]
+            nums[target] = nums[i]
+            nums[i] = temp
+        }
+    }
+    for (i in 0 until n) if (nums[i] != i) return i
+    return n
+}
+"""),
+        ("no-full-array-answer", "WRONG_BRANCH",
+         "자리가 다 맞았을 때 n+1 대신 n 을 돌려준다. 1..n 이 꽉 찬 입력에서 어긋난다.",
+         """
+fun firstMissingPositive(nums: IntArray): Int {
+    val n = nums.size
+    for (i in 0 until n) {
+        while (nums[i] in 1..n && nums[nums[i] - 1] != nums[i]) {
+            val target = nums[i] - 1
+            val temp = nums[target]
+            nums[target] = nums[i]
+            nums[i] = temp
+        }
+    }
+    for (i in 0 until n) if (nums[i] != i + 1) return i + 1
+    return n
+}
+"""),
+        ("candidate-scans-array", "PERFORMANCE",
+         "1 부터 후보를 올리며 후보마다 배열 전체를 훑는다. O(n^2).",
+         """
+fun firstMissingPositive(nums: IntArray): Int {
+    var candidate = 1
+    while (true) {
+        var found = false
+        for (v in nums) { Drill.compare(candidate, v); if (v == candidate) { found = true; break } }
+        if (!found) return candidate
+        candidate += 1
+    }
+}
+"""),
+    ],
+))

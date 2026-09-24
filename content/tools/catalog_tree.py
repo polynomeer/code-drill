@@ -1947,3 +1947,170 @@ fun treeCentroid(parent: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 188. 모든 정점까지의 거리 합 (루트 옮기기) -------------------------------
+
+def _distance_sums(parent):
+    n = len(parent)
+    size = [1] * n
+    # parent[i] < i 라 뒤에서 앞으로 한 번이면 서브트리 크기와 그 안의 깊이 합이 나온다.
+    inside = [0] * n
+    for i in range(n - 1, 0, -1):
+        p = parent[i]
+        size[p] += size[i]
+        inside[p] += inside[i] + size[i]
+    out = [0] * n
+    out[0] = inside[0]
+    # 루트를 부모에서 자식으로 옮기면 서브트리 안은 한 걸음 가까워지고 밖은 한 걸음 멀어진다.
+    for i in range(1, n):
+        out[i] = out[parent[i]] + n - 2 * size[i]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="distance-sum-in-tree",
+    title="모든 정점까지의 거리 합",
+    summary="""
+정점 `n` 개의 트리가 부모 배열 `parent` 로 주어진다(`parent[i]` 가 `i` 의 부모, 루트는 `-1`,
+`parent[i] < i`). 정점마다 **자신에서 다른 모든 정점까지 거리의 합**을 담은 배열을 반환한다.
+거리는 지나는 간선의 수다.
+""",
+    notes="""
+정점마다 탐색하면 `n²` 이다. 한 정점의 답에서 **이웃의 답이 바로 나온다** — 루트를 부모에서 자식으로
+옮기면 그 자식의 서브트리에 있는 정점들은 한 걸음 가까워지고, 나머지는 한 걸음 멀어진다. 즉
+`답[자식] = 답[부모] + (n - 서브트리크기[자식]) - 서브트리크기[자식]` 이다.
+
+그래서 필요한 것은 둘뿐이다 — 서브트리 크기, 그리고 루트 하나의 답. `parent[i] < i` 라 둘 다 배열을 한 번씩
+훑어 얻는다.
+""",
+    drill_doc="""
+Drill.visit(v, size)          // v 의 서브트리 크기가 정해졌다
+Drill.write(v, total)         // v 의 거리 합
+""",
+    constraints="""
+- `1 <= n <= 50_000`, `parent[0] = -1`, `1 <= i` 에 대해 `0 <= parent[i] < i`
+""",
+    signature=dict(name="distanceSums", parameters=[("parent", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_distance_sums,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", [[-1, 0, 0, 1, 1, 2, 2]]), ("02", [[-1, 0, 1]])],
+        "boundary": [
+            ("01-single", [[-1]]),
+            ("02-two", [[-1, 0]]),
+            ("03-star", [[-1, 0, 0, 0, 0]]),
+            # 사슬의 양 끝이 가장 크고 가운데가 가장 작다.
+            ("04-chain", [[-1, 0, 1, 2, 3]]),
+            ("05-lopsided", [[-1, 0, 1, 1, 3, 3, 3]]),
+            ("06-two-branches", [[-1, 0, 0, 1, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_random_parents(12, salt=9801)]),
+            ("02-random-medium", [_random_parents(400, salt=9803)]),
+            ("03-random-large", [_random_parents(6000, salt=9805)]),
+            ("04-chain-then-fan", [_deep_chain_then_fan_parents(500)]),
+            ("05-deep-chain", [[-1] + list(range(0, 999))]),
+        ],
+        "performance": [
+            ("01-small", [_random_parents(10000, salt=9811)]),
+            ("02-chain-then-fan", [_deep_chain_then_fan_parents(30000)]),
+            ("03-large", [_random_parents(50000, salt=9813)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 서브트리 크기 한 번, 루트 하나의 답, 그리고 루트 옮기기.
+fun distanceSums(parent: IntArray): IntArray {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    val inside = LongArray(n)
+    for (i in n - 1 downTo 1) {
+        val p = parent[i]
+        size[p] += size[i]
+        inside[p] += inside[i] + size[i]
+        Drill.visit(p, size[p])
+    }
+    val out = IntArray(n)
+    out[0] = inside[0].toInt()
+    for (i in 1 until n) {
+        out[i] = out[parent[i]] + n - 2 * size[i]
+        Drill.write(i, out[i])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("subtree-only", "WRONG_ALGORITHM",
+         "자기 서브트리 안의 거리만 더한다. 위로 올라가는 쪽을 빼먹는다.",
+         """
+fun distanceSums(parent: IntArray): IntArray {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    val inside = LongArray(n)
+    for (i in n - 1 downTo 1) { val p = parent[i]; size[p] += size[i]; inside[p] += inside[i] + size[i] }
+    return IntArray(n) { inside[it].toInt() }
+}
+"""),
+        ("reroot-sign-flipped", "WRONG_BRANCH",
+         "루트를 옮길 때 가까워지는 쪽과 멀어지는 쪽을 바꿔 쓴다.",
+         """
+fun distanceSums(parent: IntArray): IntArray {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    val inside = LongArray(n)
+    for (i in n - 1 downTo 1) { val p = parent[i]; size[p] += size[i]; inside[p] += inside[i] + size[i] }
+    val out = IntArray(n)
+    out[0] = inside[0].toInt()
+    for (i in 1 until n) out[i] = out[parent[i]] - n + 2 * size[i]
+    return out
+}
+"""),
+        ("counts-children-not-subtree", "MISSING_EDGE_CASE",
+         "서브트리 크기 대신 자식 수를 쓴다. 손자 아래가 세어지지 않는다.",
+         """
+fun distanceSums(parent: IntArray): IntArray {
+    val n = parent.size
+    val size = IntArray(n) { 1 }
+    val children = IntArray(n)
+    val inside = LongArray(n)
+    for (i in n - 1 downTo 1) { val p = parent[i]; size[p] += size[i]; children[p] += 1; inside[p] += inside[i] + size[i] }
+    val out = IntArray(n)
+    out[0] = inside[0].toInt()
+    for (i in 1 until n) out[i] = out[parent[i]] + n - 2 * (children[i] + 1)
+    return out
+}
+"""),
+        ("search-from-every-vertex", "PERFORMANCE",
+         "정점마다 트리를 한 번씩 훑는다. O(n^2).",
+         """
+fun distanceSums(parent: IntArray): IntArray {
+    val n = parent.size
+    val head = IntArray(n) { -1 }
+    val next = IntArray(n)
+    for (i in n - 1 downTo 1) { next[i] = head[parent[i]]; head[parent[i]] = i }
+    val out = IntArray(n)
+    val stack = IntArray(n)
+    val depth = IntArray(n)
+    for (start in 0 until n) {
+        var total = 0L
+        var top = 0
+        stack[top] = start; depth[start] = 0; top += 1
+        val seen = IntArray(n) { -1 }
+        seen[start] = 0
+        while (top > 0) {
+            val v = stack[--top]
+            Drill.compare(start, v)
+            total += depth[v]
+            var c = head[v]
+            while (c != -1) { if (seen[c] == -1) { seen[c] = 0; depth[c] = depth[v] + 1; stack[top++] = c }; c = next[c] }
+            val p = parent[v]
+            if (p != -1 && seen[p] == -1) { seen[p] = 0; depth[p] = depth[v] + 1; stack[top++] = p }
+        }
+        out[start] = total.toInt()
+    }
+    return out
+}
+"""),
+    ],
+))

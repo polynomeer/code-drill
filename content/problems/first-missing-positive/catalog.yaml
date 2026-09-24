@@ -1,0 +1,18 @@
+# first-missing-positive 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - in-place
+  - hash-map
+competencies:
+  - MODELING
+  - CONSTRAINTS
+  - EDGE_CASES
+  - OPTIMIZATION
+prerequisites:
+  - missing-number
+  - sort-colors
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "값을 제자리로 보내고 한 번 더 훑는다"

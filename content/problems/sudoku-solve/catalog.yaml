@@ -1,0 +1,18 @@
+# sudoku-solve 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - backtracking
+  - matrix
+  - recursion
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - CORRECTNESS
+  - OPTIMIZATION
+prerequisites:
+  - n-queens-count
+  - beautiful-arrangement-count
+complexity:
+  time: EXPONENTIAL
+  space: CONSTANT
+  note: "가지치기가 사실상의 비용을 정한다"

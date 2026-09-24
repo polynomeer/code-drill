@@ -2038,3 +2038,306 @@ fun combinationSumCount(candidates: IntArray, target: Int): Int {
 """),
     ],
 ))
+
+
+# --- 189. 스도쿠 채우기 -------------------------------------------------------
+
+def _sudoku_solve(board):
+    grid = [row[:] for row in board]
+    rows = [0] * 9
+    cols = [0] * 9
+    boxes = [0] * 9
+    blanks = []
+    for r in range(9):
+        for c in range(9):
+            v = grid[r][c]
+            if v == 0:
+                blanks.append((r, c))
+            else:
+                bit = 1 << v
+                rows[r] |= bit
+                cols[c] |= bit
+                boxes[(r // 3) * 3 + c // 3] |= bit
+
+    def go(k):
+        if k == len(blanks):
+            return True
+        r, c = blanks[k]
+        b = (r // 3) * 3 + c // 3
+        for v in range(1, 10):
+            bit = 1 << v
+            if rows[r] & bit or cols[c] & bit or boxes[b] & bit:
+                continue
+            rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit; grid[r][c] = v
+            if go(k + 1):
+                return True
+            rows[r] ^= bit; cols[c] ^= bit; boxes[b] ^= bit; grid[r][c] = 0
+        return False
+
+    go(0)
+    return grid
+
+
+def _sudoku_solution_count(board, cap=2):
+    """해의 개수를 [cap] 까지만 센다. 케이스가 '해가 하나뿐'인지 확인하는 데만 쓴다."""
+    rows = [0] * 9
+    cols = [0] * 9
+    boxes = [0] * 9
+    blanks = []
+    for r in range(9):
+        for c in range(9):
+            v = board[r][c]
+            if v == 0:
+                blanks.append((r, c))
+            else:
+                bit = 1 << v
+                rows[r] |= bit; cols[c] |= bit; boxes[(r // 3) * 3 + c // 3] |= bit
+    found = 0
+
+    def go(k):
+        nonlocal found
+        if k == len(blanks):
+            found += 1
+            return found >= cap
+        r, c = blanks[k]
+        b = (r // 3) * 3 + c // 3
+        for v in range(1, 10):
+            bit = 1 << v
+            if rows[r] & bit or cols[c] & bit or boxes[b] & bit:
+                continue
+            rows[r] |= bit; cols[c] |= bit; boxes[b] |= bit
+            if go(k + 1):
+                return True
+            rows[r] ^= bit; cols[c] ^= bit; boxes[b] ^= bit
+        return False
+
+    go(0)
+    return found
+
+
+def _sudoku_puzzle(blanks, salt):
+    """해가 하나뿐인 스도쿠를 결정적으로 만든다 — 완성판에서 칸을 지우되, 지워서 해가 둘이 되면 되돌린다."""
+    digits = [d for _, d in sorted(zip(randoms(9, 0, 10 ** 9, salt=salt), range(1, 10)))]
+    band = randoms(6, 0, 10 ** 9, salt=salt + 1)
+    order = sorted(range(9), key=lambda r: (r // 3, band[r % 6]))
+    grid = [[digits[(3 * (rr % 3) + rr // 3 + c) % 9] for c in range(9)] for rr in order]
+    cells = [c for _, c in sorted(zip(randoms(81, 0, 10 ** 9, salt=salt + 2), range(81)))]
+    removed = 0
+    for cell in cells:
+        if removed >= blanks:
+            break
+        r, c = divmod(cell, 9)
+        keep = grid[r][c]
+        grid[r][c] = 0
+        if _sudoku_solution_count(grid) != 1:
+            grid[r][c] = keep
+        else:
+            removed += 1
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="sudoku-solve",
+    title="스도쿠 채우기",
+    summary="""
+`9 x 9` 스도쿠 판 `board` 가 주어진다. `0` 은 빈칸이다. 규칙을 지키도록 빈칸을 채운 판을 반환한다 —
+각 행, 각 열, 그리고 `3 x 3` 상자 아홉 개가 각각 `1..9` 를 한 번씩 담아야 한다. 해는 하나뿐이다.
+""",
+    notes="""
+빈칸에 값을 하나 놓고 다음 빈칸으로 간다. 막히면 **놓은 값을 지우고** 다음 후보로 돌아온다 — 되돌리기를
+빠뜨리면 실패한 시도가 판에 남아 뒤가 전부 어긋난다.
+
+후보를 고를 때마다 행·열·상자를 훑으면 판 하나에 수십만 번이다. 세 곳의 "이미 쓴 숫자"를 비트로 들고
+다니면 후보 검사가 비트 연산 셋이다. 그리고 **놓기 전에** 검사해야 한다 — 다 놓고 나서 확인하면 9^빈칸이다.
+""",
+    drill_doc="""
+Drill.write(index, value)     // 행 우선 번호 index 칸에 값을 놓았다
+Drill.visit(index, 0)         // 그 칸을 되돌렸다
+""",
+    constraints="""
+- 판은 언제나 `9 x 9`, 값은 `0..9`, 주어진 값끼리는 규칙을 어기지 않는다
+- 해가 정확히 하나인 판만 주어진다
+""",
+    signature=dict(name="solveSudoku", parameters=[("board", "INT_MATRIX")], returns="INT_MATRIX"),
+    groups=perf_groups(),
+    reference=_sudoku_solve,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [
+            ("01", [_sudoku_puzzle(28, salt=9821)]),
+            ("02", [_sudoku_puzzle(34, salt=9823)]),
+        ],
+        "boundary": [
+            # 이미 다 찬 판 — 그대로 돌려준다.
+            ("01-full", [_sudoku_puzzle(0, salt=9825)]),
+            ("02-one-blank", [_sudoku_puzzle(1, salt=9827)]),
+            ("03-two-blanks", [_sudoku_puzzle(2, salt=9829)]),
+            ("04-row-blank", [_sudoku_puzzle(9, salt=9831)]),
+            ("05-few", [_sudoku_puzzle(20, salt=9833)]),
+            ("06-half", [_sudoku_puzzle(40, salt=9835)]),
+        ],
+        "hidden": [
+            ("01-random-30", [_sudoku_puzzle(30, salt=9841)]),
+            ("02-random-38", [_sudoku_puzzle(38, salt=9843)]),
+            ("03-random-45", [_sudoku_puzzle(45, salt=9845)]),
+            ("04-random-48", [_sudoku_puzzle(48, salt=9847)]),
+        ],
+        "performance": [
+            ("01-hard-52", [_sudoku_puzzle(52, salt=9851)]),
+            ("02-hard-54", [_sudoku_puzzle(54, salt=9853)]),
+            ("03-hard-55", [_sudoku_puzzle(55, salt=9855)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 빈칸마다 후보를 놓고, 막히면 되돌린다. 후보 검사는 비트 셋.
+fun solveSudoku(board: Array<IntArray>): Array<IntArray> {
+    val rows = IntArray(9)
+    val cols = IntArray(9)
+    val boxes = IntArray(9)
+    val blanks = ArrayList<Int>()
+    for (r in 0 until 9) for (c in 0 until 9) {
+        val v = board[r][c]
+        if (v == 0) blanks.add(r * 9 + c)
+        else { val bit = 1 shl v; rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; boxes[(r / 3) * 3 + c / 3] = boxes[(r / 3) * 3 + c / 3] or bit }
+    }
+    fun go(k: Int): Boolean {
+        if (k == blanks.size) return true
+        val cell = blanks[k]
+        val r = cell / 9
+        val c = cell % 9
+        val b = (r / 3) * 3 + c / 3
+        for (v in 1..9) {
+            val bit = 1 shl v
+            if (rows[r] and bit != 0 || cols[c] and bit != 0 || boxes[b] and bit != 0) continue
+            rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; boxes[b] = boxes[b] or bit
+            board[r][c] = v
+            Drill.write(cell, v)
+            if (go(k + 1)) return true
+            rows[r] = rows[r] xor bit; cols[c] = cols[c] xor bit; boxes[b] = boxes[b] xor bit
+            board[r][c] = 0
+            Drill.visit(cell, 0)
+        }
+        return false
+    }
+    go(0)
+    return board
+}
+""",
+    mutants=[
+        ("ignores-box", "WRONG_BRANCH",
+         "행과 열만 보고 3 x 3 상자는 보지 않는다. 상자 안에서 숫자가 겹친다.",
+         """
+fun solveSudoku(board: Array<IntArray>): Array<IntArray> {
+    val rows = IntArray(9); val cols = IntArray(9)
+    val blanks = ArrayList<Int>()
+    for (r in 0 until 9) for (c in 0 until 9) {
+        val v = board[r][c]
+        if (v == 0) blanks.add(r * 9 + c)
+        else { val bit = 1 shl v; rows[r] = rows[r] or bit; cols[c] = cols[c] or bit }
+    }
+    fun go(k: Int): Boolean {
+        if (k == blanks.size) return true
+        val cell = blanks[k]; val r = cell / 9; val c = cell % 9
+        for (v in 1..9) {
+            val bit = 1 shl v
+            if (rows[r] and bit != 0 || cols[c] and bit != 0) continue
+            rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; board[r][c] = v
+            if (go(k + 1)) return true
+            rows[r] = rows[r] xor bit; cols[c] = cols[c] xor bit; board[r][c] = 0
+        }
+        return false
+    }
+    go(0)
+    return board
+}
+"""),
+        ("undo-keeps-bitmask", "WRONG_ALGORITHM",
+         "막혀 돌아올 때 판은 지우지만 행·열·상자의 표시는 남긴다. 그 숫자를 다시는 못 쓴다.",
+         """
+fun solveSudoku(board: Array<IntArray>): Array<IntArray> {
+    val rows = IntArray(9); val cols = IntArray(9); val boxes = IntArray(9)
+    val blanks = ArrayList<Int>()
+    for (r in 0 until 9) for (c in 0 until 9) {
+        val v = board[r][c]
+        if (v == 0) blanks.add(r * 9 + c)
+        else { val bit = 1 shl v; rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; boxes[(r / 3) * 3 + c / 3] = boxes[(r / 3) * 3 + c / 3] or bit }
+    }
+    fun go(k: Int): Boolean {
+        if (k == blanks.size) return true
+        val cell = blanks[k]; val r = cell / 9; val c = cell % 9; val b = (r / 3) * 3 + c / 3
+        for (v in 1..9) {
+            val bit = 1 shl v
+            if (rows[r] and bit != 0 || cols[c] and bit != 0 || boxes[b] and bit != 0) continue
+            rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; boxes[b] = boxes[b] or bit
+            board[r][c] = v
+            if (go(k + 1)) return true
+            board[r][c] = 0
+        }
+        return false
+    }
+    go(0)
+    return board
+}
+"""),
+        ("box-index-mixed", "OFF_BY_ONE",
+         "상자 번호를 행/3 + 열/3 으로 센다. 다른 상자가 같은 번호를 나눠 갖는다.",
+         """
+fun solveSudoku(board: Array<IntArray>): Array<IntArray> {
+    val rows = IntArray(9); val cols = IntArray(9); val boxes = IntArray(9)
+    val blanks = ArrayList<Int>()
+    for (r in 0 until 9) for (c in 0 until 9) {
+        val v = board[r][c]
+        if (v == 0) blanks.add(r * 9 + c)
+        else { val bit = 1 shl v; rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; boxes[r / 3 + c / 3] = boxes[r / 3 + c / 3] or bit }
+    }
+    fun go(k: Int): Boolean {
+        if (k == blanks.size) return true
+        val cell = blanks[k]; val r = cell / 9; val c = cell % 9; val b = r / 3 + c / 3
+        for (v in 1..9) {
+            val bit = 1 shl v
+            if (rows[r] and bit != 0 || cols[c] and bit != 0 || boxes[b] and bit != 0) continue
+            rows[r] = rows[r] or bit; cols[c] = cols[c] or bit; boxes[b] = boxes[b] or bit; board[r][c] = v
+            if (go(k + 1)) return true
+            rows[r] = rows[r] xor bit; cols[c] = cols[c] xor bit; boxes[b] = boxes[b] xor bit; board[r][c] = 0
+        }
+        return false
+    }
+    go(0)
+    return board
+}
+"""),
+        ("checks-after-filling", "PERFORMANCE",
+         "규칙을 보지 않고 빈칸을 다 채운 뒤에야 판이 맞는지 확인한다. 9^빈칸.",
+         """
+fun solveSudoku(board: Array<IntArray>): Array<IntArray> {
+    val blanks = ArrayList<Int>()
+    for (r in 0 until 9) for (c in 0 until 9) if (board[r][c] == 0) blanks.add(r * 9 + c)
+    fun valid(): Boolean {
+        for (i in 0 until 9) {
+            var row = 0; var col = 0; var box = 0
+            for (j in 0 until 9) {
+                row = row or (1 shl board[i][j])
+                col = col or (1 shl board[j][i])
+                box = box or (1 shl board[(i / 3) * 3 + j / 3][(i % 3) * 3 + j % 3])
+            }
+            if (row != 0b1111111110 || col != 0b1111111110 || box != 0b1111111110) return false
+        }
+        return true
+    }
+    fun go(k: Int): Boolean {
+        if (k == blanks.size) return valid()
+        val cell = blanks[k]
+        for (v in 1..9) {
+            board[cell / 9][cell % 9] = v
+            Drill.compare(cell, v)
+            if (go(k + 1)) return true
+        }
+        board[cell / 9][cell % 9] = 0
+        return false
+    }
+    go(0)
+    return board
+}
+"""),
+    ],
+))

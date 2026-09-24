@@ -3364,3 +3364,215 @@ fun zeroOutRowsAndColumns(grid: Array<IntArray>): Array<IntArray> {
 """),
     ],
 ))
+
+
+# --- 187. 가장 가까운 1 까지의 거리 -------------------------------------------
+
+def _nearest_one(grid):
+    from collections import deque
+    rows = len(grid)
+    cols = len(grid[0])
+    dist = [[-1] * cols for _ in range(rows)]
+    queue = deque()
+    for r in range(rows):
+        for c in range(cols):
+            if grid[r][c] == 1:
+                dist[r][c] = 0
+                queue.append((r, c))
+    while queue:
+        r, c = queue.popleft()
+        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols and dist[nr][nc] == -1:
+                dist[nr][nc] = dist[r][c] + 1
+                queue.append((nr, nc))
+    return dist
+
+
+def _binary_grid(rows, cols, ones, salt):
+    """1 이 `ones` 칸 있는 격자. 적어도 하나는 1 이다."""
+    spots = randoms(max(ones, 1) * 2, 0, max(rows, cols) - 1, salt=salt)
+    grid = [[0] * cols for _ in range(rows)]
+    for i in range(max(ones, 1)):
+        grid[spots[2 * i] % rows][spots[2 * i + 1] % cols] = 1
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="nearest-one-distance",
+    title="가장 가까운 1 까지의 거리",
+    summary="""
+`0` 과 `1` 로만 된 격자 `grid` 가 주어진다. 칸마다 **가장 가까운 `1` 까지 몇 걸음인가**를 담은 같은 크기의
+격자를 반환한다. 한 걸음은 위·아래·왼쪽·오른쪽으로 한 칸이고, `1` 인 칸은 `0` 이다.
+""",
+    notes="""
+`1` 마다 퍼뜨리면 `1` 의 수 × 칸 수다. 대신 **모든 `1` 에서 동시에** 퍼뜨린다 — 시작할 때 `1` 인 칸을 전부
+큐에 넣으면, 큐에서 꺼내는 순서가 곧 거리 순서라 칸마다 한 번씩만 정해진다.
+
+한 방향으로만 훑는 두 번의 누적으로도 풀리지만(위·왼쪽 다음 아래·오른쪽), 한 번만 훑으면 뒤쪽의 `1` 을
+보지 못한다.
+""",
+    drill_doc="""
+Drill.enqueue(index)          // 행 우선 번호 index 칸을 큐에 넣었다
+Drill.write(index, distance)  // 그 칸의 거리를 정했다
+""",
+    constraints="""
+- `1 <= 행 <= 500`, `1 <= 열 <= 500`, 모든 행의 길이는 같다
+- `grid[r][c]` 는 `0` 또는 `1` 이고, `1` 인 칸이 적어도 하나 있다
+""",
+    signature=dict(name="nearestOne", parameters=[("grid", "INT_MATRIX")], returns="INT_MATRIX"),
+    groups=perf_groups(),
+    reference=_nearest_one,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [
+            ("01", [[[0, 0, 0], [0, 1, 0], [0, 0, 0]]]),
+            ("02", [[[1, 0, 0], [0, 0, 0]]]),
+        ],
+        "boundary": [
+            ("01-single-cell", [[[1]]]),
+            ("02-all-ones", [[[1, 1], [1, 1]]]),
+            # 뒤쪽의 1 — 앞에서 뒤로만 훑으면 못 본다.
+            ("03-one-at-end", [[[0, 0, 0, 1]]]),
+            ("04-one-column", [[[0], [0], [1], [0]]]),
+            ("05-two-sources", [[[1, 0, 0, 0, 1]]]),
+            # 직사각형 — 행과 열을 맞바꾼 구현이 여기서 갈린다.
+            ("06-wide", [[[1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]]),
+            ("07-tall", [[[0, 0], [0, 0], [0, 0], [0, 1]]]),
+            # 대각선은 한 걸음이 아니다 — 두 걸음이다.
+            ("08-diagonal", [[[1, 0], [0, 0]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_binary_grid(6, 6, 3, salt=9781)]),
+            ("02-random-sparse", [_binary_grid(40, 40, 5, salt=9783)]),
+            ("03-random-dense", [_binary_grid(40, 40, 400, salt=9785)]),
+            ("04-single-one-far", [_binary_grid(60, 30, 1, salt=9787)]),
+            ("05-random-wide", [_binary_grid(20, 120, 30, salt=9789)]),
+        ],
+        "performance": [
+            ("01-medium", [_binary_grid(300, 300, 9000, salt=9791)]),
+            ("02-dense-large", [_binary_grid(500, 500, 50000, salt=9793)]),
+            ("03-sparse-large", [_binary_grid(500, 500, 20000, salt=9795)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 모든 1 을 큐에 넣고 한 번에 퍼뜨린다.
+fun nearestOne(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val dist = Array(rows) { IntArray(cols) { -1 } }
+    val queue = IntArray(rows * cols)
+    var head = 0
+    var tail = 0
+    for (r in 0 until rows) for (c in 0 until cols) if (grid[r][c] == 1) {
+        dist[r][c] = 0
+        queue[tail++] = r * cols + c
+        Drill.enqueue(r * cols + c)
+    }
+    val dr = intArrayOf(1, -1, 0, 0)
+    val dc = intArrayOf(0, 0, 1, -1)
+    while (head < tail) {
+        val cell = queue[head++]
+        val r = cell / cols
+        val c = cell % cols
+        for (k in 0 until 4) {
+            val nr = r + dr[k]
+            val nc = c + dc[k]
+            if (nr in 0 until rows && nc in 0 until cols && dist[nr][nc] == -1) {
+                dist[nr][nc] = dist[r][c] + 1
+                Drill.write(nr * cols + nc, dist[nr][nc])
+                queue[tail++] = nr * cols + nc
+            }
+        }
+    }
+    return dist
+}
+""",
+    mutants=[
+        ("eight-directions", "WRONG_BRANCH",
+         "대각선도 한 걸음으로 친다. 걸음은 위·아래·왼쪽·오른쪽뿐이다.",
+         """
+fun nearestOne(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val dist = Array(rows) { IntArray(cols) { -1 } }
+    val queue = IntArray(rows * cols)
+    var head = 0; var tail = 0
+    for (r in 0 until rows) for (c in 0 until cols) if (grid[r][c] == 1) { dist[r][c] = 0; queue[tail++] = r * cols + c }
+    val dr = intArrayOf(1, -1, 0, 0, 1, 1, -1, -1)
+    val dc = intArrayOf(0, 0, 1, -1, 1, -1, 1, -1)
+    while (head < tail) {
+        val cell = queue[head++]; val r = cell / cols; val c = cell % cols
+        for (k in 0 until 8) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr in 0 until rows && nc in 0 until cols && dist[nr][nc] == -1) { dist[nr][nc] = dist[r][c] + 1; queue[tail++] = nr * cols + nc }
+        }
+    }
+    return dist
+}
+"""),
+        ("one-pass-only", "MISSING_EDGE_CASE",
+         "위와 왼쪽만 보고 한 번 훑는다. 뒤쪽에 있는 1 을 보지 못한다.",
+         """
+fun nearestOne(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val big = 1_000_000
+    val dist = Array(rows) { r -> IntArray(cols) { c -> if (grid[r][c] == 1) 0 else big } }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        if (r > 0 && dist[r - 1][c] + 1 < dist[r][c]) dist[r][c] = dist[r - 1][c] + 1
+        if (c > 0 && dist[r][c - 1] + 1 < dist[r][c]) dist[r][c] = dist[r][c - 1] + 1
+    }
+    return dist
+}
+"""),
+        ("distance-starts-at-one", "OFF_BY_ONE",
+         "1 인 칸에도 1 을 적는다. 자기 자신까지는 0 걸음이다.",
+         """
+fun nearestOne(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val dist = Array(rows) { IntArray(cols) { -1 } }
+    val queue = IntArray(rows * cols)
+    var head = 0; var tail = 0
+    for (r in 0 until rows) for (c in 0 until cols) if (grid[r][c] == 1) { dist[r][c] = 1; queue[tail++] = r * cols + c }
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    while (head < tail) {
+        val cell = queue[head++]; val r = cell / cols; val c = cell % cols
+        for (k in 0 until 4) {
+            val nr = r + dr[k]; val nc = c + dc[k]
+            if (nr in 0 until rows && nc in 0 until cols && dist[nr][nc] == -1) { dist[nr][nc] = dist[r][c] + 1; queue[tail++] = nr * cols + nc }
+        }
+    }
+    return dist
+}
+"""),
+        ("bfs-per-one", "PERFORMANCE",
+         "1 마다 따로 퍼뜨리고 가장 작은 거리를 고른다. 1 의 수 × 칸 수.",
+         """
+fun nearestOne(grid: Array<IntArray>): Array<IntArray> {
+    val rows = grid.size
+    val cols = grid[0].size
+    val best = Array(rows) { IntArray(cols) { Int.MAX_VALUE } }
+    val queue = IntArray(rows * cols)
+    val dr = intArrayOf(1, -1, 0, 0); val dc = intArrayOf(0, 0, 1, -1)
+    for (sr in 0 until rows) for (sc in 0 until cols) {
+        if (grid[sr][sc] != 1) continue
+        val seen = Array(rows) { IntArray(cols) { -1 } }
+        var head = 0; var tail = 0
+        seen[sr][sc] = 0; queue[tail++] = sr * cols + sc
+        while (head < tail) {
+            val cell = queue[head++]; val r = cell / cols; val c = cell % cols
+            Drill.compare(sr * cols + sc, cell)
+            if (seen[r][c] < best[r][c]) best[r][c] = seen[r][c]
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr in 0 until rows && nc in 0 until cols && seen[nr][nc] == -1) { seen[nr][nc] = seen[r][c] + 1; queue[tail++] = nr * cols + nc }
+            }
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

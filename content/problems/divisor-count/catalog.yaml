@@ -1,0 +1,16 @@
+# divisor-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - math
+  - number-theory
+  - counting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+prerequisites:
+  - count-primes
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "약수를 고정하고 배수를 훑는다 — n/1 + n/2 + … "

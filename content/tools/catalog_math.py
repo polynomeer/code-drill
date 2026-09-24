@@ -2009,3 +2009,129 @@ fun binomialMod(queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 185. 약수의 개수 질의 ------------------------------------------------------
+
+def _divisor_counts(queries):
+    limit = max(queries) if queries else 1
+    counts = [0] * (limit + 1)
+    for d in range(1, limit + 1):
+        for multiple in range(d, limit + 1, d):
+            counts[multiple] += 1
+    return [counts[n] for n in queries]
+
+
+PROBLEMS.append(Problem(
+    id="divisor-count",
+    title="약수의 개수 질의",
+    summary="""
+질의 `queries` 의 각 수 `n` 에 대해 **`n` 의 약수가 몇 개인가**를 담은 배열을 반환한다.
+""",
+    notes="""
+질의마다 `1..n` 을 훑으면 질의 수 × `n` 이다. 질의를 따로 보지 말고 **한꺼번에** 본다 —
+약수 `d` 를 고정하면 `d` 의 배수마다 약수가 하나씩 늘어난다. `d` 를 1 부터 올리며 배수를
+훑으면 전부 합쳐 `n/1 + n/2 + n/3 + …`, 즉 `n log n` 번이다.
+""",
+    drill_doc="""
+Drill.write(n, count)         // n 의 약수 개수를 적었다
+""",
+    constraints="""
+- 질의 `1..100_000` 개, `1 <= n <= 200_000`
+""",
+    signature=dict(name="divisorCounts", parameters=[("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_divisor_counts,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [("01", [[1, 6, 12]]), ("02", [[7, 16]])],
+        "boundary": [
+            ("01-one", [[1]]),
+            ("02-prime", [[199999]]),
+            # 제곱수는 약수가 홀수 개다 — 가운데 약수가 하나뿐이다.
+            ("03-squares", [[4, 9, 16, 100, 10000]]),
+            ("04-max", [[200000]]),
+            ("05-repeated-query", [[12, 12, 12]]),
+            ("06-powers-of-two", [[2, 4, 8, 16, 32, 64]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(50, 1, 100, salt=9741)]),
+            ("02-random-medium", [randoms(2000, 1, 20000, salt=9743)]),
+            ("03-random-large", [randoms(5000, 1, 200000, salt=9745)]),
+            ("04-all-small", [randoms(3000, 1, 10, salt=9747)]),
+        ],
+        "performance": [
+            ("01-many", [randoms(30000, 1, 200000, salt=9751)]),
+            ("02-max-repeated", [[200000] * 100000]),
+            ("03-random-large", [randoms(100000, 1, 200000, salt=9753)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 약수를 고정하고 그 배수를 훑는다 — 전부 합쳐 n log n.
+fun divisorCounts(queries: IntArray): IntArray {
+    var limit = 1
+    for (n in queries) if (n > limit) limit = n
+    val counts = IntArray(limit + 1)
+    for (d in 1..limit) {
+        var multiple = d
+        while (multiple <= limit) { counts[multiple] += 1; multiple += d }
+    }
+    return IntArray(queries.size) { i -> counts[queries[i]].also { Drill.write(queries[i], it) } }
+}
+""",
+    mutants=[
+        ("counts-only-up-to-half", "MISSING_EDGE_CASE",
+         "자기 자신을 약수로 세지 않는다. 모든 답이 하나씩 적다.",
+         """
+fun divisorCounts(queries: IntArray): IntArray {
+    var limit = 1
+    for (n in queries) if (n > limit) limit = n
+    val counts = IntArray(limit + 1)
+    for (d in 1..limit / 2) {
+        var multiple = d
+        while (multiple <= limit) { counts[multiple] += 1; multiple += d }
+    }
+    return IntArray(queries.size) { i -> counts[queries[i]] }
+}
+"""),
+        ("square-root-double-counts", "OFF_BY_ONE",
+         "제곱근까지 세고 짝을 두 배 한다. 제곱수의 가운데 약수를 두 번 센다.",
+         """
+fun divisorCounts(queries: IntArray): IntArray {
+    return IntArray(queries.size) { i ->
+        val n = queries[i]
+        var count = 0
+        var d = 1
+        while (d * d <= n) { if (n % d == 0) count += 2; d += 1 }
+        count
+    }
+}
+"""),
+        ("sieve-limit-off-by-one", "WRONG_BRANCH",
+         "체를 가장 큰 질의보다 하나 짧게 만든다. 가장 큰 수의 답이 비어 있다.",
+         """
+fun divisorCounts(queries: IntArray): IntArray {
+    var limit = 1
+    for (n in queries) if (n > limit) limit = n
+    val counts = IntArray(limit + 1)
+    for (d in 1 until limit) {
+        var multiple = d
+        while (multiple < limit) { counts[multiple] += 1; multiple += d }
+    }
+    return IntArray(queries.size) { i -> counts[queries[i]] }
+}
+"""),
+        ("divides-every-number", "PERFORMANCE",
+         "질의마다 1 부터 n 까지 전부 나눠 본다. 질의 수 × n.",
+         """
+fun divisorCounts(queries: IntArray): IntArray {
+    return IntArray(queries.size) { i ->
+        val n = queries[i]
+        var count = 0
+        for (d in 1..n) { Drill.compare(i, d); if (n % d == 0) count += 1 }
+        count
+    }
+}
+"""),
+    ],
+))
