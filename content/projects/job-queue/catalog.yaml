@@ -1,0 +1,8 @@
+difficulty: HARD
+tags:
+  - queue
+  - hash-map
+  - simulation
+summary: 임대·재시도·데드레터가 있는 작업 큐를 주입된 시각으로 결정적으로 시험하며 구현한다. 만료된 임대는 회수되고, 지난 토큰의 완료 보고는 거절된다.
+competencies:
+  - SPECIFICATION
