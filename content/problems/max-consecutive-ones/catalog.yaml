@@ -1,0 +1,15 @@
+# max-consecutive-ones 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - array
+  - counting
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - longest-increasing-run
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "이어지는 길이와 최댓값 둘만 들고 한 번"

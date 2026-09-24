@@ -4428,3 +4428,417 @@ fun firstMissingPositive(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 192. 연속한 1 의 최대 길이 -------------------------------------------------------------------
+
+def _max_consecutive_ones(nums):
+    best = 0
+    run = 0
+    for value in nums:
+        if value == 1:
+            run += 1
+            if run > best:
+                best = run
+        else:
+            run = 0
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="max-consecutive-ones",
+    title="연속한 1 의 최대 길이",
+    summary="""
+`0` 과 `1` 로만 된 배열 `nums` 에서 **연속한 `1` 이 가장 길게 이어지는 길이**를 반환한다. `1` 이 하나도
+없으면 `0` 이다.
+""",
+    notes="""
+한 번 훑으며 "지금 이어지는 길이"와 "지금까지의 최댓값" 둘만 들고 간다. `1` 을 만나면 이어지는 길이를 올리고
+최댓값을 갱신하고, `0` 을 만나면 이어지는 길이를 `0` 으로 되돌린다.
+
+**끝에서 한 번 더 갱신해야 하는가**를 확인한다 — 갱신을 `0` 을 만났을 때만 하면 배열이 `1` 로 끝날 때 마지막
+구간이 빠진다.
+""",
+    drill_doc="""
+Drill.visit(index, value)     // 칸을 봤다
+Drill.write(0, best)          // 최댓값을 갱신했다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`, `nums[i]` 는 `0` 또는 `1`
+""",
+    signature=dict(name="maxConsecutiveOnes", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_max_consecutive_ones,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[1, 1, 0, 1, 1, 1]]), ("02", [[1, 0, 1, 1, 0, 1]])],
+        "boundary": [
+            ("01-single-one", [[1]]),
+            ("02-single-zero", [[0]]),
+            ("03-all-ones", [[1, 1, 1, 1]]),
+            ("04-all-zeros", [[0, 0, 0]]),
+            # 가장 긴 구간이 맨 끝에서 끝난다.
+            ("05-longest-at-end", [[1, 0, 1, 1, 1]]),
+            ("06-longest-at-start", [[1, 1, 1, 0, 1]]),
+            ("07-alternating", [[1, 0, 1, 0, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, 0, 1, salt=9911)]),
+            ("02-random-medium", [randoms(500, 0, 1, salt=9913)]),
+            ("03-mostly-ones", [[1 if v > 0 else 0 for v in randoms(500, 0, 9, salt=9915)]]),
+            ("04-mostly-zeros", [[1 if v == 0 else 0 for v in randoms(500, 0, 9, salt=9917)]]),
+            ("05-long-run-at-end", [[0] * 300 + [1] * 200]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 이어지는 길이와 최댓값 둘만 들고 한 번 훑는다.
+fun maxConsecutiveOnes(nums: IntArray): Int {
+    var best = 0
+    var run = 0
+    for (i in nums.indices) {
+        Drill.visit(i, nums[i])
+        if (nums[i] == 1) {
+            run += 1
+            if (run > best) { best = run; Drill.write(0, best) }
+        } else {
+            run = 0
+        }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("updates-only-on-zero", "MISSING_EDGE_CASE",
+         "0 을 만났을 때만 최댓값을 갱신한다. 1 로 끝나는 배열의 마지막 구간이 빠진다.",
+         """
+fun maxConsecutiveOnes(nums: IntArray): Int {
+    var best = 0
+    var run = 0
+    for (value in nums) {
+        if (value == 1) run += 1
+        else { if (run > best) best = run; run = 0 }
+    }
+    return best
+}
+"""),
+        ("never-resets", "WRONG_ALGORITHM",
+         "0 을 만나도 이어지는 길이를 되돌리지 않는다. 1 의 전체 개수를 센다.",
+         """
+fun maxConsecutiveOnes(nums: IntArray): Int {
+    var best = 0
+    var run = 0
+    for (value in nums) {
+        if (value == 1) { run += 1; if (run > best) best = run }
+    }
+    return best
+}
+"""),
+        ("counts-zeros-too", "WRONG_BRANCH",
+         "값을 보지 않고 자리마다 길이를 올린다. 0 도 이어진 것으로 센다.",
+         """
+fun maxConsecutiveOnes(nums: IntArray): Int {
+    var best = 0
+    var run = 0
+    for (value in nums) {
+        run += 1
+        if (run > best) best = run
+        if (value == 0) { }
+    }
+    return best
+}
+"""),
+        ("off-by-one-run", "OFF_BY_ONE",
+         "이어지는 길이를 0 이 아니라 1 에서 다시 시작한다. 0 뒤의 구간이 하나씩 길어진다.",
+         """
+fun maxConsecutiveOnes(nums: IntArray): Int {
+    var best = 0
+    var run = 0
+    for (value in nums) {
+        if (value == 1) { run += 1; if (run > best) best = run } else run = 1
+    }
+    return best
+}
+"""),
+    ],
+))
+
+
+# --- 193. 산 모양 배열인가 ------------------------------------------------------------------------
+
+def _is_mountain(nums):
+    n = len(nums)
+    i = 0
+    while i + 1 < n and nums[i] < nums[i + 1]:
+        i += 1
+    if i == 0 or i == n - 1:
+        return 0
+    while i + 1 < n and nums[i] > nums[i + 1]:
+        i += 1
+    return 1 if i == n - 1 else 0
+
+
+PROBLEMS.append(Problem(
+    id="valid-mountain-array",
+    title="산 모양 배열인가",
+    summary="""
+배열 `nums` 가 **산 모양**이면 `1`, 아니면 `0` 을 반환한다. 산 모양이란 어떤 꼭대기까지 **엄격히 늘다가**
+그 뒤로 **엄격히 주는** 것이다. 오르막과 내리막이 각각 한 칸 이상 있어야 하므로 길이가 3 보다 짧으면 산이
+아니고, 평평한 구간이 있어도 산이 아니다.
+""",
+    notes="""
+앞에서부터 오를 수 있는 데까지 오르고, 거기서부터 내릴 수 있는 데까지 내린다. 끝에 닿았으면 산이다.
+
+걸리는 곳은 **꼭대기의 자리**다 — 한 번도 오르지 못했거나(첫 칸이 꼭대기) 끝까지 올랐으면(마지막 칸이
+꼭대기) 한쪽이 비었으니 산이 아니다.
+""",
+    drill_doc="""
+Drill.pointer("peak", index)  // 꼭대기로 정한 자리
+Drill.compare(left, right)    // 이웃한 두 칸을 견줬다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`, `-1_000_000_000 <= nums[i] <= 1_000_000_000`
+""",
+    signature=dict(name="isMountain", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_is_mountain,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[0, 3, 2, 1]]), ("02", [[3, 5, 5]])],
+        "boundary": [
+            ("01-too-short", [[1, 2]]),
+            ("02-single", [[7]]),
+            # 꼭대기가 맨 끝 — 내리막이 없다.
+            ("03-only-up", [[1, 2, 3]]),
+            ("04-only-down", [[3, 2, 1]]),
+            ("05-flat-top", [[1, 3, 3, 1]]),
+            ("06-flat-start", [[2, 2, 3, 1]]),
+            ("07-minimal-mountain", [[1, 2, 1]]),
+            ("08-all-equal", [[4, 4, 4]]),
+            ("09-negatives", [[-5, -1, -3]]),
+        ],
+        "hidden": [
+            ("01-long-mountain", [list(range(0, 300)) + list(range(299, -1, -1))]),
+            ("02-up-then-flat", [list(range(0, 100)) + [99] + list(range(98, -1, -1))]),
+            ("03-random", [randoms(50, 0, 20, salt=9921)]),
+            ("04-peak-near-start", [[0, 9] + list(range(8, -1, -1))]),
+            ("05-peak-near-end", [list(range(0, 300)) + [1]]),
+            ("06-dip-then-rise", [[5, 3, 4]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오를 수 있는 데까지 오르고, 거기서 끝까지 내려가는지 본다.
+fun isMountain(nums: IntArray): Int {
+    val n = nums.size
+    var i = 0
+    while (i + 1 < n && nums[i] < nums[i + 1]) { Drill.compare(i, i + 1); i += 1 }
+    Drill.pointer("peak", i)
+    if (i == 0 || i == n - 1) return 0
+    while (i + 1 < n && nums[i] > nums[i + 1]) { Drill.compare(i, i + 1); i += 1 }
+    return if (i == n - 1) 1 else 0
+}
+""",
+    mutants=[
+        ("allows-flat", "WRONG_BRANCH",
+         "같은 값이 이어져도 오르막·내리막으로 친다. 산은 엄격히 늘고 엄격히 줄어야 한다.",
+         """
+fun isMountain(nums: IntArray): Int {
+    val n = nums.size
+    var i = 0
+    while (i + 1 < n && nums[i] <= nums[i + 1]) i += 1
+    if (i == 0 || i == n - 1) return 0
+    while (i + 1 < n && nums[i] >= nums[i + 1]) i += 1
+    return if (i == n - 1) 1 else 0
+}
+"""),
+        ("peak-at-edge-allowed", "MISSING_EDGE_CASE",
+         "꼭대기가 첫 칸이나 마지막 칸이어도 산으로 친다. 양쪽이 모두 있어야 한다.",
+         """
+fun isMountain(nums: IntArray): Int {
+    val n = nums.size
+    var i = 0
+    while (i + 1 < n && nums[i] < nums[i + 1]) i += 1
+    while (i + 1 < n && nums[i] > nums[i + 1]) i += 1
+    return if (i == n - 1) 1 else 0
+}
+"""),
+        ("checks-only-the-climb", "WRONG_ALGORITHM",
+         "오르막만 확인하고 내리막이 끝까지 가는지 보지 않는다.",
+         """
+fun isMountain(nums: IntArray): Int {
+    val n = nums.size
+    var i = 0
+    while (i + 1 < n && nums[i] < nums[i + 1]) i += 1
+    return if (i > 0 && i < n - 1) 1 else 0
+}
+"""),
+        ("length-two-passes", "OFF_BY_ONE",
+         "길이가 둘인 배열을 거른 것으로 친다. 꼭대기 자리 검사가 그 자리를 못 막는다.",
+         """
+fun isMountain(nums: IntArray): Int {
+    val n = nums.size
+    if (n < 2) return 0
+    var i = 0
+    while (i + 1 < n && nums[i] < nums[i + 1]) i += 1
+    if (i == 0) return 0
+    while (i + 1 < n && nums[i] > nums[i + 1]) i += 1
+    return if (i == n - 1) 1 else 0
+}
+"""),
+    ],
+))
+
+
+# --- 194. 합이 0 인 가장 긴 구간 --------------------------------------------------------------------
+
+def _longest_zero_sum(nums):
+    first = {0: -1}
+    total = 0
+    best = 0
+    for i, value in enumerate(nums):
+        total += value
+        if total in first:
+            if i - first[total] > best:
+                best = i - first[total]
+        else:
+            first[total] = i
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="longest-zero-sum-subarray",
+    title="합이 0 인 가장 긴 구간",
+    summary="""
+정수 배열 `nums` 에서 **합이 `0` 인 가장 긴 연속 구간**의 길이를 반환한다. 그런 구간이 없으면 `0` 이다.
+""",
+    notes="""
+구간의 합은 접두사 합의 차다 — `nums[l..r]` 의 합이 `0` 이라는 것은 `합[r] == 합[l-1]` 이라는 뜻이다.
+그러니 **같은 접두사 합이 두 번 나오는 자리**를 찾으면 된다.
+
+같은 값이 여러 번 나오면 **가장 먼저 나온 자리**만 기억한다 — 나중 것으로 덮어쓰면 구간이 짧아진다.
+빈 접두사(합 `0`, 자리 `-1`)를 미리 넣어 두면 맨 앞에서 시작하는 구간이 저절로 잡힌다.
+""",
+    drill_doc="""
+Drill.write(index, prefix)    // 그 자리까지의 접두사 합
+Drill.match(left, right)      // 같은 접두사 합을 만났다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`, `-1_000_000 <= nums[i] <= 1_000_000`
+""",
+    signature=dict(name="longestZeroSum", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_longest_zero_sum,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [[1, 2, -3, 3]]), ("02", [[1, 2, 3]])],
+        "boundary": [
+            ("01-single-zero", [[0]]),
+            ("02-single-nonzero", [[5]]),
+            ("03-whole-array", [[2, -2, 3, -3]]),
+            # 같은 접두사 합이 세 번 — 가장 먼 짝이 답이다.
+            ("04-repeated-prefix", [[1, -1, 1, -1, 1, -1]]),
+            ("05-starts-at-front", [[3, -3, 5]]),
+            ("06-none", [[1, 2, 3, 4]]),
+            ("07-all-zeros", [[0, 0, 0]]),
+            ("08-negatives-first", [[-4, 4, -1, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, -3, 3, salt=9931)]),
+            ("02-random-medium", [randoms(500, -5, 5, salt=9933)]),
+            ("03-random-wide", [randoms(1000, -1000000, 1000000, salt=9935)]),
+            ("04-long-balanced", [[1] * 500 + [-1] * 500]),
+            ("05-no-zero-sum", [[7] * 500]),
+        ],
+        "performance": [
+            ("01-medium", [randoms(50000, -2, 2, salt=9941)]),
+            # 합이 0 인 구간이 없다 — 두 겹 풀이가 한 번도 일찍 끝나지 못한다.
+            ("02-no-answer-large", [[1] * 200000]),
+            ("03-random-large", [randoms(200000, -1000000, 1000000, salt=9943)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 접두사 합이 처음 나온 자리를 기억하고, 다시 만나면 그 거리가 후보다.
+fun longestZeroSum(nums: IntArray): Int {
+    val first = HashMap<Long, Int>()
+    first[0L] = -1
+    var total = 0L
+    var best = 0
+    for (i in nums.indices) {
+        total += nums[i]
+        Drill.write(i, total.toInt())
+        val seen = first[total]
+        if (seen != null) {
+            if (i - seen > best) { best = i - seen; Drill.match(seen, i) }
+        } else {
+            first[total] = i
+        }
+    }
+    return best
+}
+""",
+    mutants=[
+        ("keeps-latest-index", "WRONG_ALGORITHM",
+         "접두사 합의 자리를 볼 때마다 덮어쓴다. 가장 먼 짝 대신 가까운 짝을 잰다.",
+         """
+fun longestZeroSum(nums: IntArray): Int {
+    val seen = HashMap<Long, Int>()
+    seen[0L] = -1
+    var total = 0L
+    var best = 0
+    for (i in nums.indices) {
+        total += nums[i]
+        val at = seen[total]
+        if (at != null && i - at > best) best = i - at
+        seen[total] = i
+    }
+    return best
+}
+"""),
+        ("no-empty-prefix", "MISSING_EDGE_CASE",
+         "빈 접두사를 넣지 않는다. 맨 앞에서 시작하는 구간을 놓친다.",
+         """
+fun longestZeroSum(nums: IntArray): Int {
+    val first = HashMap<Long, Int>()
+    var total = 0L
+    var best = 0
+    for (i in nums.indices) {
+        total += nums[i]
+        val at = first[total]
+        if (at != null) { if (i - at > best) best = i - at } else first[total] = i
+    }
+    return best
+}
+"""),
+        ("length-off-by-one", "OFF_BY_ONE",
+         "구간의 길이를 하나 짧게 센다. 두 자리 사이의 칸 수가 곧 길이다.",
+         """
+fun longestZeroSum(nums: IntArray): Int {
+    val first = HashMap<Long, Int>()
+    first[0L] = -1
+    var total = 0L
+    var best = 0
+    for (i in nums.indices) {
+        total += nums[i]
+        val at = first[total]
+        if (at != null) { if (i - at - 1 > best) best = i - at - 1 } else first[total] = i
+    }
+    return best
+}
+"""),
+        ("all-pairs", "PERFORMANCE",
+         "모든 시작점에서 합을 다시 더해 본다. O(n^2).",
+         """
+fun longestZeroSum(nums: IntArray): Int {
+    var best = 0
+    for (l in nums.indices) {
+        var total = 0L
+        for (r in l until nums.size) {
+            total += nums[r]
+            Drill.compare(l, r)
+            if (total == 0L && r - l + 1 > best) best = r - l + 1
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

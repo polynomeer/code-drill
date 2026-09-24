@@ -1,0 +1,17 @@
+# longest-zero-sum-subarray 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - prefix-sum
+  - hash-map
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+prerequisites:
+  - subarray-sum-count
+  - running-sum
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "접두사 합이 처음 나온 자리를 기억한다"

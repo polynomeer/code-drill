@@ -1,0 +1,18 @@
+# shortest-path-count 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - shortest-path
+  - counting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CONSTRAINTS
+  - CORRECTNESS
+prerequisites:
+  - cheapest-paths
+  - fibonacci-mod
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "다익스트라 한 번, 가짓수를 함께 옮긴다"

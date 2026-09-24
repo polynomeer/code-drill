@@ -1,0 +1,15 @@
+# digit-sum-steps 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - math
+  - simulation
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - count-letters
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT
+  note: "한 번 더할 때마다 자릿수가 크게 준다"

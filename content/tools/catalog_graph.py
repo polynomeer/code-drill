@@ -5312,3 +5312,482 @@ fun componentsAfterRemovals(n: Int, edges: IntArray, removals: IntArray): IntArr
 """),
     ],
 ))
+
+
+# --- 195. 금지된 사이를 지키며 친구 맺기 (유니온 파인드) ------------------------------------------
+
+def _friend_requests(n, restrictions, requests):
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    out = []
+    for i in range(0, len(requests), 2):
+        a, b = find(requests[i]), find(requests[i + 1])
+        allowed = True
+        if a != b:
+            for j in range(0, len(restrictions), 2):
+                x, y = find(restrictions[j]), find(restrictions[j + 1])
+                # 두 무리가 붙으면 금지된 쌍이 한 무리가 되는가
+                if (x == a and y == b) or (x == b and y == a):
+                    allowed = False
+                    break
+        if allowed:
+            parent[a] = b
+        out.append(1 if allowed else 0)
+    return out
+
+
+def _distinct_pairs(n, count, salt):
+    a = randoms(count, 0, n - 1, salt=salt)
+    span = randoms(count, 1, n - 1, salt=salt + 1)
+    return flat([a[i], (a[i] + span[i]) % n] for i in range(count))
+
+
+PROBLEMS.append(Problem(
+    id="friend-requests",
+    title="금지된 사이를 지키며 친구 맺기",
+    summary="""
+사람 `n` 명(`0..n-1`)과 **절대 같은 무리가 되면 안 되는 쌍** `restrictions = [x1, y1, ...]` 가 주어진다.
+친구 요청 `requests = [a1, b1, ...]` 을 **주어진 순서대로** 처리한다. 요청을 받아들이면 두 사람의 무리가
+하나로 합쳐진다 — 친구의 친구도 같은 무리다.
+
+받아들여도 금지된 쌍이 같은 무리가 되지 **않을 때만** 받아들인다. 요청마다 `1`(받아들임) / `0`(거절)을
+순서대로 담은 배열을 반환한다. 거절된 요청은 아무것도 바꾸지 않는다.
+""",
+    notes="""
+"같은 무리"는 합치기와 묻기만 있으면 되니 유니온 파인드다. 어려운 것은 **미리 보기**다 — 합치기 전에
+"합치면 무엇이 깨지는가"를 알아야 한다.
+
+두 무리를 합쳤을 때 금지된 쌍 `(x, y)` 가 한 무리가 되는 경우는 하나뿐이다: `x` 가 한쪽 무리에, `y` 가 다른
+쪽 무리에 있는 것. 그러니 요청마다 금지 목록을 훑어 **그 둘의 대표가 지금 두 무리와 맞는지**만 보면 된다.
+""",
+    drill_doc="""
+Drill.match(a, b)             // 두 무리를 합쳤다
+Drill.write(q, verdict)       // q 번째 요청의 결과
+""",
+    constraints="""
+- `2 <= n <= 1_000`, 금지 쌍 `0..1_000` 개, 요청 `1..1_000` 개
+- 금지 쌍과 요청의 두 사람은 서로 다르다
+""",
+    signature=dict(
+        name="friendRequests",
+        parameters=[("n", "INT"), ("restrictions", "INT_ARRAY"), ("requests", "INT_ARRAY")],
+        returns="INT_ARRAY",
+    ),
+    # 정답 풀이 자체가 요청 × 금지라, 같은 접근을 조금 더 느리게 한 오답은 자릿수가 아니라 상수배로만
+    # 진다. 그런 오답은 머신에 따라 갈리므로 성능 그룹을 두지 않는다 (§12.1 재현성).
+    groups=standard_groups(),
+    reference=_friend_requests,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [
+            ("01", [3, [0, 1], [0, 2, 2, 1]]),
+            ("02", [3, [0, 1], [1, 2, 0, 2]]),
+        ],
+        "boundary": [
+            ("01-no-restrictions", [4, [], [0, 1, 1, 2, 2, 3]]),
+            ("02-direct-restriction", [2, [0, 1], [0, 1]]),
+            # 이미 같은 무리인 요청은 언제나 받아들인다 — 아무것도 바뀌지 않는다.
+            ("03-already-together", [3, [0, 2], [0, 1, 1, 0]]),
+            ("04-rejected-changes-nothing", [4, [0, 3], [0, 1, 2, 3, 1, 2, 1, 3]]),
+            ("05-restriction-both-ways", [3, [2, 0], [0, 1, 1, 2]]),
+            ("06-chain-then-block", [5, [0, 4], [0, 1, 1, 2, 2, 3, 3, 4]]),
+            ("07-self-contained", [4, [1, 2], [0, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _distinct_pairs(8, 3, salt=9951), _distinct_pairs(8, 12, salt=9953)]),
+            ("02-random-medium", [100, _distinct_pairs(100, 40, salt=9955), _distinct_pairs(100, 200, salt=9957)]),
+            ("03-many-restrictions", [50, _distinct_pairs(50, 200, salt=9959), _distinct_pairs(50, 100, salt=9961)]),
+            ("04-few-restrictions", [200, _distinct_pairs(200, 5, salt=9963), _distinct_pairs(200, 400, salt=9965)]),
+            ("05-no-requests-accepted", [4, [0, 1, 0, 2, 0, 3, 1, 2, 1, 3, 2, 3], _distinct_pairs(4, 10, salt=9967)]),
+            ("06-large", [1000, _distinct_pairs(1000, 1000, salt=9975), _distinct_pairs(1000, 1000, salt=9977)]),
+            ("07-dense-restrictions", [1000, _distinct_pairs(1000, 1000, salt=9979), _distinct_pairs(1000, 1000, salt=9981)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 합치기 전에 금지 목록을 훑어 "합치면 깨지는가"를 본다.
+fun friendRequests(n: Int, restrictions: IntArray, requests: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int {
+        var x = start
+        while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }
+        return x
+    }
+    val out = IntArray(requests.size / 2)
+    for (q in out.indices) {
+        val a = find(requests[2 * q])
+        val b = find(requests[2 * q + 1])
+        var allowed = true
+        if (a != b) {
+            var j = 0
+            while (j < restrictions.size) {
+                val x = find(restrictions[j])
+                val y = find(restrictions[j + 1])
+                if ((x == a && y == b) || (x == b && y == a)) { allowed = false; break }
+                j += 2
+            }
+        }
+        if (allowed) { parent[a] = b; Drill.match(a, b) }
+        out[q] = if (allowed) 1 else 0
+        Drill.write(q, out[q])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("checks-only-direct-pair", "WRONG_ALGORITHM",
+         "요청한 두 사람이 곧바로 금지된 쌍인지만 본다. 무리를 타고 이어지는 금지를 놓친다.",
+         """
+fun friendRequests(n: Int, restrictions: IntArray, requests: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    val out = IntArray(requests.size / 2)
+    for (q in out.indices) {
+        val u = requests[2 * q]; val v = requests[2 * q + 1]
+        var allowed = true
+        var j = 0
+        while (j < restrictions.size) {
+            if ((restrictions[j] == u && restrictions[j + 1] == v) || (restrictions[j] == v && restrictions[j + 1] == u)) { allowed = false; break }
+            j += 2
+        }
+        if (allowed) parent[find(u)] = find(v)
+        out[q] = if (allowed) 1 else 0
+    }
+    return out
+}
+"""),
+        ("one-direction-only", "WRONG_BRANCH",
+         "금지된 쌍을 한 방향으로만 견준다. 무리가 반대로 붙은 경우를 놓친다.",
+         """
+fun friendRequests(n: Int, restrictions: IntArray, requests: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    val out = IntArray(requests.size / 2)
+    for (q in out.indices) {
+        val a = find(requests[2 * q]); val b = find(requests[2 * q + 1])
+        var allowed = true
+        if (a != b) {
+            var j = 0
+            while (j < restrictions.size) {
+                val x = find(restrictions[j]); val y = find(restrictions[j + 1])
+                if (x == a && y == b) { allowed = false; break }
+                j += 2
+            }
+        }
+        if (allowed) parent[a] = b
+        out[q] = if (allowed) 1 else 0
+    }
+    return out
+}
+"""),
+        ("merges-before-checking", "MISSING_EDGE_CASE",
+         "먼저 합치고 나서 금지가 깨졌는지 본다. 거절된 요청이 무리를 바꿔 놓는다.",
+         """
+fun friendRequests(n: Int, restrictions: IntArray, requests: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    val out = IntArray(requests.size / 2)
+    for (q in out.indices) {
+        val a = find(requests[2 * q]); val b = find(requests[2 * q + 1])
+        if (a != b) parent[a] = b
+        var allowed = true
+        var j = 0
+        while (j < restrictions.size) {
+            if (find(restrictions[j]) == find(restrictions[j + 1])) { allowed = false; break }
+            j += 2
+        }
+        out[q] = if (allowed) 1 else 0
+    }
+    return out
+}
+"""),
+        ("checks-only-first-restriction", "MISSING_EDGE_CASE",
+         "금지 목록의 첫 쌍만 본다. 뒤에 적힌 금지는 지켜지지 않는다.",
+         """
+fun friendRequests(n: Int, restrictions: IntArray, requests: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(start: Int): Int { var x = start; while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x] }; return x }
+    val out = IntArray(requests.size / 2)
+    for (q in out.indices) {
+        val a = find(requests[2 * q]); val b = find(requests[2 * q + 1])
+        var allowed = true
+        if (a != b && restrictions.isNotEmpty()) {
+            val x = find(restrictions[0]); val y = find(restrictions[1])
+            if ((x == a && y == b) || (x == b && y == a)) allowed = false
+        }
+        if (allowed) parent[a] = b
+        out[q] = if (allowed) 1 else 0
+    }
+    return out
+}
+"""),
+    ],
+))
+
+
+# --- 196. 최단 경로의 개수 ------------------------------------------------------------------------
+
+def _shortest_path_count(n, edges):
+    import heapq
+    mod = 1_000_000_007
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        a, b, w = edges[i], edges[i + 1], edges[i + 2]
+        adj[a].append((b, w))
+        adj[b].append((a, w))
+    inf = float("inf")
+    dist = [inf] * n
+    ways = [0] * n
+    dist[0] = 0
+    ways[0] = 1
+    heap = [(0, 0)]
+    done = [False] * n
+    while heap:
+        d, v = heapq.heappop(heap)
+        if done[v]:
+            continue
+        done[v] = True
+        for u, w in adj[v]:
+            if d + w < dist[u]:
+                dist[u] = d + w
+                ways[u] = ways[v]
+                heapq.heappush(heap, (dist[u], u))
+            elif d + w == dist[u]:
+                ways[u] = (ways[u] + ways[v]) % mod
+    return ways[n - 1] % mod
+
+
+def _layered_graph(layers, width, salt, weight=1):
+    """0 → 층 → … → 마지막 정점. 층마다 width 갈래라 최단 경로가 width^layers 개다."""
+    edges = []
+    for i in range(width):
+        edges += [0, 1 + i, weight]
+    for layer in range(layers - 1):
+        base = 1 + layer * width
+        nxt = base + width
+        for a in range(width):
+            for b in range(width):
+                edges += [base + a, nxt + b, weight]
+    last = 1 + layers * width
+    for i in range(width):
+        edges += [1 + (layers - 1) * width + i, last, weight]
+    return edges
+
+
+PROBLEMS.append(Problem(
+    id="shortest-path-count",
+    title="최단 경로의 개수",
+    summary="""
+정점 `n` 개와 무방향 간선 `edges = [a1, b1, w1, ...]` 이 주어진다. 정점 `0` 에서 `n-1` 까지 가는 **최단 경로가
+몇 가지인가**를 `1000000007` 로 나눈 나머지로 반환한다. 닿을 수 없으면 `0` 이다.
+""",
+    notes="""
+거리를 구하면서 **가짓수를 같이 들고 간다.** 정점 `u` 의 거리가 줄어들면 가짓수는 새 앞 정점의 것으로
+바뀌고, 같은 거리로 다시 닿으면 **더한다**.
+
+거리가 확정된 순서대로 처리해야 더한 값이 다시 뒤집히지 않는다 — 가장 가까운 것부터 꺼내는 우선순위 큐가
+그 순서를 준다. 가짓수는 금세 커지므로 더할 때마다 나머지를 취한다.
+""",
+    drill_doc="""
+Drill.visit(v, distance)      // v 의 거리를 확정했다
+Drill.write(v, ways)          // v 로 가는 최단 경로의 수
+""",
+    constraints="""
+- `1 <= n <= 50_000`, 간선 `0..200_000` 개, `1 <= w <= 1_000_000`
+- 같은 쌍의 간선이 여럿 있을 수 있고, 자기 자신으로 가는 간선은 없다
+""",
+    signature=dict(name="shortestPathCount", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_shortest_path_count,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 1, 0, 2, 1, 1, 3, 1, 2, 3, 1]]),
+            ("02", [3, [0, 1, 1, 1, 2, 1]]),
+        ],
+        "boundary": [
+            ("01-single-vertex", [1, []]),
+            ("02-unreachable", [3, [0, 1, 5]]),
+            ("03-parallel-edges", [2, [0, 1, 4, 0, 1, 4]]),
+            # 더 짧은 길이 나중에 나타난다 — 가짓수를 덮어써야 한다.
+            ("04-shorter-later", [4, [0, 1, 10, 1, 3, 10, 0, 2, 1, 2, 3, 1]]),
+            ("05-same-length-two-ways", [4, [0, 1, 2, 0, 2, 2, 1, 3, 3, 2, 3, 3]]),
+            ("06-longer-path-ignored", [4, [0, 1, 1, 1, 3, 1, 0, 2, 5, 2, 3, 5]]),
+            ("07-weights-differ", [5, [0, 1, 1, 1, 4, 3, 0, 2, 2, 2, 4, 2, 0, 3, 4, 3, 4, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [10, _forward_edges(10, 20, salt=9985, low=1, high=5)]),
+            ("02-random-medium", [200, _forward_edges(200, 600, salt=9987, low=1, high=20)]),
+            ("03-layered-small", [1 + 3 * 5 + 1, _layered_graph(5, 3, salt=0)]),
+            ("04-equal-weights", [300, _forward_edges(300, 900, salt=9989, low=1, high=1)]),
+            ("05-sparse", [1000, _forward_edges(1000, 1200, salt=9991, low=1, high=100)]),
+        ],
+        "performance": [
+            # 층마다 갈래가 셋이라 최단 경로가 3^층 개다 — 경로를 하나씩 세는 풀이가 끝나지 않는다.
+            ("01-layered", [1 + 3 * 2000 + 1, _layered_graph(2000, 3, salt=0)]),
+            ("02-layered-wide", [1 + 4 * 5000 + 1, _layered_graph(5000, 4, salt=0)]),
+            ("03-random-large", [50000, _forward_edges(50000, 150000, salt=9993, low=1, high=1000)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 다익스트라로 거리를 확정하며 가짓수를 함께 옮긴다.
+fun shortestPathCount(n: Int, edges: IntArray): Int {
+    val mod = 1_000_000_007L
+    val head = IntArray(n) { -1 }
+    val next = IntArray(edges.size / 3 * 2)
+    val to = IntArray(edges.size / 3 * 2)
+    val weight = IntArray(edges.size / 3 * 2)
+    var count = 0
+    for (i in edges.indices step 3) {
+        val a = edges[i]; val b = edges[i + 1]; val w = edges[i + 2]
+        to[count] = b; weight[count] = w; next[count] = head[a]; head[a] = count; count += 1
+        to[count] = a; weight[count] = w; next[count] = head[b]; head[b] = count; count += 1
+    }
+    val inf = Long.MAX_VALUE / 4
+    val dist = LongArray(n) { inf }
+    val ways = LongArray(n)
+    val done = BooleanArray(n)
+    dist[0] = 0
+    ways[0] = 1
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val v = top[1].toInt()
+        if (done[v]) continue
+        done[v] = true
+        Drill.visit(v, dist[v].toInt())
+        var e = head[v]
+        while (e != -1) {
+            val u = to[e]
+            val candidate = dist[v] + weight[e]
+            if (candidate < dist[u]) {
+                dist[u] = candidate
+                ways[u] = ways[v]
+                heap.add(longArrayOf(candidate, u.toLong()))
+                Drill.write(u, ways[u].toInt())
+            } else if (candidate == dist[u]) {
+                ways[u] = (ways[u] + ways[v]) % mod
+                Drill.write(u, ways[u].toInt())
+            }
+            e = next[e]
+        }
+    }
+    return (ways[n - 1] % mod).toInt()
+}
+""",
+    mutants=[
+        ("keeps-first-count", "MISSING_EDGE_CASE",
+         "같은 거리로 다시 닿았을 때 가짓수를 더하지 않는다. 길이 같은 다른 길이 세어지지 않는다.",
+         """
+fun shortestPathCount(n: Int, edges: IntArray): Int {
+    val mod = 1_000_000_007L
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (i in edges.indices step 3) { adj[edges[i]].add(intArrayOf(edges[i + 1], edges[i + 2])); adj[edges[i + 1]].add(intArrayOf(edges[i], edges[i + 2])) }
+    val inf = Long.MAX_VALUE / 4
+    val dist = LongArray(n) { inf }
+    val ways = LongArray(n)
+    val done = BooleanArray(n)
+    dist[0] = 0; ways[0] = 1
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val v = top[1].toInt()
+        if (done[v]) continue
+        done[v] = true
+        for (e in adj[v]) {
+            val candidate = dist[v] + e[1]
+            if (candidate < dist[e[0]]) { dist[e[0]] = candidate; ways[e[0]] = ways[v]; heap.add(longArrayOf(candidate, e[0].toLong())) }
+        }
+    }
+    return (ways[n - 1] % mod).toInt()
+}
+"""),
+        ("no-modulo", "WRONG_ALGORITHM",
+         "가짓수에 나머지를 취하지 않는다. 갈래가 많으면 Int 를 넘겨 값이 뒤집힌다.",
+         """
+fun shortestPathCount(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (i in edges.indices step 3) { adj[edges[i]].add(intArrayOf(edges[i + 1], edges[i + 2])); adj[edges[i + 1]].add(intArrayOf(edges[i], edges[i + 2])) }
+    val inf = Long.MAX_VALUE / 4
+    val dist = LongArray(n) { inf }
+    val ways = IntArray(n)
+    val done = BooleanArray(n)
+    dist[0] = 0; ways[0] = 1
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val v = top[1].toInt()
+        if (done[v]) continue
+        done[v] = true
+        for (e in adj[v]) {
+            val candidate = dist[v] + e[1]
+            if (candidate < dist[e[0]]) { dist[e[0]] = candidate; ways[e[0]] = ways[v]; heap.add(longArrayOf(candidate, e[0].toLong())) }
+            else if (candidate == dist[e[0]]) ways[e[0]] = ways[e[0]] + ways[v]
+        }
+    }
+    return ways[n - 1]
+}
+"""),
+        ("ignores-weights", "WRONG_BRANCH",
+         "간선을 한 걸음으로 세고 너비 우선으로 센다. 가중치가 다르면 최단이 아니다.",
+         """
+fun shortestPathCount(n: Int, edges: IntArray): Int {
+    val mod = 1_000_000_007L
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 3) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val dist = IntArray(n) { -1 }
+    val ways = LongArray(n)
+    dist[0] = 0; ways[0] = 1
+    val queue = java.util.ArrayDeque<Int>()
+    queue.add(0)
+    while (queue.isNotEmpty()) {
+        val v = queue.poll()
+        for (u in adj[v]) {
+            if (dist[u] == -1) { dist[u] = dist[v] + 1; ways[u] = ways[v]; queue.add(u) }
+            else if (dist[u] == dist[v] + 1) ways[u] = (ways[u] + ways[v]) % mod
+        }
+    }
+    return (ways[n - 1] % mod).toInt()
+}
+"""),
+        ("enumerates-paths", "PERFORMANCE",
+         "최단 거리를 구한 뒤 경로를 하나씩 세어 나간다. 갈래가 늘면 경로 수만큼 돈다.",
+         """
+fun shortestPathCount(n: Int, edges: IntArray): Int {
+    val mod = 1_000_000_007L
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (i in edges.indices step 3) { adj[edges[i]].add(intArrayOf(edges[i + 1], edges[i + 2])); adj[edges[i + 1]].add(intArrayOf(edges[i], edges[i + 2])) }
+    val inf = Long.MAX_VALUE / 4
+    val dist = LongArray(n) { inf }
+    val done = BooleanArray(n)
+    dist[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val v = top[1].toInt()
+        if (done[v]) continue
+        done[v] = true
+        for (e in adj[v]) { val candidate = dist[v] + e[1]; if (candidate < dist[e[0]]) { dist[e[0]] = candidate; heap.add(longArrayOf(candidate, e[0].toLong())) } }
+    }
+    if (dist[n - 1] >= inf) return 0
+    var total = 0L
+    fun walk(v: Int, spent: Long) {
+        Drill.compare(v, spent.toInt())
+        if (v == n - 1) { total = (total + 1) % mod; return }
+        for (e in adj[v]) {
+            val next = spent + e[1]
+            if (next + dist[n - 1] - dist[n - 1] <= dist[n - 1] && next == dist[e[0]]) walk(e[0], next)
+        }
+    }
+    walk(0, 0)
+    return (total % mod).toInt()
+}
+"""),
+    ],
+))

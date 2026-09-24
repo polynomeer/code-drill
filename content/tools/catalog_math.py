@@ -2135,3 +2135,136 @@ fun divisorCounts(queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 191. 한 자리가 될 때까지 (자릿수 합 반복) ---------------------------------
+
+def _digit_sum_steps(n):
+    steps = 0
+    while n >= 10:
+        total = 0
+        while n > 0:
+            total += n % 10
+            n //= 10
+        n = total
+        steps += 1
+    return steps
+
+
+PROBLEMS.append(Problem(
+    id="digit-sum-steps",
+    title="한 자리가 될 때까지",
+    summary="""
+음이 아닌 정수 `n` 의 자릿수를 모두 더하는 일을 **한 자리 수가 될 때까지** 반복한다. 몇 번 더했는지 반환한다.
+`n` 이 이미 한 자리면 `0` 이다.
+""",
+    notes="""
+바깥 반복은 "아직 두 자리 이상인가", 안쪽 반복은 "자릿수를 하나씩 떼어 더하기"다. 10 으로 나눈 나머지가
+맨 뒷자리이고 10 으로 나누면 그 자리가 떨어진다.
+
+한 번 더하면 값이 확 줄어든다 — 열 자리 수도 두어 번이면 한 자리다.
+""",
+    drill_doc="""
+Drill.write(0, value)         // 한 번 더한 결과
+""",
+    constraints="""
+- `0 <= n <= 2_000_000_000`
+""",
+    signature=dict(name="digitSumSteps", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_digit_sum_steps,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [("01", [38]), ("02", [5])],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-nine", [9]),
+            ("03-ten", [10]),
+            # 한 번 더해 또 두 자리가 되는 값.
+            ("04-two-rounds", [99]),
+            ("05-three-rounds", [999999999]),
+            ("06-max", [2000000000]),
+            ("07-power-of-ten", [1000000]),
+        ],
+        "hidden": [
+            ("01-random-small", [7]),
+            ("02-random-medium", [randoms(1, 10, 99999, salt=9901)[0]]),
+            ("03-random-large", [randoms(1, 100000, 2000000000, salt=9903)[0]]),
+            ("04-all-nines", [999999]),
+            ("05-single-digit-boundary", [1]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 두 자리 이상인 동안 자릿수를 더한다.
+fun digitSumSteps(n: Int): Int {
+    var value = n
+    var steps = 0
+    while (value >= 10) {
+        var total = 0
+        var rest = value
+        while (rest > 0) { total += rest % 10; rest /= 10 }
+        value = total
+        steps += 1
+        Drill.write(0, value)
+    }
+    return steps
+}
+""",
+    mutants=[
+        ("counts-inner-loop", "WRONG_ALGORITHM",
+         "자릿수를 떼어 낸 횟수를 센다. 세는 것은 '더한 횟수'다.",
+         """
+fun digitSumSteps(n: Int): Int {
+    var value = n
+    var steps = 0
+    while (value >= 10) {
+        var total = 0
+        var rest = value
+        while (rest > 0) { total += rest % 10; rest /= 10; steps += 1 }
+        value = total
+    }
+    return steps
+}
+"""),
+        ("stops-above-ten", "OFF_BY_ONE",
+         "10 보다 클 때만 더한다. 10 자신이 한 자리로 취급된다.",
+         """
+fun digitSumSteps(n: Int): Int {
+    var value = n
+    var steps = 0
+    while (value > 10) {
+        var total = 0
+        var rest = value
+        while (rest > 0) { total += rest % 10; rest /= 10 }
+        value = total
+        steps += 1
+    }
+    return steps
+}
+"""),
+        ("single-round", "MISSING_EDGE_CASE",
+         "한 번만 더하고 끝낸다. 더한 결과가 또 두 자리일 수 있다.",
+         """
+fun digitSumSteps(n: Int): Int {
+    if (n < 10) return 0
+    return 1
+}
+"""),
+        ("drops-last-digit", "WRONG_BRANCH",
+         "나머지를 더하기 전에 자리를 먼저 떨어뜨린다. 맨 뒷자리가 빠진다.",
+         """
+fun digitSumSteps(n: Int): Int {
+    var value = n
+    var steps = 0
+    while (value >= 10) {
+        var total = 0
+        var rest = value
+        while (rest > 0) { rest /= 10; total += rest % 10 }
+        value = total
+        steps += 1
+    }
+    return steps
+}
+"""),
+    ],
+))

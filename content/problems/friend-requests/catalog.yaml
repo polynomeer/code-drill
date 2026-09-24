@@ -1,0 +1,18 @@
+# friend-requests 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - union-find
+  - simulation
+competencies:
+  - MODELING
+  - CONSTRAINTS
+  - CORRECTNESS
+  - ALGORITHM_CHOICE
+prerequisites:
+  - connected-components
+  - equations-possible
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "요청마다 금지 목록을 한 번씩 — 요청 수 × 금지 수"
