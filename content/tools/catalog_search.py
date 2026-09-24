@@ -1972,6 +1972,8 @@ def _random_buildings(count, span, height, salt):
 
 PROBLEMS.append(Problem(
     id="skyline-outline",
+    # v2: 성능 그룹의 시계를 조였다. 좌표마다 훑는 오답이 CI 머신에서 한도의 2.2배에 그쳤다 (§12.1 재현성).
+    version=2,
     title="건물의 윤곽선",
     summary="""
 건물들이 `buildings = [l1, r1, h1, l2, r2, h2, ...]` 로 주어진다. 건물 하나는 `x` 가 `l` 이상 `r` **미만**인
@@ -1995,7 +1997,9 @@ Drill.compare(left, right)    // 두 윤곽선의 다음 점을 견줬다
 - 건물 `0..50_000` 개, `1 <= l < r <= 1_000_000_000`, `1 <= h <= 1_000_000_000`
 """,
     signature=dict(name="skyline", parameters=[("buildings", "INT_ARRAY")], returns="INT_ARRAY"),
-    groups=perf_groups(),
+    # 좌표마다 건물을 훑는 오답의 안쪽은 정수 비교뿐이라 JIT 가 벡터화한다 — CI 머신에서 한도의 2.2배로
+    # 떨어졌고 같은 케이스가 다른 실행에서는 3배를 넘겼다. 정답이 한도의 4% 를 쓰므로 시계를 조인다.
+    groups=perf_groups(time_multiplier=0.25),
     reference=_skyline,
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 16000000},
     cases={
