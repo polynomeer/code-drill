@@ -33,6 +33,16 @@ class Account:
     def headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.access_token}"}
 
+    def refresh(self) -> None:
+        """세션을 갱신한다 (§11.2 회전). access 는 30분이라 긴 실행은 도중에 만료된다.
+
+        웹이 401 을 받으면 하는 것과 같은 일이다 (web/src/api/client.ts). 쓰는 순간 이전
+        refresh 는 무효가 되므로 받은 것으로 바꿔 끼운다.
+        """
+        session = post("/auth/refresh", {"refreshToken": self.refresh_token})
+        self.access_token = session["accessToken"]
+        self.refresh_token = session["refreshToken"]
+
 
 def post(path: str, body: dict) -> dict:
     request = urllib.request.Request(

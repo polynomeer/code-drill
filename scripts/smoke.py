@@ -257,10 +257,26 @@ def raw_request(method: str, path: str, body: dict | None = None, headers: dict 
 
 
 def request(method: str, path: str, body: dict | None = None, headers: dict | None = None) -> dict:
+    merged = with_auth(headers)
+    # 기본 계정으로 나가는 요청인가. 남의 토큰이나 빈 토큰으로 401 을 **시험하는** 호출까지
+    # 갱신하면 그 검사가 무의미해진다.
+    mine = USER is not None and merged.get("Authorization") == f"Bearer {USER.access_token}"
+    try:
+        return _send(method, path, body, merged)
+    except urllib.error.HTTPError as error:
+        # access token 은 30분이다 (§11.2). 스모크는 그보다 오래 걸리므로 도중에 만료된다 —
+        # 웹이 401 에서 하는 것과 같이 한 번 갱신하고 다시 보낸다 (web/src/api/client.ts).
+        if error.code != 401 or not mine:
+            raise
+        USER.refresh()
+        return _send(method, path, body, with_auth(headers))
+
+
+def _send(method: str, path: str, body: dict | None, headers: dict) -> dict:
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{BASE}{path}", data=data, method=method)
     req.add_header("Content-Type", "application/json")
-    for key, value in with_auth(headers).items():
+    for key, value in headers.items():
         # 빈 값은 "이 헤더 없이 보내라"는 뜻이다. 인증 없는 요청을 시험할 때 쓴다.
         if value != "":
             req.add_header(key, value)
