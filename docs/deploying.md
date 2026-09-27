@@ -184,8 +184,14 @@ docker compose -f deploy/docker-compose.yml exec -e PW=<비밀번호> rabbitmq s
 스위트도 같다. 요청에는 참조와 digest 만 실리고, Runner 는 받은 것의 SHA-256 을 대조한 뒤에야
 쓴다.
 
-스토어에도 신원이 둘이다. 앱 스택의 `storage-init` 이 스토어가 뜬 뒤 한 번 돌아 버킷과
-신원을 만든다 ([deploy/storage/init.sh](../deploy/storage/init.sh)).
+스토어는 **SeaweedFS** 의 S3 게이트웨이다. MinIO 였는데 2026-09 에 그 컨테이너 이미지를 어느
+레지스트리에서도 익명으로 받을 수 없게 됐다 — 이미 받아 둔 머신에서만 스택이 떴고, 새 머신인 CI 가
+기동에서 걸려 알았다. 자격증명이 있어야 받는 의존성은 첫 배포 호스트에서도 같은 자리에서 막힌다.
+
+신원과 권한은 **스토어가 뜰 때** 정해진다 ([deploy/storage/start.sh](../deploy/storage/start.sh)) —
+S3 게이트웨이가 설정 파일을 시작할 때 읽기 때문이다. 비밀은 `.env` 에서 와 파일로 쓰이고 이미지에는
+남지 않는다. 버킷은 앱 스택의 `storage-init` 이 한 번 만든다
+([deploy/storage/init.sh](../deploy/storage/init.sh)).
 
 | 신원 | 할 수 있는 것 |
 |---|---|
@@ -194,7 +200,9 @@ docker compose -f deploy/docker-compose.yml exec -e PW=<비밀번호> rabbitmq s
 | `runner` | 이 버킷을 읽는다 — 번들·스위트·소스·워크스페이스 |
 
 지우는 것은 제어 영역만, 그것도 `sources/`·`workspaces/` 아래만이다 — 삭제 요청(§11.3)이 그
-길을 쓴다. 숨은 스위트(`suites/`)는 제어 영역이 건드리지 못한다.
+길을 쓴다. 숨은 스위트(`suites/`)는 제어 영역이 건드리지 못한다. SeaweedFS 에는 삭제만 따로 떼는
+권한이 없어 지우기가 쓰기에 들어 있다 — MinIO 정책에서 옮겨 올 때 모양이 달라진 유일한 곳이고,
+제어 영역의 쓰기를 두 접두사로 좁혀 둔 것이 그래서다.
 아무도 버킷을 만들지 못한다. 앱이 버킷을 만들 수 있다는 것은 곧 그 자격증명이 너무 넓다는
 뜻이다. 비밀 셋은 밖에서 준다.
 

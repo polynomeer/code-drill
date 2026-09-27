@@ -9,7 +9,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException
 import software.amazon.awssdk.services.s3.model.S3Exception
 
 /**
- * S3 호환 스토어. MinIO 와 S3 에 같은 코드로 붙는다.
+ * S3 호환 스토어. SeaweedFS 와 S3 에 같은 코드로 붙는다.
  *
  * 버킷은 만들지 않는다. 배포에서 버킷과 그 권한은 스토어 쪽 설정이고(deploy/), 여기서
  * 만들 수 있다는 것은 곧 이 자격증명이 너무 넓다는 뜻이다.

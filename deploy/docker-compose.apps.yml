@@ -22,19 +22,23 @@ services:
   # 오브젝트 스토어의 버킷과 신원 (§8.3, §11.2). 스토어가 뜬 뒤 한 번 돌고 끝난다.
   # 비밀 둘은 밖에서 준다 — 오케스트레이터(읽기·쓰기)와 Runner 노드(읽기)의 것이다.
   storage-init:
-    # 서버 이미지에 mc 가 들어 있다. 이미지를 하나 더 받지 않는다. 출처와 태그는 위 compose 와 같다.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    # 스토어와 같은 이미지다 — weed shell 이 들어 있어 이미지를 하나 더 받지 않는다.
+    image: chrislusf/seaweedfs:4.47
     profiles: ["apps"]
     entrypoint: ["/bin/sh", "/init.sh"]
     environment:
-      MINIO_ROOT_USER: codedrill
-      MINIO_ROOT_PASSWORD: codedrill
+      STORAGE_BUCKET: codedrill
+      STORAGE_MASTER: storage:9333
+    volumes: ["./storage/init.sh:/init.sh:ro"]
+    depends_on:
+      storage: {condition: service_healthy}
+
+  # 신원과 권한은 스토어가 뜰 때 정해진다 (storage/start.sh). 비밀은 여기서 넘긴다.
+  storage:
+    environment:
       STORAGE_ORCHESTRATOR_SECRET: ${STORAGE_ORCHESTRATOR_SECRET:?오케스트레이터의 스토어 비밀이 필요하다}
       STORAGE_RUNNER_SECRET: ${STORAGE_RUNNER_SECRET:?Runner 의 스토어 비밀이 필요하다}
       STORAGE_CONTROL_PLANE_SECRET: ${STORAGE_CONTROL_PLANE_SECRET:?제어 영역의 스토어 비밀이 필요하다}
-    volumes: ["./storage/init.sh:/init.sh:ro"]
-    depends_on:
-      minio: {condition: service_healthy}
 
   rabbitmq:
     # 개발용 브로커(docker-compose.yml)와 다른 점 셋: 평문 5672 가 없고, 인증서로만
@@ -61,7 +65,7 @@ services:
       AUTH_ORIGIN_SALT: ${AUTH_ORIGIN_SALT:?출처 해시의 소금이 필요하다}
       AUTH_TRUSTED_PROXY: ${AUTH_TRUSTED_PROXY:-false}
       # 제출 소스가 가는 스토어 (§8.3). sources/ 아래만 올리고 지운다.
-      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ENDPOINT: http://storage:8333
       STORAGE_ACCESS_KEY: control-plane
       STORAGE_SECRET_KEY: ${STORAGE_CONTROL_PLANE_SECRET:?}
     volumes: ["./certs/control-plane:/etc/codedrill/broker-tls:ro"]
@@ -92,7 +96,7 @@ services:
       # 임대와 fencing 토큰이 여기 있다 (§4.3). 재시작과 인스턴스 여럿을 넘기는 유일한 자리다.
       REDIS_URL: redis://redis:6379
       # 테스트 번들을 올리는 곳 (§8.3). 이 버킷에 읽고 쓴다.
-      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ENDPOINT: http://storage:8333
       STORAGE_ACCESS_KEY: orchestrator
       STORAGE_SECRET_KEY: ${STORAGE_ORCHESTRATOR_SECRET:?}
     volumes: ["./certs/orchestrator:/etc/codedrill/broker-tls:ro"]

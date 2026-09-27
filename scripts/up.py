@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """로컬 스택 전체를 띄운다 (기술 설계서 §0.1, docs/running-locally.md).
 
-플랫폼 의존성(Postgres·Redis·RabbitMQ·MinIO) + 앱 세 개 + 웹 개발 서버를 한 번에
+플랫폼 의존성(Postgres·Redis·RabbitMQ·오브젝트 스토어) + 앱 세 개 + 웹 개발 서버를 한 번에
 올린다. 절차와 함정은 문서가 진실의 원천이고, 이 스크립트는 그 절차를 실행할 뿐이다.
 
 **포트를 비켜 간다.** 개발 머신에는 5432·6379·8080 을 쓰는 스택이 이미 떠 있는 경우가
@@ -43,8 +43,8 @@ PORTS = {
     "redis": (6379, "REDIS_PORT"),
     "rabbitmq": (5672, "RABBITMQ_PORT"),
     "rabbitmq-ui": (15672, "RABBITMQ_UI_PORT"),
-    "minio": (9000, "MINIO_PORT"),
-    "minio-ui": (9001, "MINIO_UI_PORT"),
+    "storage": (8333, "STORAGE_PORT"),
+    "storage-ui": (8888, "STORAGE_UI_PORT"),
     "control-plane": (8080, None),
     "orchestrator": (8081, None),
     "runner-agent": (8082, None),
@@ -60,8 +60,8 @@ INFRA = {
     "redis": ("redis", 6379),
     "rabbitmq": ("rabbitmq", 5672),
     "rabbitmq-ui": ("rabbitmq", 15672),
-    "minio": ("minio", 9000),
-    "minio-ui": ("minio", 9001),
+    "storage": ("storage", 8333),
+    "storage-ui": ("storage", 8888),
 }
 
 
@@ -156,7 +156,7 @@ def env_for(ports: dict) -> dict:
         REDIS_URL=f"redis://localhost:{ports['redis']}",
         BROKER_URL=f"amqp://codedrill:codedrill@localhost:{ports['rabbitmq']}",
         # 테스트 번들이 가는 곳 (§8.3). 오케스트레이터가 올리고 Runner 가 받는다.
-        STORAGE_ENDPOINT=f"http://localhost:{ports['minio']}",
+        STORAGE_ENDPOINT=f"http://localhost:{ports['storage']}",
         STORAGE_ACCESS_KEY="codedrill",
         STORAGE_SECRET_KEY="codedrill",
         CONTENT_ROOT=str(ROOT / "content" / "problems"),
@@ -240,8 +240,9 @@ def start_infra(ports: dict, env: dict) -> None:
     # 테스트 번들이 가는 버킷 (§8.3). 앱은 버킷을 만들지 않는다 — 만들 수 있는 자격증명은
     # 너무 넓은 자격증명이다. 배포에서는 deploy/ 의 초기화가, 여기서는 이 한 줄이 만든다.
     subprocess.run(
-        [*COMPOSE, "exec", "-T", "minio", "sh", "-c",
-         "mc alias set local http://localhost:9000 codedrill codedrill >/dev/null && mc mb --ignore-existing local/codedrill"],
+        [*COMPOSE, "exec", "-T", "storage", "sh", "-c",
+         "echo 's3.bucket.create -name codedrill' | weed shell -master=localhost:9333 >/dev/null 2>&1; "
+         "echo 's3.bucket.list' | weed shell -master=localhost:9333 | grep -q codedrill"],
         cwd=ROOT, env=compose_env, check=True, capture_output=True,
     )
 
@@ -391,7 +392,7 @@ def summary(ports: dict, with_web: bool) -> None:
         print(f"  웹            http://localhost:{ports['web']}")
     print(f"  제어 영역      http://localhost:{ports['control-plane']}/api/v1")
     print(f"  RabbitMQ UI   http://localhost:{ports['rabbitmq-ui']}  (codedrill/codedrill)")
-    print(f"  MinIO UI      http://localhost:{ports['minio-ui']}     (codedrill/codedrill)")
+    print(f"  스토어 UI     http://localhost:{ports['storage-ui']}     (SeaweedFS filer)")
     print(f"  로그           {LOGS}")
     print()
     print("관리자 API 를 부르려면 스크립트 터미널에서:")

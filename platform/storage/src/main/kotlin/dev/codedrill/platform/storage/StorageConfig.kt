@@ -40,7 +40,7 @@ class StorageConfig {
             .credentialsProvider(
                 StaticCredentialsProvider.create(AwsBasicCredentials.create(properties.accessKey, properties.secretKey)),
             )
-            // MinIO 는 버킷을 경로로 받는다. 가상 호스트 방식은 DNS 가 필요하다.
+            // 자체 호스팅 스토어는 버킷을 경로로 받는다. 가상 호스트 방식은 DNS 가 필요하다.
             .forcePathStyle(true)
             .httpClientBuilder(UrlConnectionHttpClient.builder())
             .build()
@@ -55,7 +55,7 @@ data class StorageProperties(
     val bucket: String = "codedrill",
     val accessKey: String = "",
     val secretKey: String = "",
-    /** MinIO 는 아무 값이나 받지만 클라이언트는 하나를 요구한다. */
+    /** 자체 호스팅 스토어는 아무 값이나 받지만 클라이언트는 하나를 요구한다. */
     val region: String = "us-east-1",
     /** 엔드포인트가 없을 때 쓰는 디렉터리. 비우면 임시 디렉터리 아래다. */
     val directory: String = "",

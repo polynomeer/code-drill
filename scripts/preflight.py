@@ -207,7 +207,7 @@ def runner() -> None:
     if broker and not broker.startswith("amqps://"):
         bad("BROKER_URL 이 amqps 다", f"{broker} — 배포용 브로커에는 평문 리스너가 없다")
     tls_dir = check_env("BROKER_TLS", "runner 신원 디렉터리 (cert.pem·key.pem·ca.pem)")
-    check_env("STORAGE_ENDPOINT", "http://<스토어 호스트>:9000")
+    check_env("STORAGE_ENDPOINT", "http://<스토어 호스트>:8333")
     check_env("STORAGE_RUNNER_SECRET", "앱 호스트에서 만든 Runner 의 스토어 비밀")
 
     for name, default in (("KOTLIN_IMAGE", "eclipse-temurin:21-jre"), ("JAVA_IMAGE", "eclipse-temurin:21-jdk"), ("PYTHON_IMAGE", "python:3.12-alpine")):
@@ -229,7 +229,7 @@ def runner() -> None:
         check_tls(hostname, int(port or 5671), pathlib.Path(tls_dir), "브로커에 runner 신원으로 붙는다")
     endpoint = os.environ.get("STORAGE_ENDPOINT")
     if endpoint:
-        check_http(f"{endpoint.rstrip('/')}/minio/health/live", "스토어에 닿는다")
+        check_http(f"{endpoint.rstrip('/')}/status", "스토어에 닿는다")
     check_http(f"http://localhost:{os.environ.get('RUNNER_PORT', '8082')}/actuator/health", "Runner 가 떠 있다")
 
 

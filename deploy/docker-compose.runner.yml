@@ -10,7 +10,7 @@
 #
 #   BROKER_URL=amqps://<브로커 호스트>:5671 \
 #   BROKER_TLS=<runner 신원 디렉터리> \
-#   STORAGE_ENDPOINT=http://<스토어 호스트>:9000 STORAGE_RUNNER_SECRET=<runner 의 스토어 비밀> \
+#   STORAGE_ENDPOINT=http://<스토어 호스트>:8333 STORAGE_RUNNER_SECRET=<runner 의 스토어 비밀> \
 #   CODEDRILL_TAG=<커밋 SHA> \
 #     docker compose -f deploy/docker-compose.runner.yml up -d
 #

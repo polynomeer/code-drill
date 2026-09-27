@@ -53,20 +53,30 @@ services:
       timeout: 5s
       retries: 10
 
-  minio:
-    # Docker Hub 의 minio/minio 는 더 이상 받을 수 없다(pull access denied) — 이미 받아 둔
-    # 머신에서만 뜨고 새 머신에서는 스택이 통째로 안 선다. quay 의 같은 이미지를 태그까지
-    # 고정해 쓴다. latest 였던 유일한 이미지이기도 했다.
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: ["server", "/data", "--console-address", ":9001"]
+  # 오브젝트 스토어 (§8.3). 소스·테스트 번들·워크스페이스는 DB 가 아니라 여기에 두고
+  # 참조와 digest 만 보관한다.
+  #
+  # MinIO 였다. 2026-09 에 MinIO 의 컨테이너 이미지가 Docker Hub·quay·ghcr 어디에서도
+  # 익명으로 받히지 않게 됐고, 이미 받아 둔 개발 머신에서만 스택이 떴다 — 새 머신인 CI 가
+  # 기동에서 걸려 드러났다. 자격증명이 있어야 받는 의존성은 배포 호스트에서도 같은 자리에서
+  # 막히므로, 익명으로 받히는 S3 구현으로 옮겼다. 앱 쪽은 S3 SDK 그대로라 바뀌지 않는다.
+  storage:
+    image: chrislusf/seaweedfs:4.47
+    entrypoint: ["/bin/sh", "/etc/seaweedfs/start.sh"]
     environment:
-      MINIO_ROOT_USER: codedrill
-      MINIO_ROOT_PASSWORD: codedrill
-    # 소스·테스트 번들·로그·트레이스는 DB 가 아니라 여기에 두고 참조와 digest 만 보관한다 (§8.3).
-    ports: ["${MINIO_PORT:-9000}:9000", "${MINIO_UI_PORT:-9001}:9001"]
-    volumes: ["minio-data:/data"]
+      STORAGE_BUCKET: codedrill
+      STORAGE_ROOT_KEY: codedrill
+      STORAGE_ROOT_SECRET: codedrill
+      # 개발 기본값. 배포에서는 .env 가 덮어쓴다 (docker-compose.apps.yml).
+      STORAGE_ORCHESTRATOR_SECRET: ${STORAGE_ORCHESTRATOR_SECRET:-codedrill}
+      STORAGE_RUNNER_SECRET: ${STORAGE_RUNNER_SECRET:-codedrill}
+      STORAGE_CONTROL_PLANE_SECRET: ${STORAGE_CONTROL_PLANE_SECRET:-codedrill}
+    ports: ["${STORAGE_PORT:-8333}:8333", "${STORAGE_UI_PORT:-8888}:8888"]
+    volumes:
+      - storage-data:/data
+      - ./storage/start.sh:/etc/seaweedfs/start.sh:ro
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://localhost:8333/status"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -120,4 +130,4 @@ services:
 volumes:
   postgres-data:
   rabbitmq-data:
-  minio-data:
+  storage-data:
