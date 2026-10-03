@@ -23,6 +23,7 @@ const DIST = new URL('../dist/', import.meta.url).pathname
  * UI 개편 U0 에서 94KB → 117KB 가 됐다. 서버 상태 캐시(react-query) 10KB, 디자인 시스템과
  * 아이콘 7KB, 라우터(wouter) 3KB. 라우터는 react-router 를 먼저 들였다가 그것 하나가 32KB 라
  * 바꿨다 (docs/ui-overhaul.md §3). 웹 글꼴 CSS 는 진입에 넣지 않고 늦게 불러온다.
+ * U1 에서 풀이 화면이 따로 청크로 나가며 102KB 로 줄었다. 한도는 그대로 둔다.
  */
 const ENTRY_GZIP_KB = 140
 

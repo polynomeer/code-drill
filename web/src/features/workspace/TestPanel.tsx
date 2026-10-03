@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import type { Ref } from 'react'
 import { getTrial, startTrial } from '../../api/client'
 import { MutationCheckPanel } from './MutationCheckPanel'
 import { VERDICT_LABEL } from '../../shared/types'
@@ -14,14 +15,21 @@ import type { Problem, SubmissionLanguage, Trial } from '../../shared/types'
  * 흔하고, 그때 억지로 적게 하면 아무 값이나 넣게 된다. 적지 않은 케이스는 맞고 틀림을
  * 말하지 않고 나온 값만 보여준다.
  */
+export type TestPanelHandle = { run: () => void }
+
 export function TestPanel({
   problem,
   language,
   source,
+  ref,
+  onRunningChange,
 }: {
   problem: Problem
   language: SubmissionLanguage
   source: string
+  /** 툴바의 실행 버튼과 ⌘↵ 가 이 패널의 실행을 부른다 (디자인 설계서 §6.4) */
+  ref?: Ref<TestPanelHandle>
+  onRunningChange?: (running: boolean) => void
 }) {
   const [text, setText] = useState('')
   const [trial, setTrial] = useState<Trial | null>(null)
@@ -72,14 +80,18 @@ export function TestPanel({
     }, 600)
   }
 
+  // 실행 중이면 다시 부르지 않는다 — 단축키를 연타해도 실행은 하나다.
+  useImperativeHandle(ref, () => ({ run: () => void (!running && source.trim() && run()) }))
+  useEffect(() => onRunningChange?.(running), [running, onRunningChange])
+
   const inputs = parseCases(text)
 
   return (
     <section className="panel test-panel">
       <div className="editor-header">
-        <h3>테스트</h3>
+        <h3 className="visually-hidden">테스트</h3>
         <button onClick={() => void run()} disabled={running || !source.trim()}>
-          {running ? '실행 중…' : '실행'}
+          {running ? '실행 중…' : '이 케이스로 실행'}
         </button>
       </div>
 

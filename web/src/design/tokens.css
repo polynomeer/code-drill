@@ -140,6 +140,9 @@
   --control-default: 36px;
   --control-touch: 44px;
 
+  /* 에디터는 두 테마 모두 어둡다. 그 위의 글자는 테마를 따르지 않는다 */
+  --color-text-on-editor: #a9b5bb;
+
   --header-height: 56px;
   --content-max: 1200px;
 

@@ -1,0 +1,432 @@
+/* S-01 풀이 Workspace — 화면 전체를 쓴다 (디자인 설계서 §13.3 workspace: viewport full) */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg-app);
+}
+
+/* ─── 툴바 ─── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: 52px;
+  flex: none;
+  padding: 0 var(--space-3);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.toolbarStart,
+.toolbarEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.toolbarEnd {
+  flex: none;
+}
+
+.back {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-default);
+  height: var(--control-default);
+  flex: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+}
+
+.back:hover {
+  background: var(--color-bg-subtle);
+}
+
+.title {
+  margin: 0 0 0 var(--space-1);
+  overflow: hidden;
+  font: var(--text-h3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.language {
+  width: 112px;
+  height: var(--control-default);
+}
+
+.saveState,
+.saveFailed {
+  min-width: 52px;
+  font: var(--text-caption);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.saveState {
+  color: var(--color-text-muted);
+}
+
+.saveFailed {
+  color: var(--color-danger);
+}
+
+.alert {
+  padding: var(--space-2) var(--space-3) 0;
+}
+
+/* ─── 본문 ─── */
+
+.body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.group {
+  height: 100%;
+}
+
+.problemPane,
+.editorPane,
+.drawer {
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.problemPane {
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+
+.problemPane:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+/* 탭 머리는 붙어 있고 본문만 흐른다 */
+.problemPane > div,
+.drawer > div {
+  height: 100%;
+}
+
+.problemPane [role='tablist'],
+.drawer [role='tablist'] {
+  flex: none;
+  padding: 0 var(--space-3);
+}
+
+.problemPane [role='tabpanel'],
+.drawer [role='tabpanel'] {
+  flex: 1;
+  min-height: 0;
+  padding-top: 0;
+  overflow-y: auto;
+}
+
+.keepAlive {
+  min-height: 100%;
+}
+
+.paneBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+
+/* 옛 패널(section.panel)이 새 창 안에 들어오면 테두리를 겹으로 두르지 않는다 */
+.paneBody :global(.panel),
+.drawerBody :global(.panel),
+.coaching :global(.panel) {
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+
+.editorPane {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-editor);
+  border-color: var(--color-bg-editor);
+}
+
+.editor {
+  flex: 1;
+  min-height: 0;
+}
+
+.editorLoading {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-on-editor);
+}
+
+.saveBanner {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.saveBanner p {
+  margin: 0;
+}
+
+.drawer {
+  display: flex;
+  flex-direction: column;
+}
+
+.drawerBody {
+  padding: var(--space-3) var(--space-4) var(--space-5);
+}
+
+/* 접힌 결과 창은 탭 머리만 남는다 — 판정 배지가 상태 표시줄 노릇을 한다 */
+.drawerCollapsed [role='tabpanel'] {
+  visibility: hidden;
+}
+
+.instrumentation {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.instrumentation summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.instrumentation[open] summary {
+  margin-bottom: var(--space-3);
+}
+
+/* ─── 분할 핸들 (UI 디자인 문서 §4.1 — 4~8px, 키보드 조절) ─── */
+
+.separatorVertical,
+.separatorHorizontal {
+  position: relative;
+  flex: none;
+  background: transparent;
+  outline: none;
+}
+
+.separatorVertical {
+  width: 8px;
+}
+
+.separatorHorizontal {
+  height: 8px;
+}
+
+.separatorVertical::after,
+.separatorHorizontal::after {
+  content: '';
+  position: absolute;
+  border-radius: var(--radius-full);
+  background: transparent;
+  transition: background-color var(--motion-micro);
+}
+
+.separatorVertical::after {
+  top: 50%;
+  left: 3px;
+  width: 2px;
+  height: 40px;
+  transform: translateY(-50%);
+}
+
+.separatorHorizontal::after {
+  left: 50%;
+  top: 3px;
+  height: 2px;
+  width: 40px;
+  transform: translateX(-50%);
+}
+
+.separatorVertical:hover::after,
+.separatorHorizontal:hover::after,
+.separatorVertical[data-separator='active']::after,
+.separatorHorizontal[data-separator='active']::after {
+  background: var(--color-border-strong);
+}
+
+.separatorVertical:focus-visible::after,
+.separatorHorizontal:focus-visible::after {
+  background: var(--color-brand);
+}
+
+/* ─── 코칭 (DS §6.1 side utility — overlay) ─── */
+
+.coaching {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-2);
+  z-index: var(--z-drawer);
+  width: min(360px, calc(100% - 2 * var(--space-2)));
+  padding: var(--space-4);
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  animation: coaching-in var(--motion-panel);
+}
+
+@keyframes coaching-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+}
+
+.coachingHead {
+  display: flex;
+  justify-content: flex-end;
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) var(--space-1) 0;
+}
+
+/* ─── 모바일 (< 768) ─── */
+
+.mobile {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile > div {
+  height: 100%;
+}
+
+.mobile [role='tablist'] {
+  flex: none;
+  padding: 0 var(--space-3);
+  background: var(--color-bg-surface);
+}
+
+.mobile [role='tabpanel'] {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.mobileBody,
+.mobileFill {
+  height: 100%;
+}
+
+.mobileFill:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobileHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.mobileFill .editorPane {
+  flex: 1;
+  min-height: 320px;
+}
+
+.fallback {
+  padding: var(--space-7) var(--space-4);
+}
+
+/* ─── 설정 대화상자 ─── */
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: end;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-default);
+  font: var(--text-label);
+}
+
+.settingsHeading {
+  margin: var(--space-5) 0 var(--space-2);
+  font: var(--text-label);
+  color: var(--color-text-muted);
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.shortcut dd {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+}
+
+.settingsDanger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+}
+
+.settingsDanger p {
+  margin: 0;
+}
+
+@media (max-width: 767px) {
+  .toolbar {
+    padding: 0 var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .toolbarEnd {
+    gap: var(--space-1);
+  }
+
+  .language {
+    width: 96px;
+  }
+}
+
+@media (max-width: 560px) {
+  .settingsGrid,
+  .shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

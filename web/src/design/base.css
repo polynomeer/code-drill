@@ -28,6 +28,9 @@ pre,
 samp,
 .mono {
   font-family: var(--font-mono);
+  /* 합자를 끈다. JetBrains Mono 는 <= 를 ≤ 로 그려, 지문의 코드가 실제와 다른 글자로 보인다.
+     컴포넌트마다 쓰는 `font:` 단축 속성이 이 값을 normal 로 되돌리므로 !important 로 지킨다. */
+  font-variant-ligatures: none !important;
 }
 
 button,

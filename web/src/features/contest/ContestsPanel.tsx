@@ -203,7 +203,7 @@ export function ContestsPanel({
                 분
               </p>
             ) : (
-              <p className="muted">문제를 고르면 그 문제로 대결을 열 수 있습니다.</p>
+              <p className="muted">대결은 풀이 화면 툴바의 "미니 대결 열기"로 그 문제를 골라 엽니다.</p>
             )}
             <p>
               <input

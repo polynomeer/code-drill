@@ -10,7 +10,7 @@ import {
 } from '../../api/client'
 import { DIFFICULTY_LABEL, VERDICT_LABEL } from '../../shared/types'
 import type { ProjectDraft, ProjectProbeOutcome, ProjectSubmission, ProjectView } from '../../shared/types'
-import { SaveIndicator } from '../workspace/Workspace'
+import { SaveIndicator } from '../workspace/SaveIndicator'
 import { useDraftSync } from '../workspace/useDraftSync'
 
 const MonacoWorkspace = lazy(() => import('../workspace/MonacoWorkspace'))

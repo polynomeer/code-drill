@@ -24,7 +24,16 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }
   { value: 'system', label: '시스템 설정', Icon: Monitor },
 ]
 
-export function AppShell({ session, children }: { session: Session; children: ReactNode }) {
+export function AppShell({
+  session,
+  immersive = false,
+  children,
+}: {
+  session: Session
+  /** 풀이 화면처럼 화면 전체를 쓰는 곳. 전역 헤더를 접고 본문이 남은 높이를 다 갖는다 */
+  immersive?: boolean
+  children: ReactNode
+}) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [location] = useLocation()
   const [theme, setTheme] = useState<ThemePreference>(getThemePreference)
@@ -35,11 +44,11 @@ export function AppShell({ session, children }: { session: Session; children: Re
   }
 
   return (
-    <div className={styles.shell}>
+    <div className={immersive ? `${styles.shell} ${styles.immersive}` : styles.shell}>
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
-      <header className={styles.header}>
+      <header className={styles.header} hidden={immersive}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.logo} aria-label="CodeDrill 홈">
             <span className={styles.logoMark} aria-hidden="true">

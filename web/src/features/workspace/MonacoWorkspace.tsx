@@ -1,31 +1,60 @@
 import Editor from '@monaco-editor/react'
+import type { OnMount } from '@monaco-editor/react'
 import { setupMonaco } from './monacoSetup'
+import type { EditorSettings } from './editorSettings'
 
 // 모듈이 로드되는 시점 = 에디터가 실제로 필요해진 시점이다.
 setupMonaco()
+
+export type EditorHandle = { focus: () => void; revealLine: (line: number, column?: number) => void }
 
 export default function MonacoWorkspace({
   source,
   language,
   onChange,
+  settings,
+  onReady,
+  label = '코드 편집기',
 }: {
   source: string
   language: string
   onChange: (next: string) => void
+  /** 없으면 예전 기본값 — 프로젝트형 작업 공간은 아직 설정을 따르지 않는다 */
+  settings?: EditorSettings
+  /** 포커스·줄 이동을 바깥에서 부를 수 있게 손잡이를 건넨다 (단축키 ⌥2, 컴파일 오류 줄) */
+  onReady?: (handle: EditorHandle) => void
+  label?: string
 }) {
+  const handleMount: OnMount = (editor) => {
+    onReady?.({
+      focus: () => editor.focus(),
+      revealLine: (line, column = 1) => {
+        editor.revealLineInCenter(line)
+        editor.setPosition({ lineNumber: line, column })
+        editor.focus()
+      },
+    })
+  }
+
   return (
     <Editor
       language={language}
+      // 에디터는 두 테마 모두 어둡다 (docs/ui-overhaul.md §2 — editor.base).
       theme="vs-dark"
       value={source}
       onChange={(next) => onChange(next ?? '')}
+      onMount={handleMount}
       options={{
-        minimap: { enabled: false },
-        fontSize: 13,
+        minimap: { enabled: settings?.minimap ?? false },
+        fontSize: settings?.fontSize ?? 13,
+        tabSize: settings?.tabSize ?? 4,
+        wordWrap: settings?.wordWrap ? 'on' : 'off',
         fontFamily: "'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, Menlo, monospace",
         fontLigatures: false,
         scrollBeyondLastLine: false,
         automaticLayout: true,
+        ariaLabel: label,
+        padding: { top: 8 },
       }}
     />
   )
