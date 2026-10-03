@@ -1,0 +1,202 @@
+.shell {
+  min-height: 100vh;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  height: var(--header-height);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  max-width: 1400px;
+  height: 100%;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font: var(--text-h3);
+}
+
+.logoMark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+  border-radius: var(--radius-md);
+  font: 700 12px/1 var(--font-mono);
+  letter-spacing: -0.5px;
+}
+
+.nav {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  height: 100%;
+}
+
+.navItem {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font: var(--text-label);
+  transition: color var(--motion-micro);
+}
+
+.navItem:hover {
+  color: var(--color-text-primary);
+}
+
+/* 현재 메뉴는 색·굵기·밑줄 셋으로 (UI 디자인 문서 §3.2 "현재 메뉴 표시") */
+.navActive {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-strong);
+}
+
+.navActive::after {
+  content: '';
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 0;
+  height: 2px;
+  background: var(--color-brand);
+}
+
+.userArea {
+  margin-left: auto;
+}
+
+.userButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-default);
+  padding: 0 var(--space-2) 0 var(--space-1);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.userButton:hover {
+  background: var(--color-bg-subtle);
+}
+
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-brand-subtle);
+  color: var(--color-brand);
+  border-radius: 50%;
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.userName {
+  font: var(--text-label);
+}
+
+.menu {
+  /* popover 는 top layer 에 뜬다. 버튼 아래 오른쪽에 붙인다 */
+  position: fixed;
+  inset: auto;
+  top: calc(var(--header-height) - 4px);
+  right: max(var(--space-4), calc((100vw - 1400px) / 2 + var(--space-4)));
+  margin: 0;
+  min-width: 220px;
+  padding: var(--space-2);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  color: var(--color-text-primary);
+}
+
+.menuHeading {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+  border-bottom: 1px solid var(--color-border-default);
+  margin-bottom: var(--space-1);
+}
+
+.menuGroup {
+  margin: var(--space-1) 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  border-top: 1px solid var(--color-border-default);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.menuLabel {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: var(--control-default);
+  padding: 0 var(--space-3);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: var(--text-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--color-bg-subtle);
+}
+
+.menuItem[aria-pressed='true'] {
+  color: var(--color-brand);
+  font-weight: var(--weight-strong);
+}
+
+.menuItem[aria-pressed='true']::after {
+  content: '✓';
+  margin-left: auto;
+}
+
+.main {
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .userName,
+  .logoText {
+    display: none;
+  }
+
+  .headerInner {
+    gap: var(--space-3);
+  }
+}

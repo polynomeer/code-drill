@@ -15,13 +15,7 @@ import type { Contributions, Rating } from '../../shared/types'
  */
 const TIER_NAME = { NEW: '새 기여자', ACTIVE: '기여자', TRUSTED: '믿을 만한 기여자' }
 
-export function AccountSettings({
-  session,
-  onClose,
-}: {
-  session: Session
-  onClose: () => void
-}) {
+export function AccountSettings({ session }: { session: Session }) {
   const [name, setName] = useState(session.displayName)
   const [contributions, setContributions] = useState<Contributions | null>(null)
   const [rating, setRating] = useState<Rating | null>(null)
@@ -65,13 +59,8 @@ export function AccountSettings({
     })
 
   return (
-    <section className="panel settings">
-      <div className="problem-head">
-        <h3>계정 설정</h3>
-        <button type="button" className="linklike" onClick={onClose}>
-          닫기
-        </button>
-      </div>
+    // 제목과 닫기는 감싸는 대화상자(app/AppShell.tsx)가 그린다.
+    <div className="settings">
 
       {error && <p className="warn">{error}</p>}
       {note && <p className="muted">{note}</p>}
@@ -198,6 +187,6 @@ export function AccountSettings({
           계정 삭제
         </button>
       </div>
-    </section>
+    </div>
   )
 }

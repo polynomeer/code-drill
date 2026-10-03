@@ -1,0 +1,84 @@
+.page {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-7);
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.title {
+  margin: 0;
+  font: var(--text-display);
+}
+
+.lead {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.section {
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-4);
+  font: var(--text-h2);
+}
+
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-caption);
+}
+
+.swatchColor {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 480px;
+}

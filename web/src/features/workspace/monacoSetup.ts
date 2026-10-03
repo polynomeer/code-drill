@@ -51,4 +51,7 @@ export function setupMonaco() {
     getWorker: () => new editorWorker(),
   }
   loader.config({ monaco })
+  // 에디터는 글자 폭을 처음 그릴 때 한 번 잰다. 웹 글꼴이 그 뒤에 도착하면 커서와 글자가
+  // 어긋나므로, 글꼴이 다 오면 다시 잰다.
+  void document.fonts?.ready.then(() => monaco.editor.remeasureFonts())
 }

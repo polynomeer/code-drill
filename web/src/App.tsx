@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { createSubmission, getDraft, getProblem, listProjects, listSubmissions, logout } from './api/client'
-import { getSession, onSessionChange, type Session } from './api/session'
-import { AccountSettings } from './features/auth/AccountSettings'
-import { SanctionBanner } from './features/auth/SanctionBanner'
-import { SignIn } from './features/auth/SignIn'
+import { createSubmission, getDraft, getProblem, listProjects, listSubmissions } from './api/client'
 import { ProblemList } from './features/problems/ProblemList'
 import { ReplayView } from './features/replay/ReplayView'
 import { HistoryPanel } from './features/submissions/HistoryPanel'
@@ -33,22 +29,11 @@ import type { Problem, Submission, SubmissionLanguage } from './shared/types'
  *
  * 문제 탐색 → 코드 작성(자동 저장) → 제출 → SSE → 판정 → 리플레이 → 기록.
  * Judge first 원칙에 따라 판정 결과가 항상 먼저 보이고, 리플레이와 기록은 그 아래에 붙는다.
+ *
+ * 전역 헤더·계정 설정·제재 배너는 앱 셸(app/AppShell.tsx)이 그린다. 이 화면은 docs/ui-overhaul.md
+ * U1·U2 에서 Workspace 와 문제 탐색 라우트로 나뉜다.
  */
-export function App() {
-  // 세션이 없으면 아무것도 그리지 않는다. 제출·초안·기록이 전부 인증을 요구하므로,
-  // 로그인 전 화면은 실패한 요청 목록이 될 뿐이다.
-  const [session, setSession] = useState<Session | null>(getSession)
-
-  // 토큰 갱신이 끝내 실패하면 세션 모듈이 스스로 비운다. 그때 화면도 로그인으로
-  // 돌아가야 한다 — 그러지 않으면 사용자는 아무 반응 없는 화면을 보게 된다.
-  useEffect(() => onSessionChange(setSession), [])
-
-  if (!session) return <SignIn onSignedIn={setSession} />
-  return <Drill session={session} />
-}
-
-function Drill({ session }: { session: Session }) {
-  const [settingsOpen, setSettingsOpen] = useState(false)
+export function Drill() {
   const [slug, setSlug] = useState<string | null>(null)
   const [problem, setProblem] = useState<Problem | null>(null)
   const [language, setLanguage] = useState<SubmissionLanguage>('KOTLIN')
@@ -179,43 +164,20 @@ function Drill({ session }: { session: Session }) {
 
   return (
     <div className="app">
-      <header className="top">
-        <strong>CodeDrill</strong>
-        <span className="muted">문제를 푸는 것이 아니라, 문제 해결 역량을 훈련합니다</span>
-        <span className="who">
-          <button
-            type="button"
-            className="linklike"
-            onClick={() => setSettingsOpen((open) => !open)}
-            aria-expanded={settingsOpen}
-          >
-            {session.displayName}
-          </button>
-          <button type="button" className="linklike" onClick={() => void logout()}>
-            로그아웃
-          </button>
-        </span>
-      </header>
-
       {error && <p className="warn">{error}</p>}
-      {/* 제재는 무엇보다 먼저 보여야 한다 (§8.5). 없으면 아무것도 그리지 않는다. */}
-      <SanctionBanner />
 
       {openProject && (
-        <main>
+        <div>
           <ProjectWorkspace
             id={openProject}
             onClose={() => setOpenProject(null)}
             onJudged={() => setProjectsJudged((n) => n + 1)}
           />
-        </main>
+        </div>
       )}
       {/* 프로젝트가 열려 있으면 두 열은 그리지 않는다 — 같은 화면에 작업 공간이 둘이면 어느 것이 내 일인지 헷갈린다. */}
-      <main className="columns" hidden={openProject !== null}>
+      <div className="columns" hidden={openProject !== null}>
         <div className="stack">
-          {settingsOpen && (
-            <AccountSettings session={session} onClose={() => setSettingsOpen(false)} />
-          )}
           {/* 목록보다 위다. "무엇을 풀지 모를 때 현재 수준과 약점을 기준으로 고른다"가
               PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
           <TodayPanel onOpenProblem={selectProblem} refreshKey={history.length} />
@@ -332,7 +294,7 @@ function Drill({ session }: { session: Session }) {
             onView={setViewingCode}
           />
         </div>
-      </main>
+      </div>
     </div>
   )
 }

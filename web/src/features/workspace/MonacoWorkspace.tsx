@@ -22,6 +22,8 @@ export default function MonacoWorkspace({
       options={{
         minimap: { enabled: false },
         fontSize: 13,
+        fontFamily: "'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, Menlo, monospace",
+        fontLigatures: false,
         scrollBeyondLastLine: false,
         automaticLayout: true,
       }}

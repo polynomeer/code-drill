@@ -1,42 +1,27 @@
 /*
  * 디자인 설계서 §1.2: State over decoration.
  * 상태와 변화가 시각 강조의 근거다. 의미 없는 다색 카드를 만들지 않는다.
+ *
+ * 이 파일은 개편 전 화면들의 스타일이다. 값은 전부 design/tokens.css 를 가리키고, 아래
+ * 옛 이름들은 그 토큰의 별칭일 뿐이다. 화면이 design/ 컴포넌트로 옮겨 갈 때마다 여기서
+ * 해당 규칙을 지운다 (docs/ui-overhaul.md §5). 새 규칙을 여기 더하지 않는다.
  */
 
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --border: #262b36;
-  --text: #e6e8ec;
-  --muted: #8b93a3;
-  --ok: #3fb950;
-  --bad: #f85149;
-  --accent: #4d8ef7;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --bg: var(--color-bg-app);
+  --panel: var(--color-bg-surface);
+  --border: var(--color-border-default);
+  --text: var(--color-text-primary);
+  --muted: var(--color-text-muted);
+  --ok: var(--color-success);
+  --bad: var(--color-danger);
+  --accent: var(--color-brand);
 }
 
 .app {
   max-width: 1400px;
   margin: 0 auto;
   padding: 16px;
-}
-
-.top {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
 }
 
 .columns {
@@ -53,12 +38,15 @@ body {
 }
 
 @media (max-width: 900px) {
+  /* 1fr 은 minmax(auto, 1fr) 라 가장 긴 줄(줄바꿈 없는 태그 목록 등)만큼 열이 늘어나 화면 밖으로
+     밀렸다. 0 을 바닥으로 두면 열은 화면 폭을 넘지 않고 안의 것이 스스로 줄인다. */
   .columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 .stack {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -108,7 +96,7 @@ body {
 select {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 5px 8px;
 }
@@ -158,7 +146,7 @@ select {
 button {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
   padding: 6px 12px;
   cursor: pointer;
@@ -172,7 +160,7 @@ button:disabled {
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--color-text-on-brand);
 }
 
 .status {
@@ -218,7 +206,7 @@ button.primary {
 }
 
 .log {
-  background: #0b0d11;
+  background: var(--color-bg-inset);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
@@ -268,7 +256,7 @@ table.groups td {
   padding: 8px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #0b0d11;
+  background: var(--color-bg-inset);
 }
 
 .cell-index {
@@ -315,7 +303,7 @@ table.groups td {
 
 .search {
   width: 100%;
-  background: #0b0d11;
+  background: var(--color-bg-inset);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -515,7 +503,7 @@ table.groups td {
   padding: 6px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: #0b0d11;
+  background: var(--color-bg-inset);
   font-variant-numeric: tabular-nums;
 }
 
@@ -546,7 +534,7 @@ table.groups td {
 }
 
 .graph-node circle {
-  fill: #0b0d11;
+  fill: var(--color-bg-inset);
   stroke: var(--muted);
   stroke-width: 1.5;
 }
@@ -645,8 +633,8 @@ table.groups td {
   margin: 0;
   padding: 8px 10px;
   border-radius: 6px;
-  background: rgba(220, 80, 80, 0.12);
-  color: #d05050;
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
   font-size: 12px;
 }
 
@@ -656,7 +644,7 @@ table.groups td {
   border: 0;
   border-radius: 6px;
   background: var(--accent);
-  color: #fff;
+  color: var(--color-text-on-brand);
   font-size: 14px;
   cursor: pointer;
 }
@@ -1334,4 +1322,20 @@ table.groups td {
 
 .import-label input[type='file'] {
   display: none;
+}
+
+/*
+ * 컨트롤 경계는 UI 경계 대비 3:1 을 넘어야 한다 (디자인 설계서 §15.2) — 패널 경계(--border)와 다른
+ * 토큰이다. :where 로 걸어 우선순위를 0 으로 둔다. 목록 행처럼 경계를 따로 정한 규칙과
+ * design/ 컴포넌트가 언제나 이긴다.
+ */
+:where(input:not([type='checkbox']):not([type='radio']), textarea) {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+}
+
+.panel h3 {
+  font: var(--text-h3);
 }
