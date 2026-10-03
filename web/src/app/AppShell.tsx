@@ -16,7 +16,10 @@ import styles from './AppShell.module.css'
  * 내비게이션에는 **지금 있는 라우트만** 올린다. 훈련·역량·대회는 ui-overhaul.md 의 단계가
  * 라우트를 열 때 여기 한 줄씩 늘어난다 — 누르면 같은 화면이 나오는 메뉴는 메뉴가 아니다.
  */
-const NAV = [{ to: '/', label: '문제' }]
+const NAV = [
+  { to: '/', label: '홈', signedIn: true },
+  { to: '/problems', label: '문제', signedIn: false },
+]
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }[] = [
   { value: 'light', label: '라이트', Icon: Sun },
@@ -29,7 +32,8 @@ export function AppShell({
   immersive = false,
   children,
 }: {
-  session: Session
+  /** 없으면 둘러보는 사람이다 — 공개 화면만 열리고 오른쪽에 로그인이 있다 */
+  session: Session | null
   /** 풀이 화면처럼 화면 전체를 쓰는 곳. 전역 헤더를 접고 본문이 남은 높이를 다 갖는다 */
   immersive?: boolean
   children: ReactNode
@@ -58,12 +62,12 @@ export function AppShell({
           </Link>
 
           <nav aria-label="주 메뉴" className={styles.nav}>
-            {NAV.map((item) => (
+            {NAV.filter((item) => session || !item.signedIn).map((item) => (
               <Link
                 key={item.to}
                 href={item.to}
-                className={(active) => (active ? `${styles.navItem} ${styles.navActive}` : styles.navItem)}
-                aria-current={location === item.to ? 'page' : undefined}
+                className={isCurrent(location, item.to) ? `${styles.navItem} ${styles.navActive}` : styles.navItem}
+                aria-current={isCurrent(location, item.to) ? 'page' : undefined}
               >
                 {item.label}
               </Link>
@@ -71,6 +75,12 @@ export function AppShell({
           </nav>
 
           <div className={styles.userArea}>
+            {!session ? (
+              <Link href={`/login?next=${encodeURIComponent(location)}`} className={styles.signIn}>
+                로그인
+              </Link>
+            ) : (
+            <>
             {/* Popover API — 바깥 클릭과 Esc 로 닫히는 것을 브라우저가 준다 */}
             <button type="button" className={styles.userButton} popoverTarget="user-menu">
               <span className={styles.avatar} aria-hidden="true">
@@ -113,12 +123,14 @@ export function AppShell({
                 로그아웃
               </button>
             </div>
+            </>
+            )}
           </div>
         </div>
       </header>
 
       {/* 제재는 무엇보다 먼저 보여야 한다 (§8.5). 없으면 아무것도 그리지 않는다. */}
-      <SanctionBanner />
+      {session && <SanctionBanner />}
 
       <main id="main" tabIndex={-1} className={styles.main}>
         {children}
@@ -131,8 +143,13 @@ export function AppShell({
         description="표시 이름, 비밀번호, 내 데이터"
         size="wide"
       >
-        {settingsOpen && <AccountSettings session={session} />}
+        {settingsOpen && session && <AccountSettings session={session} />}
       </Dialog>
     </div>
   )
+}
+
+/** 홈은 정확히 `/` 일 때만, 나머지는 그 아래 경로까지 현재 메뉴다 (`/problems/x` 도 "문제"). */
+function isCurrent(location: string, to: string): boolean {
+  return to === '/' ? location === '/' : location === to || location.startsWith(`${to}/`)
 }

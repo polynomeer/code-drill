@@ -1,0 +1,366 @@
+/* P-01 문제 탐색 — 표 + 보조 열 (UI 디자인 문서 §3.2, §8.1) */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--space-5);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+@media (max-width: 1279px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font: var(--text-h1);
+}
+
+.count {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+/* ─── 필터 ─── */
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+}
+
+.group {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.groupLabel {
+  float: left;
+  width: 44px;
+  padding: 5px 0 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.groupBody {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.moreTags {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-dense);
+  padding: 0 var(--space-3);
+  background: transparent;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font: var(--text-caption);
+  cursor: pointer;
+}
+
+.moreTags:hover {
+  background: var(--color-bg-subtle);
+}
+
+.tagPopover {
+  width: min(480px, calc(100vw - 2 * var(--space-4)));
+  max-height: min(420px, 70vh);
+  margin: auto;
+  padding: var(--space-4);
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  color: var(--color-text-primary);
+}
+
+.tagPopover::backdrop {
+  background: var(--color-backdrop);
+}
+
+.tagGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.reset {
+  align-self: flex-start;
+}
+
+/* ─── 표 ─── */
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: opacity var(--motion-micro);
+}
+
+.table[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.table th {
+  padding: 0 var(--space-3);
+  height: 40px;
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border-default);
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* 행 전체가 링크다: 제목 링크가 행을 덮는다. hover 는 미세한 배경만 (UI 디자인 문서 §3.3) */
+.table tbody tr {
+  position: relative;
+}
+
+.table tbody tr:hover {
+  background: var(--color-bg-subtle);
+}
+
+.rowLink {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.rowLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.rowLink:focus-visible {
+  box-shadow: none;
+}
+
+.rowLink:focus-visible::after {
+  box-shadow: inset var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sortButton:hover {
+  color: var(--color-text-primary);
+}
+
+.sortIdle {
+  opacity: 0.4;
+}
+
+.sortActive {
+  color: var(--color-brand);
+}
+
+.colStatus {
+  width: 36px;
+  text-align: center;
+}
+
+.table .colStatus {
+  padding-right: 0;
+}
+
+.colNumber {
+  width: 72px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.colTitle {
+  min-width: 0;
+}
+
+.tags {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 460px;
+}
+
+.colDifficulty {
+  width: 96px;
+}
+
+.colRate,
+.colSolvers {
+  width: 96px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th.colRate,
+.table th.colSolvers {
+  text-align: right;
+}
+
+.solved {
+  color: var(--color-success);
+}
+
+.unsolved {
+  color: var(--color-border-strong);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.skeletonRow {
+  display: grid;
+  grid-template-columns: 56px 1fr 72px;
+  gap: var(--space-4);
+}
+
+.empty {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+/* ─── 보조 열 ─── */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.cta {
+  padding: var(--space-4);
+  background: var(--color-brand-subtle);
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-lg);
+}
+
+.cta h2 {
+  margin: 0 0 var(--space-2);
+  font: var(--text-h3);
+}
+
+.cta p {
+  margin: 0 0 var(--space-3);
+}
+
+.ctaLink {
+  color: var(--color-brand);
+  font-weight: var(--weight-strong);
+}
+
+/* ─── 모바일 (UI 디자인 문서 §7.3 — 정답률·기록 열을 축약) ─── */
+
+@media (max-width: 767px) {
+  .page {
+    padding: var(--space-4) var(--space-3) var(--space-6);
+  }
+
+  .colRate,
+  .colSolvers,
+  .tags {
+    display: none;
+  }
+
+  .colNumber {
+    width: 52px;
+  }
+
+  .colDifficulty {
+    width: auto;
+  }
+
+  .groupLabel {
+    float: none;
+    width: auto;
+    padding: 0;
+  }
+
+  .group {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+}

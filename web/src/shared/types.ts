@@ -49,6 +49,8 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
 
 export interface Problem {
   id: string
+  /** 사람이 부르는 번호 (content/problems/numbers.yaml). 아직 없으면 null */
+  number: number | null
   version: number
   title: string
   statement: string
@@ -82,6 +84,7 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
 
 export interface ProblemSummary {
   id: string
+  number: number | null
   version: number
   title: string
   difficulty: Difficulty
@@ -89,6 +92,8 @@ export interface ProblemSummary {
   competencies: string[]
   /** 표본이 적으면 null 이다. 없는 값을 0% 로 그리지 않는다 (§0.2 No false precision). */
   solvedRate: number | null
+  /** 맞힌 사람 수 (제출 수가 아니다) */
+  solvedCount: number
   solved: boolean
 }
 
@@ -104,6 +109,9 @@ export interface ProblemPage {
   total: number
   /** 태그 → 이 조건에서의 문제 수. 결과가 있는 태그만 온다. */
   tags: Record<string, number>
+  /** 쪽 번호 방식(sort·page 를 보냈을 때)에만 온다 */
+  page?: number | null
+  pageCount?: number | null
 }
 
 /** 목록 필터 (PRD FR-201). 비어 있는 항목은 요청에 싣지 않는다. */
@@ -112,9 +120,24 @@ export interface ProblemFilter {
   difficulty: Difficulty[]
   tags: string[]
   status: 'SOLVED' | 'UNSOLVED' | null
+  sort: ProblemSort
+  order: 'ASC' | 'DESC'
+  /** 1부터 */
+  page: number
 }
 
-export const EMPTY_FILTER: ProblemFilter = { query: '', difficulty: [], tags: [], status: null }
+export const PROBLEM_SORTS = ['NUMBER', 'TITLE', 'DIFFICULTY', 'ACCURACY', 'SOLVERS'] as const
+export type ProblemSort = (typeof PROBLEM_SORTS)[number]
+
+export const EMPTY_FILTER: ProblemFilter = {
+  query: '',
+  difficulty: [],
+  tags: [],
+  status: null,
+  sort: 'NUMBER',
+  order: 'ASC',
+  page: 1,
+}
 
 export type SubmissionLanguage = 'KOTLIN' | 'JAVA' | 'PYTHON'
 

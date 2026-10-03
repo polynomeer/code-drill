@@ -1,4 +1,4 @@
-import { DIFFICULTIES, EMPTY_FILTER, type Difficulty, type ProblemFilter } from '../../shared/types'
+import { DIFFICULTIES, EMPTY_FILTER, PROBLEM_SORTS, type Difficulty, type ProblemFilter, type ProblemSort } from '../../shared/types'
 
 /**
  * 필터를 URL 에 보존한다 (PRD FR-201 수용 기준).
@@ -16,12 +16,17 @@ export function readFilter(search: string): ProblemFilter {
   const params = new URLSearchParams(search)
   const known = new Set<string>(DIFFICULTIES)
   const status = params.get('status')
+  const sort = params.get('sort')
+  const page = Number(params.get('page'))
 
   return {
     query: params.get('query') ?? '',
     difficulty: params.getAll('difficulty').filter((v): v is Difficulty => known.has(v)),
     tags: params.getAll('tags').filter((v) => v.trim() !== ''),
     status: status === 'SOLVED' || status === 'UNSOLVED' ? status : null,
+    sort: (PROBLEM_SORTS as readonly string[]).includes(sort ?? '') ? (sort as ProblemSort) : EMPTY_FILTER.sort,
+    order: params.get('order') === 'DESC' ? 'DESC' : 'ASC',
+    page: Number.isInteger(page) && page > 1 ? page : 1,
   }
 }
 
@@ -32,11 +37,25 @@ export function writeFilter(filter: ProblemFilter): string {
   for (const value of filter.difficulty) params.append('difficulty', value)
   for (const value of filter.tags) params.append('tags', value)
   if (filter.status) params.set('status', filter.status)
+  if (filter.sort !== EMPTY_FILTER.sort) params.set('sort', filter.sort)
+  if (filter.order !== EMPTY_FILTER.order) params.set('order', filter.order)
+  if (filter.page > 1) params.set('page', String(filter.page))
   return params.toString()
 }
 
+/**
+ * 거르는 조건이 하나도 없는가. 정렬과 쪽은 거르는 것이 아니라 "필터 지우기"가 지우지 않는다 —
+ * 정답률 순으로 보던 사람이 태그를 지웠다고 번호 순으로 돌아가면 안 된다.
+ */
 export function isEmpty(filter: ProblemFilter): boolean {
-  return writeFilter(filter) === writeFilter(EMPTY_FILTER)
+  return (
+    filter.query.trim() === '' && filter.difficulty.length === 0 && filter.tags.length === 0 && filter.status === null
+  )
+}
+
+/** 거르는 조건만 비운다. 정렬은 남긴다 (위 isEmpty 와 같은 이유). */
+export function clearFilters(filter: ProblemFilter): ProblemFilter {
+  return { ...EMPTY_FILTER, sort: filter.sort, order: filter.order }
 }
 
 /** 켜져 있으면 끄고, 꺼져 있으면 켠다. 다중 선택 필터는 전부 이 동작이다. */

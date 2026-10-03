@@ -6,16 +6,15 @@ import { ContestsPanel } from '../features/contest/ContestsPanel'
 import { CollectionsPanel } from '../features/learning/CollectionsPanel'
 import { TodayPanel } from '../features/learning/TodayPanel'
 import { WeeklyReportPanel } from '../features/learning/WeeklyReportPanel'
-import { ProblemList } from '../features/problems/ProblemList'
 import { ProjectWorkspace } from '../features/project/ProjectWorkspace'
 import { ProjectsPanel } from '../features/project/ProjectsPanel'
 
 /**
  * 홈 — 무엇을 풀지 고르는 곳 (디자인 설계서 §2.1).
  *
- * 풀이(에디터·판정·리플레이·기록)는 U1 에서 `/problems/:slug/solve` 로 나갔다. 남은 것은
- * 고르기 위한 패널들이고, 이들도 각자 라우트를 얻으면 여기서 빠진다 — 문제 목록은 U2 의
- * `/problems`, 처방·역량은 U5, 대회는 U6 (docs/ui-overhaul.md §9).
+ * 풀이(에디터·판정·리플레이·기록)는 U1 에서 `/problems/:slug/solve` 로, 문제 목록은 U2 에서
+ * `/problems` 로 나갔다. 남은 패널들도 각자 라우트를 얻으면 여기서 빠진다 — 처방·역량은 U5,
+ * 대회는 U6 (docs/ui-overhaul.md §9).
  */
 export function HomePage() {
   const [, navigate] = useLocation()
@@ -53,7 +52,6 @@ export function HomePage() {
           {/* 목록보다 위다. "무엇을 풀지 모를 때 현재 수준과 약점을 기준으로 고른다"가
               PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
           <TodayPanel onOpenProblem={openProblem} refreshKey={0} />
-          <ProblemList selected={null} onSelect={openProblem} />
           {/* 목록 아래. 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
           <ProjectsPanel refreshKey={projectsJudged} onOpen={setOpenProject} />
         </div>
