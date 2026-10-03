@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.problem
 import dev.codedrill.platform.common.Principal
 import dev.codedrill.platform.problempackage.Competency
 import dev.codedrill.platform.problempackage.Difficulty
+import dev.codedrill.platform.problempackage.ProblemNumbers
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.common.Cursor
@@ -47,16 +48,22 @@ class ProblemController(
     /**
      * 문제 목록 (기술 설계서 §9.2, PRD FR-201~203).
      *
-     * 목록의 진실 원천은 패키지 디렉터리다. 난이도·태그·역량은 `catalog.yaml` 에서 오고,
-     * 정답률과 완료 상태는 제출 도메인이 [ProblemProgress] 로 답한다.
+     * 목록의 진실 원천은 패키지 디렉터리다. 난이도·태그·역량은 `catalog.yaml` 에서, 번호는
+     * `numbers.yaml` 에서 오고, 정답률과 완료 상태는 제출 도메인이 [ProblemProgress] 로 답한다.
      *
      * 필터는 **모두 AND 로 겹치고, 같은 종류 안에서는 OR** 다. `difficulty=EASY,MEDIUM`
      * 은 둘 중 하나, `tags=array&difficulty=EASY` 는 둘 다 — 사람이 필터를 여러 개 켤 때
      * 기대하는 것이 그것이다.
      *
-     * 정렬 키는 id 오름차순으로 고정한다. 커서가 의미를 가지려면 같은 요청이 늘 같은
-     * 순서를 내야 한다 (§9.1). **정답률 정렬은 붙이지 않았다** — 정렬 키를 늘리려면 커서에
-     * 그 키를 실어야 하고, 값이 바뀌는 키로 페이지를 넘기면 항목이 건너뛰거나 겹친다.
+     * ## 페이지를 넘기는 두 방식
+     *
+     * 기본은 **커서**다. 정렬 키는 id 오름차순으로 고정한다 — 커서가 의미를 가지려면 같은 요청이
+     * 늘 같은 순서를 내야 하고 (§9.1), 값이 바뀌는 키(정답률)로 커서를 넘기면 항목이 건너뛰거나
+     * 겹친다. 끝까지 빠짐없이 돌아야 하는 쪽(스모크, 도구)이 이것을 쓴다.
+     *
+     * `sort` 나 `page` 를 주면 **쪽 번호** 방식이다. 사람이 표를 보며 "정답률 낮은 순, 3쪽"으로
+     * 가는 화면을 위한 것이다 (docs/ui-overhaul.md §6.1). 쪽을 넘기는 사이 정답률이 바뀌면 한
+     * 줄이 밀릴 수 있다 — 사람이 훑는 표에서는 그것이 커서를 못 쓰는 것보다 작은 문제다.
      */
     @GetMapping
     fun list(
@@ -67,36 +74,108 @@ class ProblemController(
         @RequestParam(required = false) status: Status?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) sort: Sort?,
+        @RequestParam(required = false) order: Order?,
+        @RequestParam(required = false) page: Int?,
         @RequestAttribute(name = Principal.ATTRIBUTE, required = false) principal: Principal?,
     ): ProblemPage {
         val size = Cursor.limitOf(limit)
+        val (base, matched) = select(query, difficulty, tags, competency, status, principal)
+
+        if (sort != null || page != null) {
+            val sorted = sorted(matched, sort ?: Sort.NUMBER, order ?: Order.ASC)
+            val pageCount = maxOf(1, (sorted.size + size - 1) / size)
+            val current = (page ?: 1).coerceIn(1, pageCount)
+            return ProblemPage(
+                items = sorted.drop((current - 1) * size).take(size),
+                nextCursor = null,
+                total = matched.size,
+                tags = facets(base),
+                page = current,
+                pageCount = pageCount,
+            )
+        }
+
         val after = Cursor.decode(cursor)?.firstOrNull()
-
-        // 로그인하지 않았으면 완료 상태를 묻지 않는다. 물어봐야 답이 없다.
-        val solved = principal?.let(Principal::id)?.let(progress::solvedBy).orEmpty()
-        val accuracy = progress.accuracy()
-
-        // 태그를 뺀 나머지 조건까지만 좁힌 집합. 태그 후보를 여기서 센다.
-        val base = availableProblems()
-            .map { id -> ProblemSummary.of(packages.load(id), accuracy[id], id in solved) }
-            .filter { it.matches(query) }
-            .filter { difficulty.isNullOrEmpty() || it.difficulty in difficulty }
-            .filter { competency.isNullOrEmpty() || it.competencies.any { c -> c in competency } }
-            .filter { matchesStatus(it, status, principal) }
-
-        val matched = base.filter { tags.isNullOrEmpty() || it.tags.any { tag -> tag in tags } }
-        val page = matched.filter { after == null || it.id > after }
-        val items = page.take(size)
+        val rest = matched.filter { after == null || it.id > after }
+        val items = rest.take(size)
 
         return ProblemPage(
             items = items,
-            nextCursor = if (page.size > size) Cursor.encode(items.last().id) else null,
+            nextCursor = if (rest.size > size) Cursor.encode(items.last().id) else null,
             // **페이지 크기가 아니라 조건에 맞는 수다** (FR-202). 이것을 페이지 크기로
             // 표시하면 20개 넘는 결과가 늘 "20개"로 보이고, 필터를 좁혀도 숫자가 움직이지
             // 않아 사용자는 필터가 듣지 않는다고 읽는다.
             total = matched.size,
             tags = facets(base),
         )
+    }
+
+    /**
+     * 지금 조건에서 아무 문제 하나 (docs/ui-overhaul.md §6.1 "아무 문제나").
+     *
+     * 로그인했으면 **안 푼 문제에서** 고른다 — 이미 푼 문제로 데려가면 "아무거나"를 누른 이유가
+     * 사라진다. 다 풀었으면 푼 문제에서라도 고른다. 조건에 맞는 문제가 없으면 404 다.
+     */
+    @GetMapping("/random")
+    fun random(
+        @RequestParam(required = false) query: String?,
+        @RequestParam(required = false) difficulty: List<Difficulty>?,
+        @RequestParam(required = false) tags: List<String>?,
+        @RequestParam(required = false) competency: List<Competency>?,
+        @RequestParam(required = false) status: Status?,
+        @RequestAttribute(name = Principal.ATTRIBUTE, required = false) principal: Principal?,
+    ): ResponseEntity<ProblemSummary> {
+        val (_, matched) = select(query, difficulty, tags, competency, status, principal)
+        val pool = matched.filterNot { it.solved }.ifEmpty { matched }
+        return pool.randomOrNull()?.let { ResponseEntity.ok(it) } ?: ResponseEntity.notFound().build()
+    }
+
+    /** 태그 후보를 셀 집합(태그 필터 전)과 결과(태그 필터 후). */
+    private fun select(
+        query: String?,
+        difficulty: List<Difficulty>?,
+        tags: List<String>?,
+        competency: List<Competency>?,
+        status: Status?,
+        principal: Principal?,
+    ): Pair<List<ProblemSummary>, List<ProblemSummary>> {
+        // 로그인하지 않았으면 완료 상태를 묻지 않는다. 물어봐야 답이 없다.
+        val solved = principal?.let(Principal::id)?.let(progress::solvedBy).orEmpty()
+        val accuracy = progress.accuracy()
+        val numbers = ProblemNumbers.load(Path.of(contentRoot))
+
+        // 태그를 뺀 나머지 조건까지만 좁힌 집합. 태그 후보를 여기서 센다.
+        val base = availableProblems()
+            .map { id -> ProblemSummary.of(packages.load(id), numbers.of(id), accuracy[id], id in solved) }
+            .filter { it.matches(query) }
+            .filter { difficulty.isNullOrEmpty() || it.difficulty in difficulty }
+            .filter { competency.isNullOrEmpty() || it.competencies.any { c -> c in competency } }
+            .filter { matchesStatus(it, status, principal) }
+
+        val matched = base.filter { tags.isNullOrEmpty() || it.tags.any { tag -> tag in tags } }
+        return base to matched
+    }
+
+    /**
+     * 정렬. 값이 같으면 번호로, 번호가 없으면 id 로 가른다 — 같은 요청이 같은 순서를 내야 쪽을
+     * 넘겨도 줄이 섞이지 않는다.
+     *
+     * **정답률이 없는(표본이 적은) 문제는 방향과 상관없이 맨 뒤다.** 모르는 값을 0% 로 쳐서
+     * "가장 어려운 문제"로 올리면 그것은 정렬이 아니라 거짓말이다 (No false precision).
+     */
+    private fun sorted(items: List<ProblemSummary>, sort: Sort, order: Order): List<ProblemSummary> {
+        val tie = compareBy<ProblemSummary>({ it.number ?: Int.MAX_VALUE }, { it.id })
+        val key: Comparator<ProblemSummary> = when (sort) {
+            Sort.NUMBER -> tie
+            Sort.TITLE -> compareBy { it.title }
+            Sort.DIFFICULTY -> compareBy { it.difficulty }
+            Sort.ACCURACY -> compareBy { it.solvedRate }
+            Sort.SOLVERS -> compareBy { it.solvedCount }
+        }
+        val directed = if (order == Order.DESC) key.reversed() else key
+        val (known, unknown) = items.partition { sort != Sort.ACCURACY || it.solvedRate != null }
+        return known.sortedWith(directed.then(tie)) + unknown.sortedWith(tie)
     }
 
     /**
@@ -133,10 +212,16 @@ class ProblemController(
     /** 목록에서 거를 수 있는 완료 상태. */
     enum class Status { SOLVED, UNSOLVED }
 
+    /** 쪽 번호 방식의 정렬 키. */
+    enum class Sort { NUMBER, TITLE, DIFFICULTY, ACCURACY, SOLVERS }
+
+    enum class Order { ASC, DESC }
+
     @GetMapping("/{slug}")
     fun detail(@PathVariable slug: String): ResponseEntity<ProblemDetail> {
         if (slug !in availableProblems()) return ResponseEntity.notFound().build()
-        return ResponseEntity.ok(ProblemDetail.of(packages.load(slug)))
+        val number = ProblemNumbers.load(Path.of(contentRoot)).of(slug)
+        return ResponseEntity.ok(ProblemDetail.of(packages.load(slug), number))
     }
 
     /**
@@ -159,6 +244,8 @@ class ProblemController(
 
 data class ProblemSummary(
     val id: String,
+    /** 사람이 부르는 번호 (numbers.yaml). 아직 매기지 않았으면 null — 검증이 공개를 막는다. */
+    val number: Int?,
     val version: Int,
     val title: String,
     val difficulty: Difficulty,
@@ -166,30 +253,42 @@ data class ProblemSummary(
     val competencies: List<Competency>,
     /** 표본이 적으면 null. 이유는 [ProblemProgress.Accuracy.rate] 에 있다. */
     val solvedRate: Double?,
+    /** 맞힌 사람 수. 사람 수다 — 제출 수가 아니다 ([ProblemProgress.accuracy]). */
+    val solvedCount: Int,
     /** 부르는 사람이 한 번이라도 맞혔는지. 로그인하지 않았으면 항상 false 다. */
     val solved: Boolean,
 ) {
 
-    /** 제목과 id 에서 부분 일치를 본다. 대소문자는 구분하지 않는다. */
+    /**
+     * 제목과 id 에서 부분 일치를 본다. 대소문자는 구분하지 않는다.
+     *
+     * 숫자만 쳤으면(`1042`, `#1042`) 번호로도 찾는다 — 번호는 사람이 문제를 부르는 이름이다.
+     * 번호는 부분 일치가 아니라 일치다. `10` 을 친 사람에게 1000~1099 를 다 보여 주면 찾던
+     * 것이 묻힌다.
+     */
     fun matches(query: String?): Boolean {
         if (query.isNullOrBlank()) return true
         val needle = query.trim().lowercase()
+        needle.removePrefix("#").toIntOrNull()?.let { if (it == number) return true }
         return title.lowercase().contains(needle) || id.lowercase().contains(needle)
     }
 
     companion object {
         fun of(
             pkg: ProblemPackage,
+            number: Int?,
             accuracy: ProblemProgress.Accuracy?,
             solved: Boolean,
         ) = ProblemSummary(
             id = pkg.manifest.id,
+            number = number,
             version = pkg.manifest.version,
             title = pkg.manifest.title,
             difficulty = pkg.catalog.difficulty,
             tags = pkg.catalog.tags,
             competencies = pkg.catalog.competencies,
             solvedRate = accuracy?.rate,
+            solvedCount = accuracy?.solved ?: 0,
             solved = solved,
         )
     }
@@ -197,6 +296,7 @@ data class ProblemSummary(
 
 data class ProblemDetail(
     val id: String,
+    val number: Int?,
     val version: Int,
     val title: String,
     val statement: String,
@@ -208,10 +308,11 @@ data class ProblemDetail(
     val groups: List<GroupInfo>,
 ) {
     companion object {
-        fun of(pkg: ProblemPackage): ProblemDetail {
+        fun of(pkg: ProblemPackage, number: Int?): ProblemDetail {
             val signature = pkg.manifest.signature
             return ProblemDetail(
                 id = pkg.manifest.id,
+                number = number,
                 version = pkg.manifest.version,
                 title = pkg.manifest.title,
                 statement = pkg.statementMarkdown,
@@ -257,6 +358,10 @@ data class ProblemPage(
     val total: Int,
     /** 태그 → 이 조건에서의 문제 수. */
     val tags: Map<String, Int>,
+    /** 쪽 번호 방식일 때 지금 쪽(1부터). 커서 방식이면 null. */
+    val page: Int? = null,
+    /** 쪽 번호 방식일 때 전체 쪽 수. 커서 방식이면 null. */
+    val pageCount: Int? = null,
 )
 
 /** 공개 예제. 문제 패키지의 케이스는 항상 기대 출력을 갖는다 (TestCase.expected). */

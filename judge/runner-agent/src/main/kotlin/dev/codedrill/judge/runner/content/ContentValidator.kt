@@ -12,6 +12,7 @@ import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.platform.problempackage.DefectKind
 import dev.codedrill.platform.problempackage.Limits
 import dev.codedrill.platform.problempackage.MutantSource
+import dev.codedrill.platform.problempackage.ProblemNumbers
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import dev.codedrill.platform.problempackage.TestCase
@@ -193,6 +194,11 @@ class ContentValidator(
             problems += "알고리즘 문제는 실무군 역량을 달 수 없다: ${engineering.joinToString()}"
         }
 
+        // 번호가 없으면 목록에 번호 없이 뜨고, 사람은 그 문제를 부를 이름이 없다 (numbers.yaml).
+        if (numbers.of(pkg.manifest.id) == null) {
+            problems += "번호가 없다 — content/problems/numbers.yaml 맨 아래에 다음 번호로 더한다"
+        }
+
         pkg.catalog.prerequisites.forEach { id ->
             if (!contentRoot.resolve(id).resolve("manifest.yaml").exists()) {
                 problems += "선수 문제가 없다: $id"
@@ -212,6 +218,9 @@ class ContentValidator(
             },
         )
     }
+
+    /** 문제 번호표. 겹친 번호는 읽는 순간 실패한다 (ProblemNumbers). */
+    private val numbers: ProblemNumbers by lazy { ProblemNumbers.load(contentRoot) }
 
     /** 태그 어휘. 값만 필요하므로 `- value` 줄을 모은다 — 구조를 파싱할 이유가 없다. */
     private val vocabulary: Set<String> by lazy {
