@@ -1,0 +1,158 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font: var(--text-h1);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.filters > div {
+  width: 180px;
+}
+
+.clear {
+  display: inline-flex;
+  margin-left: var(--space-1);
+  padding: 2px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  cursor: pointer;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.table th {
+  height: 40px;
+  padding: 0 var(--space-3);
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border-default);
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover,
+.chosen {
+  background: var(--color-bg-subtle);
+}
+
+.chosen td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.rowLink {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.colPick {
+  width: 40px;
+  text-align: center;
+}
+
+.colPick input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-brand);
+}
+
+.colTime {
+  width: 120px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.colScore {
+  width: 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th.colScore {
+  text-align: right;
+}
+
+.colLanguage {
+  width: 88px;
+}
+
+.loading {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.empty {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 767px) {
+  .page {
+    padding: var(--space-4) var(--space-3) var(--space-6);
+  }
+
+  .colLanguage,
+  .colScore {
+    display: none;
+  }
+
+  .colTime {
+    width: auto;
+  }
+
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

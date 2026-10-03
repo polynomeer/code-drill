@@ -19,6 +19,7 @@ import styles from './AppShell.module.css'
 const NAV = [
   { to: '/', label: '홈', signedIn: true },
   { to: '/problems', label: '문제', signedIn: false },
+  { to: '/submissions', label: '제출', signedIn: true },
 ]
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }[] = [
@@ -82,7 +83,13 @@ export function AppShell({
             ) : (
             <>
             {/* Popover API — 바깥 클릭과 Esc 로 닫히는 것을 브라우저가 준다 */}
-            <button type="button" className={styles.userButton} popoverTarget="user-menu">
+            <button
+              type="button"
+              className={styles.userButton}
+              popoverTarget="user-menu"
+              // 좁은 화면에서는 이름 글자가 숨는다 — 그때도 버튼 이름은 남아야 한다
+              aria-label={`${session.displayName} 계정 메뉴`}
+            >
               <span className={styles.avatar} aria-hidden="true">
                 {session.displayName.slice(0, 1)}
               </span>

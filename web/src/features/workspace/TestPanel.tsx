@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { Ref } from 'react'
 import { getTrial, startTrial } from '../../api/client'
 import { MutationCheckPanel } from './MutationCheckPanel'
+import { returnKind, showWire } from '../submissions/wire'
 import { VERDICT_LABEL } from '../../shared/types'
 import type { Problem, SubmissionLanguage, Trial } from '../../shared/types'
 
@@ -130,7 +131,10 @@ export function TestPanel({
                       표시하면 사용자는 멀쩡한 출력을 보고 고치려 든다. */}
                   {!judged ? '·' : result.outcome === 'ACCEPTED' ? '✓' : '✗'}
                 </span>
-                <span className="mono test-actual">{result.actual ?? '—'}</span>
+                {/* 하네스의 전송 형식(`0,1`, Base64)을 [0,1]·글자로 되돌려 보인다 (wire.ts) */}
+                <span className="mono test-actual">
+                  {result.actual === null ? '—' : showWire(returnKind(problem.signature), result.actual)}
+                </span>
                 <span className="muted small">
                   {judged && result.outcome !== 'ACCEPTED' && (
                     <>기대 {JSON.stringify(expected)} · </>

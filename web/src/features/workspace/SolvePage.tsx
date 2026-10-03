@@ -4,7 +4,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { ReactNode } from 'react'
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Link, useLocation } from 'wouter'
-import { createSubmission, getProblem, listSubmissions } from '../../api/client'
+import { createSubmission, getProblem, getSubmissionSource, listSubmissions } from '../../api/client'
 import {
   Button,
   EmptyState,
@@ -15,6 +15,7 @@ import {
   Skeleton,
   Tabs,
   VerdictBadge,
+  useToast,
 } from '../../design'
 import { IN_FLIGHT, LANGUAGE_LABEL, EDITOR_LANGUAGE } from '../../shared/types'
 import type { Submission, SubmissionLanguage } from '../../shared/types'
@@ -66,6 +67,8 @@ function readQuery() {
   return {
     language: (LANGUAGES as string[]).includes(lang ?? '') ? (lang as SubmissionLanguage) : 'KOTLIN',
     submission: params.get('submission'),
+    /** `?from=<제출 id>` — 그 제출의 코드를 편집기로 옮겨 시작한다 (제출 상세의 "이 코드로 편집기 열기") */
+    from: params.get('from'),
     step: step === null || Number.isNaN(Number(step)) ? null : Number(step),
   }
 }
@@ -81,6 +84,29 @@ export function SolvePage({ slug }: { slug: string }) {
   const [language, setLanguage] = useState<SubmissionLanguage>(initial.language)
   const workspace = useWorkspaceSource(problem, language)
   const settings = useEditorSettings()
+  const toast = useToast()
+
+  // 제출한 코드를 새 초안으로 옮긴다. 손댄 것으로 치므로 저장된 초안을 덮지 않고, 자동 저장이 새
+  // 초안을 쓴다. 한 번 옮기면 주소에서 지운다 — 새로고침에 다시 덮어쓰면 그 사이 고친 것을 잃는다.
+  const { edit } = workspace
+  useEffect(() => {
+    if (!initial.from || !problem) return
+    let cancelled = false
+    getSubmissionSource(initial.from)
+      .then((code) => {
+        if (cancelled) return
+        if (code !== null) {
+          edit(code)
+          toast.show('제출한 코드를 편집기로 옮겼습니다', 'success')
+        }
+        setParam('from', null)
+      })
+      .catch(() => toast.show('제출한 코드를 가져오지 못했습니다', 'danger'))
+    return () => {
+      cancelled = true
+    }
+    // 문제가 처음 온 순간에 한 번만
+  }, [problem?.id])
 
   const historyQuery = useQuery({
     queryKey: ['submissions', slug],
@@ -401,6 +427,9 @@ export function SolvePage({ slug }: { slug: string }) {
                       onOpen={(id) => openSubmission(id)}
                       onView={setViewingCode}
                     />
+                    <Link href={`/submissions?problem=${problem.id}`} className={styles.allSubmissions}>
+                      이 문제의 제출 전체 보기
+                    </Link>
                     {viewed && (
                       <CodeView
                         submission={viewed}
@@ -464,7 +493,22 @@ export function SolvePage({ slug }: { slug: string }) {
             </div>
             <div hidden={drawerTab !== 'verdict'} aria-live="polite">
               {submission ? (
-                <VerdictPanel submission={submission} />
+                <VerdictPanel
+                  submission={submission}
+                  problem={problem}
+                  hasTrace={trace !== null && trace.status !== 'EMPTY'}
+                  onJumpToLine={(line, column) => {
+                    if (isMobile) setMobileTab('code')
+                    requestAnimationFrame(() => editor.current?.revealLine(line, column ?? 1))
+                  }}
+                  onOpenReplay={() => showDrawer('replay')}
+                  onOpenEditorial={() => {
+                    setProblemTab('editorial')
+                    if (isMobile) setMobileTab('problem')
+                    else if (problemPanel.current?.isCollapsed()) problemPanel.current.expand()
+                  }}
+                  onResubmit={() => void submit()}
+                />
               ) : (
                 <EmptyState title="아직 제출하지 않았습니다">
                   제출하면 채점 단계와 그룹별 결과가 여기 나옵니다. ({MOD}⇧↵)

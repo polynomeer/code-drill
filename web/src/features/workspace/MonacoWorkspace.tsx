@@ -15,6 +15,7 @@ export default function MonacoWorkspace({
   settings,
   onReady,
   label = '코드 편집기',
+  readOnly = false,
 }: {
   source: string
   language: string
@@ -24,6 +25,8 @@ export default function MonacoWorkspace({
   /** 포커스·줄 이동을 바깥에서 부를 수 있게 손잡이를 건넨다 (단축키 ⌥2, 컴파일 오류 줄) */
   onReady?: (handle: EditorHandle) => void
   label?: string
+  /** 제출한 코드처럼 고칠 수 없는 것을 보일 때 */
+  readOnly?: boolean
 }) {
   const handleMount: OnMount = (editor) => {
     onReady?.({
@@ -54,6 +57,8 @@ export default function MonacoWorkspace({
         scrollBeyondLastLine: false,
         automaticLayout: true,
         ariaLabel: label,
+        readOnly,
+        domReadOnly: readOnly,
         padding: { top: 8 },
       }}
     />
