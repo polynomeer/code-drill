@@ -119,6 +119,11 @@ test.describe('데스크톱', () => {
   test('접근성 위반이 없다', async ({ page }) => {
     await page.goto(`/problems/${PROBLEM.id}/solve`)
     await expect(page.getByRole('article', { name: '문제' })).toBeVisible()
+    // 다 뜬 화면을 본다. Monaco 는 늦게 불러오고, 뜨는 도중에 글자 폭을 재는 노드와 레이아웃 전의
+    // 큰 상자를 잠깐 둔다 — 그 순간에 걸리면 axe 가 결과 창 탭의 배경을 에디터의 것으로 읽는다
+    // (느린 CI 에서만 그랬다). 규칙은 그대로이고, 검사하는 시점만 고정한다.
+    await expect(page.locator('.monaco-editor')).toBeVisible()
+    await page.evaluate(() => document.fonts.ready)
     const result = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
       // Monaco 는 우리가 그리는 DOM 이 아니다. 접근성은 Monaco 자신의 스크린리더 모드가 맡는다.
