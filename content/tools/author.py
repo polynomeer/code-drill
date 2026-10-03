@@ -281,6 +281,25 @@ def scaffold(directory):
     return created
 
 
+def assign_number(problem_id):
+    """새 문제에 다음 번호를 준다 (content/problems/numbers.yaml — 맨 아래에 더하기만 한다).
+
+    이미 번호가 있으면 그대로 둔다. 번호는 한 번 주면 바꾸지 않는다.
+    """
+    path = CONTENT / "numbers.yaml"
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    taken = {}
+    for line in text.splitlines():
+        head, _, tail = line.partition(":")
+        if head.strip().isdigit():
+            taken[tail.split("#")[0].strip()] = int(head)
+    if problem_id in taken:
+        return None
+    number = max(taken.values(), default=999) + 1
+    path.write_text(text.rstrip("\n") + f"\n{number}: {problem_id}\n", encoding="utf-8")
+    return number
+
+
 def emit(problem):
     directory = CONTENT / problem.id
     # 자리는 **새 문제에만** 잡는다. 있는 문제를 다시 뽑을 때 빈 자리를 채우면, 산문 없이
@@ -295,6 +314,9 @@ def emit(problem):
     print(f"{problem.id:<28} 케이스 {total:>3}개, 오답 {len(problem.mutants)}개")
     for name in (scaffold(directory) if fresh else []):
         print(f"  {name}: 자리를 잡았다. 채우기 전에는 검증을 통과하지 못한다")
+    number = assign_number(problem.id)
+    if number is not None:
+        print(f"  numbers.yaml: {number}번을 줬다")
 
 
 ARTIFACTS = [

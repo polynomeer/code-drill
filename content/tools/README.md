@@ -44,6 +44,7 @@ python3 content/tools/author.py --status   # 문제 × 산출물 표 — 무엇�
 | `solutions/reference.kt` | 참조 풀이 | 안 든다 |
 | `mutants/*.kt` | 변이 구현 | 안 든다 |
 | `catalog.yaml` | 난이도·태그·역량·선수 관계 | **안 든다** |
+| `../numbers.yaml` (한 파일) | 문제 번호 | **안 든다** |
 | `hints.yaml` | 코칭 도움 사다리 | **안 든다** |
 | `editorial.md` | 해설 | **안 든다** |
 
@@ -53,6 +54,16 @@ python3 content/tools/author.py --status   # 문제 × 산출물 표 — 무엇�
 그래서 카탈로그와 힌트는 밖에 있다. 난이도와 태그는 판정을 바꾸지 않는데 digest 에 들면
 **오타 하나를 고치는 데도 문제 버전이 올라가고**, 버전 번호가 "무엇으로 채점됐는가"를 뜻하지
 않게 된다. 경계는 한 문장이다 — **digest 에 드는 것은 판정을 바꾸는 것뿐이다.**
+
+## numbers.yaml
+
+문제 번호는 `content/problems/numbers.yaml` 한 파일에 `1042: slug` 로 한 줄씩 산다. 사람은 문제를
+번호로 부르고 건넨다 — slug 는 주소용이다. `author.py` 가 새 문제를 처음 뽑을 때 맨 아래에 다음
+번호를 더한다.
+
+**한 번 준 번호는 바꾸지 않고 다시 쓰지 않는다.** 문제를 내려도 그 줄은 지우지 않는다 — 번호가
+옮겨 가면 사람들이 적어 둔 번호가 다른 문제를 가리킨다. 겹친 번호는 읽는 순간 실패하고, 번호 없는
+문제는 검증의 `catalog` 단계가 막는다.
 
 ## catalog.yaml
 
