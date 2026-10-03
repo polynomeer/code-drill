@@ -60,6 +60,15 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # 브라우저 검사 (docs/ui-overhaul.md §8). 백엔드 없이 도는 화면만 — 카탈로그와 로그인.
+      # 접근성 위반 하나가 빌드를 깬다. 위반이 나오면 규칙을 끄지 말고 컴포넌트를 고친다.
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: web/test-results
 
   # 격리 회귀 (§5.2, §11.4 sandbox regression 게이트).
   #
