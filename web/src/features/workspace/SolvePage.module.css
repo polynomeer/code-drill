@@ -123,6 +123,14 @@
 
 /* 탭 머리는 붙어 있고 본문만 흐른다 */
 .problemPane > div,
+/* 결과 창은 에디터 위의 층이다. Monaco 의 스크롤 면(.lines-content)은 높이 1677만 px 의 상자를
+   Monaco 안쪽에서 잘라 두는데, 접근성 검사기(axe)는 그 자르기를 따라가지 못하고 그 면을 결과 창
+   아래·위에 깔린 것으로 읽어 탭 글자를 에디터 배경 위에서 쟀다. 칠하는 순서를 여기서 못 박는다. */
+.drawer {
+  position: relative;
+  z-index: 1;
+}
+
 .drawer > div {
   height: 100%;
 }
