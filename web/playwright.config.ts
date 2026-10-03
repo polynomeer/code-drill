@@ -6,8 +6,8 @@ declare const process: { env: Record<string, string | undefined> }
 /**
  * 브라우저 검사 (docs/ui-overhaul.md §8 — E2E·접근성·시각 회귀의 자리).
  *
- * 지금은 백엔드 없이 도는 것만 둔다 — 컴포넌트 카탈로그(/design)와 로그인 화면. 판정 흐름을
- * 끝까지 도는 E2E 는 scripts/smoke.py 처럼 앱 셋이 떠 있어야 해서 U1 에서 따로 붙인다.
+ * 백엔드 없이 돈다 — 컴포넌트 카탈로그(/design), 로그인, 그리고 API 를 흉내 낸 풀이 화면.
+ * 채점까지 끝까지 도는 E2E 는 scripts/smoke.py 처럼 앱 셋이 떠 있어야 해서 아직 없다.
  *
  * 파일 이름이 `*.e2e.ts` 인 이유: vitest 가 `*.spec.ts` 를 자기 것으로 집어 간다.
  */
