@@ -28,6 +28,8 @@ import sys
 import urllib.error
 import urllib.request
 
+import accounts
+
 BASE = os.environ.get("CODEDRILL_BASE", "http://localhost:8080").rstrip("/") + "/api/v1"
 BOOTSTRAP_ENV = "ADMIN_BOOTSTRAP_EMAIL"
 STORE = pathlib.Path.home() / ".codedrill" / "seed-operators.json"
@@ -50,15 +52,24 @@ SEED_OPERATORS = {
 
 
 class Operator:
-    def __init__(self, name: str, user_id: str, token: str, roles: set[str]) -> None:
+    def __init__(self, name: str, session: dict, roles: set[str]) -> None:
         self.name = name
-        self.user_id = user_id
-        self.token = token
+        self.user_id = session["userId"]
+        self.access_token = session["accessToken"]
+        self.refresh_token = session["refreshToken"]
         self.roles = roles
+        accounts.remember(self)
 
     @property
     def headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self.token}"}
+        return {"Authorization": f"Bearer {self.access_token}"}
+
+    def refresh(self) -> None:
+        """사용자 세션과 같다 (accounts.Account.refresh). access 는 30분이고 스모크는 그보다 길다."""
+        session = accounts.post("/auth/refresh", {"refreshToken": self.refresh_token})
+        self.access_token = session["accessToken"]
+        self.refresh_token = session["refreshToken"]
+        accounts.remember(self)
 
 
 def _call(method: str, path: str, body=None, headers=None):
@@ -95,18 +106,18 @@ def _store_write(data: dict) -> None:
     STORE.chmod(0o600)
 
 
-def _session(email: str, password: str, display_name: str) -> tuple[str, str]:
-    """계정을 만들거나 로그인해 (계정 id, access token) 을 돌려준다."""
+def _session(email: str, password: str, display_name: str) -> dict:
+    """계정을 만들거나 로그인해 세션(계정 id, access·refresh token)을 돌려준다."""
     status, body = _call(
         "POST", "/auth/register",
         {"email": email, "displayName": display_name, "password": password},
     )
     if status in (200, 201):
-        return body["userId"], body["accessToken"]
+        return body
 
     status, body = _call("POST", "/auth/login", {"email": email, "password": password})
     if status == 200:
-        return body["userId"], body["accessToken"]
+        return body
 
     print(f"운영자 계정 로그인 실패 ({email}): {status} {body}")
     print(f"{STORE} 를 지우고 다시 돌리면 계정을 새로 만든다.")
@@ -134,9 +145,7 @@ def _ensure_seeded() -> dict:
         return passwords[key]
 
     # 1. 부트스트랩 계정. 역할 표가 비어 있으면 첫 호출에서 SECURITY_ADMIN 을 받는다.
-    root_id, root_token = _session(
-        bootstrap_email, password_for("bootstrap"), "bootstrap admin",
-    )
+    root_token = _session(bootstrap_email, password_for("bootstrap"), "bootstrap admin")["accessToken"]
     _store_write(store)
 
     status, _ = _call("GET", "/admin/operators", headers={"Authorization": f"Bearer {root_token}"})
@@ -150,8 +159,7 @@ def _ensure_seeded() -> dict:
     sessions = {}
     for name, roles in SEED_OPERATORS.items():
         email = f"{name}@{bootstrap_email.split('@', 1)[1]}"
-        user_id, token = _session(email, password_for(name), name)
-        sessions[name] = Operator(name, user_id, token, set(roles))
+        sessions[name] = Operator(name, _session(email, password_for(name), name), set(roles))
 
     _store_write(store)
 
@@ -164,7 +172,7 @@ def _ensure_seeded() -> dict:
     #    모두 달라야 하므로 approver 자신의 역할은 3번에서 이미 끝나 있어야 한다.
     for operator in sessions.values():
         for role in operator.roles:
-            _grant(root_token, operator.user_id, role, approver.token)
+            _grant(root_token, operator.user_id, role, approver.access_token)
 
     return sessions
 

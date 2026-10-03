@@ -258,18 +258,22 @@ def raw_request(method: str, path: str, body: dict | None = None, headers: dict 
 
 def request(method: str, path: str, body: dict | None = None, headers: dict | None = None) -> dict:
     merged = with_auth(headers)
-    # 기본 계정으로 나가는 요청인가. 남의 토큰이나 빈 토큰으로 401 을 **시험하는** 호출까지
-    # 갱신하면 그 검사가 무의미해진다.
-    mine = USER is not None and merged.get("Authorization") == f"Bearer {USER.access_token}"
+    # 스크립트가 받은 세션의 토큰인가 — 기본 계정만이 아니라 다른 사용자·운영자도. 모르는
+    # 토큰이나 빈 토큰으로 401 을 **시험하는** 호출까지 갱신하면 그 검사가 무의미해진다.
+    # 401 을 기대하는 검사는 raw_request 로 부르므로 여기를 지나지 않는다.
+    owner = accounts.owner_of(merged.get("Authorization"))
     try:
         return _send(method, path, body, merged)
     except urllib.error.HTTPError as error:
         # access token 은 30분이다 (§11.2). 스모크는 그보다 오래 걸리므로 도중에 만료된다 —
         # 웹이 401 에서 하는 것과 같이 한 번 갱신하고 다시 보낸다 (web/src/api/client.ts).
-        if error.code != 401 or not mine:
+        # 호출부가 일찍 꺼내 둔 헤더라면 그 세션은 이미 다른 자리에서 갱신됐을 수 있다 —
+        # 그때는 갱신하지 않고 지금 토큰으로만 바꿔 보낸다. 쓴 refresh 는 무효다.
+        if error.code != 401 or owner is None:
             raise
-        USER.refresh()
-        return _send(method, path, body, with_auth(headers))
+        if merged["Authorization"] == owner.headers["Authorization"]:
+            owner.refresh()
+        return _send(method, path, body, {**merged, **owner.headers})
 
 
 def _send(method: str, path: str, body: dict | None, headers: dict) -> dict:
@@ -371,6 +375,19 @@ def await_trace(submission_id: str) -> dict | None:
             return manifest
         time.sleep(0.5)
     return None
+
+
+def await_arena(attempt: dict) -> dict:
+    """아레나 시도가 끝나기를 기다린다. 시간 안에 못 끝나면 PENDING 인 채로 돌려준다.
+
+    호출부가 상태를 검사해야 한다. 그러지 않으면 끝나지 않은 시도의 빈 결과가
+    "깨뜨리지 못했다"로 읽힌다 — 느린 것이 틀린 것으로 보인다.
+    """
+    deadline = time.time() + TIMEOUT
+    while attempt["status"] == "PENDING" and time.time() < deadline:
+        time.sleep(1)
+        attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+    return attempt
 
 
 def await_rejudge(job_id: str, headers: dict, timeout: int = TIMEOUT) -> dict:
@@ -991,10 +1008,8 @@ def main() -> int:
         results.append(check("  누군가의 오답으로 표시", target["community"], True))
         results.append(check("  검수자의 설명이 과녁의 설명", target["note"], "무엇을 받든 0, 0 이다"))
         attempt = request("POST", "/arena/two-sum/attempts", {"args": [[2, 7, 11, 15], 9]})
-        deadline = time.time() + TIMEOUT
-        while attempt["status"] == "PENDING" and time.time() < deadline:
-            time.sleep(1)
-            attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+        attempt = await_arena(attempt)
+        results.append(check("  시도가 끝났다", attempt["status"], "COMPLETED"))
         broken = next((r for r in attempt["results"] if r["name"] == target_name), None)
         results.append(check("  깨뜨렸다", bool(broken and broken["broken"]), True))
         mine = request("GET", "/arena/two-sum/donations/mine", None, donor.headers)
@@ -1344,18 +1359,14 @@ def main() -> int:
     view = request("GET", f"/contests/{hack['id']}")
     results.append(check("반례 대전에서 정답은 점수가 아니다", next(r for r in view["standings"] if r["mine"])["total"], 0))
     attempt = request("POST", "/arena/two-sum/attempts", {"args": [[2, 7, 11, 15], 9]})
-    deadline = time.time() + TIMEOUT
-    while attempt["status"] == "PENDING" and time.time() < deadline:
-        time.sleep(1)
-        attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+    attempt = await_arena(attempt)
+    results.append(check("  시도가 끝났다", attempt["status"], "COMPLETED"))
     broken = sum(1 for r in attempt["results"] if r["broken"])
     view = request("GET", f"/contests/{hack['id']}")
     results.append(check("깨뜨린 과녁의 수가 점수다", (broken > 0, next(r for r in view["standings"] if r["mine"])["total"]), (True, broken)))
     attempt = request("POST", "/arena/two-sum/attempts", {"args": [[2, 7, 11, 15], 9]})
-    deadline = time.time() + TIMEOUT
-    while attempt["status"] == "PENDING" and time.time() < deadline:
-        time.sleep(1)
-        attempt = request("GET", f"/arena/attempts/{attempt['id']}")
+    attempt = await_arena(attempt)
+    results.append(check("  다시 낸 시도도 끝났다", attempt["status"], "COMPLETED"))
     view = request("GET", f"/contests/{hack['id']}")
     results.append(check("  같은 과녁을 다시 깨뜨려도 한 번이다", next(r for r in view["standings"] if r["mine"])["total"], broken))
 
