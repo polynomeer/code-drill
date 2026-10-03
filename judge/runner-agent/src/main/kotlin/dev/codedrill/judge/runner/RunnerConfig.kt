@@ -3,6 +3,7 @@ package dev.codedrill.judge.runner
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.ArenaRunner
 import dev.codedrill.judge.runner.execution.BundleResolver
+import dev.codedrill.judge.runner.execution.CompileCache
 import dev.codedrill.judge.runner.execution.ExecutionEngine
 import dev.codedrill.judge.runner.execution.KotlinCompilerArchive
 import dev.codedrill.judge.runner.execution.LabRunner
@@ -134,6 +135,8 @@ class RunnerConfig {
         },
         // 판정의 테스트는 오브젝트 스토어의 번들에서 온다 (§8.3). 읽기만 한다.
         bundles = BundleResolver(store),
+        // 아레나·축소는 같은 소스를 입력만 바꿔 수십 번 돌린다. 컴파일은 한 번이면 된다.
+        compileCache = CompileCache(),
     )
 
     /**

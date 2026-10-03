@@ -54,6 +54,8 @@ class ExecutionEngine(
         { _, _, _, _ -> },
     /** 요청이 가리키는 테스트 번들을 케이스로 푸는 곳 (§8.3). 케이스가 메시지에 실려 오면 지나간다. */
     private val bundles: BundleResolver = BundleResolver.NONE,
+    /** 같은 소스를 다시 컴파일하지 않는다 — 이유는 [CompileCache]. null 이면 매번 컴파일한다. */
+    private val compileCache: CompileCache? = null,
 ) {
 
     fun execute(envelope: ExecutionRequest): ExecutionResult {
@@ -125,12 +127,20 @@ class ExecutionEngine(
 
         // compile — 실행과 같은 샌드박스 안에서 (§5.5). 산출물 디렉터리만 쓸 수 있다.
         val compileStart = System.nanoTime()
-        val compiled = compile(adapter, sandboxes(request.language), sourceDir, outputDir)
-        onPhase(
-            "compile", request.language,
-            if (compiled is RuntimeAdapter.CompileOutcome.Success) "success" else "failure",
-            System.nanoTime() - compileStart,
-        )
+        val cacheKey = compileCache?.key(request.language, sourceDir)
+        val compiled = if (cacheKey != null && compileCache!!.restore(cacheKey, outputDir)) {
+            onPhase("compile", request.language, "cached", System.nanoTime() - compileStart)
+            RuntimeAdapter.CompileOutcome.Success
+        } else {
+            compile(adapter, sandboxes(request.language), sourceDir, outputDir).also { outcome ->
+                onPhase(
+                    "compile", request.language,
+                    if (outcome is RuntimeAdapter.CompileOutcome.Success) "success" else "failure",
+                    System.nanoTime() - compileStart,
+                )
+                if (cacheKey != null && outcome is RuntimeAdapter.CompileOutcome.Success) compileCache!!.store(cacheKey, outputDir)
+            }
+        }
         when (compiled) {
             is RuntimeAdapter.CompileOutcome.Failure ->
                 return terminal(request, Verdict.COMPILE_ERROR, compiled.log, reason = null)
