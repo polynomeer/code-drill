@@ -16,6 +16,8 @@
 | [deploying.md](deploying.md) | 개발 머신 밖에서 어떻게 띄우나 | 배포할 때 |
 | [production-readiness.md](production-readiness.md) | 상용 수준까지 무엇이 남았나 | 로드맵을 정할 때 |
 | [feature-roadmap.md](feature-roadmap.md) | 원본 기획의 나머지를 어떤 순서로 짓나 | 무엇을 다음에 만들지 정할 때 |
+| [ux-benchmark.md](ux-benchmark.md) | 지금 웹 UI 는 상용 플랫폼과 견줘 어디가 모자라나 | UI 개편의 이유를 확인할 때 |
+| [ui-overhaul.md](ui-overhaul.md) | 웹 UI·디자인·기능을 어떤 순서로 개편하나 | 화면을 고치거나 새로 지을 때 |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | 사람이 처음 무엇을 읽고 설정하는가 | 사람 기여자 |
 | [../content/tools/README.md](../content/tools/README.md) | 문제 패키지를 어떻게 만들고 다시 뽑나 | 문제를 추가할 때 |
 | [../content/projects/README.md](../content/projects/README.md) | 프로젝트형 문제 패키지의 모양과 검증 | 프로젝트형 문제를 추가할 때 |
@@ -65,6 +67,7 @@
 | 배포 단위·이미지 내용·태그 규칙이 바뀜 | `deploying.md` |
 | 출시 준비 항목을 닫거나 새로 발견함 | `production-readiness.md` |
 | 기능 단계를 닫거나 의존 관계가 바뀜 | `feature-roadmap.md` |
+| UI 개편 단계를 닫거나 프런트엔드 기반 라이브러리를 바꿈 | `ui-overhaul.md` (진단이 낡았으면 `ux-benchmark.md` 도) |
 | 문제 저작 절차나 패키지 스키마가 바뀜 | `content/tools/README.md` |
 | 프로젝트형 패키지의 모양이나 검증 규칙이 바뀜 | `content/projects/README.md` |
 | SLO 목표값이 바뀜 | `deploy/observability/alerts.yml` (문서에 옮겨 적지 않는다) |
