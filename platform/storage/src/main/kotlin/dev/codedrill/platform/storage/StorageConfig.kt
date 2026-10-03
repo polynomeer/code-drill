@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
@@ -42,6 +43,14 @@ class StorageConfig {
             )
             // 자체 호스팅 스토어는 버킷을 경로로 받는다. 가상 호스트 방식은 DNS 가 필요하다.
             .forcePathStyle(true)
+            // 업로드에 꼬리 체크섬(x-amz-trailer)을 붙이지 않는다. SDK 2.30 부터의 기본값은
+            // 서명된 청크 뒤에 CRC32 를 꼬리로 다는데, SeaweedFS(4.47, 그 뒤도 같은 코드)는 그
+            // 꼬리를 bufio.ReadSlice 의 조각으로 붙들고 있다가 다음 줄을 읽으며 덮어쓴다. 꼬리
+            // 줄들이 따로 도착하면 — Linux 의 JDK 가 그렇게 보낸다 — 대조가 틀려 400 "Content-Md5
+            // 가 유효하지 않다"가 되고, 제출이 500 이 된다. 같은 바이트가 한 덩어리로 오면
+            // 통과해 macOS 에서는 드러나지 않았다. 무결성은 남는다: 청크마다 SHA-256 이 서명에
+            // 들어가고, 받는 쪽은 우리 digest(sha256 메타데이터)를 따로 대조한다.
+            .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
             .httpClientBuilder(UrlConnectionHttpClient.builder())
             .build()
         return S3BlobStore(client, properties.bucket)
