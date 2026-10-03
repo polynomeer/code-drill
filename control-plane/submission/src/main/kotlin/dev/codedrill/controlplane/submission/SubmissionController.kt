@@ -113,15 +113,22 @@ class SubmissionController(
         return ResponseEntity.ok(mapOf("source" to source))
     }
 
-    /** 제출 기록 (§9.1). 정렬 키가 고정된 cursor 페이지네이션이다. */
+    /**
+     * 제출 기록 (§9.1). 정렬 키가 고정된 cursor 페이지네이션이다.
+     *
+     * 판정·언어로 거르는 것은 서버가 한다 (디자인 설계서 §9.1). 화면이 받은 쪽에서 거르면 한
+     * 쪽에 스무 건을 받아도 남는 것이 두 건일 수 있고, "더 보기"가 무엇을 더 보이는지 알 수 없다.
+     */
     @GetMapping
     fun history(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @RequestParam(required = false) problemId: String?,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) verdict: Verdict?,
+        @RequestParam(required = false) language: String?,
     ): Page<SubmissionResponse> {
-        val page = service.history(principal.id, problemId, cursor, limit)
+        val page = service.history(principal.id, problemId, cursor, limit, verdict, language)
         return Page(page.items.map { SubmissionResponse.of(it, json) }, page.nextCursor)
     }
 
@@ -366,6 +373,8 @@ data class SubmissionResponse(
     val groups: Any?,
     /** 몇 번째 판정인지. 1 보다 크면 재채점을 거쳤다는 뜻이다 (§4.2). */
     val revision: Int,
+    /** 제출한 시각. 기록은 이 순서다 (§9.1). */
+    val createdAt: java.time.Instant,
     /** 내 제출인가. 게시판에 붙어 공유된 남의 제출을 열면 false 다 (§8.5) — 화면이 내놓기 같은 소유자의 일을 숨긴다. */
     val mine: Boolean = true,
 ) {
@@ -383,6 +392,7 @@ data class SubmissionResponse(
             // 채우지 않는다 (§9.1 DTO 단계에서 제거).
             groups = submission.groupsJson?.let { json.readTree(it) },
             revision = submission.revision,
+            createdAt = submission.createdAt,
             mine = mine,
         )
     }

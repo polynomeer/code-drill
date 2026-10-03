@@ -126,14 +126,21 @@ class SubmissionService(
      * 커서가 가리키는 항목 **다음**부터 [limit] 개를 읽는다. 커서는 권한을 담지 않으므로
      * 소유자 조건은 여기서 다시 건다.
      */
-    fun history(userId: String, problemId: String?, cursor: String?, limit: Int?): Page<Submission> {
+    fun history(
+        userId: String,
+        problemId: String?,
+        cursor: String?,
+        limit: Int?,
+        verdict: Verdict? = null,
+        language: String? = null,
+    ): Page<Submission> {
         val size = Cursor.limitOf(limit)
         val after = Cursor.decode(cursor)?.let { parts ->
             runCatching { Instant.parse(parts[0]) to UUID.fromString(parts[1]) }.getOrNull()
         }
 
         // 한 건 더 읽어 다음 페이지가 있는지 본다. count(*) 보다 싸고 정확하다.
-        val rows = repository.page(userId, problemId, after, size + 1)
+        val rows = repository.page(userId, problemId, after, size + 1, verdict, language)
         val items = rows.take(size)
         val nextCursor = if (rows.size > size) {
             items.last().let { Cursor.encode(it.createdAt.toString(), it.id.toString()) }

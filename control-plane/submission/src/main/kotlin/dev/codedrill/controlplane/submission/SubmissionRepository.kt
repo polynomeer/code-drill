@@ -94,12 +94,22 @@ class SubmissionRepository(private val jdbc: JdbcTemplate) {
         problemId: String?,
         after: Pair<Instant, UUID>?,
         limit: Int,
+        verdict: Verdict? = null,
+        language: String? = null,
     ): List<Submission> {
         val conditions = mutableListOf("user_id = ?")
         val args = mutableListOf<Any>(userId)
 
         problemId?.let {
             conditions += "problem_id = ?"
+            args += it
+        }
+        verdict?.let {
+            conditions += "verdict = ?"
+            args += it.name
+        }
+        language?.let {
+            conditions += "language = ?"
             args += it
         }
         after?.let { (createdAt, id) ->
