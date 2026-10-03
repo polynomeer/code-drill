@@ -436,9 +436,9 @@ TypeScript 컴파일러로 채우고 있었다. `MonacoEnvironment.getWorker` �
 - `monacoSetup.test.ts` 가 **진입점이 부르는 목록에서 언어를 뺀 것**과 우리 목록을
   대조한다. monaco 를 올려 기능이 늘면 실패한다.
 - 같은 테스트가 채점 언어(`EDITOR_LANGUAGE`)와 문법 정의 import 를 짝지어 본다.
-- `pnpm build` 마지막에 번들 예산이 돈다 (`web/scripts/bundle-budget.mjs`). 첫 화면
-  gzip 120KB, 배포물 6MB, 파일 20개. `monaco-editor` 를 통째로 import 하면 13.8MB /
-  98개가 되어 빌드가 실패한다.
+- `pnpm build` 마지막에 번들 예산이 돈다 (`web/scripts/bundle-budget.mjs` — 한도와 그 근거가
+  거기 있다). 배포물 크기와 파일 수는 웹 글꼴 조각을 빼고 센다. `monaco-editor` 를 통째로
+  import 하면 13.8MB / 98개가 되어 빌드가 실패한다.
 
 남은 3.9MB(gzip 1.0MB)는 Monaco 코어와 그 기능 전부다. 에디터를 쓰는 값이며, 첫 화면
 뒤에서 받는다.

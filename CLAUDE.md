@@ -46,8 +46,9 @@ python3 scripts/preflight.py app  # 배포 호스트 점검 (app | runner) — �
 경보가 울렸을 때의 첫 대응은 → [docs/runbook.md](docs/runbook.md)
 
 ```bash
-cd web && pnpm build   # tsc --noEmit + vitest + vite build + 번들 예산
+cd web && pnpm build   # 토큰 대비 + tsc --noEmit + vitest + vite build + 번들 예산
 cd web && pnpm test    # 리플레이 리듀서 불변식, Monaco import 경계
+cd web && pnpm e2e     # Playwright + axe — /design 카탈로그와 로그인 (백엔드 불필요)
 cd web && pnpm dev     # :8080 으로 /api 프록시
 ```
 
