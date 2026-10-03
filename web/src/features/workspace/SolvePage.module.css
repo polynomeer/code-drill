@@ -436,3 +436,9 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.allSubmissions {
+  align-self: flex-start;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}

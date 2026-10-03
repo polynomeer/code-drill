@@ -21,6 +21,7 @@ import type {
   ProblemFilter,
   ProblemPage,
   ProblemSummary,
+  Verdict,
   Submission,
   QuestionKind,
   SubmissionLanguage,
@@ -537,9 +538,25 @@ function optionalAuth(): Record<string, string> {
   return session ? { Authorization: `Bearer ${session.accessToken}` } : {}
 }
 
-export function listSubmissions(problemId?: string): Promise<Page<Submission>> {
-  const params = problemId ? `?problemId=${encodeURIComponent(problemId)}` : ''
-  return authed(`/submissions${params}`).then(json<Page<Submission>>)
+export type SubmissionQuery = {
+  problemId?: string | null
+  verdict?: Verdict | null
+  language?: string | null
+  cursor?: string | null
+  limit?: number
+}
+
+/** 내 제출 기록. 판정·언어로 거르는 것은 서버가 한다 (쪽마다 남는 수가 들쭉날쭉하지 않게). */
+export function listSubmissions(query: string | SubmissionQuery = {}): Promise<Page<Submission>> {
+  const q = typeof query === 'string' ? { problemId: query } : query
+  const params = new URLSearchParams()
+  if (q.problemId) params.set('problemId', q.problemId)
+  if (q.verdict) params.set('verdict', q.verdict)
+  if (q.language) params.set('language', q.language)
+  if (q.cursor) params.set('cursor', q.cursor)
+  if (q.limit) params.set('limit', String(q.limit))
+  const suffix = params.toString() ? `?${params}` : ''
+  return authed(`/submissions${suffix}`).then(json<Page<Submission>>)
 }
 
 export async function getDraft(problemId: string, language: string): Promise<Draft | null> {

@@ -36,10 +36,11 @@ export const IN_FLIGHT: ReadonlySet<SubmissionStatus> = new Set([
   'AGGREGATING',
 ])
 
+/** 판정 문구는 결과를 먼저 사실로 말한다 (UI 디자인 문서 §7.2, §9.2). */
 export const VERDICT_LABEL: Record<Verdict, string> = {
-  ACCEPTED: '정답',
-  WRONG_ANSWER: '오답',
-  COMPILE_ERROR: '컴파일 실패',
+  ACCEPTED: '맞았습니다',
+  WRONG_ANSWER: '틀렸습니다',
+  COMPILE_ERROR: '컴파일 오류',
   RUNTIME_ERROR: '런타임 오류',
   TIME_LIMIT: '시간 초과',
   MEMORY_LIMIT: '메모리 초과',
@@ -158,8 +159,13 @@ export interface CaseResult {
   caseId: string
   groupId: string
   verdict: Verdict
-  measurements: { wallTimeMillis: number; peakMemoryBytes: number }
+  measurements: { wallTimeMillis: number; peakMemoryBytes: number; cpuTimeMillis?: number }
   message: string | null
+  /**
+   * 실제로 나온 값 — 하네스의 전송 형식 그대로다 (features/submissions/wire.ts 가 되돌린다).
+   * 공개 그룹에서만 온다. 숨은 그룹의 출력은 숨은 입력을 되짚게 하므로 서버가 싣지 않는다 (§8.3).
+   */
+  actual?: string | null
 }
 
 export interface GroupResult {
@@ -180,6 +186,10 @@ export interface Submission {
   score: number | null
   compileLog: string | null
   groups: GroupResult[] | null
+  /** 몇 번째 판정인지. 1 보다 크면 재채점을 거쳤다 (§4.2) */
+  revision?: number
+  /** 제출한 시각 (ISO) */
+  createdAt?: string
   /** 내 제출인가. 게시판에 붙어 공유된 남의 제출을 열면 false 다 (§8.5). 목록에서는 오지 않는다 — 전부 내 것이다. */
   mine?: boolean
 }

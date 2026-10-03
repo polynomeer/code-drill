@@ -1,0 +1,360 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.headline {
+  margin: 0;
+  font: var(--text-h2);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+/* ─── 진행 ─── */
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.steps {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  font: var(--text-label);
+}
+
+.steps li:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  min-width: 12px;
+  background: var(--color-border-default);
+  border-radius: 1px;
+}
+
+.dot {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.stepDone {
+  color: var(--color-text-muted);
+}
+
+.stepDone .dot {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.stepDone::after {
+  background: var(--color-success) !important;
+}
+
+.stepNow {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-strong);
+}
+
+.stepNow .dot {
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.stepNext {
+  color: var(--color-text-muted);
+}
+
+.stepNext .dot {
+  border: 1px solid var(--color-border-strong);
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 4px var(--color-brand-subtle);
+  }
+}
+
+.progressText {
+  margin: 0;
+}
+
+/* ─── 떨어진 실행 ─── */
+
+.failure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.diff {
+  align-self: stretch;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border-default);
+  border-left: 3px solid var(--color-danger);
+  border-radius: var(--radius-md);
+}
+
+.diffTitle {
+  margin: 0 0 var(--space-2);
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.diffRows {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+}
+
+.diffRows > div {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.diffRows dt {
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.diffRows dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.diffRows code,
+.segments {
+  font: var(--text-code);
+  overflow-wrap: anywhere;
+}
+
+.mark {
+  padding: 0 1px;
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-bottom: 2px solid var(--color-danger);
+  border-radius: 2px;
+}
+
+.note {
+  margin: 0;
+}
+
+.groupName {
+  margin-right: var(--space-1);
+  padding: 1px 6px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
+  font: var(--text-code);
+}
+
+.limits {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* ─── 컴파일 ─── */
+
+.compile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.compileList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compileList li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+}
+
+.compileList li > span:last-child {
+  font: var(--text-code);
+  overflow-wrap: anywhere;
+}
+
+.jump,
+.lineRef {
+  flex: none;
+  padding: 2px var(--space-2);
+  background: var(--color-danger-subtle);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  font: var(--text-label);
+}
+
+.jump {
+  cursor: pointer;
+}
+
+.jump:hover {
+  background: var(--color-bg-surface);
+}
+
+.log summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.log pre {
+  max-height: 260px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  overflow: auto;
+  background: var(--color-bg-inset);
+  border-radius: var(--radius-md);
+  font: var(--text-code);
+  white-space: pre-wrap;
+}
+
+/* ─── 시스템 오류 ─── */
+
+.reportId {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2) !important;
+  font: var(--text-caption);
+}
+
+.reportId code {
+  font: var(--text-code);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.copy {
+  display: inline-flex;
+  padding: var(--space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ─── 다음 행동 ─── */
+
+.next {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-success-subtle);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-md);
+}
+
+.nextTitle {
+  margin: 0 0 var(--space-2);
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.nextActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.nextLink {
+  color: var(--color-text-primary);
+  font: var(--text-label);
+}
+
+/* ─── 그룹 ─── */
+
+.groups {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.caption {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  text-align: left;
+}
+
+.groups th {
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  text-align: left;
+}
+
+.groups td {
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.groups code {
+  font: var(--text-code);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bar {
+  width: 30%;
+}
+
+.more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.more:empty {
+  display: none;
+}

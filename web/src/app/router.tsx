@@ -1,8 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
 import { Suspense, lazy } from 'react'
 import type { ReactNode } from 'react'
 import { Link, Redirect, Route, Switch, useLocation, useRoute } from 'wouter'
-import { getSubmission } from '../api/client'
 import { useSession } from '../api/session'
 import { EmptyState, Skeleton } from '../design'
 import { SignIn } from '../features/auth/SignIn'
@@ -30,6 +28,13 @@ const DesignPage = import.meta.env.DEV
   : null
 
 const SolvePage = lazy(() => import('../features/workspace/SolvePage').then((m) => ({ default: m.SolvePage })))
+const SubmissionsPage = lazy(() =>
+  import('../features/submissions/SubmissionsPage').then((m) => ({ default: m.SubmissionsPage })),
+)
+const SubmissionDetailPage = lazy(() =>
+  import('../features/submissions/SubmissionDetailPage').then((m) => ({ default: m.SubmissionDetailPage })),
+)
+const ComparePage = lazy(() => import('../features/submissions/ComparePage').then((m) => ({ default: m.ComparePage })))
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
@@ -97,10 +102,26 @@ function Shell() {
             </Suspense>
           )}
         </Route>
+        <Route path="/submissions">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <SubmissionsPage />
+            </Suspense>
+          </RequireSession>
+        </Route>
+        <Route path="/submissions/compare">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <ComparePage />
+            </Suspense>
+          </RequireSession>
+        </Route>
         <Route path="/submissions/:id">
           {(params) => (
             <RequireSession>
-              <SubmissionLink id={params.id} />
+              <Suspense fallback={<RouteLoading />}>
+                <SubmissionDetailPage key={params.id} id={params.id} />
+              </Suspense>
             </RequireSession>
           )}
         </Route>
@@ -129,22 +150,6 @@ function LoginPage() {
   return <SignIn onSignedIn={() => navigate(next, { replace: true })} />
 }
 
-
-/**
- * `/submissions/:id` — 제출 하나로 가는 링크 (역량 근거, 게시판 붙임).
- *
- * 제출 상세 화면은 U3 에서 선다. 그때까지는 그 제출의 문제를 풀이 화면으로 열고 제출과 걸음을
- * 넘긴다. 링크를 이 모양으로 먼저 굳혀 두면 U3 에서 바꿀 것은 이 컴포넌트뿐이다.
- */
-function SubmissionLink({ id }: { id: string }) {
-  const query = useQuery({ queryKey: ['submission', id], queryFn: () => getSubmission(id) })
-  if (query.isError) return <NotFound />
-  if (!query.data) return <RouteLoading />
-  const params = new URLSearchParams({ submission: id })
-  const step = new URLSearchParams(window.location.search).get('step')
-  if (step !== null) params.set('step', step)
-  return <Redirect to={`/problems/${query.data.problemId}/solve?${params}`} replace />
-}
 
 /**
  * U1 전에는 제출을 `/?submission=<id>&step=<n>` 으로 열었다. 그 링크(북마크·게시판에 남은
