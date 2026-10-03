@@ -143,6 +143,9 @@ CREATED → QUEUED → LEASED → COMPILING → RUNNING → AGGREGATING → COMP
 - **임대 만료는 "워커가 죽었다"만 뜻해야 한다.** 실행을 집어 든 Runner 가 심장 박동으로
   임대를 연장하고, 아무도 집어 들지 않은 요청에는 훨씬 긴 dispatch timeout 을 따로 둔다.
   큐 대기를 임대에 넣으면 밀렸을 뿐인 제출이 유실로 처리돼 `SYSTEM_ERROR` 로 끝난다.
+  dispatch timeout 을 넘겨도 **같은 큐의 워커가 박동을 보내는 동안**은 다시 걸지 않고 기한만
+  늦춘다 — 다시 걸면 같은 요청이 큐 꼬리에 또 붙어 줄이 길어지고, 대량 재채점이 그렇게 대상
+  전부를 `SYSTEM_ERROR` 로 끝냈다. 일하는 워커가 없을 때만 유실로 본다.
 - 플랫폼 장애(`SYSTEM_ERROR`)를 사용자 코드 실패로 덮지 않는다.
 
 ## 신뢰 경계

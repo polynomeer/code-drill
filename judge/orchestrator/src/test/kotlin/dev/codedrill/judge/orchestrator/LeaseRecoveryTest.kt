@@ -54,6 +54,46 @@ class LeaseRecoveryTest {
     }
 
     @Test
+    fun `줄이 밀려 배정 기한을 넘겨도 워커가 일하는 동안에는 다시 걸지 않는다`() {
+        val world = World()
+        world.queue("busy")
+        val busy = world.gateway.requests.single()
+        world.coordinator.onHeartbeat(world.heartbeatFor(busy))
+        world.queue("waiting")
+
+        // 앞의 실행이 배정 기한(5분)의 두 배 넘게 걸린다. 워커는 그동안 박동을 보낸다.
+        repeat(12 * 60 / 20) {
+            world.advance(Duration.ofSeconds(20))
+            world.coordinator.onHeartbeat(world.heartbeatFor(busy))
+            world.coordinator.reclaimExpiredLeases()
+        }
+
+        assertEquals(
+            listOf("busy", "waiting"), world.gateway.requests.map { it.submissionId },
+            "줄 선 요청을 다시 걸면 같은 요청이 꼬리에 또 붙고, 길어진 줄이 다음 기한도 넘긴다",
+        )
+        assertTrue(world.gateway.completed.isEmpty(), "기다린 것이 SYSTEM_ERROR 가 되면 안 된다")
+
+        // 차례가 와서 집혔다. 그 뒤로는 보통의 임대다 — 박동이 끊기면 회수한다.
+        world.pickUp()
+        world.advance(Duration.ofSeconds(31))
+        world.coordinator.reclaimExpiredLeases()
+        assertEquals(2, world.gateway.requests.count { it.submissionId == "waiting" })
+    }
+
+    @Test
+    fun `일하는 워커가 없으면 배정 기한은 그대로 끝난다`() {
+        val world = World()
+        world.queue()
+
+        // Runner 가 하나도 없다. 줄을 서 있다고 봐 주면 끝나지 않는 채점으로 숨는다.
+        world.advance(Duration.ofMinutes(6))
+        world.coordinator.reclaimExpiredLeases()
+
+        assertEquals(2, world.gateway.requests.size, "집지 않은 채 기한을 넘기면 다시 건다")
+    }
+
+    @Test
     fun `임대가 만료되면 실행을 다시 건다`() {
         val world = World()
 
@@ -255,9 +295,9 @@ class LeaseRecoveryTest {
             now = now.plus(by)
         }
 
-        fun queue() = coordinator.onSubmissionQueued(
+        fun queue(submissionId: String = SUBMISSION) = coordinator.onSubmissionQueued(
             SubmissionQueued(
-                submissionId = SUBMISSION,
+                submissionId = submissionId,
                 correlationId = "corr-1",
                 problemId = PROBLEM,
                 problemVersion = 1,

@@ -5,6 +5,7 @@ import dev.codedrill.judge.protocol.JudgeOrigin
 import dev.codedrill.judge.protocol.LeasedResult
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -22,6 +23,8 @@ class MemoryLeaseRegistry(
 
     private val active = ConcurrentHashMap<String, Lease>()
     private val completed = ConcurrentHashMap<String, String>()
+    /** 큐마다 마지막 심장 박동이 살려 둔 시각. [working] 이 본다. */
+    private val alive = ConcurrentHashMap<String, Instant>()
     private var nextToken = 0L
 
     override fun lease(origin: JudgeOrigin, executionId: String): Lease {
@@ -53,8 +56,26 @@ class MemoryLeaseRegistry(
         val renewed = active.computeIfPresent(submissionId) { _, lease ->
             if (lease.token != token) lease else lease.copy(expiresAt = clock.instant().plus(leaseDuration), started = true)
         }
-        return renewed != null && renewed.token == token
+        if (renewed == null || renewed.token != token) return false
+        alive[renewed.origin.lane] = renewed.expiresAt
+        return true
     }
+
+    override fun postpone(waiting: Lease): Boolean {
+        var postponed = false
+        active.computeIfPresent(waiting.submissionId) { _, current ->
+            if (current.token != waiting.token || current.started) {
+                current
+            } else {
+                postponed = true
+                current.copy(expiresAt = clock.instant().plus(dispatchTimeout))
+            }
+        }
+        return postponed
+    }
+
+    override fun working(origin: JudgeOrigin): Boolean =
+        alive[origin.lane]?.isAfter(clock.instant()) == true
 
     override fun expired(): List<Lease> {
         val now = clock.instant()

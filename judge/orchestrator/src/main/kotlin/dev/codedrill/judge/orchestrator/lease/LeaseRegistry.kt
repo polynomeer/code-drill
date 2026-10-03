@@ -3,6 +3,8 @@ package dev.codedrill.judge.orchestrator.lease
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.JudgeOrigin
 import dev.codedrill.judge.protocol.LeasedResult
+import dev.codedrill.judge.protocol.ProjectQueued
+import dev.codedrill.judge.protocol.SubmissionQueued
 import java.time.Instant
 
 /**
@@ -56,6 +58,28 @@ interface LeaseRegistry {
     fun renew(submissionId: String, token: FencingToken): Boolean
 
     /**
+     * 아무도 집어 들지 않은 임대의 배정 기한을 한 번 더 준다. attempt 도 토큰도 그대로다.
+     *
+     * 배정 기한은 "요청이 사라졌다"를 잡는 장치다. 그런데 같은 큐의 워커가 살아서 앞의 일을
+     * 하고 있다면([working]) 아직 집히지 않은 요청은 사라진 것이 아니라 차례를 기다리는
+     * 것이다. 그것을 다시 걸면 같은 요청이 큐 꼬리에 한 번 더 붙어 줄이 길어지고, 길어진 줄이
+     * 다음 기한을 또 넘긴다 — 재채점 하나가 대상 전부를 SYSTEM_ERROR 로 끝냈다.
+     *
+     * 토큰이 같고 아직 시작되지 않았을 때만 늦춘다. 그 사이 다른 인스턴스가 다시 걸었거나
+     * 워커가 집어 들었으면 false 다.
+     */
+    fun postpone(waiting: Lease): Boolean
+
+    /**
+     * [origin] 과 같은 큐를 비우는 워커가 살아서 일하고 있는가 — 그 큐에서 집은 실행의 심장
+     * 박동이 임대 시간 안에 왔는가.
+     *
+     * 워커가 하나도 없으면 거짓이 되어 배정 기한이 원래대로 끝난다. 그래야 Runner 가 없는
+     * 상태가 끝나지 않는 채점으로 숨지 않고 SYSTEM_ERROR 로 드러난다.
+     */
+    fun working(origin: JudgeOrigin): Boolean
+
+    /**
      * 만료된 임대 전부.
      *
      * 워커가 죽으면 결과가 영영 오지 않고, 제출은 LEASED 에서 멈춘 채 남는다. 임대에
@@ -80,6 +104,16 @@ interface LeaseRegistry {
      */
     fun accept(result: LeasedResult): Acceptance
 }
+
+/**
+ * 이 요청이 기다리는 큐. 알고리즘 실행과 프로젝트 실행은 큐가 따로라, 한쪽 워커가 바쁜 것이
+ * 다른 쪽 줄이 움직인다는 뜻이 아니다.
+ */
+internal val JudgeOrigin.lane: String
+    get() = when (this) {
+        is SubmissionQueued -> "executions"
+        is ProjectQueued -> "projects"
+    }
 
 data class Lease(
     val submissionId: String,
