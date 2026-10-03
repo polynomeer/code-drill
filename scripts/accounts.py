@@ -28,6 +28,7 @@ class Account:
         self.display_name = session["displayName"]
         self.access_token = session["accessToken"]
         self.refresh_token = session["refreshToken"]
+        remember(self)
 
     @property
     def headers(self) -> dict[str, str]:
@@ -42,6 +43,25 @@ class Account:
         session = post("/auth/refresh", {"refreshToken": self.refresh_token})
         self.access_token = session["accessToken"]
         self.refresh_token = session["refreshToken"]
+        remember(self)
+
+
+# 스크립트가 받은 access token → 그 세션의 주인. 갱신 전의 토큰도 남긴다 — 호출부는
+# `.headers` 를 일찍 꺼내 변수에 담아 두고 한참 뒤에 쓰므로, 401 을 받은 요청이 실은 토큰이
+# 이미 바뀐 세션의 것일 수 있다. 운영자 세션(operators.py)도 여기에 적힌다.
+_OWNERS: dict[str, object] = {}
+
+
+def remember(session) -> None:
+    """`access_token`·`headers`·`refresh()` 를 가진 세션을 그 토큰으로 찾을 수 있게 한다."""
+    _OWNERS[session.access_token] = session
+
+
+def owner_of(authorization: str | None):
+    """`Authorization` 헤더 값이 가리키는 세션. 스크립트가 받은 토큰이 아니면 None."""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    return _OWNERS.get(authorization.removeprefix("Bearer "))
 
 
 def post(path: str, body: dict) -> dict:
