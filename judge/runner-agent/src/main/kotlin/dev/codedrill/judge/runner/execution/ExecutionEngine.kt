@@ -174,7 +174,10 @@ class ExecutionEngine(
             }
             results += toCaseResults(
                 run, group, request.limits.outputBytes, request.signature.returns,
-                includeActual = request.mode == ExecutionMode.TRIAL || request.mode == ExecutionMode.LAB,
+                // 시험·실험실은 사용자가 적은 입력이라 늘, 판정은 공개 그룹에서만 싣는다 —
+                // 공개 예제는 입력·기댓값이 지문에 있어 실행값을 보여도 새는 것이 없다 (§8.3).
+                includeActual = request.mode == ExecutionMode.TRIAL || request.mode == ExecutionMode.LAB ||
+                    group.policy.exposesInput,
             )
         }
         onPhase("execute", request.language, request.mode.name.lowercase(), System.nanoTime() - executeStart)
@@ -242,7 +245,7 @@ class ExecutionEngine(
          * 문제가 무엇을 돌려주기로 했는지는 manifest 에 이미 적혀 있다.
          */
         returns: ValueType,
-        /** 실제 출력을 실을지. 시험 실행에서만 참이다 — 이유는 TestCaseResult.actual 에 있다. */
+        /** 실제 출력을 실을지. 시험 실행과 판정의 공개 그룹에서만 참이다 — 이유는 TestCaseResult.actual 에 있다. */
         includeActual: Boolean,
     ): List<TestCaseResult> {
         val byId = group.cases.associateBy { it.qualifiedId() }
@@ -256,7 +259,6 @@ class ExecutionEngine(
                 verdict = verdictOf(outcome, case, outputLimit, returns),
                 measurements = measurementsOf(outcome),
                 message = messageOf(outcome, group.policy.exposesInput),
-                // 시험 실행에서만 실제 출력을 싣는다. 이유는 TestCaseResult.actual 에 있다.
                 actual = (outcome as? CaseOutcome.Completed)?.output?.takeIf { includeActual },
             )
         }
