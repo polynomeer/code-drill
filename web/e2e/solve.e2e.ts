@@ -11,6 +11,7 @@ import type { Page } from '@playwright/test'
  */
 const PROBLEM = {
   id: 'apply-range-updates',
+  number: 1042,
   version: 1,
   title: '구간 더하기 뒤의 배열',
   statement: [
@@ -72,7 +73,7 @@ test('지문을 마크다운으로 그리고 계측 절은 리플레이 탭으�
   await expect(statement).not.toContainText('**')
   await expect(statement).not.toContainText('```')
   // 제목은 툴바가 그린다 — 본문에 같은 H1 이 또 나오지 않는다
-  await expect(page.getByRole('heading', { level: 1, name: PROBLEM.title })).toHaveCount(1)
+  await expect(page.getByRole('heading', { level: 1, name: `${PROBLEM.number}${PROBLEM.title}` })).toHaveCount(1)
   // 계측 절은 지문에 없다
   await expect(statement).not.toContainText('Drill.write')
   // 예제는 표로
