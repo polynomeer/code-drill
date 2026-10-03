@@ -190,6 +190,25 @@
   outline: none;
 }
 
+/* 풀이 화면: 헤더 없이 화면 높이를 꽉 채운다. 문서가 아니라 본문 안의 창들이 흐른다 */
+.immersive {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
+.immersive .main {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.header[hidden] {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .userName,
   .logoText {

@@ -1,0 +1,187 @@
+.statement {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  font: var(--text-label);
+}
+
+.limits > div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.limits dt {
+  color: var(--color-text-muted);
+}
+
+.limits dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 마크다운 본문 ─── */
+
+.prose {
+  font: var(--text-reading);
+  overflow-wrap: anywhere;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose > :last-child {
+  margin-bottom: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose pre,
+.prose table,
+.prose blockquote {
+  margin: 0 0 var(--space-4);
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  margin: var(--space-6) 0 var(--space-3);
+  font: var(--text-h3);
+}
+
+.prose h1 {
+  font: var(--text-h2);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: var(--space-5);
+}
+
+.prose li + li {
+  margin-top: var(--space-1);
+}
+
+.prose code {
+  padding: 1px 5px;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-sm);
+  font: var(--text-code);
+  font-size: 0.9em;
+}
+
+.prose pre {
+  padding: var(--space-3) var(--space-4);
+  overflow-x: auto;
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.prose pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+  white-space: pre;
+}
+
+.prose strong {
+  font-weight: var(--weight-strong);
+}
+
+.prose a {
+  color: var(--color-brand);
+}
+
+.prose blockquote {
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+
+.prose table,
+.samples,
+.groups {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+}
+
+.prose th,
+.prose td,
+.samples th,
+.samples td,
+.groups th,
+.groups td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th,
+.samples th,
+.groups th {
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.samples code,
+.groups code {
+  font: var(--text-code);
+  overflow-wrap: anywhere;
+}
+
+/* ─── 절 ─── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0;
+  font: var(--text-h3);
+}
+
+.index {
+  width: 32px;
+  color: var(--color-text-muted);
+}
+
+.grading {
+  border-top: 1px solid var(--color-border-default);
+  padding-top: var(--space-3);
+}
+
+.grading summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.grading[open] summary {
+  margin-bottom: var(--space-3);
+}
+
+.signature {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+}
+
+.signature code {
+  font: var(--text-code);
+  overflow-wrap: anywhere;
+}
