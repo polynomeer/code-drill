@@ -1,5 +1,6 @@
 package dev.codedrill.judge.orchestrator.lease
 
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration
@@ -7,6 +8,7 @@ import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactor
 import org.springframework.data.redis.core.StringRedisTemplate
 import java.net.URI
 import java.time.Duration
+import java.util.UUID
 import kotlin.test.assertTrue
 
 /**
@@ -28,9 +30,17 @@ class RedisLeaseRegistryTest : LeaseRegistryContract() {
     override fun registry() = RedisLeaseRegistry(
         redis = template!!, clock = clock,
         leaseDuration = Duration.ofSeconds(30), dispatchTimeout = Duration.ofMinutes(5),
-        // 테스트끼리, 그리고 같은 Redis 를 쓰는 개발 스택과 섞이지 않게.
-        prefix = "judge-test",
+        // 테스트끼리, 그리고 같은 Redis 를 쓰는 개발 스택과 섞이지 않게. 큐별 생존 기록은
+        // 제출마다가 아니라 큐마다 하나라, 접두사를 나누지 않으면 앞 테스트의 박동이 남는다.
+        prefix = prefix,
     )
+
+    private val prefix = "judge-test-${UUID.randomUUID()}"
+
+    @AfterEach
+    fun cleanUp() {
+        template?.let { redis -> redis.keys("$prefix:*").takeIf { it.isNotEmpty() }?.let(redis::delete) }
+    }
 
     private companion object {
         val template: StringRedisTemplate? by lazy {

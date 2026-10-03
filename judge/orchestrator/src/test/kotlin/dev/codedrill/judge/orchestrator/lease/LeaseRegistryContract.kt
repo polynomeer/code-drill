@@ -4,9 +4,11 @@ import dev.codedrill.judge.protocol.ExecutionResult
 import dev.codedrill.judge.protocol.FencingToken
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.protocol.Measurements
+import dev.codedrill.judge.protocol.ProjectQueued
 import dev.codedrill.judge.protocol.SubmissionQueued
 import dev.codedrill.judge.protocol.TestCaseResult
 import dev.codedrill.judge.protocol.Verdict
+import dev.codedrill.judge.protocol.WorkspaceRef
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -160,16 +162,70 @@ abstract class LeaseRegistryContract {
         assertTrue(registry.expired().none { it.submissionId == submission })
     }
 
+    @Test
+    fun `같은 큐의 워커가 일하는 동안에는 줄 선 임대의 배정 기한을 늦춘다`() {
+        val registry = registry()
+        val other = "sub-${UUID.randomUUID()}"
+        val busy = registry.lease(origin(other), "exec-busy")
+        val waiting = registry.lease(origin(), "exec-1")
+        assertTrue(!registry.working(origin()), "아직 아무 워커도 일하지 않는다")
+
+        assertTrue(registry.renew(other, busy.token))
+        assertTrue(registry.working(origin()), "같은 큐의 실행이 박동을 보냈다")
+        assertTrue(!registry.working(projectOrigin()), "다른 큐의 줄은 움직이지 않는다")
+
+        now = now.plus(Duration.ofMinutes(5)).plusSeconds(1)
+        registry.renew(other, busy.token)
+        val expired = registry.expired().single { it.submissionId == submission }
+        assertTrue(registry.postpone(expired))
+        assertTrue(registry.expired().none { it.submissionId == submission }, "기한을 다시 받았다")
+
+        // attempt 도 토큰도 그대로다 — 다시 건 것이 아니다.
+        val result = resultOf(waiting)
+        assertIs<Acceptance.Accepted>(registry.accept(result))
+    }
+
+    @Test
+    fun `집어 든 임대나 바뀐 임대는 늦추지 않는다`() {
+        val registry = registry()
+        val first = registry.lease(origin(), "exec-1")
+        registry.lease(origin(), "exec-2")
+        assertTrue(!registry.postpone(first), "다른 인스턴스가 이미 다시 걸었다")
+
+        val current = registry.lease(origin(), "exec-3")
+        registry.renew(submission, current.token)
+        assertTrue(!registry.postpone(current), "워커가 집어 든 뒤의 만료는 워커 유실이다")
+    }
+
+    @Test
+    fun `박동이 끊긴 큐는 일하고 있지 않다`() {
+        val registry = registry()
+        val lease = registry.lease(origin(), "exec-1")
+        registry.renew(submission, lease.token)
+
+        now = now.plusSeconds(31)
+        assertTrue(!registry.working(origin()), "워커가 죽었으면 줄을 서 있다고 봐 주지 않는다")
+    }
+
     // --- 픽스처 ---
 
-    protected fun origin() = SubmissionQueued(
-        submissionId = submission,
+    protected fun origin(submissionId: String = submission) = SubmissionQueued(
+        submissionId = submissionId,
         correlationId = "corr-1",
         problemId = "two-sum",
         problemVersion = 1,
         language = Language.KOTLIN,
         source = "fun twoSum(nums: IntArray, target: Int) = intArrayOf(0, 1)",
         requestTrace = true,
+    )
+
+    protected fun projectOrigin() = ProjectQueued(
+        submissionId = "project-${UUID.randomUUID()}",
+        correlationId = "corr-2",
+        projectId = "inventory-ledger",
+        projectVersion = 1,
+        language = Language.PYTHON,
+        workspace = WorkspaceRef(key = "workspaces/x.zip", digest = "d"),
     )
 
     protected fun resultOf(lease: Lease) = resultOf(lease.attempt, lease.token)

@@ -33,6 +33,7 @@ import java.time.Instant
  * | `judge:expiry` | 만료 시각 순 정렬 집합. 회수는 이것만 훑는다 |
  * | `judge:done:<제출>` | 끝난 실행의 result digest. 중복과 뒤늦은 결과를 가른다 |
  * | `judge:fencing` | 토큰 카운터 |
+ * | `judge:alive` | 해시 — 큐(lane)마다 마지막 심장 박동이 살려 둔 시각. [working] 이 본다 |
  *
  * 완료 기록에는 만료가 있다. 메모리 구현은 그것을 영원히 들고 있었다 — 하루 뒤에 오는
  * 중복 결과는 없으므로, 그때까지만 기억하면 된다.
@@ -51,6 +52,7 @@ class RedisLeaseRegistry(
     private fun doneKey(id: String) = "$prefix:done:$id"
     private val expiryKey = "$prefix:expiry"
     private val fencingKey = "$prefix:fencing"
+    private val aliveKey = "$prefix:alive"
 
     override fun lease(origin: JudgeOrigin, executionId: String): Lease =
         checkNotNull(grant(origin, executionId, expectedToken = null)) { "새 임대는 조건이 없어 실패하지 않는다" }
@@ -69,6 +71,7 @@ class RedisLeaseRegistry(
             expiresAt.toEpochMilli().toString(),
             expectedToken?.value?.toString() ?: "",
             LEASE_TTL_SECONDS.toString(),
+            origin.lane,
         )
         // Lua 의 nil 은 클라이언트에 따라 null 로도, null 하나가 든 목록으로도 온다.
         if (reply?.firstOrNull() == null) return null
@@ -85,7 +88,20 @@ class RedisLeaseRegistry(
 
     override fun renew(submissionId: String, token: FencingToken): Boolean {
         val expiresAt = clock.instant().plus(leaseDuration).toEpochMilli()
-        return redis.execute(RENEW, listOf(leaseKey(submissionId), expiryKey), submissionId, token.value.toString(), expiresAt.toString()) == 1L
+        return redis.execute(RENEW, listOf(leaseKey(submissionId), expiryKey, aliveKey), submissionId, token.value.toString(), expiresAt.toString()) == 1L
+    }
+
+    override fun postpone(waiting: Lease): Boolean {
+        val expiresAt = clock.instant().plus(dispatchTimeout).toEpochMilli()
+        return redis.execute(
+            POSTPONE, listOf(leaseKey(waiting.submissionId), expiryKey),
+            waiting.submissionId, waiting.token.value.toString(), expiresAt.toString(),
+        ) == 1L
+    }
+
+    override fun working(origin: JudgeOrigin): Boolean {
+        val until = redis.opsForHash<String, String>().get(aliveKey, origin.lane)?.toLongOrNull() ?: return false
+        return until > clock.instant().toEpochMilli()
     }
 
     override fun expired(): List<Lease> {
@@ -147,6 +163,7 @@ class RedisLeaseRegistry(
 
         val LEASE = script<List<*>>("lease.lua")
         val RENEW = script<Long>("renew.lua")
+        val POSTPONE = script<Long>("postpone.lua")
         val ABANDON = script<Long>("abandon.lua")
         val ACCEPT = script<List<*>>("accept.lua")
 

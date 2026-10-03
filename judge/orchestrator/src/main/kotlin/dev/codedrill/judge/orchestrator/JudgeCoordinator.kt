@@ -226,8 +226,18 @@ class JudgeCoordinator(
      * "다시 실행"과 "중복 판정"이 동시에 일어나지 않는다.
      */
     fun reclaimExpiredLeases() {
+        var postponed = 0
         for (expired in registry.expired()) {
             val submissionId = expired.submissionId
+
+            // 아무도 집지 않았는데 같은 큐의 워커는 살아서 일하고 있다 — 사라진 것이 아니라
+            // 줄을 서 있는 것이다. 다시 걸면 같은 요청이 꼬리에 또 붙어 줄만 길어지고, 그 줄이
+            // 다음 기한도 넘긴다. 재채점 한 번에 대상 63건이 이렇게 SYSTEM_ERROR 가 됐다.
+            // 밀린 것 자체는 큐 대기 지표(QueueWaitSlow)가 드러낸다.
+            if (!expired.started && registry.working(expired.origin)) {
+                if (registry.postpone(expired)) postponed += 1
+                continue
+            }
 
             if (expired.attempt >= maxAttempts) {
                 registry.abandon(submissionId)
@@ -243,6 +253,7 @@ class JudgeCoordinator(
             val lease = registry.reclaim(expired, executionId = UUID.randomUUID().toString()) ?: continue
             dispatch(lease)
         }
+        if (postponed > 0) log.info("큐에서 차례를 기다리는 실행 {}건의 배정 기한을 늦췄다 — 워커는 살아 있다", postponed)
     }
 
     /** 임대가 품은 원 요청의 종류가 어느 판정기로 다시 걸지 정한다. */
