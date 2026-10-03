@@ -29,8 +29,12 @@
 
 **U0 이후 닫힌 것** ([ui-overhaul.md](ui-overhaul.md) §9): 토큰·라이트/다크 테마(§1.3 첫 줄),
 Pretendard·JetBrains Mono, 공용 컴포넌트, 흰 입력칸, 주 버튼 대비(이제 7.0:1), 입력 경계 대비,
-`:focus-visible`, `prefers-color-scheme`·`prefers-reduced-motion`, 375px 가로 넘침. 아래 표는
-측정 당시 그대로 둔다 — 무엇이 왜 바뀌었는지의 기준이다.
+`:focus-visible`, `prefers-color-scheme`·`prefers-reduced-motion`, 375px 가로 넘침.
+
+**U1 이후 닫힌 것**: §1.2 의 풀이 화면 — 지문과 에디터가 한 화면에 나란하고, 지문이 마크다운으로
+그려지고, 예제 표·단축키·에디터 설정·결과 창이 생겼다. 라우트가 섰다 (`/problems/:slug/solve`).
+
+아래 표는 측정 당시 그대로 둔다 — 무엇이 왜 바뀌었는지의 기준이다.
 
 ### 1.1 정보 구조
 
