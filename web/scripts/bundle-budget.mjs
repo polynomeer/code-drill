@@ -19,10 +19,14 @@ const DIST = new URL('../dist/', import.meta.url).pathname
 /**
  * 첫 화면이 내려받는 것. 에디터는 여기 들어 있지 않다 — Workspace 가 lazy 로 갈라
  * 두어, 문제 목록과 지문은 에디터를 기다리지 않고 그려진다.
+ *
+ * UI 개편 U0 에서 94KB → 117KB 가 됐다. 서버 상태 캐시(react-query) 10KB, 디자인 시스템과
+ * 아이콘 7KB, 라우터(wouter) 3KB. 라우터는 react-router 를 먼저 들였다가 그것 하나가 32KB 라
+ * 바꿨다 (docs/ui-overhaul.md §3). 웹 글꼴 CSS 는 진입에 넣지 않고 늦게 불러온다.
  */
-const ENTRY_GZIP_KB = 120
+const ENTRY_GZIP_KB = 140
 
-/** 배포물 전체. 언어 정의나 워커가 다시 쏟아지면 여기서 걸린다. */
+/** 배포물 전체 (글꼴 제외). 언어 정의나 워커가 다시 쏟아지면 여기서 걸린다. */
 const TOTAL_MB = 6
 
 /**
@@ -34,6 +38,13 @@ const TOTAL_MB = 6
  */
 const FILES = 20
 
+/**
+ * 웹 글꼴은 따로 센다. unicode-range 로 잘린 조각이라 파일은 100개 가깝지만 브라우저는
+ * 페이지에 나온 글자가 든 조각만 받는다 — 위의 "전체"·"개수"와 같은 잣대로 재면 사고가
+ * 아닌 것이 사고로 보이고, 섞어 두면 진짜 사고(워커가 돌아옴)를 가린다.
+ */
+const FONT_MB = 3.5
+
 function walk(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
@@ -41,8 +52,11 @@ function walk(dir) {
   })
 }
 
-const files = walk(DIST)
+const all = walk(DIST)
+const isFont = (f) => f.endsWith('.woff2') || f.endsWith('.woff')
+const files = all.filter((f) => !isFont(f))
 const total = files.reduce((sum, f) => sum + statSync(f).size, 0)
+const fonts = all.filter(isFont).reduce((sum, f) => sum + statSync(f).size, 0)
 
 // 진입점은 index.html 이 직접 참조하는 것들이다. 이름으로 찾지 않는다 — 해시가 붙고,
 // 청크 이름은 번들러가 정한다.
@@ -55,8 +69,9 @@ const entryGzip = entry.reduce(
 
 const checks = [
   ['첫 화면 (gzip)', entryGzip / 1024, ENTRY_GZIP_KB, 'KB'],
-  ['배포물 전체', total / 1024 / 1024, TOTAL_MB, 'MB'],
-  ['파일 개수', files.length, FILES, '개'],
+  ['배포물 전체 (글꼴 제외)', total / 1024 / 1024, TOTAL_MB, 'MB'],
+  ['파일 개수 (글꼴 제외)', files.length, FILES, '개'],
+  ['웹 글꼴 전체', fonts / 1024 / 1024, FONT_MB, 'MB'],
 ]
 
 let failed = false

@@ -1,0 +1,175 @@
+/* ─── Panel ─── */
+
+.panel {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.panelTitle {
+  margin: 0;
+  font: var(--text-h3);
+}
+
+.panelActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ─── Tabs ─── */
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabList {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border-default);
+  scrollbar-width: none;
+}
+
+.tab {
+  position: relative;
+  flex: none;
+  height: 40px;
+  padding: 0 var(--space-3);
+  background: none;
+  border: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  cursor: pointer;
+  transition: color var(--motion-micro);
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--color-text-primary);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-strong);
+}
+
+/* 선택 표시는 색만이 아니라 밑줄 모양으로도 (디자인 설계서 §15.2) */
+.tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-brand);
+  border-radius: 2px 2px 0 0;
+}
+
+.tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tabPanel {
+  padding-top: var(--space-4);
+  min-height: 0;
+}
+
+.tabPanel:focus-visible {
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Dialog ─── */
+
+.dialog {
+  width: min(520px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100vh - 2 * var(--space-6));
+  padding: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-dialog);
+  color: var(--color-text-primary);
+}
+
+.wide {
+  width: min(760px, calc(100vw - 2 * var(--space-4)));
+}
+
+.dialog::backdrop {
+  background: var(--color-backdrop);
+}
+
+.dialog[open] {
+  animation: dialog-in var(--motion-panel);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.dialogInner {
+  display: flex;
+  flex-direction: column;
+  max-height: inherit;
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+}
+
+.dialogTitle {
+  margin: 0;
+  font: var(--text-h2);
+}
+
+.dialogDescription {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.dialogClose {
+  display: inline-flex;
+  padding: var(--space-1);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.dialogClose:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-subtle);
+}
+
+.dialogBody {
+  padding: 0 var(--space-5) var(--space-5);
+  overflow-y: auto;
+}
+
+.dialogFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--color-border-default);
+}

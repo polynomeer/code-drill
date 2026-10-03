@@ -1,5 +1,7 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { listProblems } from '../../api/client'
+import { Button, InlineAlert } from '../../design'
 import {
   DIFFICULTIES,
   DIFFICULTY_LABEL,
@@ -31,19 +33,22 @@ export function ProblemList({
   onSelect: (slug: string) => void
 }) {
   const [filter, setFilter] = useState<ProblemFilter>(() => readFilter(window.location.search))
-  const [page, setPage] = useState<ProblemPage>(EMPTY_PAGE)
-  const [loading, setLoading] = useState(false)
-
+  // 타이핑마다 요청하지 않는다. 잠잠해지면 한 번 보낸다.
+  const [settled, setSettled] = useState(filter)
   useEffect(() => {
-    setLoading(true)
-    // 타이핑마다 요청하지 않는다. 잠잠해지면 한 번 보낸다.
-    const timer = setTimeout(() => {
-      listProblems(filter)
-        .then(setPage)
-        .finally(() => setLoading(false))
-    }, 250)
+    const timer = setTimeout(() => setSettled(filter), 250)
     return () => clearTimeout(timer)
   }, [filter])
+
+  // 새 조건의 결과가 올 때까지 앞 결과를 둔다 — 비웠다가 다시 채우면 목록이 깜빡이며
+  // 스크롤 자리를 잃는다. 필터를 되돌리면 캐시에서 바로 나온다.
+  const query = useQuery({
+    queryKey: ['problems', settled],
+    queryFn: () => listProblems(settled),
+    placeholderData: keepPreviousData,
+  })
+  const page = query.data ?? EMPTY_PAGE
+  const loading = filter !== settled || query.isFetching
 
   // 필터가 바뀌면 주소의 **필터 키만** 갈아 끼운다. 열어 둔 제출(`?submission`)은
   // App 의 것이라 건드리지 않는다.
@@ -137,7 +142,19 @@ export function ProblemList({
         {loading ? '찾는 중…' : `${page.total}개`}
       </p>
 
-      {page.total === 0 && !loading && <p className="muted">조건에 맞는 문제가 없습니다.</p>}
+      {query.isError && (
+        <InlineAlert
+          tone="danger"
+          title="문제 목록을 불러오지 못했습니다"
+          action={
+            <Button size="dense" onClick={() => void query.refetch()}>
+              다시 시도
+            </Button>
+          }
+        />
+      )}
+
+      {page.total === 0 && !loading && !query.isError && <p className="muted">조건에 맞는 문제가 없습니다.</p>}
 
       <ul className="problem-list">
         {page.items.map((item) => (

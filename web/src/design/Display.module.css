@@ -1,0 +1,176 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.badgeIcon {
+  display: inline-flex;
+}
+
+.neutral {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+}
+.brand {
+  background: var(--color-brand-subtle);
+  color: var(--color-brand);
+}
+.trace {
+  background: var(--color-trace-subtle);
+  color: var(--color-text-primary);
+}
+.trace .badgeIcon {
+  color: var(--color-trace);
+}
+.success {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+.warning {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+.danger {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+.system {
+  background: var(--color-system-subtle);
+  color: var(--color-system);
+}
+
+/* ─── 난이도 ─── */
+
+.difficulty {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-caption);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.bar,
+.barOn {
+  width: 3px;
+  border-radius: 1px;
+}
+
+.bars > :nth-child(1) {
+  height: 4px;
+}
+.bars > :nth-child(2) {
+  height: 6px;
+}
+.bars > :nth-child(3) {
+  height: 8px;
+}
+.bars > :nth-child(4) {
+  height: 10px;
+}
+.bars > :nth-child(5) {
+  height: 12px;
+}
+
+.bar {
+  background: var(--color-border-default);
+}
+
+.barOn {
+  background: currentColor;
+}
+
+/* ─── Chip ─── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-dense);
+  padding: 0 var(--space-3);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font: var(--text-caption);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-micro),
+    border-color var(--motion-micro);
+}
+
+.chip:hover {
+  background: var(--color-bg-subtle);
+}
+
+.chip:focus-visible {
+  border-radius: var(--radius-full);
+}
+
+.chipOn {
+  background: var(--color-brand-subtle);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+  font-weight: var(--weight-strong);
+}
+
+.chipOn:hover {
+  background: var(--color-brand-subtle);
+}
+
+.chipCount {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+/* 켜진 칩의 옅은 배경 위에서는 muted 가 4.5:1 을 못 넘는다 */
+.chipOn .chipCount {
+  color: inherit;
+}
+
+/* ─── Kbd ─── */
+
+.kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 var(--space-1);
+  background: var(--color-bg-inset);
+  border: 1px solid var(--color-border-default);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+/* ─── ProgressBar ─── */
+
+.progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-full);
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--motion-state);
+}

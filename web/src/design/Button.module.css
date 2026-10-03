@@ -1,0 +1,90 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-default);
+  padding: 0 var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: var(--text-label);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-micro),
+    border-color var(--motion-micro),
+    color var(--motion-micro);
+}
+
+.button:focus-visible {
+  border-radius: var(--radius-md);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* loading 은 흐려지지 않는다. 비활성이 아니라 진행 중이다 */
+.button[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}
+
+.dense {
+  height: var(--control-dense);
+  padding: 0 var(--space-3);
+  font: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.primary {
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+}
+
+.secondary {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--color-bg-subtle);
+}
+
+.tertiary {
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+.tertiary:hover:not(:disabled) {
+  background: var(--color-bg-subtle);
+}
+
+.danger {
+  background: transparent;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
+}
+
+.iconOnly {
+  width: var(--control-default);
+  padding: 0;
+}
+
+.iconOnly.dense {
+  width: var(--control-dense);
+}
+
+.icon {
+  display: inline-flex;
+}

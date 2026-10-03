@@ -1,0 +1,167 @@
+/*
+ * 디자인 토큰 — 색·글꼴·간격·반경·그림자·모션의 단일 출처 (docs/ui-overhaul.md §5.1).
+ *
+ * 값의 원본은 디자인 설계서 §13.1~13.3 과 UI 디자인 문서 §9.1 이다. 둘이 어긋나는 곳은
+ * ui-overhaul.md §2 에서 고른 쪽을 따른다. 컴포넌트 CSS 는 hex 를 직접 쓰지 않는다.
+ *
+ * 테마는 <html data-theme> 이 정한다. index.html 의 인라인 스크립트가 첫 페인트 전에
+ * 저장된 선택 또는 시스템 설정으로 채운다 — 미디어 쿼리로 두 번 적으면 다크 값이 두 벌이
+ * 되고, 한쪽만 고치는 사고가 난다.
+ *
+ * 대비는 scripts/contrast.mjs 가 빌드에서 잰다. 값을 바꾸면 그 스크립트의 쌍도 본다.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* 표면. app 은 페이지 바탕, surface 는 패널, inset 은 코드·입력처럼 한 단 들어간 곳 */
+  --color-bg-app: #f6f8f9;
+  --color-bg-surface: #ffffff;
+  --color-bg-subtle: #f0f3f5;
+  --color-bg-inset: #f1f4f6;
+  --color-bg-elevated: #ffffff;
+  --color-bg-editor: #0f171d;
+
+  --color-text-primary: #1d252c;
+  --color-text-muted: #62717a;
+  --color-text-on-brand: #ffffff;
+
+  /* 경계: default 는 패널 구분(장식), strong 은 입력·컨트롤 경계(UI 경계 3:1) */
+  --color-border-default: #dce5e8;
+  --color-border-strong: #808f99;
+
+  --color-brand: #265f7a;
+  --color-brand-hover: #1d4d63;
+  --color-brand-subtle: #e3eff4;
+  --color-trace: #168b8c;
+  --color-trace-subtle: #dff2f1;
+
+  --color-success: #1e6a4a;
+  --color-success-subtle: #e2f2ea;
+  --color-warning: #8a5a00;
+  --color-warning-subtle: #fbf0dc;
+  --color-danger: #a33a3a;
+  --color-danger-subtle: #f9e5e5;
+  /* System Error 는 사용자 잘못이 아니다 — 오답색을 쓰지 않는다 (디자인 설계서 §7.4) */
+  --color-system: #5a6670;
+  --color-system-subtle: #eceff1;
+
+  /* 난이도 1(입문)~5(최상). 배지는 글자를 함께 쓰므로 색은 보조 신호다 */
+  --color-difficulty-1: #5a6670;
+  --color-difficulty-2: #1e6a4a;
+  --color-difficulty-3: #265f7a;
+  --color-difficulty-4: #8a5a00;
+  --color-difficulty-5: #a33a3a;
+
+  --shadow-popover: 0 8px 28px rgb(16 22 26 / 14%);
+  --shadow-dialog: 0 18px 55px rgb(16 22 26 / 18%);
+  --color-backdrop: rgb(16 22 26 / 40%);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg-app: #10161a;
+  --color-bg-surface: #172128;
+  --color-bg-subtle: #1e2a32;
+  --color-bg-inset: #0c1216;
+  --color-bg-elevated: #1e2a32;
+  --color-bg-editor: #0f171d;
+
+  --color-text-primary: #edf2f4;
+  --color-text-muted: #a9b5bb;
+  --color-text-on-brand: #0b1418;
+
+  --color-border-default: #2a3a45;
+  --color-border-strong: #627784;
+
+  --color-brand: #6ab3cf;
+  --color-brand-hover: #8cc6dc;
+  --color-brand-subtle: #1b3440;
+  --color-trace: #54c9c4;
+  --color-trace-subtle: #163634;
+
+  --color-success: #61c48b;
+  --color-success-subtle: #173326;
+  --color-warning: #e6b85c;
+  --color-warning-subtle: #3a2e14;
+  --color-danger: #f07c7c;
+  --color-danger-subtle: #3d1f21;
+  --color-system: #a9b5bb;
+  --color-system-subtle: #26323a;
+
+  --color-difficulty-1: #a9b5bb;
+  --color-difficulty-2: #61c48b;
+  --color-difficulty-3: #6ab3cf;
+  --color-difficulty-4: #e6b85c;
+  --color-difficulty-5: #f07c7c;
+
+  --shadow-popover: 0 8px 28px rgb(0 0 0 / 40%);
+  --shadow-dialog: 0 18px 55px rgb(0 0 0 / 50%);
+  --color-backdrop: rgb(0 0 0 / 55%);
+}
+
+:root {
+  /* 글꼴 (디자인 설계서 §13.2, 굵기는 ui-overhaul.md §2) */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Malgun Gothic',
+    'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --text-display: 600 28px/36px var(--font-sans);
+  --text-h1: 600 22px/30px var(--font-sans);
+  --text-h2: 600 17px/24px var(--font-sans);
+  --text-h3: 600 15px/22px var(--font-sans);
+  --text-body: 400 14px/22px var(--font-sans);
+  --text-reading: 400 15px/24px var(--font-sans);
+  --text-label: 500 13px/18px var(--font-sans);
+  --text-caption: 400 12px/18px var(--font-sans);
+  --text-code: 400 13px/20px var(--font-mono);
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+
+  /* 간격 — 4px 기준 (디자인 설계서 §13.3) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 999px;
+
+  --control-dense: 28px;
+  --control-default: 36px;
+  --control-touch: 44px;
+
+  --header-height: 56px;
+  --content-max: 1200px;
+
+  /* focus ring — 2px + 2px offset (디자인 설계서 §13.3) */
+  --focus-ring: 0 0 0 2px var(--color-bg-surface), 0 0 0 4px var(--color-brand);
+
+  /* 모션 (UI 디자인 문서 §9.1) */
+  --motion-micro: 120ms ease-out;
+  --motion-panel: 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-state: 260ms ease-in-out;
+
+  --z-sticky: 10;
+  --z-drawer: 20;
+  --z-popover: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-micro: 0ms linear;
+    --motion-panel: 0ms linear;
+    --motion-state: 0ms linear;
+  }
+}
