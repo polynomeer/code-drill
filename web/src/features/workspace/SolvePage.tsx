@@ -122,7 +122,7 @@ export function SolvePage({ slug }: { slug: string }) {
   const parts = useMemo(() => (problem ? splitStatement(problem.statement, problem.title) : null), [problem])
 
   useEffect(() => {
-    if (problem) document.title = `${problem.title} · CodeDrill`
+    if (problem) document.title = `${problem.number ? `${problem.number}. ` : ''}${problem.title} · CodeDrill`
     return () => {
       document.title = 'CodeDrill'
     }
@@ -256,7 +256,7 @@ export function SolvePage({ slug }: { slug: string }) {
   const toolbar = (
     <header className={styles.toolbar}>
       <div className={styles.toolbarStart}>
-        <Link href="/" className={styles.back} aria-label="문제 목록으로">
+        <Link href="/problems" className={styles.back} aria-label="문제 목록으로">
           <ArrowLeft size={18} aria-hidden="true" />
         </Link>
         {!isMobile && (
@@ -266,7 +266,16 @@ export function SolvePage({ slug }: { slug: string }) {
             onClick={toggleProblemPane}
           />
         )}
-        <h1 className={styles.title}>{problem?.title ?? <Skeleton width={160} height={18} />}</h1>
+        <h1 className={styles.title}>
+          {problem ? (
+            <>
+              {problem.number && <span className={styles.number}>{problem.number}</span>}
+              {problem.title}
+            </>
+          ) : (
+            <Skeleton width={160} height={18} />
+          )}
+        </h1>
       </div>
 
       <div className={styles.toolbarEnd}>

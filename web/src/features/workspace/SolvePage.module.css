@@ -56,6 +56,12 @@
   text-overflow: ellipsis;
 }
 
+.number {
+  margin-right: var(--space-2);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .language {
   width: 112px;
   height: var(--control-default);

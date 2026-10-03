@@ -46,7 +46,8 @@ export function StatementView({ problem, body }: { problem: Problem; body: strin
 
       <Markdown source={body} />
 
-      {problem.samples.length > 0 && (
+      {/* 지문이 예제를 직접 적었으면(세 문제) 또 그리지 않는다 — 같은 표가 두 번 나온다 */}
+      {problem.samples.length > 0 && !/^##\s*예제/m.test(body) && (
         <section className={styles.section} aria-labelledby="samples-title">
           <h3 id="samples-title" className={styles.sectionTitle}>
             예제

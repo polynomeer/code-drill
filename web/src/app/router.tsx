@@ -1,20 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy } from 'react'
 import type { ReactNode } from 'react'
-import { Link, Redirect, Route, Switch, useRoute } from 'wouter'
+import { Link, Redirect, Route, Switch, useLocation, useRoute } from 'wouter'
 import { getSubmission } from '../api/client'
-import { getSession, onSessionChange } from '../api/session'
-import type { Session } from '../api/session'
+import { useSession } from '../api/session'
 import { EmptyState, Skeleton } from '../design'
 import { SignIn } from '../features/auth/SignIn'
+import { ProblemsPage } from '../features/problems/ProblemsPage'
 import { AppShell } from './AppShell'
+import { safeNext } from './navigation'
 import { HomePage } from './HomePage'
 
 /**
  * 라우트 표 (docs/ui-overhaul.md §4).
  *
- * 화면이 하나씩 자기 라우트를 얻을 때마다 여기 한 줄이 는다. 풀이 화면은 Monaco 와 마크다운
- * 렌더러를 끌고 오므로 따로 청크로 나눈다 — 홈은 그것을 기다리지 않는다.
+ * **공개와 로그인 필요를 라우트마다 정한다.** 문제 목록과 읽기는 로그인 없이 열리고
+ * (디자인 설계서 §11.1), 풀이·제출·홈은 로그인해야 한다. 로그인이 필요한 곳에 둘러보던 사람이
+ * 오면 `/login?next=<원래 주소>` 로 보내고, 로그인하면 그 주소로 돌아온다.
+ *
+ * 풀이·읽기 화면은 Monaco·마크다운 렌더러를 끌고 오므로 따로 청크로 나눈다.
  *
  * 쿼리(`?submission=`·`?step=`·`?lang=`·필터)는 각 화면이 history.replaceState 로 직접 쓴다
  * (shared/url.ts). wouter 는 경로만 보므로 둘이 부딪히지 않는다.
@@ -26,6 +30,9 @@ const DesignPage = import.meta.env.DEV
   : null
 
 const SolvePage = lazy(() => import('../features/workspace/SolvePage').then((m) => ({ default: m.SolvePage })))
+const ProblemReadPage = lazy(() =>
+  import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
+)
 
 const SOLVE_PATH = '/problems/:slug/solve'
 
@@ -39,45 +46,64 @@ export function AppRoutes() {
           </Suspense>
         </Route>
       )}
+      <Route path="/login">
+        <LoginPage />
+      </Route>
       <Route>
-        <SessionGate />
+        <Shell />
       </Route>
     </Switch>
   )
 }
 
-/**
- * 세션이 없으면 로그인 화면이다. 제출·초안·기록이 전부 인증을 요구하므로, 로그인 전 화면은
- * 실패한 요청 목록이 될 뿐이다. (익명 탐색은 U2 에서 백엔드와 함께 연다.)
- *
- * 토큰 갱신이 끝내 실패하면 세션 모듈이 스스로 비운다. 그때 화면도 로그인으로 돌아가야
- * 한다 — 그러지 않으면 사용자는 아무 반응 없는 화면을 보게 된다.
- */
-function SessionGate() {
-  const [session, setSession] = useState<Session | null>(getSession)
-  useEffect(() => onSessionChange(setSession), [])
+function Shell() {
+  const session = useSession()
   // 풀이 화면은 전역 헤더를 접고 자기 툴바만 쓴다 (ui-overhaul.md §4).
   const [solving] = useRoute(SOLVE_PATH)
 
-  if (!session) return <SignIn onSignedIn={setSession} />
-  // 계정이 바뀌면 셸 아래 상태를 통째로 버린다. 앞 사람의 초안이 남으면 안 된다.
   return (
-    <AppShell key={session.userId} session={session} immersive={solving}>
+    // 계정이 바뀌면 셸 아래 상태를 통째로 버린다. 앞 사람의 초안이 남으면 안 된다.
+    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={solving && session !== null}>
       <Switch>
         <Route path="/">
-          <LegacySubmissionLink>
-            <HomePage />
-          </LegacySubmissionLink>
+          {session ? (
+            <LegacySubmissionLink>
+              <HomePage />
+            </LegacySubmissionLink>
+          ) : (
+            // 둘러보는 사람의 첫 화면은 문제 목록이다. 예전 제출 링크는 로그인으로 보낸다.
+            <LegacySubmissionLink>
+              <Redirect to="/problems" replace />
+            </LegacySubmissionLink>
+          )}
+        </Route>
+        <Route path="/problems">
+          <ProblemsPage />
         </Route>
         <Route path={SOLVE_PATH}>
           {(params) => (
+            <RequireSession>
+              <Suspense fallback={<RouteLoading />}>
+                {/* 문제를 바꾸면 화면 상태를 통째로 새로 시작한다 — 앞 문제의 판정·초안이 남지 않게 */}
+                <SolvePage key={params.slug} slug={params.slug} />
+              </Suspense>
+            </RequireSession>
+          )}
+        </Route>
+        <Route path="/problems/:slug">
+          {(params) => (
             <Suspense fallback={<RouteLoading />}>
-              {/* 문제를 바꾸면 화면 상태를 통째로 새로 시작한다 — 앞 문제의 판정·초안이 남지 않게 */}
-              <SolvePage key={params.slug} slug={params.slug} />
+              <ProblemReadPage key={params.slug} slug={params.slug} />
             </Suspense>
           )}
         </Route>
-        <Route path="/submissions/:id">{(params) => <SubmissionLink id={params.id} />}</Route>
+        <Route path="/submissions/:id">
+          {(params) => (
+            <RequireSession>
+              <SubmissionLink id={params.id} />
+            </RequireSession>
+          )}
+        </Route>
         <Route>
           <NotFound />
         </Route>
@@ -85,6 +111,24 @@ function SessionGate() {
     </AppShell>
   )
 }
+
+/** 로그인해야 하는 화면. 아니면 지금 주소를 들고 로그인으로 간다. */
+function RequireSession({ children }: { children: ReactNode }) {
+  const session = useSession()
+  if (session) return <>{children}</>
+  const here = window.location.pathname + window.location.search
+  return <Redirect to={`/login?next=${encodeURIComponent(here)}`} replace />
+}
+
+/** `/login?next=` — 로그인하면 원래 가려던 곳으로 돌아간다. 밖으로 나가는 주소는 safeNext 가 막는다. */
+function LoginPage() {
+  const session = useSession()
+  const [, navigate] = useLocation()
+  const next = safeNext(new URLSearchParams(window.location.search).get('next'))
+  if (session) return <Redirect to={next} replace />
+  return <SignIn onSignedIn={() => navigate(next, { replace: true })} />
+}
+
 
 /**
  * `/submissions/:id` — 제출 하나로 가는 링크 (역량 근거, 게시판 붙임).
@@ -131,7 +175,7 @@ function NotFound() {
       <EmptyState
         title="찾는 화면이 없습니다"
         action={
-          <Link href="/" className="linklike">
+          <Link href="/problems" className="linklike">
             문제 목록으로
           </Link>
         }

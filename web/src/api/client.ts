@@ -20,6 +20,7 @@ import type {
   Problem,
   ProblemFilter,
   ProblemPage,
+  ProblemSummary,
   Submission,
   QuestionKind,
   SubmissionLanguage,
@@ -498,18 +499,42 @@ export async function deleteAccount(password: string): Promise<void> {
  * 문제"를 표시해 준다. [authed] 를 쓰지 않는 이유는 그것이 세션이 없을 때 던지기
  * 때문이다. 여기서는 세션이 없는 것이 오류가 아니라 **평범한 경우**다.
  */
-export function listProblems(filter: ProblemFilter): Promise<ProblemPage> {
+export function listProblems(filter: ProblemFilter, pageSize?: number): Promise<ProblemPage> {
+  const params = filterParams(filter)
+  // 쪽 크기를 주면 쪽 번호 방식이다 — 표 화면 (docs/ui-overhaul.md §6.1). 안 주면 예전처럼 커서 방식.
+  if (pageSize !== undefined) {
+    params.set('sort', filter.sort)
+    params.set('order', filter.order)
+    params.set('page', String(filter.page))
+    params.set('limit', String(pageSize))
+  }
+  const suffix = params.toString() ? `?${params}` : ''
+  return fetch(`${BASE}/problems${suffix}`, { headers: optionalAuth() }).then(json<ProblemPage>)
+}
+
+/** 지금 조건에서 아무 문제 하나. 로그인했으면 안 푼 것에서 고른다. 없으면 null. */
+export async function randomProblem(filter: ProblemFilter): Promise<ProblemSummary | null> {
+  const params = filterParams(filter)
+  const response = await fetch(`${BASE}/problems/random${params.toString() ? `?${params}` : ''}`, {
+    headers: optionalAuth(),
+  })
+  if (response.status === 404) return null
+  return json<ProblemSummary>(response)
+}
+
+function filterParams(filter: ProblemFilter): URLSearchParams {
   const params = new URLSearchParams()
   if (filter.query.trim()) params.set('query', filter.query.trim())
   for (const value of filter.difficulty) params.append('difficulty', value)
   for (const value of filter.tags) params.append('tags', value)
   if (filter.status) params.set('status', filter.status)
+  return params
+}
 
+/** 공개 경로는 토큰이 없어도 열린다. 있으면 실어 "푼 문제"를 받는다. */
+function optionalAuth(): Record<string, string> {
   const session = getSession()
-  const suffix = params.toString() ? `?${params}` : ''
-  return fetch(`${BASE}/problems${suffix}`, {
-    headers: session ? { Authorization: `Bearer ${session.accessToken}` } : {},
-  }).then(json<ProblemPage>)
+  return session ? { Authorization: `Bearer ${session.accessToken}` } : {}
 }
 
 export function listSubmissions(problemId?: string): Promise<Page<Submission>> {

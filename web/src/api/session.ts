@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react'
+
 /**
  * 로그인 세션 (기술 설계서 §11.2).
  *
@@ -88,4 +90,13 @@ export function refreshSession(): Promise<Session | null> {
     })
 
   return refreshing
+}
+
+/**
+ * 지금 세션을 화면에서 읽는다. 로그인·로그아웃·갱신 실패가 곧바로 다시 그려진다.
+ *
+ * 공개 화면(문제 목록·읽기)은 세션이 없어도 그려지고, 있으면 "푼 문제" 같은 내 것을 더 보인다.
+ */
+export function useSession(): Session | null {
+  return useSyncExternalStore(onSessionChange, getSession)
 }

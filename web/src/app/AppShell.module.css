@@ -84,6 +84,22 @@
   margin-left: auto;
 }
 
+.signIn {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-default);
+  padding: 0 var(--space-4);
+  background: var(--color-brand);
+  border-radius: var(--radius-md);
+  color: var(--color-text-on-brand);
+  font: var(--text-label);
+  text-decoration: none;
+}
+
+.signIn:hover {
+  background: var(--color-brand-hover);
+}
+
 .userButton {
   display: inline-flex;
   align-items: center;
