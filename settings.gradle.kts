@@ -26,6 +26,7 @@ include(
     ":control-plane:admin",
     ":control-plane:profile",
     ":control-plane:notification",
+    ":control-plane:analytics",
 
     // 실행 영역: 독립 신뢰 경계 (§5.1)
     ":judge:protocol",

@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":control-plane:admin"))
     implementation(project(":control-plane:profile"))
     implementation(project(":control-plane:notification"))
+    implementation(project(":control-plane:analytics"))
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)
