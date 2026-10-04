@@ -99,15 +99,12 @@ test('빈 결과는 걸린 조건과 초기화를 보인다', async ({ page }) =
   await expect(page).not.toHaveURL(/query=/)
 })
 
-test('읽기 화면은 로그인 없이 열리고 풀기는 로그인으로 보낸다', async ({ page }) => {
+test('읽기 화면은 로그인 없이 열리고 풀기도 로그인 없이 풀이 화면으로 간다', async ({ page }) => {
   await mockApi(page)
   await page.goto('/problems/p0')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('1000')
   await expect(page.getByRole('article', { name: '문제' })).toContainText('뒤집는다')
-  await expect(page.getByRole('link', { name: '로그인하고 풀기' })).toHaveAttribute(
-    'href',
-    '/login?next=%2Fproblems%2Fp0%2Fsolve',
-  )
+  await expect(page.getByRole('link', { name: '풀어 보기' })).toHaveAttribute('href', '/problems/p0/solve')
 })
 
 test('접근성 위반이 없다', async ({ page }) => {
