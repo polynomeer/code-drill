@@ -64,10 +64,35 @@ jobs:
       # 접근성 위반 하나가 빌드를 깬다. 위반이 나오면 규칙을 끄지 말고 컴포넌트를 고친다.
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+      # 성능 게이트 (ui-overhaul.md §8 — LCP·INP·Workspace 조작). 위 `pnpm build` 의 배포물을 vite preview 로 잰다.
+      - run: pnpm perf
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-traces
+          path: web/test-results
+
+  # 시각 회귀 (ui-overhaul.md §8). 기준 이미지를 찍은 것과 **같은 컨테이너**에서 견준다 — 글자 그리기는 운영체제마다
+  # 달라 macOS 기준은 여기서 맞지 않는다. 로컬은 `pnpm e2e:visual` 이 같은 이미지를 띄운다 (web/scripts/visual.sh).
+  visual:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright test -c playwright.visual.config.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-diffs
           path: web/test-results
 
   # 격리 회귀 (§5.2, §11.4 sandbox regression 게이트).

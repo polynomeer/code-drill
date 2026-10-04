@@ -48,7 +48,9 @@ python3 scripts/preflight.py app  # 배포 호스트 점검 (app | runner) — �
 ```bash
 cd web && pnpm build   # 토큰 대비 + tsc --noEmit + vitest + vite build + 번들 예산
 cd web && pnpm test    # 리플레이 리듀서 불변식, Monaco import 경계
-cd web && pnpm e2e     # Playwright + axe — /design, 로그인, 풀이 화면(API 흉내). 백엔드 불필요
+cd web && pnpm e2e     # Playwright + axe — 주요 화면 전부(API 흉내), 다크 검수, §16.1 계측. 백엔드 불필요
+cd web && pnpm perf    # 성능 게이트 — pnpm build 뒤 배포물로 LCP·INP·Workspace 조작
+cd web && pnpm e2e:visual   # 시각 회귀 — CI 와 같은 리눅스 컨테이너(Docker)에서. 바꿨으면 --update-snapshots
 cd web && pnpm dev     # :8080 으로 /api 프록시
 ```
 

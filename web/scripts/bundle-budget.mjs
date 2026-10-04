@@ -44,6 +44,20 @@ const TOTAL_MB = 6
 const FILES = 60
 
 /**
+ * 화면 청크 하나 (gzip). 라우트마다 따로 받으니 첫 화면 한도와 따로 잰다 (docs/ui-overhaul.md §8 "라우트 청크별
+ * 한도"). 한 화면이 이보다 커지면 무엇을 끌어왔는지 본다 — 대개 다른 화면의 것을 잘못 import 했다.
+ * U9 에서 가장 큰 것이 26KB(지문 렌더러)다.
+ */
+const ROUTE_CHUNK_GZIP_KB = 40
+
+/**
+ * Monaco 는 화면 청크가 아니다. 풀이·비교·검수 화면이 늦게 받아 오는 편집기 한 덩이이고, 그 크기는 위
+ * "배포물 전체"와 별도로 여기서만 막는다. U9 에서 1,071KB. 언어 서비스가 다시 쏟아지면 몇 MB 가 늘어 걸린다.
+ */
+const MONACO_GZIP_KB = 1200
+const isMonaco = (f) => /monaco|editor\.worker/.test(f)
+
+/**
  * 웹 글꼴은 따로 센다. unicode-range 로 잘린 조각이라 파일은 100개 가깝지만 브라우저는
  * 페이지에 나온 글자가 든 조각만 받는다 — 위의 "전체"·"개수"와 같은 잣대로 재면 사고가
  * 아닌 것이 사고로 보이고, 섞어 두면 진짜 사고(워커가 돌아옴)를 가린다.
@@ -72,8 +86,16 @@ const entryGzip = entry.reduce(
   0,
 )
 
+const chunks = files
+  .filter((f) => f.endsWith('.js') && !entry.some((name) => f.endsWith(name)))
+  .map((f) => ({ name: f.split('/').pop(), kb: gzipSync(readFileSync(f)).length / 1024 }))
+const routeChunk = chunks.filter((c) => !isMonaco(c.name)).sort((a, b) => b.kb - a.kb)[0] ?? { name: '-', kb: 0 }
+const monaco = chunks.filter((c) => isMonaco(c.name)).reduce((sum, c) => sum + c.kb, 0)
+
 const checks = [
   ['첫 화면 (gzip)', entryGzip / 1024, ENTRY_GZIP_KB, 'KB'],
+  [`가장 큰 화면 청크 (gzip, ${routeChunk.name})`, routeChunk.kb, ROUTE_CHUNK_GZIP_KB, 'KB'],
+  ['편집기 Monaco (gzip)', monaco, MONACO_GZIP_KB, 'KB'],
   ['배포물 전체 (글꼴 제외)', total / 1024 / 1024, TOTAL_MB, 'MB'],
   ['파일 개수 (글꼴 제외)', files.length, FILES, '개'],
   ['웹 글꼴 전체', fonts / 1024 / 1024, FONT_MB, 'MB'],
