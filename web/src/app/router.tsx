@@ -35,6 +35,9 @@ const SubmissionDetailPage = lazy(() =>
   import('../features/submissions/SubmissionDetailPage').then((m) => ({ default: m.SubmissionDetailPage })),
 )
 const ComparePage = lazy(() => import('../features/submissions/ComparePage').then((m) => ({ default: m.ComparePage })))
+const WelcomePage = lazy(() => import('../features/onboarding/WelcomePage').then((m) => ({ default: m.WelcomePage })))
+const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })))
+const ResetPasswordPage = lazy(() => import('../features/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })))
 const ReplayPage = lazy(() => import('../features/replay/ReplayPage').then((m) => ({ default: m.ReplayPage })))
 const TrainingPage = lazy(() => import('../features/training/TrainingPage').then((m) => ({ default: m.TrainingPage })))
 const CompetenciesPage = lazy(() =>
@@ -64,6 +67,17 @@ export function AppRoutes() {
       )}
       <Route path="/login">
         <LoginPage />
+      </Route>
+      {/* 비밀번호를 잊은 사람은 세션이 없다 — 셸 밖의 단독 화면 */}
+      <Route path="/forgot-password">
+        <Suspense fallback={null}>
+          <ForgotPasswordPage />
+        </Suspense>
+      </Route>
+      <Route path="/reset-password">
+        <Suspense fallback={null}>
+          <ResetPasswordPage />
+        </Suspense>
       </Route>
       <Route>
         <Shell />
@@ -113,6 +127,13 @@ function Shell() {
               <ProblemReadPage key={params.slug} slug={params.slug} />
             </Suspense>
           )}
+        </Route>
+        <Route path="/welcome">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <WelcomePage />
+            </Suspense>
+          </RequireSession>
         </Route>
         <Route path="/training">
           <RequireSession>
@@ -215,7 +236,14 @@ function LoginPage() {
   const [, navigate] = useLocation()
   const next = safeNext(new URLSearchParams(window.location.search).get('next'))
   if (session) return <Redirect to={next} replace />
-  return <SignIn onSignedIn={() => navigate(next, { replace: true })} />
+  // 가입했으면 세 문항으로 — 원래 가려던 곳은 들고 간다 (가입 → 진단 → 첫 처방)
+  return (
+    <SignIn
+      onSignedIn={(_, created) =>
+        navigate(created ? `/welcome?next=${encodeURIComponent(next)}` : next, { replace: true })
+      }
+    />
+  )
 }
 
 

@@ -6,6 +6,7 @@ import {
   closeCoaching,
   deferPrescribed,
   explainTransfer,
+  getOnboarding,
   getPrescription,
   listOpenCoaching,
   listOpenTransfers,
@@ -31,6 +32,7 @@ import styles from './TrainingPage.module.css'
 export function TrainingPage() {
   const query = useQuery({ queryKey: ['me', 'prescription'], queryFn: getPrescription })
   const prescription = query.data
+  const onboarding = useQuery({ queryKey: ['me', 'onboarding'], queryFn: getOnboarding })
 
   return (
     <div className={styles.page}>
@@ -43,6 +45,21 @@ export function TrainingPage() {
           역량 지도 보기
         </Link>
       </header>
+
+      {/* 세 문항에 답하지 않았으면 진단 없이 "가장 쉬운 문제"만 권한다 — 진단으로 시작하자고 권한다 */}
+      {onboarding.data === null && (
+        <InlineAlert
+          tone="info"
+          title="세 가지만 답하면 진단으로 시작합니다"
+          action={
+            <Link href="/welcome?next=/training" className={styles.headLink}>
+              답하기
+            </Link>
+          }
+        >
+          하루 목표·주 언어·지금 수준에 맞춰 역량군마다 첫 근거를 만들 문제를 고릅니다.
+        </InlineAlert>
+      )}
 
       {query.isError ? (
         <InlineAlert tone="danger" title="처방을 불러오지 못했습니다" action={<Button size="dense" onClick={() => void query.refetch()}>다시 시도</Button>} />

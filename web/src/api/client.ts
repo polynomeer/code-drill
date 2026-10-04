@@ -5,6 +5,7 @@ import type {
   ContestSummary,
   ContestView,
   FinishedContests,
+  LearnerProfile,
   ProfileSettings,
   PublicProfile,
   Contributions,
@@ -258,6 +259,42 @@ export async function skipPrescribed(problemId: string): Promise<Prescription> {
 /** 미루기 — 며칠 동안 권하지 않는다. 오늘의 빈자리는 교체처럼 채워진다. */
 export async function deferPrescribed(problemId: string): Promise<Prescription> {
   return json<Prescription>(await authed(`/me/prescription/${problemId}/defer`, { method: 'POST' }))
+}
+
+/** 온보딩 세 문항의 답. 아직 답하지 않았으면 null. */
+export async function getOnboarding(): Promise<LearnerProfile | null> {
+  const response = await authed('/me/onboarding')
+  if (response.status === 204) return null
+  return json<LearnerProfile>(response)
+}
+
+/** 답한다. 진단이 든 첫 처방이 돌아온다. */
+export async function saveOnboarding(profile: LearnerProfile): Promise<Prescription> {
+  const response = await authed('/me/onboarding', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile),
+  })
+  return json<Prescription>(response)
+}
+
+/** 비밀번호 재설정 요청. 계정이 있든 없든 같은 답이다 — 화면도 같은 문장을 보인다. */
+export async function forgotPassword(email: string): Promise<void> {
+  const response = await fetch(`${BASE}/auth/password/forgot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  if (!response.ok) await json(response)
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const response = await fetch(`${BASE}/auth/password/reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, newPassword }),
+  })
+  if (!response.ok) await json(response)
 }
 
 export async function getWeeklyReport(): Promise<WeeklyReport> {

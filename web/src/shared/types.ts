@@ -347,6 +347,7 @@ export interface Counterexample {
 export type Reason =
   | 'RECENT_FAILURE'
   | 'TRANSFER'
+  | 'DIAGNOSTIC'
   | 'HINT_DEPENDENT'
   | 'REVIEW_DUE'
   | 'WEAK_COMPETENCY'
@@ -355,6 +356,7 @@ export type Reason =
 export const REASON_LABEL: Record<Reason, string> = {
   RECENT_FAILURE: '최근에 틀린 문제',
   TRANSFER: '전이 확인',
+  DIAGNOSTIC: '진단',
   HINT_DEPENDENT: '힌트 없이 다시',
   REVIEW_DUE: '복습 시점',
   WEAK_COMPETENCY: '약점 보완',
@@ -922,4 +924,13 @@ export interface PublicProfile {
   } | null
   solutions: { postId: string; problemId: string; title: string | null; helpful: number; at: string }[]
   contributorTier: 'NEW' | 'ACTIVE' | 'TRUSTED'
+}
+
+// --- 온보딩 (docs/ui-overhaul.md §6.9) ---
+
+/** 가입 직후 세 문항. 하루 목표는 처방 칸 수, 주 언어는 기본 언어, 수준은 진단 난이도가 된다. */
+export interface LearnerProfile {
+  dailyGoal: 1 | 2 | 3
+  language: SubmissionLanguage
+  level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 }
