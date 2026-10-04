@@ -161,10 +161,10 @@ test('대회 화면들에 접근성 위반이 없고 좁은 화면에서 넘치�
   await page.goto('/contests')
   await expect(page.getByRole('link', { name: /^지난 대회 1 / })).toBeVisible()
   expect(await axe(page)).toEqual([])
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
 
   await page.goto('/contests/c-run')
   await expect(page.locator('tr[data-mine="true"]')).toBeVisible()
   expect(await axe(page)).toEqual([])
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
 })

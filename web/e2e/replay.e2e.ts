@@ -248,8 +248,8 @@ test('좁은 화면에서는 상태가 먼저이고 검사기는 아래 시트�
   await sheet.click()
   await expect(page.getByRole('heading', { name: '현재 이벤트' })).toBeVisible()
   // 화면 밖으로 넘치지 않는다
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
-  expect(overflow).toBeLessThanOrEqual(0)
+  // innerWidth 가 아니라 기기 폭과 견준다 — 모바일은 넘친 만큼 innerWidth 도 커진다 (design.e2e.ts)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()
   expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
 })
