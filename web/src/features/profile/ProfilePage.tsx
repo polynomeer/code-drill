@@ -7,7 +7,7 @@ import { useSession } from '../../api/session'
 import { Badge, Button, Dialog, DifficultyBadge, EmptyState, Skeleton } from '../../design'
 import { DIFFICULTIES } from '../../shared/types'
 import type { PublicProfile } from '../../shared/types'
-import { fullTime, relativeTime } from '../../shared/time'
+import { date, fullTime, relativeTime, yearMonth } from '../../shared/format'
 import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import { signed } from '../contest/contestView'
 import { ActivityHeatmap } from './ActivityHeatmap'
@@ -103,7 +103,7 @@ function Profile({ handle }: { handle: string }) {
         <div className={styles.identity}>
           <h1 className={styles.name}>{profile.displayName}</h1>
           <p className={styles.muted}>
-            @{profile.handle} · {new Date(profile.joinedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })} 가입
+            @{profile.handle} · {yearMonth(profile.joinedAt)} 가입
           </p>
         </div>
         {profile.mine && (
@@ -233,7 +233,7 @@ function RatingHistory({ history }: { history: NonNullable<PublicProfile['rating
               <td className={styles.num}>{change.after}</td>
               <td className={styles.num}>
                 <time dateTime={change.at} title={fullTime(change.at)}>
-                  {new Date(change.at).toLocaleDateString('ko-KR')}
+                  {date(change.at)}
                 </time>
               </td>
             </tr>

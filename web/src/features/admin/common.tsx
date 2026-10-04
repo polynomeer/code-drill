@@ -3,7 +3,7 @@ import type { QueryKey } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { Button, Dialog, InlineAlert, Textarea, useToast } from '../../design'
-import { fullTime, relativeTime } from '../../shared/time'
+import { fullTime, relativeTime } from '../../shared/format'
 import styles from './AdminPage.module.css'
 
 /**

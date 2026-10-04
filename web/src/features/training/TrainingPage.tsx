@@ -17,6 +17,7 @@ import { COMPETENCY_LABEL, REASON_LABEL } from '../../shared/types'
 import type { CoachingSession, PrescribedProblem, Prescription, TransferTask } from '../../shared/types'
 import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import styles from './TrainingPage.module.css'
+import { monthDay } from '../../shared/format'
 
 /**
  * 훈련 `/training` (UI 디자인 문서 §9.4 Daily prescription, docs/ui-overhaul.md §6.5).
@@ -205,7 +206,7 @@ function PrescriptionCard({
       </h3>
       <p className={styles.measure}>
         <CalendarClock size={14} aria-hidden="true" />
-        다음 측정 {new Date(item.nextMeasurement).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+        다음 측정 {monthDay(item.nextMeasurement)}
       </p>
       <div className={styles.actions}>
         <Link href={`/problems/${item.problemId}/solve`} className={styles.start}>

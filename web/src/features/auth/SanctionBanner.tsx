@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { appealSanction, getMySanction } from '../../api/client'
 import type { SanctionView } from '../../shared/types'
+import { fullTime } from '../../shared/format'
 
 const KIND_LABEL = { WARNING: '경고', MUTE: '글쓰기 정지', SUSPEND: '제출·실행 정지' }
 
@@ -36,7 +37,7 @@ export function SanctionBanner() {
     <section className={`panel sanction${sanction.active ? ' sanction-active' : ''}`} role="status">
       <p>
         <strong>{KIND_LABEL[sanction.kind]}</strong>
-        {sanction.active && sanction.endsAt && <> · {new Date(sanction.endsAt).toLocaleString()} 까지</>}
+        {sanction.active && sanction.endsAt && <> · {fullTime(sanction.endsAt)} 까지</>}
         {!sanction.active && sanction.liftedAt && ' · 풀렸습니다'}
         {' — '}
         {sanction.reason}

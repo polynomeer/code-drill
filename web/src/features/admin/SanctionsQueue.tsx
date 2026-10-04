@@ -6,6 +6,7 @@ import { adminApi } from './adminApi'
 import type { Me, Sanction, SanctionKind } from './adminApi'
 import { Clear, DecisionDialog, Id, When, useDecision } from './common'
 import styles from './AdminPage.module.css'
+import { date } from '../../shared/format'
 
 const KIND_LABEL: Record<SanctionKind, string> = { WARNING: '경고', MUTE: '글쓰기 제한', SUSPEND: '정지' }
 
@@ -68,7 +69,7 @@ function SanctionSummary({ sanction, me }: { sanction: Sanction; me: Me }) {
       </header>
       <p className={styles.cardMeta}>
         근거 <code>{sanction.evidence}</code>
-        {sanction.endsAt ? <> · {new Date(sanction.endsAt).toLocaleDateString('ko-KR')}까지</> : ' · 기한 없음'}
+        {sanction.endsAt ? <> · {date(sanction.endsAt)}까지</> : ' · 기한 없음'}
         {sanction.liftedAt && ' · 해제됨'}
       </p>
     </>

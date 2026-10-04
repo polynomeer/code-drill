@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { answerQuestion, askQuestion, getThread, listQuestions, markHelpful, reportPost } from '../../api/client'
+import { fullTime } from '../../shared/format'
 import type {
   DiscussionAnchorRequest,
   DiscussionPost,
@@ -225,7 +226,7 @@ export function PostView({
         {post.spoiler && post.kind !== 'SOLUTION' && ' · 풀이 노출'}
         {post.helpful > 0 && ` · 도움됐다 ${post.helpful}`}
         {' · '}
-        {new Date(post.createdAt).toLocaleString()}
+        {fullTime(post.createdAt)}
       </p>
       {post.locked ? (
         <p className="muted small">풀이를 드러내는 글입니다. 이 문제를 맞힌 뒤에 열립니다.</p>

@@ -12,6 +12,7 @@ import { DIFFICULTY_LABEL, VERDICT_LABEL } from '../../shared/types'
 import type { ProjectDraft, ProjectProbeOutcome, ProjectSubmission, ProjectView } from '../../shared/types'
 import { SaveIndicator } from '../workspace/SaveIndicator'
 import { useDraftSync } from '../workspace/useDraftSync'
+import { fullTime } from '../../shared/format'
 
 const MonacoWorkspace = lazy(() => import('../workspace/MonacoWorkspace'))
 
@@ -252,7 +253,7 @@ export function ProjectWorkspace({
                           .catch(() => undefined)
                       }
                     >
-                      {new Date(item.createdAt).toLocaleString()}
+                      {fullTime(item.createdAt)}
                     </button>{' '}
                     <span className={item.verdict === 'ACCEPTED' ? 'ok' : 'muted'}>
                       {item.status !== 'COMPLETED' ? '채점 중' : item.verdict ? VERDICT_LABEL[item.verdict] : ''}

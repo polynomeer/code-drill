@@ -6,7 +6,7 @@ import { getProblem, getSubmission, getSubmissionSource, getTraceManifest } from
 import { EmptyState, Skeleton } from '../../design'
 import { EDITOR_LANGUAGE, LANGUAGE_LABEL } from '../../shared/types'
 import type { SubmissionLanguage } from '../../shared/types'
-import { fullTime } from '../../shared/time'
+import { fullTime } from '../../shared/format'
 import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import { VerdictPanel } from './VerdictPanel'
 import styles from './SubmissionDetailPage.module.css'

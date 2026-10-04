@@ -7,6 +7,7 @@ import type { Verdict } from '../../shared/types'
 import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import { ENOUGH_SUBMISSIONS, enoughData } from './competencyView'
 import styles from './CompetenciesPage.module.css'
+import { monthDay } from '../../shared/format'
 
 /**
  * 이번 주 (PRD FR-808, UI 디자인 문서 §9.4 Weekly growth — "성장, 재발 오류, 전이 성과, 다음 측정").
@@ -20,7 +21,7 @@ export function WeeklyReportView({ onSelectCompetency }: { onSelectCompetency: (
   const report = useQuery({ queryKey: ['me', 'weekly'], queryFn: getWeeklyReport })
   const stats = useQuery({ queryKey: ['me', 'stats'], queryFn: getStats })
   const index = useProblemIndex()
-  const date = (iso: string) => new Date(iso).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+  const date = monthDay
 
   if (report.isError) return <InlineAlert tone="danger" title="이번 주 리포트를 불러오지 못했습니다" />
   if (!report.data) {

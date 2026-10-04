@@ -22,6 +22,7 @@ import { replaceParams } from '../../shared/url'
 import { TodaySummary } from '../training/TodaySummary'
 import { clearFilters, isEmpty, readFilter, toggle, writeFilter } from './problemFilter'
 import styles from './ProblemsPage.module.css'
+import { count } from '../../shared/format'
 
 /**
  * P-01 문제 탐색 `/problems` (UI 디자인 문서 §3, docs/ui-overhaul.md §6.1).
@@ -100,7 +101,7 @@ export function ProblemsPage() {
           <div>
             <h1 className={styles.title}>문제</h1>
             <p className={styles.count} role="status">
-              {page ? `${page.total.toLocaleString()}문제` : ' '}
+              {page ? `${count(page.total)}문제` : ' '}
               {!isEmpty(filter) && page && ' · 조건에 맞는 것'}
             </p>
           </div>
@@ -305,7 +306,7 @@ function ProblemTable({
                 `${(item.solvedRate * 100).toFixed(1)}%`
               )}
             </td>
-            <td className={styles.colSolvers}>{item.solvedCount.toLocaleString()}</td>
+            <td className={styles.colSolvers}>{count(item.solvedCount)}</td>
           </tr>
         ))}
       </tbody>

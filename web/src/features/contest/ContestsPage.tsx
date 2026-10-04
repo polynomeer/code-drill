@@ -6,6 +6,7 @@ import { Link, useLocation } from 'wouter'
 import { joinDuel, listContests, listFinishedContests } from '../../api/client'
 import { Badge, Button, InlineAlert, Pagination, Skeleton, TextField } from '../../design'
 import type { ContestSummary } from '../../shared/types'
+import { date } from '../../shared/format'
 import { setParam } from '../../shared/url'
 import { KIND_LABEL, STATUS_LABEL, countdownOf, remaining, sectionOf } from './contestView'
 import { useNow } from './useNow'
@@ -126,7 +127,7 @@ function ContestList({ contests }: { contests: ContestSummary[] }) {
                     <span className={styles.timeValue}>{remaining(countdown.target, now)}</span>
                   </>
                 ) : contest.status === 'FINISHED' && contest.endsAt ? (
-                  <span className={styles.timeLabel}>{new Date(contest.endsAt).toLocaleDateString('ko-KR')} 끝남</span>
+                  <span className={styles.timeLabel}>{date(contest.endsAt)} 끝남</span>
                 ) : (
                   <span className={styles.timeLabel}>{STATUS_LABEL[contest.status]}</span>
                 )}
