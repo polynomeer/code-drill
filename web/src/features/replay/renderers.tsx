@@ -1,4 +1,5 @@
 import type { ReplayState } from './reducer'
+import { targetKey } from './timeline'
 import type { TargetKind, TraceEvent } from './traceTypes'
 
 /**
@@ -13,14 +14,30 @@ import type { TargetKind, TraceEvent } from './traceTypes'
 export interface Renderer {
   kind: TargetKind
   title: string
-  render: (state: ReplayState, input: number[]) => React.ReactNode
+  render: (state: ReplayState, input: number[], select?: Selection) => React.ReactNode
+}
+
+/**
+ * 캔버스 선택 (UI 디자인 문서 §5.1 "코드/이벤트 선택과 양방향 연결"). 리플레이 화면만 넘긴다 —
+ * 실험실의 미리보기처럼 코드가 곁에 없는 자리에서는 칸이 버튼일 이유가 없다.
+ */
+export interface Selection {
+  selected: string | null
+  onSelect: (key: string) => void
+}
+
+const CELL_STATE_LABEL: Record<string, string> = {
+  matched: '답',
+  cursor: '현재',
+  compared: '비교함',
+  visited: '살펴봄',
 }
 
 /** 배열 + 포인터. 커서와 이름 붙은 포인터를 같은 칸 위에 얹는다. */
 const arrayRenderer: Renderer = {
   kind: 'ARRAY',
   title: '배열',
-  render: (state, input) => {
+  render: (state, input, select) => {
     const { visited, compared, matched, written, cursor, pointers } = state.array
     const size = Math.max(input.length, ...[...written.keys()].map((k) => k + 1), 0)
     const cells = Array.from({ length: size }, (_, index) => index)
@@ -41,14 +58,40 @@ const arrayRenderer: Renderer = {
                 : visited.has(index)
                   ? 'visited'
                   : ''
-          return (
-            <div key={index} className={`cell ${state5}`}>
+          const value = written.get(index) ?? input[index] ?? '·'
+          const content = (
+            <>
               <span className="cell-index">{index}</span>
-              <span className="cell-value">{written.get(index) ?? input[index] ?? '·'}</span>
-              {pointerAt.has(index) && (
-                <span className="cell-pointer">{pointerAt.get(index)?.join(',')}</span>
-              )}
-            </div>
+              <span className="cell-value">{value}</span>
+              {pointerAt.has(index) && <span className="cell-pointer">{pointerAt.get(index)?.join(',')}</span>}
+            </>
+          )
+          if (!select) {
+            return (
+              <div key={index} className={`cell ${state5}`}>
+                {content}
+              </div>
+            )
+          }
+          const key = targetKey('ARRAY', String(index))
+          const pointerNames = pointerAt.get(index)?.join(', ')
+          return (
+            <button
+              key={index}
+              type="button"
+              className={`cell ${state5} ${select.selected === key ? 'selected' : ''}`}
+              aria-pressed={select.selected === key}
+              aria-label={[
+                `인덱스 ${index}, 값 ${value}`,
+                CELL_STATE_LABEL[state5],
+                pointerNames && `포인터 ${pointerNames}`,
+              ]
+                .filter(Boolean)
+                .join(', ')}
+              onClick={() => select.onSelect(key)}
+            >
+              {content}
+            </button>
           )
         })}
       </div>
@@ -103,7 +146,7 @@ const queueRenderer: Renderer = {
 const graphRenderer: Renderer = {
   kind: 'GRAPH',
   title: '그래프',
-  render: (state) => {
+  render: (state, _input, select) => {
     const nodes = [...state.graph.nodes]
     if (nodes.length === 0) return <span className="muted">정점 없음</span>
 
@@ -117,7 +160,7 @@ const graphRenderer: Renderer = {
     )
 
     return (
-      <svg className="graph-view" viewBox="0 0 180 180" role="img" aria-label="그래프 상태">
+      <svg className="graph-view" viewBox="0 0 180 180" role={select ? 'group' : 'img'} aria-label="그래프 상태">
         {state.graph.edges.map(([from, to], index) => {
           const a = position.get(from)
           const b = position.get(to)
@@ -130,7 +173,26 @@ const graphRenderer: Renderer = {
           const point = position.get(id)
           if (!point) return null
           return (
-            <g key={id} className={id === state.graph.current ? 'graph-node current' : 'graph-node'}>
+            <g
+              key={id}
+              className={[
+                'graph-node',
+                id === state.graph.current ? 'current' : '',
+                select?.selected === targetKey('GRAPH', id) ? 'selected' : '',
+              ].join(' ')}
+              {...(select && {
+                role: 'button',
+                tabIndex: 0,
+                'aria-label': `정점 ${id}${id === state.graph.current ? ', 현재' : ''}`,
+                'aria-pressed': select.selected === targetKey('GRAPH', id),
+                onClick: () => select.onSelect(targetKey('GRAPH', id)),
+                onKeyDown: (event: React.KeyboardEvent) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return
+                  event.preventDefault()
+                  select.onSelect(targetKey('GRAPH', id))
+                },
+              })}
+            >
               <circle cx={point.x} cy={point.y} r={12} />
               <text x={point.x} y={point.y + 4} textAnchor="middle">
                 {id}

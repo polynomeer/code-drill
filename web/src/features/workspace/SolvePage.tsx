@@ -26,6 +26,7 @@ import { DuelDialog } from '../contest/DuelDialog'
 import { DiscussionPanel } from '../discussion/DiscussionPanel'
 import { EditorialPanel } from '../lab/EditorialPanel'
 import { ReplayView } from '../replay/ReplayView'
+import { sampleArray } from '../replay/timeline'
 import { CodeView } from '../submissions/CodeView'
 import { HistoryPanel } from '../submissions/HistoryPanel'
 import { useSubmissionEvents } from '../submissions/useSubmissionEvents'
@@ -520,10 +521,11 @@ export function SolvePage({ slug }: { slug: string }) {
                 <ReplayView
                   submissionId={submissionId}
                   manifest={trace}
-                  input={numberArray(problem.samples[0]?.args[0])}
+                  input={sampleArray(problem.samples[0]?.args[0])}
                   initialStep={initialStep}
                   onStepChange={setReplayStep}
                   mine={submission?.mine !== false}
+                  expandHref={`/submissions/${submissionId}/replay?step=${replayStep ?? 0}`}
                 />
               ) : (
                 <EmptyState title="리플레이가 아직 없습니다">
@@ -738,21 +740,6 @@ function KeepAlive<K extends string>({
 function previousOf(history: Submission[], current: Submission): Submission | null {
   const index = history.findIndex((item) => item.id === current.id)
   return index >= 0 ? (history[index + 1] ?? null) : null
-}
-
-/**
- * 배열 렌더러가 시작 상태로 삼을 첫 인자. 격자는 행 우선으로 편다 — 계측 이벤트의 인덱스가
- * `행 * 열 + 열` 이므로 편 배열과 자리가 맞는다.
- */
-function numberArray(value: unknown): number[] {
-  if (!Array.isArray(value)) return []
-  return value.flatMap((item) =>
-    Array.isArray(item)
-      ? item.filter((cell): cell is number => typeof cell === 'number')
-      : typeof item === 'number'
-        ? [item]
-        : [],
-  )
 }
 
 /** 저장소를 못 쓰는 브라우저에서도 레이아웃 기억만 빠지고 화면은 그대로 돈다. */

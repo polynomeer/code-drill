@@ -19,7 +19,7 @@ const MonacoWorkspace = lazy(() => import('../workspace/MonacoWorkspace'))
  * 위에 판정·시각·언어·문제 버전과 "다시 풀기", 그 아래 판정, 그리고 읽기 전용 코드. 코드는
  * 고칠 수 없다 — "이 코드로 편집기 열기"가 그 코드를 새 초안으로 풀이 화면에 옮긴다.
  *
- * 리플레이 전용 화면(R-01)은 U4 에서 선다. 그 전까지 리플레이는 풀이 화면의 결과 창에서 연다.
+ * 리플레이는 전용 화면(R-01) `/submissions/:id/replay` 에서 연다.
  */
 export function SubmissionDetailPage({ id }: { id: string }) {
   const [, navigate] = useLocation()
@@ -74,7 +74,7 @@ export function SubmissionDetailPage({ id }: { id: string }) {
   const solve = `/problems/${submission.problemId}/solve`
   // `?step=` 는 리플레이의 한 걸음을 가리키는 링크다 (게시판 붙임, 예전 주소). 그 걸음으로 바로 간다.
   const step = new URLSearchParams(window.location.search).get('step')
-  const replay = `${solve}?submission=${submission.id}&step=${step ?? 0}`
+  const replay = `/submissions/${submission.id}/replay?step=${step ?? 0}`
   if (step !== null) return <Redirect to={replay} replace />
   const trace = traceQuery.data ?? null
 

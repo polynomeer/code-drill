@@ -1,28 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'wouter'
 import { DivergenceCard } from './DivergenceCard'
 import { PredictNext } from './PredictNext'
 import { applyAll } from './reducer'
 import { EventFallback, renderersFor } from './renderers'
+import { EVENT_LABEL } from './timeline'
 import { kindsIn, useTrace } from './useTrace'
 import { schemaSupported } from './traceTypes'
 import type { TraceManifest } from './traceTypes'
-
-const TYPE_LABEL: Record<string, string> = {
-  VISIT: '살펴봄',
-  COMPARE: '비교',
-  SWAP: '교환',
-  WRITE: '기록',
-  POINTER: '포인터 이동',
-  PUSH: 'push',
-  POP: 'pop',
-  ENQUEUE: 'enqueue',
-  DEQUEUE: 'dequeue',
-  NODE: '정점 방문',
-  EDGE: '간선',
-  CALL: '호출',
-  RETURN: '반환',
-  MATCH: '답을 찾음',
-}
 
 /**
  * 실행 리플레이 (기술 설계서 §7.5, 디자인 설계서 §0.2 관찰 가능).
@@ -39,6 +24,7 @@ export function ReplayView({
   initialStep = null,
   onStepChange,
   mine = true,
+  expandHref,
 }: {
   submissionId: string
   manifest: TraceManifest
@@ -48,6 +34,8 @@ export function ReplayView({
   onStepChange?: (step: number) => void
   /** 내 제출인가. 남의 것이면 분기 진단과 예측은 없다 — 그것은 푸는 사람의 증거다 (§8.5). */
   mine?: boolean
+  /** 전용 화면(R-01) 주소. 이 패널은 미리보기이고, 코드·검사기·타임라인은 거기 있다. */
+  expandHref?: string
 }) {
   const [step, setStep] = useState(0)
   const { events, error, ensureLoaded } = useTrace(submissionId, manifest)
@@ -124,11 +112,19 @@ export function ReplayView({
     >
       <h3>
         실행 리플레이 <span className="muted">{manifest.caseId}</span>
+        {expandHref && (
+          <>
+            {' · '}
+            <Link href={expandHref} className="linklike">
+              크게 보기
+            </Link>
+          </>
+        )}
       </h3>
 
       {/* 분기를 맨 위에 둔다. 리플레이를 여는 이유가 대개 "어디서 틀렸나"이고,
           그 답이 스크롤 아래 있으면 찾기 전에 재생 버튼을 누른다 (FR-805). */}
-      {mine && <DivergenceCard submissionId={submissionId} onSeek={(seq) => setStep(clamp(seq))} />}
+      {mine && <DivergenceCard submissionId={submissionId} onSeek={(target) => setStep(clamp(target))} />}
 
       {error && <p className="warn">{error}</p>}
 
@@ -173,13 +169,13 @@ export function ReplayView({
           submissionId={submissionId}
           next={events[step] ?? null}
           choices={choiceTypes}
-          labelOf={(type) => TYPE_LABEL[type] ?? type}
+          labelOf={(type) => EVENT_LABEL[type as keyof typeof EVENT_LABEL] ?? type}
         />
       )}
 
       <p className="event-line">
         {current
-          ? `#${current.seq} ${TYPE_LABEL[current.eventType] ?? current.eventType} — ${
+          ? `#${current.seq} ${EVENT_LABEL[current.eventType] ?? current.eventType} — ${
               current.targetRef
             }${current.after ? ` → ${current.after}` : ''}`
           : '재생 전'}

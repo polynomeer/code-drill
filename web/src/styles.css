@@ -964,14 +964,6 @@ table.groups td {
   margin: 6px 0;
 }
 
-/* 최초 분기 (FR-805). */
-.divergence {
-  margin: 8px 0;
-  padding: 8px 10px;
-  border-left: 3px solid var(--bad);
-  background: var(--panel-alt, transparent);
-}
-
 .divergence-steps {
   list-style: none;
   padding: 0;

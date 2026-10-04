@@ -1,0 +1,95 @@
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.note svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.same {
+  color: var(--color-success);
+}
+
+/*
+ * 오류색 왼쪽 막대 + 아이콘 + 제목 글 — 색만으로 말하지 않는다 (UI §5.3 중복 인코딩).
+ * 바탕은 표면색이다. 오류 옅은 바탕 위에서는 보조 글자가 대비 4.5 를 넘지 못한다.
+ */
+.card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-left: 4px solid var(--color-danger);
+  border-radius: var(--radius-lg);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+  color: var(--color-text-primary);
+}
+
+.title svg {
+  color: var(--color-danger);
+}
+
+.steps {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  font: var(--text-label);
+}
+
+.steps li {
+  display: grid;
+  gap: 2px;
+}
+
+.stepLabel {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.compare {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.compare div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.compare dt {
+  flex: none;
+  min-width: 4.5em;
+  color: var(--color-text-muted);
+}
+
+.compare dd {
+  margin: 0;
+}
+
+.case {
+  font: var(--text-code);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

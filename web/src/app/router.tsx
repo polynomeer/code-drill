@@ -35,11 +35,13 @@ const SubmissionDetailPage = lazy(() =>
   import('../features/submissions/SubmissionDetailPage').then((m) => ({ default: m.SubmissionDetailPage })),
 )
 const ComparePage = lazy(() => import('../features/submissions/ComparePage').then((m) => ({ default: m.ComparePage })))
+const ReplayPage = lazy(() => import('../features/replay/ReplayPage').then((m) => ({ default: m.ReplayPage })))
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
 
 const SOLVE_PATH = '/problems/:slug/solve'
+const REPLAY_PATH = '/submissions/:id/replay'
 
 export function AppRoutes() {
   return (
@@ -63,12 +65,13 @@ export function AppRoutes() {
 
 function Shell() {
   const session = useSession()
-  // 풀이 화면은 전역 헤더를 접고 자기 툴바만 쓴다 (ui-overhaul.md §4).
+  // 풀이·리플레이 화면은 전역 헤더를 접고 자기 툴바만 쓴다 (ui-overhaul.md §4).
   const [solving] = useRoute(SOLVE_PATH)
+  const [replaying] = useRoute(REPLAY_PATH)
 
   return (
     // 계정이 바뀌면 셸 아래 상태를 통째로 버린다. 앞 사람의 초안이 남으면 안 된다.
-    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={solving && session !== null}>
+    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={(solving || replaying) && session !== null}>
       <Switch>
         <Route path="/">
           {session ? (
@@ -115,6 +118,15 @@ function Shell() {
               <ComparePage />
             </Suspense>
           </RequireSession>
+        </Route>
+        <Route path={REPLAY_PATH}>
+          {(params) => (
+            <RequireSession>
+              <Suspense fallback={<RouteLoading />}>
+                <ReplayPage key={params.id} id={params.id} />
+              </Suspense>
+            </RequireSession>
+          )}
         </Route>
         <Route path="/submissions/:id">
           {(params) => (

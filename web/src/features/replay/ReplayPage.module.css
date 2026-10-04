@@ -1,0 +1,667 @@
+/* R-01 실행 리플레이 — 화면 전체를 쓴다 (디자인 설계서 §8.2) */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-bg-app);
+}
+
+/* ─── 헤더 (§8.2 56px) ─── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: 52px;
+  flex: none;
+  padding: 0 var(--space-3);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.toolbarStart {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.back {
+  display: inline-grid;
+  place-items: center;
+  width: var(--control-default);
+  height: var(--control-default);
+  flex: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+}
+
+.back:hover {
+  background: var(--color-bg-subtle);
+}
+
+.title {
+  margin: 0 var(--space-1);
+  overflow: hidden;
+  font: var(--text-h3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.titleSuffix {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+.toolbarLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  height: var(--control-default);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  text-decoration: none;
+}
+
+.toolbarLink:hover {
+  background: var(--color-bg-subtle);
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.loading {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 31fr 48fr 21fr;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.fallback {
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+/* ─── 세 pane ─── */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-2) var(--space-2) 0;
+}
+
+.group {
+  height: 100%;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.paneHeading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border-default);
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.caseId {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-family: var(--font-mono);
+}
+
+.paneTitle {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.paneNote {
+  margin: 0;
+  padding: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.code > .paneNote,
+.pane > .paneNote {
+  padding: var(--space-3);
+}
+
+.separator {
+  position: relative;
+  flex: none;
+  width: 8px;
+  background: transparent;
+  outline: none;
+}
+
+.separator::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 2px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: transparent;
+  transform: translateY(-50%);
+  transition: background-color var(--motion-micro);
+}
+
+.separator:hover::after,
+.separator[data-separator='active']::after {
+  background: var(--color-border-strong);
+}
+
+.separator:focus-visible::after {
+  background: var(--color-brand);
+}
+
+/* ─── Code Pane ─── */
+
+.code {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--color-bg-editor);
+  color: var(--color-text-on-editor);
+}
+
+.lines {
+  min-width: max-content;
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+  font: var(--text-code);
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 16px 3.5em 1fr;
+  align-items: center;
+  min-height: 20px;
+  padding-right: var(--space-3);
+}
+
+/* 상태 → 코드: 고른 칸을 건드린 줄. 옅은 배경과 왼쪽 막대 — 활성 줄과 겹쳐도 구분된다 */
+.lineTouched {
+  background: color-mix(in srgb, var(--color-trace) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--color-trace);
+}
+
+/* 지금 걸음의 줄. 배경 + 화살표 + aria-current 로 세 번 알린다 */
+.lineActive {
+  background: color-mix(in srgb, var(--color-brand) 28%, transparent);
+}
+
+.arrow {
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-brand);
+}
+
+.lineActive .arrow {
+  color: var(--color-text-on-editor);
+}
+
+.lineNumber {
+  padding: 0 var(--space-2) 0 0;
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--color-text-on-editor) 62%, transparent);
+  font: inherit;
+  text-align: right;
+}
+
+button.lineNumber {
+  color: var(--color-text-on-editor);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+button.lineNumber:hover {
+  text-decoration-style: solid;
+}
+
+button.lineNumber:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+}
+
+.lineText {
+  white-space: pre;
+  tab-size: 4;
+  font: inherit;
+  font-variant-ligatures: none;
+}
+
+/* ─── Canvas ─── */
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4);
+}
+
+.canvasLoading {
+  padding: var(--space-5);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.renderer + .renderer {
+  margin-top: var(--space-5);
+}
+
+.rendererTitle {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+/* 미리보기보다 큰 칸. 바뀜은 --motion-state 로 — reduced motion 에서 0 이 된다 (UI §5.3) */
+.canvas :global(.cells) {
+  gap: var(--space-2);
+}
+
+.canvas :global(.cell) {
+  min-width: 56px;
+  padding: var(--space-2);
+  font: var(--text-code);
+  color: var(--color-text-primary);
+  transition:
+    border-color var(--motion-state),
+    background-color var(--motion-state),
+    transform var(--motion-state);
+}
+
+.canvas button:global(.cell) {
+  cursor: pointer;
+}
+
+.canvas button:global(.cell):hover {
+  background: var(--color-bg-subtle);
+}
+
+.canvas :global(.cell.cursor) {
+  background: var(--color-brand-subtle);
+  transform: translateY(-2px);
+}
+
+.canvas :global(.cell.selected),
+.canvas :global(.graph-node.selected) circle {
+  outline: 2px dashed var(--color-trace);
+  outline-offset: 2px;
+}
+
+.canvas :global(.graph-view) {
+  width: min(100%, 320px);
+  height: auto;
+}
+
+.canvas :global(.graph-node)[role='button'] {
+  cursor: pointer;
+}
+
+.canvas :global(.graph-node)[role='button']:focus-visible circle {
+  stroke: var(--color-brand);
+  stroke-width: 3;
+}
+
+/* ─── Inspector ─── */
+
+.inspector {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  height: 100%;
+  overflow: auto;
+  padding: var(--space-3);
+}
+
+.currentEvent {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sentence {
+  margin: 0;
+  font: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+
+.eventMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-label);
+}
+
+.change {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--text-label);
+}
+
+.change dt {
+  color: var(--color-text-muted);
+}
+
+.change dd {
+  margin: 0;
+}
+
+.change code {
+  font: var(--text-code);
+}
+
+/* 변경값 우선 (UI §5.1) — 바뀐 값이 굵다 */
+.change .after {
+  font-weight: var(--weight-strong);
+}
+
+.selection {
+  padding: var(--space-3);
+  background: var(--color-trace-subtle);
+  border-radius: var(--radius-md);
+}
+
+.selectionHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.selection .paneNote {
+  color: var(--color-text-primary);
+}
+
+.recent {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentItem {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.recentItem:hover {
+  background: var(--color-bg-subtle);
+}
+
+.recentItem[aria-current='step'] {
+  background: var(--color-brand-subtle);
+}
+
+.recentSeq {
+  flex: none;
+  min-width: 2.5em;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Timeline (UI §5.1 하단 96~112px) ─── */
+
+.timeline {
+  flex: none;
+  margin: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.track {
+  position: relative;
+}
+
+/* 스크러버 손잡이(16px)의 중심이 오가는 폭과 같게 양옆 8px 를 비운다 — 마커와 손잡이가 맞물린다 */
+.markers {
+  position: relative;
+  height: 26px;
+  margin: 0 8px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.marker {
+  position: absolute;
+  bottom: 0;
+  border-radius: 1px;
+  transform: translateX(-50%);
+}
+
+.marker_normal {
+  width: 1px;
+  height: 6px;
+  background: var(--color-border-strong);
+}
+
+.marker_important {
+  width: 2px;
+  height: 12px;
+  background: var(--color-trace);
+}
+
+.marker_error {
+  width: 4px;
+  height: 20px;
+  background: var(--color-danger);
+}
+
+.errorLabel {
+  position: absolute;
+  top: -2px;
+  margin-left: 6px;
+  color: var(--color-danger);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: 1;
+}
+
+.scrubber {
+  display: block;
+  width: 100%;
+  margin: var(--space-1) 0 0;
+  accent-color: var(--color-brand);
+}
+
+.playback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-1);
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.play {
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+}
+
+.play:hover:not(:disabled) {
+  background: var(--color-brand-hover);
+  color: var(--color-text-on-brand);
+}
+
+.counter {
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.loadingNote {
+  color: var(--color-text-muted);
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.segmented {
+  display: inline-flex;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+
+.segment,
+.segmentOn {
+  position: relative;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.segment {
+  color: var(--color-text-muted);
+}
+
+.segmentOn {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font-weight: var(--weight-strong);
+  box-shadow: 0 0 0 1px var(--color-border-strong);
+}
+
+.segment:focus-within,
+.segmentOn:focus-within {
+  outline: var(--focus-ring);
+}
+
+/* ─── 좁은 화면: Canvas 중심 + Inspector bottom sheet (ui-overhaul.md §6.4) ─── */
+
+.mobile {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-2) var(--space-2) 0;
+}
+
+.mobile > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mobileBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 180px;
+  height: 100%;
+}
+
+.sheet {
+  flex: none;
+  margin-top: var(--space-2);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-popover);
+}
+
+.sheetSummary {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  font: var(--text-label);
+  cursor: pointer;
+  list-style: none;
+}
+
+.sheetSummary::-webkit-details-marker {
+  display: none;
+}
+
+.sheetHandle {
+  justify-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+}
+
+.sheetBody {
+  max-height: 36vh;
+  overflow: auto;
+  border-top: 1px solid var(--color-border-default);
+}
+
+.sheetBody .inspector {
+  height: auto;
+}
+
+@media (max-width: 599px) {
+  .toolbarLinkText,
+  .titleSuffix {
+    display: none;
+  }
+
+  .options {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
