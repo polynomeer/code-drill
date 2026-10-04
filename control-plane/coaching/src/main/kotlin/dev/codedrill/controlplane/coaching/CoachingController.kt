@@ -40,6 +40,19 @@ class CoachingController(
         return ResponseEntity.ok(response(session))
     }
 
+    /**
+     * 내 열린 세션 (훈련 화면 "하던 것"). 닫힌 세션은 오지 않는다 — 받은 도움의 기록은 증거 상세에
+     * 남고, 여기는 이어서 할 것만 보인다.
+     */
+    @GetMapping("/sessions")
+    fun open(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): List<SessionResponse> =
+        service.openSessions(principal.id).map(::response)
+
+    /** 내 안 끝난 전이 과제. 먼저 받은 것부터. */
+    @GetMapping("/transfers")
+    fun transfers(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): List<TransferView> =
+        transfers.open(principal.id).map(TransferView::of)
+
     @GetMapping("/sessions/{id}")
     fun find(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,

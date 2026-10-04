@@ -122,6 +122,9 @@ class TransferService(
     fun find(userId: String, id: UUID): TransferTask? =
         repository.find(id)?.takeIf { it.userId == userId }
 
+    /** 내 안 끝난 과제. */
+    fun open(userId: String): List<TransferTask> = repository.open(userId)
+
     fun ofSession(userId: String, sessionId: UUID): TransferTask? =
         repository.ofSession(sessionId)?.takeIf { it.userId == userId }
 

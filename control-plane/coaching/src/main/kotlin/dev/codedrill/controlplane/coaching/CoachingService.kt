@@ -106,6 +106,9 @@ class CoachingService(
     fun find(userId: String, id: UUID): CoachingSession? =
         repository.find(id)?.takeIf { it.userId == userId }
 
+    /** 내 열린 세션. 남의 것은 조회 조건이 막는다. */
+    fun openSessions(userId: String): List<CoachingSession> = repository.openSessions(userId, OPEN_LIMIT)
+
     /**
      * 이 문제에서 받은 가장 깊은 도움. 제출 증거의 가중치가 이 값을 본다 (FR-806).
      *
@@ -123,6 +126,9 @@ class CoachingService(
     }
 
     private companion object {
+        /** 훈련 화면에 보일 만큼. 열어 두고 잊은 세션이 쌓여도 화면이 그것으로 덮이지 않는다. */
+        const val OPEN_LIMIT = 10
+
         /**
          * 한 세션에 개입할 역량 수의 상한 (FR-802 "1~2개").
          *

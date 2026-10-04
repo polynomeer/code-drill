@@ -52,6 +52,16 @@ class CoachingRepository(private val jdbc: JdbcTemplate, private val json: Objec
         mapper(), userId, problemId,
     ).firstOrNull()
 
+    /** 아직 안 끝난 세션 전부, 최근 것부터. 훈련 화면이 "하던 것"으로 보인다. */
+    fun openSessions(userId: String, limit: Int): List<CoachingSession> = jdbc.query(
+        """
+        SELECT * FROM coaching_session
+         WHERE user_id = ? AND ended_at IS NULL
+         ORDER BY started_at DESC LIMIT ?
+        """.trimIndent(),
+        mapper(), userId, limit,
+    )
+
     /**
      * 이 사용자가 이 문제에서 받은 가장 깊은 도움 (끝난 세션까지 포함).
      *

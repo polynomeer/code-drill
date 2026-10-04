@@ -57,6 +57,16 @@ class TransferRepository(private val jdbc: JdbcTemplate) {
         MAPPER, userId, targetProblemId,
     ).firstOrNull()
 
+    /** 아직 안 끝난 과제 전부, 먼저 받은 것부터 (판정이 닫는 순서와 같다). */
+    fun open(userId: String): List<TransferTask> = jdbc.query(
+        """
+        SELECT * FROM transfer_task
+         WHERE user_id = ? AND completed_at IS NULL
+         ORDER BY created_at
+        """.trimIndent(),
+        MAPPER, userId,
+    )
+
     /** 이 사용자에게 걸려 있는 과제 중 가장 오래된 것의 변형 문제. 처방이 이것을 앞에 둔다. */
     fun pendingTarget(userId: String): String? = jdbc.query(
         """
