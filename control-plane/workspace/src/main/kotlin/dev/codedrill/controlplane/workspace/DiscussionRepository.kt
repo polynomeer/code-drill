@@ -40,6 +40,16 @@ class DiscussionRepository(private val jdbc: JdbcTemplate) {
         POST, problemId, kind.name, limit,
     )
 
+    /** 이 사람이 공개한 풀이, 최근 것부터. 공개 프로필의 목록이다. */
+    fun solutionsBy(authorId: String, limit: Int): List<DiscussionPost> = jdbc.query(
+        """
+        SELECT * FROM discussion_post
+         WHERE author_id = ? AND kind = 'SOLUTION' AND status = 'VISIBLE'
+         ORDER BY created_at DESC LIMIT ?
+        """.trimIndent(),
+        POST, authorId, limit,
+    )
+
     /** 이 사람이 이 제출로 이미 올린 풀이. 한 제출은 한 번만 올린다. */
     fun solutionOf(submissionId: UUID): DiscussionPost? = jdbc.query(
         "SELECT * FROM discussion_post WHERE kind = 'SOLUTION' AND anchor_submission_id = ? AND status = 'VISIBLE'",

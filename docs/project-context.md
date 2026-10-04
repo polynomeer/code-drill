@@ -77,6 +77,7 @@ MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafk
 | Integrity | submission fingerprint, similarity flag | 소스 보관, 판정·계정 변경 |
 | Contest | contest, entry, score, rating | 제출·판정 변경, 문제 공개 상태 변경 |
 | Project | project submission, submission file | 다른 도메인 모듈. 공개 여부와 스토어는 조립 지점이 잇는다 |
+| Profile | 없음 — 공개 프로필의 공개 범위 규칙 | 다른 도메인 모듈. 사실(신원·푼 문제·활동·스트릭·레이팅·풀이)은 조립 지점이 잇는다 |
 
 ## 문제 패키지 값 타입
 

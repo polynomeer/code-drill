@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":control-plane:contest"))
     implementation(project(":control-plane:project"))
     implementation(project(":control-plane:admin"))
+    implementation(project(":control-plane:profile"))
 
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)

@@ -176,9 +176,10 @@ class IdentitySecurityConfig(
             .excludePathPatterns("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh")
             .order(AUTHENTICATION_ORDER)
 
-        // 공개 경로지만 로그인했다면 알아본다. 목록에 "푼 문제"를 표시하기 위해서다.
+        // 공개 경로지만 로그인했다면 알아본다. 목록에 "푼 문제"를 표시하기 위해서다. 공개 프로필도 같다 —
+        // 본인은 비공개여도 자기 프로필을 미리 본다.
         registry.addInterceptor(AuthInterceptor(identity, json, required = false))
-            .addPathPatterns("/api/v1/problems/**", "/api/v1/problems", "/api/v1/projects", "/api/v1/projects/*")
+            .addPathPatterns("/api/v1/problems/**", "/api/v1/problems", "/api/v1/projects", "/api/v1/projects/*", "/api/v1/profiles/**")
             .order(AUTHENTICATION_ORDER)
     }
 

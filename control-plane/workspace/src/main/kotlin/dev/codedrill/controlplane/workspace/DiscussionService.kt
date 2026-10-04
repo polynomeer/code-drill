@@ -65,6 +65,24 @@ class DiscussionService(
         }
     }
 
+    /**
+     * 한 사람이 공개한 풀이 — 제목·문제·도움됐다 수만. 본문은 문제 화면에서 맞힌 사람에게만 열린다
+     * (공개 프로필이 그 잠금을 돌아가는 길이 되면 안 된다).
+     */
+    fun solutionsBy(authorId: String, limit: Int): List<SolutionSummary> {
+        val posts = repository.solutionsBy(authorId, limit)
+        val helpful = repository.helpfulCounts(posts.map { it.id })
+        return posts.map { SolutionSummary(it.id, it.problemId, it.title, helpful[it.id] ?: 0, it.createdAt) }
+    }
+
+    /** 기여 등급. 남에게 보이는 것은 이것뿐이다 (§8.5). */
+    fun tierOf(userId: String): ContributorTier {
+        val received = repository.helpfulReceivedBy(listOf(userId))[userId] ?: 0
+        return ContributorTier.of(received + donations.count(userId) * Contributions.DONATION_WEIGHT)
+    }
+
+    data class SolutionSummary(val id: UUID, val problemId: String, val title: String?, val helpful: Int, val createdAt: Instant)
+
     /** 한 사람의 기여 (§8.5 기여자 평판). 본인에게만 수치로 보인다; 남에게는 등급뿐이다. */
     fun contributions(userId: String): Contributions {
         val (helpful, solutions, answers) = repository.contributionsOf(userId)

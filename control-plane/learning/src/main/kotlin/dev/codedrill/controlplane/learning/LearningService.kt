@@ -53,6 +53,10 @@ class LearningService(
         return prescription(userId, now)
     }
 
+    /** 지금 이어지는 연속 일수. 처방과 같은 규칙 — 공개 프로필이 같은 숫자를 말하도록 여기서만 센다. */
+    fun streak(userId: String, now: Instant = Instant.now()): Int =
+        Prescriber.streakOf(sources.attempts(userId, now.minus(STREAK_WINDOW)), now, zone).days
+
     fun weekly(userId: String, now: Instant = Instant.now()): WeeklyReport {
         val weekAgo = now.minus(WEEK)
         val facts = facts(userId, now)
@@ -177,6 +181,9 @@ class LearningService(
          * 이라 권하면 목록이 옛 문제로만 채워지고, 지금 배우는 것과 멀어진다.
          */
         val HISTORY: Duration = Duration.ofDays(90)
+
+        /** 스트릭을 셀 때 거슬러 보는 기간. 스트릭 규칙이 1년에서 멈춘다. */
+        val STREAK_WINDOW: Duration = Duration.ofDays(366)
 
         /** 미루기의 기간. 주말을 넘길 만큼, 그러나 약점이 식을 만큼은 아니다. */
         const val DEFER_DAYS = 3L
