@@ -43,6 +43,8 @@ const CompetenciesPage = lazy(() =>
 const ContestsPage = lazy(() => import('../features/contest/ContestsPage').then((m) => ({ default: m.ContestsPage })))
 const ContestPage = lazy(() => import('../features/contest/ContestPage').then((m) => ({ default: m.ContestPage })))
 const ProfilePage = lazy(() => import('../features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
+// 운영 콘솔은 자기 청크로만 온다 — 일반 사용자 번들에 운영 화면이 섞이지 않는다 (ui-overhaul.md §6.8)
+const AdminPage = lazy(() => import('../features/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
@@ -138,6 +140,15 @@ function Shell() {
             <RequireSession>
               <Suspense fallback={<RouteLoading />}>
                 <ContestPage key={params.id} id={params.id} />
+              </Suspense>
+            </RequireSession>
+          )}
+        </Route>
+        <Route path="/admin/:queue?">
+          {(params) => (
+            <RequireSession>
+              <Suspense fallback={<RouteLoading />}>
+                <AdminPage queue={params.queue} />
               </Suspense>
             </RequireSession>
           )}

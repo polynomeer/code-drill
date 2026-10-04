@@ -1,0 +1,513 @@
+/* 운영 콘솔 — 왼쪽 큐, 오른쪽 일 */
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+
+.console {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: calc(100vh - var(--header-height));
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-bg-surface);
+  border-right: 1px solid var(--color-border-default);
+}
+
+.sidebarTitle {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.queueList {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queueLink {
+  /* 안의 visually-hidden(절대 위치)이 가로 스크롤 목록 밖으로 새어 모바일 화면을 넓히지 않게 */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  text-decoration: none;
+}
+
+.queueLink:hover {
+  background: var(--color-bg-subtle);
+}
+
+.queueActive {
+  background: var(--color-brand-subtle);
+  font-weight: var(--weight-strong);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.queueLabel {
+  flex: 1;
+}
+
+.count {
+  min-width: 1.6em;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-warning-subtle);
+  color: var(--color-text-primary);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.roles {
+  margin-top: auto;
+}
+
+.roleBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  max-width: 1200px;
+  padding: var(--space-5) var(--space-5) var(--space-7);
+}
+
+.title {
+  margin: 0;
+  font: var(--text-h1);
+}
+
+.subTitle {
+  margin: 0;
+  font: var(--text-h3);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.clear {
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.block {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tabBody {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+}
+
+/* ─── 개요 ─── */
+
+.overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overviewCard {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.overviewCard:hover {
+  border-color: var(--color-border-strong);
+}
+
+.overviewHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.overviewCount {
+  font: var(--text-h2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 카드 ─── */
+
+.cards {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  min-width: 0;
+}
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cardTitle {
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.cardMeta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.cardBody {
+  margin: 0;
+  font: var(--text-label);
+}
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.quoted {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+
+.quotedTitle {
+  margin: 0;
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.quotedBody,
+.code {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: var(--text-code);
+  font-variant-ligatures: none;
+}
+
+.code {
+  padding: var(--space-3);
+  background: var(--color-bg-editor);
+  border-radius: var(--radius-md);
+  color: var(--color-text-on-editor);
+  white-space: pre;
+}
+
+.appeal {
+  margin: 0;
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-bg-subtle);
+  font: var(--text-label);
+}
+
+.appeal p {
+  margin: 0 0 var(--space-1);
+}
+
+/* ─── 양식 ─── */
+
+.panelForm {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.formButton {
+  align-self: end;
+  padding-bottom: 22px;
+}
+
+.inlineCheck {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--text-label);
+}
+
+.dialogForm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.match,
+.mismatch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.match {
+  color: var(--color-success);
+}
+
+.mismatch {
+  color: var(--color-danger);
+}
+
+/* ─── 표 ─── */
+
+.tableWrap {
+  position: relative;
+  overflow-x: auto;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-label);
+}
+
+.table th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+  vertical-align: top;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.actionsCell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 거부 기록 — 왼쪽 막대. 옅은 오류 바탕 위에서는 링크 글자가 대비 4.5 를 넘지 못한다 */
+.denied td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-danger);
+}
+
+.id,
+.digest {
+  font: var(--text-code);
+  font-size: 12px;
+}
+
+.me {
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+}
+
+.when {
+  white-space: nowrap;
+}
+
+.detail {
+  display: block;
+  max-width: 420px;
+  overflow-wrap: anywhere;
+  font: var(--text-code);
+  font-size: 12px;
+}
+
+/* ─── 재채점 진행 ─── */
+
+.progress {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.changes {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  font: var(--text-label);
+}
+
+/* ─── 유사도 ─── */
+
+.split {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.pickList {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pick {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pick[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.pickTitle {
+  font: var(--text-label);
+}
+
+.pairMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font: var(--text-label);
+}
+
+.pairMeta div {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.pairMeta dt {
+  color: var(--color-text-muted);
+}
+
+.pairMeta dd {
+  margin: 0;
+}
+
+.diff {
+  height: 460px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-editor);
+}
+
+@media (max-width: 899px) {
+  .console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-default);
+  }
+
+  .queueList {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .queueLink {
+    white-space: nowrap;
+  }
+
+  .roles {
+    display: none;
+  }
+
+  .main {
+    padding: var(--space-4);
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

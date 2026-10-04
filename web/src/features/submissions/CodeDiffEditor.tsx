@@ -29,6 +29,9 @@ export default function CodeDiffEditor({
         readOnly: true,
         originalEditable: false,
         renderSideBySide: sideBySide,
+        // Monaco 는 폭이 900px 아래면 스스로 한 줄 보기로 바꾼다. 부른 쪽이 나란히를 골랐으면 그대로 둔다 —
+        // 유사도 검수는 두 소스를 나란히 보는 것이 일이다
+        useInlineViewWhenSpaceIsLimited: !sideBySide,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
         automaticLayout: true,
