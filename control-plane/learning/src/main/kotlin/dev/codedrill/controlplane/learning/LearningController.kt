@@ -29,12 +29,19 @@ class LearningController(private val service: LearningService) {
     fun prescription(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): Prescription =
         service.prescription(principal.id)
 
-    /** 오늘의 처방에서 밀어낸다 (FR-808 "사용자가 조정할 수 있다"). 바뀐 처방을 돌려준다. */
+    /** 교체 — 오늘의 처방에서 밀어낸다 (FR-808 "사용자가 조정할 수 있다"). 바뀐 처방을 돌려준다. */
     @PostMapping("/prescription/{problemId}/skip")
     fun skip(
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @PathVariable problemId: String,
     ): Prescription = service.skip(principal.id, problemId)
+
+    /** 며칠 뒤로 미룬다. 오늘의 빈자리는 교체처럼 다음 후보가 채운다. */
+    @PostMapping("/prescription/{problemId}/defer")
+    fun defer(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @PathVariable problemId: String,
+    ): Prescription = service.defer(principal.id, problemId)
 
     @GetMapping("/report/weekly")
     fun weekly(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): WeeklyReport =

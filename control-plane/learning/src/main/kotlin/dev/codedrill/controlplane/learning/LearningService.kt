@@ -29,10 +29,27 @@ class LearningService(
     fun prescription(userId: String, now: Instant = Instant.now()): Prescription =
         Prescriber.prescribe(facts(userId, now), now, zone)
 
-    /** 오늘의 처방에서 문제를 밀어낸다 (FR-808). 내일이면 다시 권할 수 있다. */
+    /**
+     * 교체 — 오늘의 처방에서 문제를 밀어낸다 (FR-808). 빈자리는 다음 후보가 채우고, 내일이면 다시
+     * 권할 수 있다.
+     */
     @Transactional
     fun skip(userId: String, problemId: String, now: Instant = Instant.now()): Prescription {
         repository.skip(userId, problemId, LocalDate.ofInstant(now, zone))
+        return prescription(userId, now)
+    }
+
+    /**
+     * 미루기 — [DEFER_DAYS] 일 동안 권하지 않는다 (UI §9.4 "시작·교체·미루기").
+     *
+     * 교체와 다른 것은 기간뿐이다. "오늘은 다른 걸로"와 "며칠 뒤에 다시"는 다른 말이고, 미룬 문제가
+     * 다음 날 그대로 돌아오면 미루기가 교체와 구별되지 않는다. 날짜 단위 밀어내기를 며칠치 적는다 —
+     * 처방이 읽는 사실은 그대로 "그날 밀어낸 문제"다.
+     */
+    @Transactional
+    fun defer(userId: String, problemId: String, now: Instant = Instant.now()): Prescription {
+        val today = LocalDate.ofInstant(now, zone)
+        for (day in 0 until DEFER_DAYS) repository.skip(userId, problemId, today.plusDays(day))
         return prescription(userId, now)
     }
 
@@ -160,5 +177,8 @@ class LearningService(
          * 이라 권하면 목록이 옛 문제로만 채워지고, 지금 배우는 것과 멀어진다.
          */
         val HISTORY: Duration = Duration.ofDays(90)
+
+        /** 미루기의 기간. 주말을 넘길 만큼, 그러나 약점이 식을 만큼은 아니다. */
+        const val DEFER_DAYS = 3L
     }
 }
