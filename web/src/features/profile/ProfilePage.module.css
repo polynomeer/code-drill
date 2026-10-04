@@ -1,0 +1,316 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-brand-subtle);
+  color: var(--color-brand);
+  font: var(--text-h1);
+}
+
+.identity {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font: var(--text-h1);
+}
+
+.ownerActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ownerNote {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.ownerNote a {
+  color: var(--color-text-primary);
+}
+
+/* ─── 요약 ─── */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stat {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.statLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.statValue {
+  font: var(--text-display);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.statValueSmall {
+  font: var(--text-h3);
+}
+
+.difficulties {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.difficulties li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 2.5em;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-subtle);
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-brand);
+}
+
+.statCount {
+  font: var(--text-label);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ─── 구획 ─── */
+
+.section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  margin: 0;
+  font: var(--text-h3);
+}
+
+/* ─── 히트맵 ─── */
+
+.heatmap {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.heatmapScroll {
+  overflow-x: auto;
+}
+
+.heatmapScroll:focus-visible {
+  outline: var(--focus-ring);
+}
+
+.heatmapLabel {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.level0 {
+  fill: var(--color-bg-subtle);
+  stroke: var(--color-border-default);
+  stroke-width: 1;
+}
+
+.level1 {
+  fill: color-mix(in srgb, var(--color-brand) 30%, var(--color-bg-surface));
+}
+
+.level2 {
+  fill: color-mix(in srgb, var(--color-brand) 55%, var(--color-bg-surface));
+}
+
+.level3 {
+  fill: color-mix(in srgb, var(--color-brand) 80%, var(--color-bg-surface));
+}
+
+.level4 {
+  fill: var(--color-brand);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.legend svg:first-of-type {
+  margin-left: var(--space-1);
+}
+
+.legend svg:last-of-type {
+  margin-right: var(--space-1);
+}
+
+/* ─── 레이팅 ─── */
+
+.chart {
+  width: 100%;
+  height: auto;
+  padding: var(--space-3);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.chartGrid {
+  stroke: var(--color-border-default);
+  stroke-dasharray: 3 3;
+}
+
+.chartLabel {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.chartLine {
+  fill: none;
+  stroke: var(--color-brand);
+  stroke-width: 2;
+}
+
+.chartPoint {
+  fill: var(--color-bg-surface);
+  stroke: var(--color-brand);
+  stroke-width: 2;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-label);
+}
+
+.table th {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+  text-align: left;
+}
+
+.table td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-border-default);
+}
+
+.table a {
+  color: var(--color-text-primary);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.up {
+  color: var(--color-success);
+}
+
+.down {
+  color: var(--color-danger);
+}
+
+/* ─── 공개한 풀이 ─── */
+
+.solutions {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.solutions li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+}
+
+.solutionTitle {
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getContributions, getMyRating, changePassword, deleteAccount, exportAccount, rename } from '../../api/client'
 import type { Session } from '../../api/session'
+import { ProfileSettingsForm } from '../profile/ProfileSettingsForm'
 import type { Contributions, Rating } from '../../shared/types'
 
 /**
@@ -64,6 +65,11 @@ export function AccountSettings({ session }: { session: Session }) {
 
       {error && <p className="warn">{error}</p>}
       {note && <p className="muted">{note}</p>}
+
+      <section className="settings-section" aria-labelledby="profile-settings-heading">
+        <h3 id="profile-settings-heading">공개 프로필</h3>
+        <ProfileSettingsForm />
+      </section>
 
       {/* 레이팅 (§8.4). 레이팅 대회가 끝날 때마다 움직인다. 첫 몇 대회는 잠정이다. */}
       {rating && (

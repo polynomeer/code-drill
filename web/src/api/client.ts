@@ -4,6 +4,9 @@ import type {
   ApiError,
   ContestSummary,
   ContestView,
+  FinishedContests,
+  ProfileSettings,
+  PublicProfile,
   Contributions,
   Rating,
   SanctionView,
@@ -748,8 +751,14 @@ export async function appealSanction(id: string, text: string): Promise<Sanction
 
 // --- 대회와 미니 대결 (§8.4) ---
 
-export async function listContests(): Promise<ContestSummary[]> {
-  return json<ContestSummary[]>(await authed('/contests'))
+/** `active` 면 끝나지 않은 것만 (진행 중·예정·대기). 없으면 최근 것 50개. */
+export async function listContests(scope?: 'active'): Promise<ContestSummary[]> {
+  return json<ContestSummary[]>(await authed(scope ? `/contests?scope=${scope}` : '/contests'))
+}
+
+/** 끝난 대회 한 쪽, 최근에 끝난 것부터. */
+export async function listFinishedContests(page: number): Promise<FinishedContests> {
+  return json<FinishedContests>(await authed(`/contests/finished?page=${page}`))
 }
 
 export async function getContest(id: string): Promise<ContestView> {
@@ -788,6 +797,28 @@ export async function startVirtual(contestId: string): Promise<{ contest: Contes
 
 export async function getMyRating(): Promise<Rating> {
   return json<Rating>(await authed('/contests/me/rating'))
+}
+
+// --- 공개 프로필 (docs/ui-overhaul.md §6.7) ---
+
+/** 공개 프로필. 로그인 없이 열린다. 비공개거나 없는 핸들은 null — 둘을 가르지 않는다. */
+export async function getProfile(handle: string): Promise<PublicProfile | null> {
+  const response = await fetch(`${BASE}/profiles/${encodeURIComponent(handle)}`, { headers: optionalAuth() })
+  if (response.status === 404) return null
+  return json<PublicProfile>(response)
+}
+
+export async function getProfileSettings(): Promise<ProfileSettings> {
+  return json<ProfileSettings>(await authed('/auth/me/profile'))
+}
+
+export async function updateProfileSettings(settings: ProfileSettings): Promise<ProfileSettings> {
+  const response = await authed('/auth/me/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  })
+  return json<ProfileSettings>(response)
 }
 
 // --- 프로젝트형 문제 (feature-roadmap 11단계) ---

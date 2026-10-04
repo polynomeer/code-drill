@@ -1,0 +1,31 @@
+.settings {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 560px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.check input {
+  margin-top: 4px;
+}
+
+.check label {
+  display: grid;
+  gap: var(--space-1);
+  font: var(--text-label);
+}
+
+.check label span {
+  color: var(--color-text-muted);
+}
+
+.settingsActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}

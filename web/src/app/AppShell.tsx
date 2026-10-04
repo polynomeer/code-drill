@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Monitor, Moon, Settings, Sun } from 'lucide-react'
+import { ChevronDown, LogOut, Monitor, Moon, Settings, Sun, UserRound } from 'lucide-react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'wouter'
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/problems', label: '문제', signedIn: false },
   { to: '/training', label: '훈련', signedIn: true },
   { to: '/competencies', label: '역량', signedIn: true },
+  { to: '/contests', label: '대회', signedIn: true },
   { to: '/submissions', label: '제출', signedIn: true },
 ]
 
@@ -100,6 +101,14 @@ export function AppShell({
             </button>
             <div id="user-menu" popover="auto" className={styles.menu}>
               <p className={styles.menuHeading}>{session.displayName}</p>
+              <Link
+                href="/u/me"
+                className={styles.menuItem}
+                onClick={() => document.getElementById('user-menu')?.hidePopover?.()}
+              >
+                <UserRound size={16} aria-hidden="true" />
+                내 프로필
+              </Link>
               <button
                 type="button"
                 className={styles.menuItem}

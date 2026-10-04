@@ -802,6 +802,14 @@ export interface Rating {
   history: { contestId: string; title: string; rank: number; before: number; after: number; appliedAt: string }[]
 }
 
+/** 끝난 대회 한 쪽 (로비의 "끝남"). */
+export interface FinishedContests {
+  items: ContestSummary[]
+  page: number
+  pageCount: number
+  total: number
+}
+
 export interface ContestView {
   contest: ContestSummary
   problems: string[]
@@ -883,4 +891,35 @@ export interface ProjectDraft {
   files: Record<string, string>
   version: number
   updatedAt: string
+}
+
+// --- 공개 프로필 (docs/ui-overhaul.md §6.7) ---
+
+/** 핸들과 공개 여부. 공개는 기본이 아니다 — 본인이 켠다. */
+export interface ProfileSettings {
+  handle: string | null
+  public: boolean
+}
+
+/**
+ * 공개 프로필. **역량 수준은 없다** — 본인에게만 보인다. 기여도 수치 대신 등급뿐이다.
+ */
+export interface PublicProfile {
+  handle: string
+  displayName: string
+  joinedAt: string
+  mine: boolean
+  public: boolean
+  solved: { total: number; byDifficulty: Partial<Record<Difficulty, number>> }
+  /** 최근 1년, 하루 한 칸, 오래된 날부터. */
+  activity: { date: string; submissions: number }[]
+  streak: { current: number; longest: number }
+  /** 대회를 치른 적이 없으면 null — 출발점을 실력처럼 내걸지 않는다. */
+  rating: {
+    rating: number
+    contests: number
+    history: { contestId: string; title: string; rank: number; before: number; after: number; at: string }[]
+  } | null
+  solutions: { postId: string; problemId: string; title: string | null; helpful: number; at: string }[]
+  contributorTier: 'NEW' | 'ACTIVE' | 'TRUSTED'
 }

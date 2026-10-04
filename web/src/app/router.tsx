@@ -40,6 +40,9 @@ const TrainingPage = lazy(() => import('../features/training/TrainingPage').then
 const CompetenciesPage = lazy(() =>
   import('../features/competency/CompetenciesPage').then((m) => ({ default: m.CompetenciesPage })),
 )
+const ContestsPage = lazy(() => import('../features/contest/ContestsPage').then((m) => ({ default: m.ContestsPage })))
+const ContestPage = lazy(() => import('../features/contest/ContestPage').then((m) => ({ default: m.ContestPage })))
+const ProfilePage = lazy(() => import('../features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
@@ -122,6 +125,30 @@ function Shell() {
               <CompetenciesPage />
             </Suspense>
           </RequireSession>
+        </Route>
+        <Route path="/contests">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <ContestsPage />
+            </Suspense>
+          </RequireSession>
+        </Route>
+        <Route path="/contests/:id">
+          {(params) => (
+            <RequireSession>
+              <Suspense fallback={<RouteLoading />}>
+                <ContestPage key={params.id} id={params.id} />
+              </Suspense>
+            </RequireSession>
+          )}
+        </Route>
+        {/* 공개 프로필은 로그인 없이 열린다. `/u/me` 는 화면 안에서 로그인을 묻는다 */}
+        <Route path="/u/:handle">
+          {(params) => (
+            <Suspense fallback={<RouteLoading />}>
+              <ProfilePage key={params.handle} handle={params.handle} />
+            </Suspense>
+          )}
         </Route>
         <Route path="/submissions">
           <RequireSession>
