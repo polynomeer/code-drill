@@ -129,11 +129,17 @@ test('/u/me 는 핸들이 없으면 그 자리에서 정하고 내 프로필로 
   expect(puts).toEqual([{ handle: 'new-ada', public: false }])
 })
 
-test('사용자 메뉴의 내 프로필은 내 핸들 주소로 간다', async ({ page }) => {
+test('사용자 메뉴의 내 프로필은 내 핸들 주소로 간다', async ({ page, isMobile }) => {
   await mockApi(page, { signedIn: true, mine: true })
   await page.goto('/problems')
-  await page.getByRole('button', { name: /계정 메뉴/ }).click()
-  await page.getByRole('link', { name: '내 프로필' }).click()
+  if (isMobile) {
+    // 좁은 화면은 아래 탭의 "나"에서 간다
+    await page.getByRole('navigation', { name: '하단 메뉴' }).getByRole('link', { name: '나' }).click()
+    await page.getByRole('link', { name: '내 프로필' }).click()
+  } else {
+    await page.getByRole('button', { name: /계정 메뉴/ }).click()
+    await page.getByRole('link', { name: '내 프로필' }).click()
+  }
   await expect(page).toHaveURL(/\/u\/ada$/)
 })
 
