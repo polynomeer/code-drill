@@ -162,6 +162,9 @@
 }
 
 .dialogBody {
+  /* 흔한 함정: flex 자식은 min-height 가 auto 라 줄어들지 않는다. 0 이어야 키 작은 화면에서
+     본문이 대화상자 안에서 스크롤되고, 아래 단추가 대화상자 밖으로 밀려나지 않는다 */
+  min-height: 0;
   padding: 0 var(--space-5) var(--space-5);
   overflow-y: auto;
 }
