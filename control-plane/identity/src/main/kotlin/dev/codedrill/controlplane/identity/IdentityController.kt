@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
@@ -169,6 +170,26 @@ class IdentityController(
                 .body(error(ErrorCode.UNAUTHENTICATED, "계정을 찾지 못했다"))
         }
 
+    /** 공개 프로필 설정 (docs/ui-overhaul.md §6.7). */
+    @GetMapping("/me/profile")
+    fun profileSettings(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): ResponseEntity<ProfileSettings> {
+        val settings = identity.profileSettings(principal.id) ?: return ResponseEntity.notFound().build()
+        return ResponseEntity.ok(settings)
+    }
+
+    /**
+     * 핸들과 공개 여부를 정한다. 공개는 기본이 아니다 — 본인이 켠다. 핸들이 겹치면 409.
+     */
+    @PutMapping("/me/profile")
+    fun updateProfile(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @RequestBody request: ProfileRequest,
+    ): ResponseEntity<Any> = when (val outcome = identity.updateProfile(principal.id, request.handle, request.public)) {
+        is ProfileOutcome.Updated -> ResponseEntity.ok(outcome.settings)
+        is ProfileOutcome.Invalid -> ResponseEntity.badRequest().body(error(ErrorCode.INVALID_SIGNATURE, outcome.reason))
+        ProfileOutcome.Taken -> ResponseEntity.status(HttpStatus.CONFLICT).body(error(ErrorCode.INVALID_SIGNATURE, "이미 쓰이고 있는 핸들이다"))
+    }
+
     /**
      * 비밀번호 변경.
      *
@@ -228,6 +249,8 @@ data class DeleteAccountRequest(@field:NotBlank val password: String)
 data class AppealRequest(@field:NotBlank val text: String)
 
 data class RenameRequest(@field:NotBlank val displayName: String)
+
+data class ProfileRequest(val handle: String?, val public: Boolean = false)
 
 data class ChangePasswordRequest(
     @field:NotBlank val currentPassword: String,

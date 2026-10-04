@@ -99,10 +99,22 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         passwordHash, id,
     )
 
+    /** 공개 프로필 설정. 핸들이 겹치면 [org.springframework.dao.DuplicateKeyException]. */
+    fun updateProfile(id: UUID, handle: String?, public: Boolean): Int = jdbc.update(
+        "UPDATE app_user SET handle = ?, profile_public = ? WHERE id = ? AND deleted_at IS NULL",
+        handle, public, id,
+    )
+
+    /** 핸들로 찾는다. 지운 계정은 없는 것이다. */
+    fun findByHandle(handle: String): User? = jdbc.query(
+        "SELECT * FROM app_user WHERE lower(handle) = lower(?) AND deleted_at IS NULL",
+        USER, handle,
+    ).firstOrNull()
+
     fun anonymize(id: UUID, tombstoneEmail: String): Int = jdbc.update(
         """
         UPDATE app_user
-           SET email = ?, display_name = '탈퇴한 사용자',
+           SET email = ?, display_name = '탈퇴한 사용자', handle = NULL, profile_public = false,
                -- BCrypt 형식이 아니라 어떤 비밀번호로도 맞출 수 없다.
                password_hash = 'deleted', deleted_at = now()
          WHERE id = ? AND deleted_at IS NULL
@@ -130,6 +142,8 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
                 email = rs.getString("email"),
                 displayName = rs.getString("display_name"),
                 createdAt = rs.getTimestamp("created_at").toInstant(),
+                handle = rs.getString("handle"),
+                profilePublic = rs.getBoolean("profile_public"),
             )
         }
 

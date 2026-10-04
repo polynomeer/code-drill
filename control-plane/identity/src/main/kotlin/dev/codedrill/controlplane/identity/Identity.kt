@@ -14,6 +14,10 @@ data class User(
     val email: String,
     val displayName: String,
     val createdAt: Instant,
+    /** 공개 프로필 주소의 이름. 고르기 전에는 null. */
+    val handle: String? = null,
+    /** 공개 프로필을 남에게 보이는가. 기본은 비공개다. */
+    val profilePublic: Boolean = false,
 )
 
 /**
@@ -29,3 +33,12 @@ data class IssuedSession(
     val refreshExpiresAt: Instant,
     val user: User,
 )
+
+/** 공개 프로필 설정 (docs/ui-overhaul.md §6.7). */
+data class ProfileSettings(val handle: String?, val public: Boolean)
+
+sealed interface ProfileOutcome {
+    data class Updated(val settings: ProfileSettings) : ProfileOutcome
+    data class Invalid(val reason: String) : ProfileOutcome
+    data object Taken : ProfileOutcome
+}

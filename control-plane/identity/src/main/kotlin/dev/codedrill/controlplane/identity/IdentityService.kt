@@ -63,6 +63,38 @@ class IdentityService(
      * 바꾸게 하면 남의 주소를 자기 계정에 붙일 수 있다.
      */
     @Transactional
+    /** 공개 프로필 설정 — 지금 핸들과 공개 여부. */
+    fun profileSettings(userId: String): ProfileSettings? =
+        repository.findById(UUID.fromString(userId))?.let { ProfileSettings(it.handle, it.profilePublic) }
+
+    /**
+     * 공개 프로필 설정을 바꾼다.
+     *
+     * 공개하려면 핸들이 있어야 한다 — 주소 없이 공개할 수는 없다. 핸들을 비우면 공개도 꺼진다.
+     */
+    @Transactional
+    fun updateProfile(userId: String, handle: String?, public: Boolean): ProfileOutcome {
+        val parsed = handle?.takeIf { it.isNotBlank() }?.let(Handle::parse)
+        if (parsed is Handle.Result.Invalid) return ProfileOutcome.Invalid(parsed.reason)
+        val normalized = (parsed as Handle.Result.Valid?)?.handle
+        if (public && normalized == null) return ProfileOutcome.Invalid("공개하려면 먼저 핸들을 정해야 한다")
+        val owner = normalized?.let { repository.findByHandle(it) }
+        if (owner != null && owner.id.toString() != userId) return ProfileOutcome.Taken
+        return try {
+            if (repository.updateProfile(UUID.fromString(userId), normalized, public && normalized != null) == 0) {
+                ProfileOutcome.Invalid("계정을 찾지 못했다")
+            } else {
+                ProfileOutcome.Updated(ProfileSettings(normalized, public && normalized != null))
+            }
+        } catch (e: org.springframework.dao.DuplicateKeyException) {
+            // 위에서 확인한 뒤 누가 먼저 가져갔다
+            ProfileOutcome.Taken
+        }
+    }
+
+    /** 핸들의 주인. 공개 여부는 묻는 쪽이 판단한다 — 본인은 비공개여도 자기 프로필을 본다. */
+    fun findByHandle(handle: String): User? = repository.findByHandle(handle.trim().lowercase())
+
     fun rename(userId: String, displayName: String): Boolean {
         require(displayName.isNotBlank()) { "표시 이름은 비울 수 없다" }
         return repository.updateDisplayName(UUID.fromString(userId), displayName.trim()) > 0
@@ -153,7 +185,8 @@ class IdentityService(
         val user = repository.findById(UUID.fromString(userId)) ?: return null
         return buildMap {
             put("account", mapOf("id" to user.id.toString(), "email" to user.email,
-                                 "displayName" to user.displayName))
+                                 "displayName" to user.displayName,
+                                 "handle" to user.handle, "profilePublic" to user.profilePublic))
             for (area in areas) put(area.area, area.export(userId))
         }
     }
