@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import { listProjects } from '../api/client'
-import { CompetencyMapPanel } from '../features/competency/CompetencyMapPanel'
 import { ContestsPanel } from '../features/contest/ContestsPanel'
 import { CollectionsPanel } from '../features/learning/CollectionsPanel'
-import { TodayPanel } from '../features/learning/TodayPanel'
-import { WeeklyReportPanel } from '../features/learning/WeeklyReportPanel'
 import { ProjectWorkspace } from '../features/project/ProjectWorkspace'
 import { ProjectsPanel } from '../features/project/ProjectsPanel'
+import { TodaySummary } from '../features/training/TodaySummary'
 
 /**
  * 홈 — 무엇을 풀지 고르는 곳 (디자인 설계서 §2.1).
  *
  * 풀이(에디터·판정·리플레이·기록)는 U1 에서 `/problems/:slug/solve` 로, 문제 목록은 U2 에서
- * `/problems` 로 나갔다. 남은 패널들도 각자 라우트를 얻으면 여기서 빠진다 — 처방·역량은 U5,
- * 대회는 U6 (docs/ui-overhaul.md §9).
+ * `/problems` 로, 처방·역량·주간 리포트는 U5 에서 `/training`·`/competencies` 로 나갔다. 여기에는
+ * 처방 요약만 남는다. 대회는 U6 에서 나간다 (docs/ui-overhaul.md §9).
  */
 export function HomePage() {
   const [, navigate] = useLocation()
@@ -32,8 +30,6 @@ export function HomePage() {
   }, [])
 
   const openProblem = (slug: string) => navigate(`/problems/${slug}/solve`)
-  const openSubmission = (id: string, step: number | null = null) =>
-    navigate(`/submissions/${id}${step === null ? '' : `?step=${step}`}`)
 
   return (
     <div className="app">
@@ -51,7 +47,7 @@ export function HomePage() {
         <div className="stack">
           {/* 목록보다 위다. "무엇을 풀지 모를 때 현재 수준과 약점을 기준으로 고른다"가
               PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
-          <TodayPanel onOpenProblem={openProblem} refreshKey={0} />
+          <TodaySummary />
           {/* 목록 아래. 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
           <ProjectsPanel refreshKey={projectsJudged} onOpen={setOpenProject} />
         </div>
@@ -63,9 +59,6 @@ export function HomePage() {
             onOpenProblem={(id) => (projectIds.has(id) ? setOpenProject(id) : openProblem(id))}
             refreshKey={0}
           />
-          {/* "무엇을 풀었나" 다음에 "그래서 무엇이 늘었나"가 온다. */}
-          <CompetencyMapPanel onOpenSubmission={openSubmission} />
-          <WeeklyReportPanel onOpenProblem={openProblem} />
           <CollectionsPanel currentProblemId={null} onOpenProblem={openProblem} />
         </div>
       </div>

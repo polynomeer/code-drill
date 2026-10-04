@@ -129,7 +129,9 @@ export function SolvePage({ slug }: { slug: string }) {
   const [problemTab, setProblemTab] = useState<ProblemTab>('statement')
   const [drawerTab, setDrawerTab] = useState<DrawerTab>(initial.submission ? (initial.step !== null ? 'replay' : 'verdict') : 'tests')
   const [mobileTab, setMobileTab] = useState<MobileTab>(initial.submission ? 'result' : 'problem')
-  const [coachingOpen, setCoachingOpen] = useState(false)
+  // 훈련 화면의 "이어 하기"는 `?coaching=1` 로 온다 — 열어 둔 세션을 바로 보이게
+  const [resumeCoaching] = useState(() => new URLSearchParams(window.location.search).get('coaching') === '1')
+  const [coachingOpen, setCoachingOpen] = useState(resumeCoaching)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [duelOpen, setDuelOpen] = useState(false)
 
@@ -556,7 +558,11 @@ export function SolvePage({ slug }: { slug: string }) {
         </Button>
       </div>
       {/* 열어야 개입한다 (FR-802 — 관문이 아니다) */}
-      <CoachingPanel problemId={problem.id} onOpenProblem={(id) => navigate(`/problems/${id}/solve`)} />
+      <CoachingPanel
+        problemId={problem.id}
+        resume={resumeCoaching}
+        onOpenProblem={(id) => navigate(`/problems/${id}/solve`)}
+      />
     </aside>
   )
 

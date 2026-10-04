@@ -1,0 +1,245 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  font: var(--text-h1);
+}
+
+.headLink {
+  color: var(--color-text-primary);
+  font: var(--text-label);
+}
+
+.streak {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.streak svg {
+  color: var(--color-warning);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-3);
+  font: var(--text-h3);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+/* ─── 처방 카드 (UI §9.4 — 1~2개를 크게) ─── */
+
+.featured {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.featured > li {
+  display: flex;
+}
+
+.card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.cardTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.competency {
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+/* 이유가 문제 이름보다 크다 */
+.reason {
+  margin: 0;
+  font: var(--text-h3);
+  font-weight: var(--weight-medium);
+}
+
+.problem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--text-body);
+  font-weight: var(--weight-strong);
+}
+
+.measure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.start,
+.secondaryLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-default);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font: var(--text-label);
+  text-decoration: none;
+}
+
+.start {
+  background: var(--color-brand);
+  color: var(--color-text-on-brand);
+}
+
+.start:hover {
+  background: var(--color-brand-hover);
+}
+
+.secondaryLink {
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.secondaryLink:hover {
+  background: var(--color-bg-subtle);
+}
+
+.rest {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rest li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.restLink {
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  font-weight: var(--weight-medium);
+}
+
+/* ─── 하던 것 ─── */
+
+.progressSection {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.progressSection .sectionTitle {
+  margin: 0;
+}
+
+.progressList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.itemHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.itemTitle {
+  font: var(--text-label);
+  font-weight: var(--weight-strong);
+}
+
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.explain {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+
+.explain > div {
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .featured {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card {
+    padding: var(--space-4);
+  }
+}

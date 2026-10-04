@@ -19,6 +19,8 @@ import styles from './AppShell.module.css'
 const NAV = [
   { to: '/', label: '홈', signedIn: true },
   { to: '/problems', label: '문제', signedIn: false },
+  { to: '/training', label: '훈련', signedIn: true },
+  { to: '/competencies', label: '역량', signedIn: true },
   { to: '/submissions', label: '제출', signedIn: true },
 ]
 

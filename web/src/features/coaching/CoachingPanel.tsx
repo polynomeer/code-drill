@@ -21,9 +21,15 @@ import type { CoachingSession } from '../../shared/types'
 export function CoachingPanel({
   problemId,
   onOpenProblem,
+  resume = false,
 }: {
   problemId: string
   onOpenProblem: (problemId: string) => void
+  /**
+   * 이미 열어 둔 세션을 이어 보인다 (훈련 화면의 "이어 하기"). 새로 여는 것이 아니라 사용자가
+   * 전에 연 세션을 다시 펼치는 것이라 "눌러야 열린다"는 원칙과 어긋나지 않는다.
+   */
+  resume?: boolean
 }) {
   const [session, setSession] = useState<CoachingSession | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -33,6 +39,8 @@ export function CoachingPanel({
   useEffect(() => {
     setSession(null)
     setError(null)
+    if (resume) void open()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemId])
 
   const open = async () => {

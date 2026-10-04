@@ -170,6 +170,22 @@ export async function openCoaching(problemId: string): Promise<CoachingSession> 
   return json<CoachingSession>(response)
 }
 
+/** 내 열린 코칭 세션. 훈련 화면의 "하던 것"이다. */
+export async function listOpenCoaching(): Promise<CoachingSession[]> {
+  return json<CoachingSession[]>(await authed('/coaching/sessions'))
+}
+
+/** 세션을 끝낸다. 받은 도움의 기록은 남는다 — 증거의 가중치는 그대로다. */
+export async function closeCoaching(sessionId: string): Promise<void> {
+  const response = await authed(`/coaching/sessions/${sessionId}/close`, { method: 'POST' })
+  if (!response.ok) await json(response)
+}
+
+/** 내 안 끝난 전이 과제. 먼저 받은 것부터. */
+export async function listOpenTransfers(): Promise<TransferTask[]> {
+  return json<TransferTask[]>(await authed('/coaching/transfers'))
+}
+
 /** 다음 단계를 펼친다. 본문은 이 응답에만 실려 온다. */
 export async function revealHint(
   sessionId: string,
@@ -231,9 +247,14 @@ export async function getPrescription(): Promise<Prescription> {
   return json<Prescription>(await authed('/me/prescription'))
 }
 
-/** 오늘의 처방에서 밀어낸다. 바뀐 처방이 돌아온다. */
+/** 교체 — 오늘의 처방에서 밀어낸다. 빈자리를 다음 후보가 채운 처방이 돌아온다. */
 export async function skipPrescribed(problemId: string): Promise<Prescription> {
   return json<Prescription>(await authed(`/me/prescription/${problemId}/skip`, { method: 'POST' }))
+}
+
+/** 미루기 — 며칠 동안 권하지 않는다. 오늘의 빈자리는 교체처럼 채워진다. */
+export async function deferPrescribed(problemId: string): Promise<Prescription> {
+  return json<Prescription>(await authed(`/me/prescription/${problemId}/defer`, { method: 'POST' }))
 }
 
 export async function getWeeklyReport(): Promise<WeeklyReport> {

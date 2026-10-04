@@ -1,0 +1,520 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) var(--space-7);
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font: var(--text-h1);
+}
+
+.headLink {
+  color: var(--color-text-primary);
+  font: var(--text-label);
+}
+
+.tabBody {
+  padding-top: var(--space-4);
+}
+
+.loading {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.count {
+  color: var(--color-text-muted);
+  font: var(--text-label);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 지도 + drawer ─── */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.map {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.summaries {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.summary {
+  display: grid;
+  gap: var(--space-1);
+  height: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.summary:hover {
+  border-color: var(--color-border-strong);
+}
+
+.summaryName {
+  font: var(--text-h3);
+}
+
+.summaryCount {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.summaryLevels {
+  font: var(--text-label);
+}
+
+.summaryNote {
+  color: var(--color-warning);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.unmeasured {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  font: var(--text-label);
+}
+
+.unmeasured summary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.unmeasured p {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+}
+
+.unmeasuredLink {
+  flex: none;
+  color: var(--color-text-primary);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+  scroll-margin-top: var(--space-5);
+}
+
+.groupTitle {
+  margin: 0;
+  font: var(--text-h3);
+}
+
+.rowsHead,
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 72px 16px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.rowsHead {
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.rowsHead span:last-child {
+  grid-column: span 2;
+}
+
+.rows {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  border-color: var(--color-border-strong);
+}
+
+.row[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.rowName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+}
+
+.level,
+.confidence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Level — 세 칸 막대 */
+.levelBar {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.levelOn,
+.levelOff {
+  width: 14px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.levelOn {
+  background: var(--color-brand);
+}
+
+.levelOff {
+  background: var(--color-bg-subtle);
+  box-shadow: inset 0 0 0 1px var(--color-border-default);
+}
+
+/* Confidence — 세 점. 막대와 모양이 달라야 둘을 하나로 읽지 않는다 */
+.dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.dotOn,
+.dotOff {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.dotOn {
+  background: var(--color-text-muted);
+}
+
+.dotOff {
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+
+.chevron {
+  color: var(--color-text-muted);
+}
+
+/* ─── Evidence drawer ─── */
+
+.drawer {
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - var(--header-height) - var(--space-6));
+  overflow: auto;
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.drawerEmpty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.evidence {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.evidenceHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.evidenceTitle {
+  margin: 0;
+  font: var(--text-h3);
+}
+
+.evidenceSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  font: var(--text-label);
+}
+
+.evidenceSummary dt {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.evidenceSummary dd {
+  margin: 0;
+  font-weight: var(--weight-strong);
+}
+
+.evidenceList {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidenceItem {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  font: var(--text-label);
+}
+
+.evidenceTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.success,
+.failure {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: var(--weight-strong);
+}
+
+.success {
+  color: var(--color-success);
+}
+
+.failure {
+  color: var(--color-danger);
+}
+
+.time {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.evidenceProblem {
+  color: var(--color-text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.evidenceDetail {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.evidenceFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.helped {
+  color: var(--color-warning);
+  font-weight: var(--weight-medium);
+}
+
+.evidenceLinks {
+  display: inline-flex;
+  gap: var(--space-3);
+}
+
+.evidenceLinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-primary);
+}
+
+/* ─── 이번 주 ─── */
+
+.weekly {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 820px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.tiles div {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+}
+
+.tiles dt {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.tiles dd {
+  margin: 0;
+  font: var(--text-h2);
+  font-variant-numeric: tabular-nums;
+}
+
+.weeklySection {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.weeklySection p {
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chipButton {
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-full);
+  color: var(--color-text-primary);
+  font: var(--text-label);
+  cursor: pointer;
+}
+
+.plainList {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-label);
+}
+
+.plainList a {
+  color: var(--color-text-primary);
+}
+
+.tagStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-label);
+}
+
+.tagStats li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+@media (max-width: 767px) {
+  .rowsHead {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'name chevron'
+      'level count'
+      'confidence confidence';
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .rowName {
+    grid-area: name;
+  }
+
+  .level {
+    grid-area: level;
+  }
+
+  .confidence {
+    grid-area: confidence;
+  }
+
+  .count {
+    grid-area: count;
+  }
+
+  .chevron {
+    grid-area: chevron;
+  }
+
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

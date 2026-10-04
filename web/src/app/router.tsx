@@ -36,6 +36,10 @@ const SubmissionDetailPage = lazy(() =>
 )
 const ComparePage = lazy(() => import('../features/submissions/ComparePage').then((m) => ({ default: m.ComparePage })))
 const ReplayPage = lazy(() => import('../features/replay/ReplayPage').then((m) => ({ default: m.ReplayPage })))
+const TrainingPage = lazy(() => import('../features/training/TrainingPage').then((m) => ({ default: m.TrainingPage })))
+const CompetenciesPage = lazy(() =>
+  import('../features/competency/CompetenciesPage').then((m) => ({ default: m.CompetenciesPage })),
+)
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
@@ -104,6 +108,20 @@ function Shell() {
               <ProblemReadPage key={params.slug} slug={params.slug} />
             </Suspense>
           )}
+        </Route>
+        <Route path="/training">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <TrainingPage />
+            </Suspense>
+          </RequireSession>
+        </Route>
+        <Route path="/competencies">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <CompetenciesPage />
+            </Suspense>
+          </RequireSession>
         </Route>
         <Route path="/submissions">
           <RequireSession>

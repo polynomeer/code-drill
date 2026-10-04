@@ -19,7 +19,7 @@ import {
 import { DIFFICULTIES, DIFFICULTY_LABEL } from '../../shared/types'
 import type { ProblemFilter, ProblemSort, ProblemSummary } from '../../shared/types'
 import { replaceParams } from '../../shared/url'
-import { TodayPanel } from '../learning/TodayPanel'
+import { TodaySummary } from '../training/TodaySummary'
 import { clearFilters, isEmpty, readFilter, toggle, writeFilter } from './problemFilter'
 import styles from './ProblemsPage.module.css'
 
@@ -201,7 +201,7 @@ export function ProblemsPage() {
       {/* 보조 열 (UI 디자인 문서 §3.2 — 250~300px). 좁으면 표 아래로 내려간다. */}
       <aside className={styles.side} aria-label="학습 맥락">
         {session ? (
-          <TodayPanel onOpenProblem={(slug) => navigate(`/problems/${slug}/solve`)} refreshKey={0} />
+          <TodaySummary />
         ) : (
           <section className={styles.cta}>
             <h2>풀이를 기록하세요</h2>
