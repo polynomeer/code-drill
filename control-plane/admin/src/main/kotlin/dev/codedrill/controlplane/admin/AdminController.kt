@@ -35,6 +35,17 @@ class AdminController(
     private val contests: ContestAdministration,
 ) {
 
+    /**
+     * 나는 어떤 역할을 가졌나 (운영 콘솔이 보일 큐를 고른다).
+     *
+     * 역할이 없으면 인터셉터가 403 을 내고 감사 로그에 남긴다 — 일반 사용자 화면은 이것을 부르지
+     * 않는다. 콘솔에 들어온 사람만 묻는다.
+     */
+    @GetMapping("/me")
+    fun me(
+        @RequestAttribute(AdminAuthInterceptor.ACTOR_ATTRIBUTE) actor: String,
+    ): Map<String, Any> = mapOf("userId" to actor, "roles" to roles.of(actor).map { it.name }.sorted())
+
     // --- 아레나 검수 (§8.3 익명화된 오답, §8.5 신고·검수) ---
 
     /**
@@ -211,6 +222,14 @@ class AdminController(
             is PublishService.RegisterOutcome.Rejected ->
                 ResponseEntity.status(HttpStatus.CONFLICT).body(mapOf("reason" to outcome.reason))
         }
+
+    /**
+     * 공개를 기다리는 버전 (운영 콘솔 검수 큐). 공개는 등록자가 아닌 PUBLISHER 가, 자기가 돌린 검증
+     * 보고서의 digest 를 들고 한다 — 이 목록의 digest 를 그대로 되돌려 보내면 대조가 아니다.
+     */
+    @GetMapping("/problems/versions/pending")
+    fun pendingVersions(@RequestParam(required = false) limit: Int?): List<PublishService.PendingVersion> =
+        publish.pendingVersions((limit ?: 50).coerceIn(1, 200))
 
     /** 공개. 등록자와 다른 사람이어야 한다 (§11.2). */
     @RequiresRole(AdminRole.PUBLISHER)

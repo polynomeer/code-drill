@@ -245,12 +245,58 @@ class PublishService(private val jdbc: JdbcTemplate, private val audit: AuditLog
             problemId,
         ).firstOrNull()
 
+    /**
+     * 공개를 기다리는 버전 — 등록됐지만 그 문제의 공개 버전보다 새것 (운영 콘솔 검수 큐).
+     *
+     * 이 목록이 없으면 공개하는 사람이 버전 id 를 어디서 알아 와야 했다. 보관된 문제는 뺀다.
+     */
+    fun pendingVersions(limit: Int): List<PendingVersion> = jdbc.query(
+        """
+        SELECT v.id, v.problem_id, v.version, v.package_digest, v.report_digest, v.validator_version,
+               v.registered_by, v.created_at, pv.version AS published_version
+          FROM problem_version v
+          JOIN problem p ON p.id = v.problem_id
+          LEFT JOIN problem_version pv ON pv.id = p.published_version_id
+         WHERE NOT p.archived
+           AND (pv.version IS NULL OR v.version > pv.version)
+         ORDER BY v.created_at DESC
+         LIMIT ?
+        """.trimIndent(),
+        { rs, _ ->
+            PendingVersion(
+                versionId = rs.getString("id"),
+                problemId = rs.getString("problem_id"),
+                version = rs.getInt("version"),
+                packageDigest = rs.getString("package_digest"),
+                reportDigest = rs.getString("report_digest"),
+                validatorVersion = rs.getString("validator_version"),
+                registeredBy = rs.getString("registered_by"),
+                registeredAt = rs.getTimestamp("created_at").toInstant(),
+                publishedVersion = rs.getObject("published_version") as Int?,
+            )
+        },
+        limit,
+    )
+
     /** 공개된 문제만. 목록 API 가 이 결과로 걸러야 미공개 문제가 새지 않는다. */
     fun publishedProblemIds(): Set<String> =
         jdbc.query(
             "SELECT id FROM problem WHERE published_version_id IS NOT NULL AND NOT archived",
             { rs, _ -> rs.getString(1) },
         ).toSet()
+
+    data class PendingVersion(
+        val versionId: String,
+        val problemId: String,
+        val version: Int,
+        val packageDigest: String,
+        val reportDigest: String,
+        val validatorVersion: String,
+        val registeredBy: String,
+        val registeredAt: java.time.Instant,
+        /** 지금 공개된 버전. 처음 공개라면 null. */
+        val publishedVersion: Int?,
+    )
 
     sealed interface RegisterOutcome {
         data class Registered(val versionId: String) : RegisterOutcome
