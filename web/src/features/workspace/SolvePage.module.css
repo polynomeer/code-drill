@@ -450,3 +450,17 @@
   color: var(--color-text-muted);
   font: var(--text-label);
 }
+
+/* 로그인 전 — 결과 창 자리에 로그인 안내 (docs/ui-overhaul.md §6.9) */
+.anonymous {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: var(--space-4);
+}
+
+.mergeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, GraduationCap, PanelLeftClose, PanelLeftOpen, Play, Send, Settings, Swords } from 'lucide-react'
+import { ArrowLeft, GraduationCap, LogIn, PanelLeftClose, PanelLeftOpen, Play, Send, Settings, Swords } from 'lucide-react'
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Link, useLocation } from 'wouter'
-import { createSubmission, getProblem, getSubmissionSource, listSubmissions } from '../../api/client'
+import { createSubmission, getOnboarding, getProblem, getSubmissionSource, listSubmissions } from '../../api/client'
+import { useSession } from '../../api/session'
 import {
   Button,
   EmptyState,
@@ -67,6 +68,7 @@ function readQuery() {
   const step = params.get('step')
   return {
     language: (LANGUAGES as string[]).includes(lang ?? '') ? (lang as SubmissionLanguage) : 'KOTLIN',
+    languageGiven: (LANGUAGES as string[]).includes(lang ?? ''),
     submission: params.get('submission'),
     /** `?from=<제출 id>` — 그 제출의 코드를 편집기로 옮겨 시작한다 (제출 상세의 "이 코드로 편집기 열기") */
     from: params.get('from'),
@@ -82,8 +84,14 @@ export function SolvePage({ slug }: { slug: string }) {
   const problemQuery = useQuery({ queryKey: ['problem', slug], queryFn: () => getProblem(slug) })
   const problem = problemQuery.data ?? null
 
+  // 로그인하지 않아도 풀이 화면은 열린다 (디자인 설계서 §11.1). 코드는 이 기기에 남고, 실행·제출할 때
+  // 로그인한다 — 돌아오면 쓰던 코드가 이어진다 (useWorkspaceSource).
+  const session = useSession()
+  const signedIn = session !== null
+  const [location] = useLocation()
+
   const [language, setLanguage] = useState<SubmissionLanguage>(initial.language)
-  const workspace = useWorkspaceSource(problem, language)
+  const workspace = useWorkspaceSource(problem, language, signedIn)
   const settings = useEditorSettings()
   const toast = useToast()
 
@@ -109,9 +117,25 @@ export function SolvePage({ slug }: { slug: string }) {
     // 문제가 처음 온 순간에 한 번만
   }, [problem?.id])
 
+  // 주소에 언어가 없으면 온보딩에서 고른 주 언어로 시작한다 (docs/ui-overhaul.md §6.9)
+  const onboarding = useQuery({ queryKey: ['me', 'onboarding'], queryFn: getOnboarding, enabled: signedIn && !initial.languageGiven })
+  const languageChosen = useRef(false)
+  useEffect(() => {
+    const preferred = onboarding.data?.language as SubmissionLanguage | undefined
+    if (!preferred || languageChosen.current || !(LANGUAGES as string[]).includes(preferred)) return
+    languageChosen.current = true
+    setLanguage(preferred)
+  }, [onboarding.data])
+
+  // 로그인 전 초안을 서버 초안으로 이어받았으면 한 번 알린다
+  useEffect(() => {
+    if (workspace.adopted) toast.show('로그인 전에 쓰던 코드를 이어 씁니다', 'success')
+  }, [workspace.adopted])
+
   const historyQuery = useQuery({
     queryKey: ['submissions', slug],
     queryFn: () => listSubmissions(slug).then((page) => page.items),
+    enabled: signedIn,
   })
   const history = historyQuery.data ?? []
 
@@ -179,12 +203,17 @@ export function SolvePage({ slug }: { slug: string }) {
 
   /* ─── 행동 ─── */
 
+  /** 로그인하고 이 화면으로 돌아온다. 쓰던 코드는 이 기기에 있다. */
+  const toLogin = () => navigate(`/login?next=${encodeURIComponent(location + window.location.search)}`)
+
   const run = () => {
+    if (!signedIn) return toLogin()
     showDrawer('tests')
     testPanel.current?.run()
   }
 
   const submit = async () => {
+    if (!signedIn) return toLogin()
     if (!problem || submitting) return
     setSubmitting(true)
     setError(null)
@@ -209,6 +238,7 @@ export function SolvePage({ slug }: { slug: string }) {
   }
 
   const changeLanguage = (next: SubmissionLanguage) => {
+    languageChosen.current = true
     setLanguage(next)
     setParam('lang', next === 'KOTLIN' ? null : next)
   }
@@ -308,7 +338,7 @@ export function SolvePage({ slug }: { slug: string }) {
       </div>
 
       <div className={styles.toolbarEnd}>
-        {!isMobile && <SaveStatus state={workspace.saveState} />}
+        {!isMobile && (signedIn ? <SaveStatus state={workspace.saveState} /> : <LocalSaveStatus saved={workspace.localSaved} />)}
         <Select
           label="언어"
           hideLabel
@@ -323,7 +353,10 @@ export function SolvePage({ slug }: { slug: string }) {
           ))}
         </Select>
         {/* 모바일은 읽기·제출 확인이 중심이다 (§8.1). 설정·대결·코칭은 데스크톱에서 */}
-        {!isMobile && (
+        {!isMobile && !signedIn && (
+          <IconButton label="에디터 설정" icon={<Settings size={18} />} onClick={() => setSettingsOpen(true)} />
+        )}
+        {!isMobile && signedIn && (
           <>
             <IconButton label="에디터 설정" icon={<Settings size={18} />} onClick={() => setSettingsOpen(true)} />
             <IconButton
@@ -342,7 +375,11 @@ export function SolvePage({ slug }: { slug: string }) {
             </Button>
           </>
         )}
-        {isMobile ? (
+        {!signedIn ? (
+          <Button variant="primary" icon={<LogIn size={16} />} onClick={toLogin} title="로그인하면 실행·제출할 수 있습니다. 쓰던 코드는 이어집니다">
+            {isMobile ? '로그인' : '로그인하고 실행·제출'}
+          </Button>
+        ) : isMobile ? (
           <IconButton label="실행" icon={<Play size={18} />} onClick={run} disabled={!problem || !workspace.source.trim() || running} />
         ) : (
           <Button
@@ -355,16 +392,18 @@ export function SolvePage({ slug }: { slug: string }) {
             실행
           </Button>
         )}
-        <Button
-          variant="primary"
-          icon={<Send size={16} />}
-          onClick={() => void submit()}
-          loading={submitting}
-          disabled={!problem || inFlight}
-          title={`제출 (${MOD}⇧↵)`}
-        >
-          제출
-        </Button>
+        {signedIn && (
+          <Button
+            variant="primary"
+            icon={<Send size={16} />}
+            onClick={() => void submit()}
+            loading={submitting}
+            disabled={!problem || inFlight}
+            title={`제출 (${MOD}⇧↵)`}
+          >
+            제출
+          </Button>
+        )}
       </div>
     </header>
   )
@@ -390,12 +429,17 @@ export function SolvePage({ slug }: { slug: string }) {
           label="문제 창"
           value={problemTab}
           onChange={setProblemTab}
-          items={[
-            { key: 'statement', label: '문제' },
-            { key: 'editorial', label: '해설' },
-            { key: 'discussion', label: '질문' },
-            { key: 'submissions', label: `제출${history.length ? ` ${history.length}` : ''}` },
-          ]}
+          items={
+            signedIn
+              ? [
+                  { key: 'statement', label: '문제' },
+                  { key: 'editorial', label: '해설' },
+                  { key: 'discussion', label: '질문' },
+                  { key: 'submissions', label: `제출${history.length ? ` ${history.length}` : ''}` },
+                ]
+              : // 해설·질문·제출 기록은 계정의 것이다 — 둘러보는 동안은 지문만
+                [{ key: 'statement', label: '문제' }]
+          }
         >
           <KeepAlive active={problemTab} keys={['statement', 'editorial', 'discussion', 'submissions']}>
             {(tab) => (
@@ -403,7 +447,7 @@ export function SolvePage({ slug }: { slug: string }) {
                 {tab === 'statement' && (
                   <>
                     {/* 풀기 전에 묻는 것은 지문 위다. 접힌 채로 시작한다 (FR-803 — 관문이 아니다). */}
-                    <PreQuestionPanel problemId={problem.id} />
+                    {signedIn && <PreQuestionPanel problemId={problem.id} />}
                     <StatementView problem={problem} body={parts.body} />
                   </>
                 )}
@@ -453,6 +497,26 @@ export function SolvePage({ slug }: { slug: string }) {
   const editorContent = (
     <div className={styles.editorPane}>
       <SaveIndicatorBanner state={workspace.saveState} onResolve={workspace.resolveConflict} />
+      {workspace.localDraft !== null && (
+        <div className={styles.saveBanner}>
+          <InlineAlert
+            tone="warning"
+            title="로그인 전에 이 기기에서 쓴 코드가 있습니다"
+            action={
+              <div className={styles.mergeActions}>
+                <Button size="dense" variant="primary" onClick={workspace.takeLocalDraft}>
+                  그 코드로 이어 쓰기
+                </Button>
+                <Button size="dense" onClick={workspace.keepServerDraft}>
+                  저장된 초안 유지
+                </Button>
+              </div>
+            }
+          >
+            저장된 초안과 다릅니다. 고르지 않은 쪽은 사라집니다.
+          </InlineAlert>
+        </div>
+      )}
       <div className={styles.editor}>
         <Suspense fallback={<p className={styles.editorLoading}>에디터를 불러오는 중…</p>}>
           <MonacoWorkspace
@@ -470,7 +534,22 @@ export function SolvePage({ slug }: { slug: string }) {
     </div>
   )
 
-  const drawerContent = (
+  const drawerContent = !signedIn ? (
+    <section className={styles.drawer} aria-label="결과 창">
+      <div className={styles.anonymous}>
+        <EmptyState
+          title="로그인하면 예제로 실행하고 제출할 수 있습니다"
+          action={
+            <Button variant="primary" icon={<LogIn size={16} />} onClick={toLogin}>
+              로그인 · 가입
+            </Button>
+          }
+        >
+          쓰던 코드는 이 기기에 남아, 로그인하고 돌아오면 그대로 이어집니다.
+        </EmptyState>
+      </div>
+    </section>
+  ) : (
     <section className={styles.drawer} aria-label="결과 창">
       {problem && (
         <Tabs
@@ -668,6 +747,16 @@ export function SolvePage({ slug }: { slug: string }) {
 }
 
 /* ─── 작은 조각 ─── */
+
+/** 로그인 전 저장 상태. 서버가 아니라 이 기기다 — 그렇게 말한다. 못 적었으면 탭을 닫으면 사라진다고. */
+function LocalSaveStatus({ saved }: { saved: boolean | null }) {
+  if (saved === null) return <span className={styles.saveState}>로그인 전 — 이 기기에 저장</span>
+  return (
+    <span className={saved ? styles.saveState : styles.saveFailed} role="status">
+      {saved ? '이 기기에 저장됨' : '이 브라우저는 저장할 수 없어 탭을 닫으면 사라집니다'}
+    </span>
+  )
+}
 
 /** 툴바의 저장 상태 — 버튼이 아니라 조용한 글 (디자인 설계서 §6.2 Status). */
 function SaveStatus({ state }: { state: ReturnType<typeof useWorkspaceSource>['saveState'] }) {

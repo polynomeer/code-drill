@@ -94,7 +94,8 @@ function Shell() {
 
   return (
     // 계정이 바뀌면 셸 아래 상태를 통째로 버린다. 앞 사람의 초안이 남으면 안 된다.
-    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={(solving || replaying) && session !== null}>
+    // 풀이 화면은 로그인 전에도 몰입 모드다 — 로그인 안내는 화면의 툴바와 결과 창이 한다
+    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={solving || (replaying && session !== null)}>
       <Switch>
         <Route path="/">
           {session ? (
@@ -113,12 +114,11 @@ function Shell() {
         </Route>
         <Route path={SOLVE_PATH}>
           {(params) => (
-            <RequireSession>
-              <Suspense fallback={<RouteLoading />}>
-                {/* 문제를 바꾸면 화면 상태를 통째로 새로 시작한다 — 앞 문제의 판정·초안이 남지 않게 */}
-                <SolvePage key={params.slug} slug={params.slug} />
-              </Suspense>
-            </RequireSession>
+            // 로그인 없이 열린다 (디자인 설계서 §11.1). 코드는 이 기기에 남고, 실행·제출할 때 로그인한다
+            <Suspense fallback={<RouteLoading />}>
+              {/* 문제를 바꾸면 화면 상태를 통째로 새로 시작한다 — 앞 문제의 판정·초안이 남지 않게 */}
+              <SolvePage key={params.slug} slug={params.slug} />
+            </Suspense>
           )}
         </Route>
         <Route path="/problems/:slug">

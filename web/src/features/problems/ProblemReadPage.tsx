@@ -30,8 +30,8 @@ export function ProblemReadPage({ slug }: { slug: string }) {
     }
   }, [problem])
 
+  // 로그인하지 않아도 풀이 화면에서 코드를 쓰기 시작할 수 있다 — 실행·제출할 때 로그인한다 (§6.9)
   const solve = `/problems/${slug}/solve`
-  const cta = session ? solve : `/login?next=${encodeURIComponent(solve)}`
 
   if (query.isError) {
     return (
@@ -66,9 +66,9 @@ export function ProblemReadPage({ slug }: { slug: string }) {
         ) : (
           <Skeleton width="50%" height={30} />
         )}
-        <Link href={cta} className={styles.solve}>
+        <Link href={solve} className={styles.solve}>
           <Code size={16} aria-hidden="true" />
-          {session ? '풀기' : '로그인하고 풀기'}
+          {session ? '풀기' : '풀어 보기'}
         </Link>
       </header>
 
