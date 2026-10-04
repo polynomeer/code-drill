@@ -1,0 +1,17 @@
+# craftable-items 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - topological-sort
+  - bfs
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - smallest-course-order
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "가진 물건에서 출발하는 위상 정렬 — 쌍마다 한 번 줄인다"

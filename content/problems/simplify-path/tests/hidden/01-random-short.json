@@ -1,0 +1,1 @@
+{"args": ["/dir/.b/./x_1/x_1/..a/a/../..a/..a"], "expected": "/dir/.b/x_1/x_1/..a/..a/..a"}

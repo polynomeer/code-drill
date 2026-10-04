@@ -1,0 +1,18 @@
+# largest-color-path 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - topological-sort
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - longest-path-in-dag
+  - detect-cycle-directed
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "위상 정렬 한 번, 간선마다 26 칸을 합친다"

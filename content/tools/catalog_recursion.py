@@ -2341,3 +2341,172 @@ fun solveSudoku(board: Array<IntArray>): Array<IntArray> {
 """),
     ],
 ))
+
+
+# --- 199. 글자 타일로 만드는 낱말 ----------------------------------------------------------------
+
+def _tile_sequences(tiles):
+    counts = [0] * 26
+    for ch in tiles:
+        counts[ord(ch) - 65] += 1
+
+    def go():
+        total = 0
+        for c in range(26):
+            if counts[c]:
+                counts[c] -= 1
+                total += 1 + go()
+                counts[c] += 1
+        return total
+
+    return go()
+
+
+def _random_tiles(length, letters, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return "".join(source.choice(letters) for _ in range(length))
+
+
+PROBLEMS.append(Problem(
+    id="letter-tile-sequences",
+    title="글자 타일로 만드는 낱말",
+    summary="""
+대문자가 하나씩 적힌 타일 `tiles` 가 있다. 타일을 **하나 이상** 골라 한 줄로 늘어놓아 만들 수 있는 글자열이
+**몇 가지**인지 반환한다. 타일은 한 번씩만 쓸 수 있고, 같은 글자가 적힌 타일끼리는 구별하지 않는다.
+
+`AAB` 로는 `A`, `B`, `AA`, `AB`, `BA`, `AAB`, `ABA`, `BAA` 여덟 가지를 만든다.
+""",
+    notes="""
+타일 자체가 아니라 **글자마다 남은 개수**를 들고 다닌다. 다음 자리에 올 글자를 남은 것 중에서 하나씩 골라
+보고, 고를 때마다 한 가지가 생기며, 돌아올 때 그 개수를 되돌려 놓는다. 같은 글자를 두 번 고르는 갈래가
+처음부터 생기지 않으므로 겹친 것을 걸러낼 필요가 없다.
+""",
+    drill_doc="""
+Drill.push(letter)   // 다음 자리에 이 글자를 놓았다 (0 = A)
+Drill.pop(letter)    // 그 글자를 되돌려 놓았다
+""",
+    constraints="""
+- `1 <= tiles.length <= 8`, 글자는 `A`~`Z`
+""",
+    signature=dict(name="tileSequences", parameters=[("tiles", "STRING")], returns="INT"),
+    groups=standard_groups(),
+    reference=_tile_sequences,
+    cases={
+        "sample": [("01", ["AAB"]), ("02", ["AAABBC"])],
+        "boundary": [
+            ("01-single", ["V"]),
+            ("02-two-same", ["AA"]),
+            ("03-two-different", ["AB"]),
+            ("04-all-same", ["ZZZZZZZZ"]),
+            ("05-all-different", ["ABCDEFGH"]),
+            ("06-one-odd-out", ["QQQQQQQR"]),
+            ("07-pairs", ["AABBCCDD"]),
+        ],
+        "hidden": [
+            ("01-random-three-letters", [_random_tiles(6, "XYZ", salt=10017)]),
+            ("02-random-wide", [_random_tiles(7, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", salt=10019)]),
+            ("03-random-two-letters", [_random_tiles(8, "MN", salt=10021)]),
+            ("04-random-four-letters", [_random_tiles(8, "KLMN", salt=10023)]),
+            ("05-unsorted", ["ZAYZA"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 글자마다 남은 개수를 들고 되추적한다.
+fun tileSequences(tiles: String): Int {
+    val counts = IntArray(26)
+    for (ch in tiles) counts[ch - 'A'] += 1
+    fun go(): Int {
+        var total = 0
+        for (c in 0 until 26) {
+            if (counts[c] == 0) continue
+            counts[c] -= 1
+            Drill.push(c)
+            total += 1 + go()
+            counts[c] += 1
+            Drill.pop(c)
+        }
+        return total
+    }
+    return go()
+}
+""",
+    mutants=[
+        ("counts-empty", "OFF_BY_ONE",
+         "타일을 하나도 고르지 않은 빈 글자열까지 센다. 하나 이상 골라야 한다.",
+         """
+fun tileSequences(tiles: String): Int {
+    val counts = IntArray(26)
+    for (ch in tiles) counts[ch - 'A'] += 1
+    fun go(): Int {
+        var total = 1
+        for (c in 0 until 26) {
+            if (counts[c] == 0) continue
+            counts[c] -= 1
+            total += go()
+            counts[c] += 1
+        }
+        return total
+    }
+    return go()
+}
+"""),
+        ("tiles-as-distinct", "WRONG_ALGORITHM",
+         "같은 글자 타일을 서로 다른 것으로 센다. 두 A 를 맞바꾼 것이 따로 세어진다.",
+         """
+fun tileSequences(tiles: String): Int {
+    val used = BooleanArray(tiles.length)
+    fun go(): Int {
+        var total = 0
+        for (i in tiles.indices) {
+            if (used[i]) continue
+            used[i] = true
+            total += 1 + go()
+            used[i] = false
+        }
+        return total
+    }
+    return go()
+}
+"""),
+        ("never-restores", "WRONG_BRANCH",
+         "고른 글자를 돌아올 때 되돌려 놓지 않는다. 한 갈래가 쓴 타일이 다음 갈래에서 사라진다.",
+         """
+fun tileSequences(tiles: String): Int {
+    val counts = IntArray(26)
+    for (ch in tiles) counts[ch - 'A'] += 1
+    fun go(): Int {
+        var total = 0
+        for (c in 0 until 26) {
+            if (counts[c] == 0) continue
+            counts[c] -= 1
+            total += 1 + go()
+        }
+        return total
+    }
+    return go()
+}
+"""),
+        ("full-length-only", "WRONG_BRANCH",
+         "타일을 모두 쓴 글자열만 센다. 몇 개만 골라도 한 가지다.",
+         """
+fun tileSequences(tiles: String): Int {
+    val counts = IntArray(26)
+    for (ch in tiles) counts[ch - 'A'] += 1
+    fun go(left: Int): Int {
+        if (left == 0) return 1
+        var total = 0
+        for (c in 0 until 26) {
+            if (counts[c] == 0) continue
+            counts[c] -= 1
+            total += go(left - 1)
+            counts[c] += 1
+        }
+        return total
+    }
+    return go(tiles.length)
+}
+"""),
+    ],
+))

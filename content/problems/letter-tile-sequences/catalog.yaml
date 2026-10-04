@@ -1,0 +1,17 @@
+# letter-tile-sequences 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - backtracking
+  - counting
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - combination-sum-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "만들 수 있는 글자열 하나에 한 걸음 — 겹친 것은 처음부터 생기지 않는다"

@@ -1,0 +1,18 @@
+# shortest-superstring-length 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - string
+  - bit-manipulation
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - shortest-path-visiting-all-nodes
+complexity:
+  time: EXPONENTIAL
+  space: EXPONENTIAL
+  note: "쓴 낱말의 집합 2^n × 마지막 낱말 n, 칸마다 다음 낱말 n"

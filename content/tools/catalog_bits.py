@@ -755,3 +755,303 @@ fun bitwiseAndOfRange(left: Int, right: Int): Int {
 """),
     ],
 ))
+
+
+# --- 202. 모두 담는 가장 짧은 문자열 -----------------------------------------------------------
+
+def _shortest_superstring(words):
+    unique = []
+    for w in words:
+        if w not in unique:
+            unique.append(w)
+    kept = [w for w in unique if not any(w != v and w in v for v in unique)]
+    n = len(kept)
+    overlap = [[0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            a, b = kept[i], kept[j]
+            for k in range(min(len(a), len(b)) - 1, 0, -1):
+                if a.endswith(b[:k]):
+                    overlap[i][j] = k
+                    break
+    full = (1 << n) - 1
+    dp = [[-1] * n for _ in range(1 << n)]
+    for i in range(n):
+        dp[1 << i][i] = 0
+    for mask in range(1, full + 1):
+        row = dp[mask]
+        for last in range(n):
+            here = row[last]
+            if here < 0:
+                continue
+            gain = overlap[last]
+            for nxt in range(n):
+                if mask >> nxt & 1:
+                    continue
+                value = here + gain[nxt]
+                target = dp[mask | 1 << nxt]
+                if value > target[nxt]:
+                    target[nxt] = value
+    return sum(len(w) for w in kept) - max(dp[full])
+
+
+def _words(count, low, high, letters, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return ["".join(source.choice(letters) for _ in range(source.randint(low, high))) for _ in range(count)]
+
+
+def _chain_words(count, length, salt):
+    """앞 낱말의 끝과 다음 낱말의 앞이 길게 겹치도록 한 긴 글자열에서 잘라 내고 순서를 섞는다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    step = length // 2
+    text = "".join(source.choice("abc") for _ in range(step * count + length))
+    return shuffled([text[i * step:i * step + length] for i in range(count)], salt=salt + 1)
+
+
+PROBLEMS.append(Problem(
+    id="shortest-superstring-length",
+    title="모두 담는 가장 짧은 문자열",
+    summary="""
+소문자 낱말 배열 `words` 가 주어진다. 모든 낱말을 **부분 문자열로 담는** 문자열 중 가장 짧은 것의 길이를
+반환한다. 낱말은 겹쳐도 된다 — `abc` 와 `bcd` 는 `abcd` 하나에 담긴다.
+
+같은 낱말이 여러 번 나올 수 있고, 한 낱말이 다른 낱말 안에 들어 있을 수도 있다.
+""",
+    notes="""
+다른 낱말 안에 든 낱말은 그 낱말을 담으면 저절로 담기므로 먼저 걷어낸다(같은 낱말은 하나만 남긴다). 남은
+낱말끼리는 서로 안에 들지 않으므로, 답은 낱말을 **어떤 순서로 잇느냐**로 정해진다: 앞 낱말의 끝과 다음 낱말의
+앞이 겹치는 만큼 짧아진다.
+
+순서를 모두 해 보면 `n!` 가지다. 그러나 다음에 무엇을 붙일지는 "이미 쓴 낱말의 집합"과 "마지막 낱말"만
+알면 정해진다 — 집합을 비트로 적으면 `2^n × n` 칸의 표가 된다.
+""",
+    drill_doc="""
+Drill.write(mask, saved)   // 이 낱말들을 이 낱말로 끝냈을 때 아낀 글자 수
+""",
+    constraints="""
+- `1 <= words.length <= 16`, `1 <= words[i].length <= 20`, 소문자만
+""",
+    signature=dict(name="shortestSuperstring", parameters=[("words", "STRING_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_shortest_superstring,
+    cases={
+        "sample": [
+            ("01", [["alex", "loves", "leetcode"]]),
+            ("02", [["catg", "ctaagt", "gcta", "ttca", "atgcatc"]]),
+        ],
+        "boundary": [
+            ("01-single", [["abc"]]),
+            ("02-one-letter", [["a"]]),
+            # 같은 낱말은 한 번만 담으면 된다.
+            ("03-duplicates", [["ab", "ab"]]),
+            ("04-all-same", [["zz", "zz", "zz"]]),
+            # 다른 낱말 안에 든 낱말.
+            ("05-contained", [["abcde", "bcd"]]),
+            ("06-contained-in-middle", [["xabcx", "abc", "cxy"]]),
+            # 짧은 쪽 길이보다 하나 적게 겹친다.
+            ("07-overlap-almost-whole", [["ab", "bc"]]),
+            ("08-no-overlap", [["ab", "cd"]]),
+            ("09-one-letter-words", [["a", "b", "a"]]),
+            ("10-max-length", [["a" * 20, "b" * 20]]),
+        ],
+        "hidden": [
+            # 지금 가장 많이 겹치는 짝부터 이으면 끝에서 손해 본다.
+            ("01-greedy-trap", [["aab", "bbab", "babb", "baba"]]),
+            ("02-greedy-trap-contained", [["bbba", "aaa", "babb"]]),
+            ("03-greedy-trap-short", [["bba", "aa", "aaba", "bab"]]),
+            ("04-random-two-letters", [_words(8, 2, 5, "ab", salt=10079)]),
+            ("05-random-three-letters", [_words(10, 3, 7, "abc", salt=10081)]),
+            ("06-chain", [_chain_words(10, 8, salt=10083)]),
+            ("07-random-wide", [_words(12, 5, 12, "abcdefghij", salt=10085)]),
+        ],
+        "performance": [
+            # 순서가 16! ≈ 2×10^13 가지다 — 순서를 모두 해 보는 풀이가 끝나지 않는다.
+            ("01-chain-sixteen", [_chain_words(16, 20, salt=10087)]),
+            ("02-random-sixteen", [_words(16, 15, 20, "ab", salt=10089)]),
+            ("03-fourteen", [_words(14, 10, 20, "abc", salt=10091)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 걷어낸 뒤 (쓴 낱말 집합, 마지막 낱말) 표로 아낀 글자 수를 키운다.
+fun shortestSuperstring(words: Array<String>): Int {
+    val unique = words.distinct()
+    val kept = unique.filter { w -> unique.none { it != w && it.contains(w) } }
+    val n = kept.size
+    val overlap = Array(n) { IntArray(n) }
+    for (i in 0 until n) for (j in 0 until n) {
+        if (i == j) continue
+        val a = kept[i]
+        val b = kept[j]
+        var k = minOf(a.length, b.length) - 1
+        while (k > 0 && !a.endsWith(b.substring(0, k))) k -= 1
+        overlap[i][j] = k
+    }
+    val full = (1 shl n) - 1
+    val saved = Array(1 shl n) { IntArray(n) { -1 } }
+    for (i in 0 until n) saved[1 shl i][i] = 0
+    for (mask in 1..full) {
+        for (last in 0 until n) {
+            val here = saved[mask][last]
+            if (here < 0) continue
+            for (next in 0 until n) {
+                if (mask and (1 shl next) != 0) continue
+                val to = mask or (1 shl next)
+                val value = here + overlap[last][next]
+                if (value > saved[to][next]) saved[to][next] = value
+            }
+        }
+        if (mask == full) Drill.write(mask, saved[mask].max())
+    }
+    return kept.sumOf { it.length } - saved[full].max()
+}
+""",
+    mutants=[
+        ("keeps-contained-words", "MISSING_EDGE_CASE",
+         "다른 낱말 안에 든 낱말을 걷어내지 않는다. 이미 담긴 낱말을 따로 이어 붙여 길어진다.",
+         """
+fun shortestSuperstring(words: Array<String>): Int {
+    val kept = words.distinct()
+    val n = kept.size
+    val overlap = Array(n) { IntArray(n) }
+    for (i in 0 until n) for (j in 0 until n) {
+        if (i == j) continue
+        var k = minOf(kept[i].length, kept[j].length) - 1
+        while (k > 0 && !kept[i].endsWith(kept[j].substring(0, k))) k -= 1
+        overlap[i][j] = k
+    }
+    val full = (1 shl n) - 1
+    val saved = Array(1 shl n) { IntArray(n) { -1 } }
+    for (i in 0 until n) saved[1 shl i][i] = 0
+    for (mask in 1..full) for (last in 0 until n) {
+        if (saved[mask][last] < 0) continue
+        for (next in 0 until n) {
+            if (mask and (1 shl next) != 0) continue
+            val to = mask or (1 shl next)
+            saved[to][next] = maxOf(saved[to][next], saved[mask][last] + overlap[last][next])
+        }
+    }
+    return kept.sumOf { it.length } - saved[full].max()
+}
+"""),
+        ("drops-both-duplicates", "MISSING_EDGE_CASE",
+         "같은 낱말이 둘이면 서로가 서로 안에 들었다고 보고 둘 다 지운다. 같은 낱말은 하나를 남겨야 한다.",
+         """
+fun shortestSuperstring(words: Array<String>): Int {
+    val kept = words.filterIndexed { i, w -> words.indices.none { j -> j != i && words[j].contains(w) } }
+    val n = kept.size
+    if (n == 0) return 0
+    val overlap = Array(n) { IntArray(n) }
+    for (i in 0 until n) for (j in 0 until n) {
+        if (i == j) continue
+        var k = minOf(kept[i].length, kept[j].length) - 1
+        while (k > 0 && !kept[i].endsWith(kept[j].substring(0, k))) k -= 1
+        overlap[i][j] = k
+    }
+    val full = (1 shl n) - 1
+    val saved = Array(1 shl n) { IntArray(n) { -1 } }
+    for (i in 0 until n) saved[1 shl i][i] = 0
+    for (mask in 1..full) for (last in 0 until n) {
+        if (saved[mask][last] < 0) continue
+        for (next in 0 until n) {
+            if (mask and (1 shl next) != 0) continue
+            val to = mask or (1 shl next)
+            saved[to][next] = maxOf(saved[to][next], saved[mask][last] + overlap[last][next])
+        }
+    }
+    return kept.sumOf { it.length } - saved[full].max()
+}
+"""),
+        ("greedy-merge", "WRONG_ALGORITHM",
+         "가장 많이 겹치는 짝부터 이어 붙인다. 지금 가장 많이 겹치는 선택이 끝까지 가장 짧지는 않다.",
+         """
+fun shortestSuperstring(words: Array<String>): Int {
+    fun overlap(a: String, b: String): Int {
+        var k = minOf(a.length, b.length) - 1
+        while (k > 0 && !a.endsWith(b.substring(0, k))) k -= 1
+        return k
+    }
+    fun prune(list: List<String>): MutableList<String> {
+        val unique = list.distinct()
+        return unique.filter { w -> unique.none { it != w && it.contains(w) } }.toMutableList()
+    }
+    var pool = prune(words.toList())
+    while (pool.size > 1) {
+        var best = -1; var bi = 0; var bj = 1
+        for (i in pool.indices) for (j in pool.indices) {
+            if (i == j) continue
+            val o = overlap(pool[i], pool[j])
+            if (o > best) { best = o; bi = i; bj = j }
+        }
+        val merged = pool[bi] + pool[bj].substring(best)
+        val rest = pool.filterIndexed { k, _ -> k != bi && k != bj }
+        pool = prune(rest + merged)
+    }
+    return pool[0].length
+}
+"""),
+        ("overlap-one-short", "OFF_BY_ONE",
+         "겹침을 짧은 쪽 길이보다 둘 적은 데서부터 찾는다. 한 글자만 빼고 다 겹치는 짝을 놓친다.",
+         """
+fun shortestSuperstring(words: Array<String>): Int {
+    val unique = words.distinct()
+    val kept = unique.filter { w -> unique.none { it != w && it.contains(w) } }
+    val n = kept.size
+    val overlap = Array(n) { IntArray(n) }
+    for (i in 0 until n) for (j in 0 until n) {
+        if (i == j) continue
+        var k = minOf(kept[i].length, kept[j].length) - 2
+        while (k > 0 && !kept[i].endsWith(kept[j].substring(0, k))) k -= 1
+        overlap[i][j] = maxOf(k, 0)
+    }
+    val full = (1 shl n) - 1
+    val saved = Array(1 shl n) { IntArray(n) { -1 } }
+    for (i in 0 until n) saved[1 shl i][i] = 0
+    for (mask in 1..full) for (last in 0 until n) {
+        if (saved[mask][last] < 0) continue
+        for (next in 0 until n) {
+            if (mask and (1 shl next) != 0) continue
+            val to = mask or (1 shl next)
+            saved[to][next] = maxOf(saved[to][next], saved[mask][last] + overlap[last][next])
+        }
+    }
+    return kept.sumOf { it.length } - saved[full].max()
+}
+"""),
+        ("tries-every-order", "PERFORMANCE",
+         "이어 붙일 순서를 모두 해 본다. 낱말이 열여섯이면 순서가 20조 가지다.",
+         """
+fun shortestSuperstring(words: Array<String>): Int {
+    val unique = words.distinct()
+    val kept = unique.filter { w -> unique.none { it != w && it.contains(w) } }
+    val n = kept.size
+    val overlap = Array(n) { IntArray(n) }
+    for (i in 0 until n) for (j in 0 until n) {
+        if (i == j) continue
+        var k = minOf(kept[i].length, kept[j].length) - 1
+        while (k > 0 && !kept[i].endsWith(kept[j].substring(0, k))) k -= 1
+        overlap[i][j] = k
+    }
+    var best = 0
+    val used = BooleanArray(n)
+    fun go(last: Int, count: Int, saved: Int) {
+        if (count == n) { best = maxOf(best, saved); return }
+        for (next in 0 until n) {
+            if (used[next]) continue
+            used[next] = true
+            Drill.compare(last, next)
+            go(next, count + 1, saved + overlap[last][next])
+            used[next] = false
+        }
+    }
+    for (first in 0 until n) { used[first] = true; go(first, 1, 0); used[first] = false }
+    return kept.sumOf { it.length } - best
+}
+"""),
+    ],
+))

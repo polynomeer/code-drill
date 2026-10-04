@@ -1,0 +1,15 @@
+# simplify-path 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - stack
+competencies:
+  - READING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - bracket-balance
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "조각마다 스택에 한 번 넣고 많아야 한 번 뺀다"

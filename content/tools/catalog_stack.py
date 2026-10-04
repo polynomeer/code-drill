@@ -2221,3 +2221,319 @@ fun hasPattern132(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 197. 경로 정리하기 ------------------------------------------------------------------------
+
+def _simplify_path(path):
+    stack = []
+    for part in path.split("/"):
+        if part == "" or part == ".":
+            continue
+        if part == "..":
+            if stack:
+                stack.pop()
+        else:
+            stack.append(part)
+    return "/" + "/".join(stack)
+
+
+def _random_path(parts, salt):
+    """조각을 무작위로 잇는다. `..` 가 잦아 루트 위로 올라가려는 자리가 저절로 생긴다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    pieces = ["a", "bc", "dir", "x_1", ".", "..", "..", "", "...", "..a", ".b", "a.."]
+    return "/" + "/".join(source.choice(pieces) for _ in range(parts)) + source.choice(["", "/"])
+
+
+PROBLEMS.append(Problem(
+    id="simplify-path",
+    title="경로 정리하기",
+    summary="""
+유닉스 식 절대 경로 `path` 를 **가장 짧은 표준 경로**로 바꿔 반환한다.
+
+- 빗금이 여러 개 이어져 있으면 하나로 본다: `//a///b` 는 `/a/b`.
+- `.` 은 지금 폴더, `..` 은 한 단계 위 폴더다. 루트의 위는 루트다.
+- 그 밖의 조각은 **모두 이름**이다 — `...` 이나 `..a` 도 이름이다.
+- 결과는 `/` 로 시작하고 `/` 로 끝나지 않는다. 다만 루트는 `/` 다.
+""",
+    notes="""
+조각을 하나씩 보며 지금까지 들어간 폴더를 스택에 쌓는다. 이름이면 넣고, `..` 이면 하나 꺼낸다 — 꺼낼 것이
+없으면(루트) 아무것도 하지 않는다. 다 보고 나면 스택의 바닥부터 `/` 로 잇는다.
+""",
+    drill_doc="""
+Drill.push(depth)   // 폴더에 들어갔다 — 깊이
+Drill.pop(depth)    // 한 단계 올라왔다
+""",
+    constraints="""
+- `1 <= path.length <= 3000`, `path` 는 `/` 로 시작한다
+- 글자는 영문자·숫자·`.`·`/`·`_` 뿐이다
+""",
+    signature=dict(name="simplifyPath", parameters=[("path", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_simplify_path,
+    cases={
+        "sample": [("01", ["/home/"]), ("02", ["/a/./b/../../c/"])],
+        "boundary": [
+            ("01-root", ["/"]),
+            # 루트의 위는 루트다.
+            ("02-above-root", ["/../"]),
+            ("03-far-above-root", ["/a/../../../b"]),
+            # 점 셋은 이름이다.
+            ("04-three-dots", ["/..."]),
+            ("05-dotted-names", ["/..a/a../.b/./b."]),
+            ("06-many-slashes", ["//a///b////"]),
+            # 들어간 만큼 다 나오면 루트다.
+            ("07-back-to-root", ["/a/b/../.."]),
+            ("08-only-dots", ["/./././."]),
+        ],
+        "hidden": [
+            ("01-random-short", [_random_path(10, salt=10001)]),
+            ("02-random-medium", [_random_path(80, salt=10003)]),
+            ("03-random-long", [_random_path(600, salt=10005)]),
+            ("04-deep", ["/" + "/".join(f"d{i}" for i in range(500))]),
+            ("05-deep-then-up", ["/" + "/".join(f"d{i}" for i in range(300)) + "/.." * 299]),
+            ("06-up-then-deep", ["/.." * 100 + "/" + "/".join("abc" for _ in range(100))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 들어간 폴더를 스택에 쌓는다.
+fun simplifyPath(path: String): String {
+    val stack = ArrayDeque<String>()
+    for (part in path.split('/')) {
+        when (part) {
+            "", "." -> {}
+            ".." -> if (stack.isNotEmpty()) {
+                stack.removeLast()
+                Drill.pop(stack.size)
+            }
+            else -> {
+                stack.addLast(part)
+                Drill.push(stack.size)
+            }
+        }
+    }
+    return "/" + stack.joinToString("/")
+}
+""",
+    mutants=[
+        ("pops-at-root", "MISSING_EDGE_CASE",
+         "루트에서 `..` 를 만나도 꺼낸다. 빈 스택에서 꺼내다 멈춘다.",
+         """
+fun simplifyPath(path: String): String {
+    val stack = ArrayDeque<String>()
+    for (part in path.split('/')) {
+        when (part) {
+            "", "." -> {}
+            ".." -> stack.removeLast()
+            else -> stack.addLast(part)
+        }
+    }
+    return "/" + stack.joinToString("/")
+}
+"""),
+        ("dots-as-parent", "WRONG_BRANCH",
+         "점으로만 된 조각을 모두 위 폴더로 본다. `...` 도 이름이다.",
+         """
+fun simplifyPath(path: String): String {
+    val stack = ArrayDeque<String>()
+    for (part in path.split('/')) {
+        if (part.isEmpty() || part == ".") continue
+        if (part.all { it == '.' }) { if (stack.isNotEmpty()) stack.removeLast() } else stack.addLast(part)
+    }
+    return "/" + stack.joinToString("/")
+}
+"""),
+        ("empty-root", "MISSING_EDGE_CASE",
+         "폴더가 하나도 남지 않으면 빈 문자열을 돌려준다. 루트는 `/` 다.",
+         """
+fun simplifyPath(path: String): String {
+    val stack = ArrayDeque<String>()
+    for (part in path.split('/')) {
+        when (part) {
+            "", "." -> {}
+            ".." -> if (stack.isNotEmpty()) stack.removeLast()
+            else -> stack.addLast(part)
+        }
+    }
+    val out = StringBuilder()
+    for (name in stack) out.append('/').append(name)
+    return out.toString()
+}
+"""),
+        ("keeps-empty-parts", "WRONG_BRANCH",
+         "빗금 사이의 빈 조각을 건너뛰지 않는다. 겹친 빗금이 빈 이름의 폴더가 된다.",
+         """
+fun simplifyPath(path: String): String {
+    val stack = ArrayDeque<String>()
+    for (part in path.substring(1).split('/')) {
+        when (part) {
+            "." -> {}
+            ".." -> if (stack.isNotEmpty()) stack.removeLast()
+            else -> stack.addLast(part)
+        }
+    }
+    return "/" + stack.joinToString("/")
+}
+"""),
+    ],
+))
+
+
+# --- 198. 가장 넓은 오르막 간격 ----------------------------------------------------------------
+
+def _max_width_ramp(nums):
+    stack = []
+    for i, x in enumerate(nums):
+        if not stack or nums[stack[-1]] > x:
+            stack.append(i)
+    best = 0
+    for j in range(len(nums) - 1, -1, -1):
+        while stack and nums[stack[-1]] <= nums[j]:
+            best = max(best, j - stack.pop())
+        if not stack:
+            break
+    return best
+
+
+PROBLEMS.append(Problem(
+    id="max-width-ramp",
+    title="가장 넓은 오르막 간격",
+    summary="""
+정수 배열 `nums` 에서 `i < j` 이고 `nums[i] <= nums[j]` 인 두 자리를 **오르막**이라 하고, 그 너비를 `j - i`
+라 한다. 가장 넓은 오르막의 너비를 반환한다. 오르막이 없으면 `0` 이다.
+""",
+    notes="""
+왼쪽 끝이 될 만한 자리는 **지금까지보다 작은 값이 나온 자리**뿐이다 — 그보다 오른쪽에 있으면서 더 크거나
+같은 값은 왼쪽 끝으로 언제나 손해다. 그 자리들은 값이 줄어드는 스택이 된다.
+
+그다음 오른쪽 끝을 **뒤에서부터** 옮기며, 스택 맨 위의 값이 지금 값 이하인 동안 꺼내 너비를 잰다. 꺼낸
+왼쪽 끝은 더 왼쪽의 오른쪽 끝과 짝지어 봐야 좁아질 뿐이라 다시 볼 필요가 없다.
+""",
+    drill_doc="""
+Drill.push(i)        // 왼쪽 끝 후보
+Drill.pop(i)         // 그 후보의 가장 먼 짝을 찾았다
+Drill.compare(i, j)  // 너비를 쟀다
+""",
+    constraints="""
+- `1 <= nums.length <= 200_000`, `0 <= nums[i] <= 1_000_000_000`
+""",
+    signature=dict(name="maxWidthRamp", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    # 안쪽이 정수 비교 하나뿐이라 n²/2 = 2×10^10 번이 5초 남짓에 끝난다(한도의 2.5배). 정답은 한도의 1% 도 안 쓰므로
+    # 성능 그룹의 시계를 넷으로 나눈다.
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_max_width_ramp,
+    cases={
+        "sample": [("01", [[6, 0, 8, 2, 1, 5]]), ("02", [[9, 8, 1, 0, 1, 9, 4, 0, 4, 1]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-decreasing", [[5, 4, 3, 2, 1]]),
+            # 같은 값도 오르막이다.
+            ("03-equal-pair", [[1, 1]]),
+            ("04-all-equal", [[3, 3, 3, 3]]),
+            # 가장 작은 값이 아니라 더 앞의 큰 값이 짝이다.
+            ("05-earlier-larger-start", [[2, 1, 3]]),
+            # 한 오른쪽 끝이 왼쪽 끝 둘을 차례로 꺼내야 한다.
+            ("06-two-starts-one-end", [[1, 0, 5]]),
+            ("07-whole-array", [[0, 1_000_000_000]]),
+            ("08-max-values", [[1_000_000_000, 1_000_000_000, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 0, 10, salt=10007)]),
+            ("02-random-medium", [randoms(500, 0, 1000, salt=10009)]),
+            ("03-random-large", [randoms(50_000, 0, 1_000_000_000, salt=10011)]),
+            ("04-valley", [list(range(100, 0, -1)) + list(range(0, 50))]),
+            ("05-few-values", [randoms(5000, 0, 3, salt=10013)]),
+        ],
+        "performance": [
+            # 줄어들기만 하면 어떤 짝도 없다 — 짝을 끝에서부터 찾는 풀이가 모든 쌍을 본다.
+            ("01-decreasing", [list(range(200_000, 0, -1))]),
+            ("02-decreasing-then-bump", [list(range(1_000_000_000, 1_000_000_000 - 199_999, -1)) + [5]]),
+            ("03-random-large", [randoms(200_000, 0, 1_000_000_000, salt=10015)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 왼쪽 끝 후보의 줄어드는 스택, 오른쪽 끝은 뒤에서부터.
+fun maxWidthRamp(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    for (i in nums.indices) {
+        if (top == 0 || nums[stack[top - 1]] > nums[i]) {
+            stack[top] = i
+            top += 1
+            Drill.push(i)
+        }
+    }
+    var best = 0
+    var j = nums.size - 1
+    while (j >= 0 && top > 0) {
+        while (top > 0 && nums[stack[top - 1]] <= nums[j]) {
+            top -= 1
+            Drill.pop(stack[top])
+            Drill.compare(stack[top], j)
+            best = maxOf(best, j - stack[top])
+        }
+        j -= 1
+    }
+    return best
+}
+""",
+    mutants=[
+        ("strict-ramp", "OFF_BY_ONE",
+         "같은 값을 오르막으로 보지 않는다. 문제는 작거나 같으면 오르막이다.",
+         """
+fun maxWidthRamp(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    for (i in nums.indices) if (top == 0 || nums[stack[top - 1]] > nums[i]) { stack[top] = i; top += 1 }
+    var best = 0
+    for (j in nums.indices.reversed()) {
+        while (top > 0 && nums[stack[top - 1]] < nums[j]) { top -= 1; best = maxOf(best, j - stack[top]) }
+    }
+    return best
+}
+"""),
+        ("latest-minimum", "WRONG_ALGORITHM",
+         "오른쪽 끝마다 지금까지 가장 작은 값의 자리와만 짝짓는다. 더 앞에 있는 조금 큰 값이 더 멀리 짝지을 수 있다.",
+         """
+fun maxWidthRamp(nums: IntArray): Int {
+    var minAt = 0
+    var best = 0
+    for (j in 1 until nums.size) {
+        if (nums[j] < nums[minAt]) minAt = j else best = maxOf(best, j - minAt)
+    }
+    return best
+}
+"""),
+        ("pops-once", "WRONG_BRANCH",
+         "오른쪽 끝 하나에 왼쪽 끝을 하나만 꺼낸다. 같은 오른쪽 끝이 더 앞의 후보와도 짝지어진다.",
+         """
+fun maxWidthRamp(nums: IntArray): Int {
+    val stack = IntArray(nums.size)
+    var top = 0
+    for (i in nums.indices) if (top == 0 || nums[stack[top - 1]] > nums[i]) { stack[top] = i; top += 1 }
+    var best = 0
+    for (j in nums.indices.reversed()) {
+        if (top > 0 && nums[stack[top - 1]] <= nums[j]) { top -= 1; best = maxOf(best, j - stack[top]) }
+    }
+    return best
+}
+"""),
+        ("scans-from-end", "PERFORMANCE",
+         "왼쪽 끝마다 오른쪽 끝을 배열 끝에서부터 찾아 내려온다. 짝이 없는 자리마다 나머지를 전부 본다.",
+         """
+fun maxWidthRamp(nums: IntArray): Int {
+    var best = 0
+    for (i in nums.indices) {
+        var j = nums.size - 1
+        while (j > i) {
+            if (nums[i] <= nums[j]) { best = maxOf(best, j - i); break }
+            j -= 1
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

@@ -5791,3 +5791,526 @@ fun shortestPathCount(n: Int, edges: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 200. 가장 많은 색의 경로 ------------------------------------------------------------------
+
+def _largest_color_path(colors, edges):
+    import collections
+    n = len(colors)
+    adj = [[] for _ in range(n)]
+    indeg = [0] * n
+    for i in range(0, len(edges), 2):
+        a, b = edges[i], edges[i + 1]
+        adj[a].append(b)
+        indeg[b] += 1
+    dp = [[0] * 26 for _ in range(n)]
+    queue = collections.deque(v for v in range(n) if indeg[v] == 0)
+    seen = 0
+    best = 0
+    while queue:
+        v = queue.popleft()
+        seen += 1
+        row = dp[v]
+        row[ord(colors[v]) - 97] += 1
+        best = max(best, row[ord(colors[v]) - 97])
+        for u in adj[v]:
+            target = dp[u]
+            for k in range(26):
+                if row[k] > target[k]:
+                    target[k] = row[k]
+            indeg[u] -= 1
+            if indeg[u] == 0:
+                queue.append(u)
+    return best if seen == n else -1
+
+
+def _colors(n, letters, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return "".join(source.choice(letters) for _ in range(n))
+
+
+def _ladder(layers, width):
+    """층마다 width 개의 정점, 이웃한 층끼리는 모두 잇는다 — 길이 width^layers 가지다."""
+    edges = []
+    for layer in range(layers - 1):
+        for a in range(width):
+            for b in range(width):
+                edges += [layer * width + a, (layer + 1) * width + b]
+    return edges
+
+
+def _relabel(n, edges, salt):
+    """정점 번호를 섞는다. 번호 순서가 곧 위상 순서면 번호대로 훑는 풀이가 우연히 맞는다."""
+    order = shuffled(range(n), salt=salt)
+    return [order[v] for v in edges]
+
+
+PROBLEMS.append(Problem(
+    id="largest-color-path",
+    title="가장 많은 색의 경로",
+    summary="""
+정점 `n` 개의 방향 그래프다. 정점 `i` 의 색은 소문자 `colors[i]` 이고, 간선은 `edges = [a1, b1, a2, b2, ...]`
+로 `a → b` 다. 어떤 경로의 **색 값**은 그 경로에서 가장 많이 나온 한 색의 개수다.
+
+모든 경로의 색 값 중 가장 큰 것을 반환한다. 그래프에 **순환이 있으면 `-1`** 이다.
+""",
+    notes="""
+경로가 끝나는 정점마다 "여기까지 오는 경로들에서 색마다 가장 많이 모을 수 있는 개수"를 26 칸으로 들고
+있으면, 다음 정점은 앞 정점들의 칸을 칸마다 큰 값으로 합친 뒤 자기 색 칸에 하나를 더하면 된다.
+
+이 합치기는 앞 정점이 **모두 끝난 뒤**에야 할 수 있다 — 들어오는 간선이 없는 정점부터 꺼내는 위상 정렬이
+그 순서를 준다. 정렬이 모든 정점을 꺼내지 못했다면 남은 정점들이 순환을 이룬다.
+""",
+    drill_doc="""
+Drill.dequeue(v)       // 앞이 모두 끝난 v 를 꺼냈다
+Drill.write(v, count)  // v 에서 끝나는 경로의 자기 색 개수
+""",
+    constraints="""
+- `1 <= n <= 100_000`, 간선 `0..200_000` 개
+- 자기 자신으로 가는 간선(그 자체로 순환이다)과 같은 간선의 반복이 있을 수 있다
+""",
+    signature=dict(name="largestColorPath", parameters=[("colors", "STRING"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_largest_color_path,
+    cases={
+        "sample": [
+            ("01", ["abaca", [0, 1, 0, 2, 2, 3, 3, 4]]),
+            ("02", ["a", [0, 0]]),
+        ],
+        "boundary": [
+            ("01-single", ["z", []]),
+            ("02-no-edges", ["abc", []]),
+            ("03-self-loop", ["ab", [0, 1, 1, 1]]),
+            ("04-two-cycle", ["aa", [0, 1, 1, 0]]),
+            # 두 갈래가 다시 만난다 — 한 번 본 정점을 다시 만난 것은 순환이 아니다.
+            ("05-diamond", ["aaba", [0, 1, 0, 2, 1, 3, 2, 3]]),
+            # 사이에 다른 색이 끼어도 센 개수는 이어진다.
+            ("06-interleaved", ["abaca", [0, 1, 1, 2, 2, 3, 3, 4]]),
+            # 처음 많던 색이 끝까지 가장 많지는 않다.
+            ("07-leader-changes", ["aabbb", [0, 1, 1, 2, 2, 3, 3, 4]]),
+            ("08-repeated-edge", ["aba", [0, 1, 0, 1, 1, 2]]),
+            # 순환은 그래프 한쪽 구석에만 있어도 -1 이다.
+            ("09-cycle-elsewhere", ["aaaab", [0, 1, 1, 2, 3, 4, 4, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_colors(10, "ab", salt=10025), _relabel(10, _dag_forward(10, 15, salt=10027), salt=10029)]),
+            ("02-random-medium", [_colors(300, "abc", salt=10031), _relabel(300, _dag_forward(300, 700, salt=10033), salt=10035)]),
+            ("03-many-colors", [_colors(2000, "abcdefghijklmnopqrstuvwxyz", salt=10037), _relabel(2000, _dag_forward(2000, 6000, salt=10039), salt=10041)]),
+            ("04-ladder", [_colors(40, "ab", salt=10043), _relabel(40, _ladder(20, 2), salt=10045)]),
+            # 뒤로 가는 간선 하나가 순환을 닫는다.
+            ("05-closing-back-edge", [_colors(500, "ab", salt=10047), _dag_forward(500, 900, salt=10049) + _dag_forward(500, 900, salt=10049)[1::-1]]),
+            # 뒤로 가는 간선이 있어도 돌아올 길이 없으면 순환이 아니다.
+            ("06-back-edge-no-cycle", [_colors(500, "ab", salt=10047), _dag_forward(500, 900, salt=10049) + [499, 0]]),
+        ],
+        "performance": [
+            # 갈래가 둘씩인 층이 5 만 개라 경로가 2^50000 가지다 — 경로를 하나씩 따라가는 풀이가 끝나지 않는다.
+            ("01-ladder", [_colors(100_000, "ab", salt=10051), _relabel(100_000, _ladder(50_000, 2), salt=10053)]),
+            ("02-random-large", [_colors(100_000, "abcdefghijklmnopqrstuvwxyz", salt=10055), _relabel(100_000, _dag_forward(100_000, 200_000, salt=10057), salt=10059)]),
+            ("03-long-chain", ["a" * 100_000, _relabel(100_000, flat([i, i + 1] for i in range(99_999)), salt=10061)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 위상 순서대로 색마다 최댓값을 옮긴다.
+fun largestColorPath(colors: String, edges: IntArray): Int {
+    val n = colors.length
+    val m = edges.size / 2
+    val head = IntArray(n) { -1 }
+    val next = IntArray(m)
+    val to = IntArray(m)
+    val indegree = IntArray(n)
+    for (e in 0 until m) {
+        val a = edges[2 * e]; val b = edges[2 * e + 1]
+        to[e] = b; next[e] = head[a]; head[a] = e
+        indegree[b] += 1
+    }
+    val best = IntArray(n * 26)
+    val queue = IntArray(n)
+    var tail = 0
+    for (v in 0 until n) if (indegree[v] == 0) { queue[tail] = v; tail += 1 }
+    var front = 0
+    var answer = 0
+    while (front < tail) {
+        val v = queue[front]
+        front += 1
+        Drill.dequeue(v)
+        val own = v * 26 + (colors[v] - 'a')
+        best[own] += 1
+        Drill.write(v, best[own])
+        answer = maxOf(answer, best[own])
+        var e = head[v]
+        while (e != -1) {
+            val u = to[e]
+            for (k in 0 until 26) {
+                if (best[v * 26 + k] > best[u * 26 + k]) best[u * 26 + k] = best[v * 26 + k]
+            }
+            indegree[u] -= 1
+            if (indegree[u] == 0) { queue[tail] = u; tail += 1 }
+            e = next[e]
+        }
+    }
+    return if (front == n) answer else -1
+}
+""",
+    mutants=[
+        ("ignores-cycle", "MISSING_EDGE_CASE",
+         "위상 정렬이 모든 정점을 꺼냈는지 보지 않는다. 순환이 있으면 -1 이어야 한다.",
+         """
+fun largestColorPath(colors: String, edges: IntArray): Int {
+    val n = colors.length
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val best = Array(n) { IntArray(26) }
+    val queue = java.util.ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) queue.add(v)
+    var answer = 0
+    while (queue.isNotEmpty()) {
+        val v = queue.poll()
+        best[v][colors[v] - 'a'] += 1
+        answer = maxOf(answer, best[v][colors[v] - 'a'])
+        for (u in adj[v]) {
+            for (k in 0 until 26) best[u][k] = maxOf(best[u][k], best[v][k])
+            indegree[u] -= 1
+            if (indegree[u] == 0) queue.add(u)
+        }
+    }
+    return answer
+}
+"""),
+        ("runs-only", "WRONG_ALGORITHM",
+         "같은 색이 연달아 나올 때만 센다. 사이에 다른 색이 끼면 그때까지 센 개수를 잃는다.",
+         """
+fun largestColorPath(colors: String, edges: IntArray): Int {
+    val n = colors.length
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val run = IntArray(n) { 1 }
+    val queue = java.util.ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) queue.add(v)
+    var seen = 0
+    var answer = 0
+    while (queue.isNotEmpty()) {
+        val v = queue.poll()
+        seen += 1
+        answer = maxOf(answer, run[v])
+        for (u in adj[v]) {
+            if (colors[u] == colors[v]) run[u] = maxOf(run[u], run[v] + 1)
+            indegree[u] -= 1
+            if (indegree[u] == 0) queue.add(u)
+        }
+    }
+    return if (seen == n) answer else -1
+}
+"""),
+        ("visited-as-cycle", "WRONG_BRANCH",
+         "깊이 우선 탐색에서 한 번 본 정점을 다시 만나면 순환이라고 본다. 두 갈래가 다시 만나는 것은 순환이 아니다.",
+         """
+fun largestColorPath(colors: String, edges: IntArray): Int {
+    val n = colors.length
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) adj[edges[i]].add(edges[i + 1])
+    val seen = BooleanArray(n)
+    val best = Array(n) { IntArray(26) }
+    var cycle = false
+    fun dfs(v: Int) {
+        seen[v] = true
+        for (u in adj[v]) {
+            if (seen[u]) { cycle = true; continue }
+            dfs(u)
+            for (k in 0 until 26) best[v][k] = maxOf(best[v][k], best[u][k])
+        }
+        best[v][colors[v] - 'a'] += 1
+    }
+    for (v in 0 until n) if (!seen[v]) dfs(v)
+    if (cycle) return -1
+    var answer = 0
+    for (v in 0 until n) for (k in 0 until 26) answer = maxOf(answer, best[v][k])
+    return answer
+}
+"""),
+        ("walks-every-path", "PERFORMANCE",
+         "시작점마다 모든 경로를 따라가며 색을 센다. 갈래가 겹치면 경로 수가 곱으로 불어난다.",
+         """
+fun largestColorPath(colors: String, edges: IntArray): Int {
+    val n = colors.length
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val left = indegree.copyOf()
+    val queue = java.util.ArrayDeque<Int>()
+    for (v in 0 until n) if (left[v] == 0) queue.add(v)
+    var seen = 0
+    while (queue.isNotEmpty()) { val v = queue.poll(); seen += 1; for (u in adj[v]) { left[u] -= 1; if (left[u] == 0) queue.add(u) } }
+    if (seen < n) return -1
+    val count = IntArray(26)
+    var answer = 0
+    val stack = java.util.ArrayDeque<IntArray>()
+    for (s in 0 until n) {
+        if (indegree[s] != 0) continue
+        stack.push(intArrayOf(s, 0))
+        count[colors[s] - 'a'] += 1
+        answer = maxOf(answer, count[colors[s] - 'a'])
+        while (stack.isNotEmpty()) {
+            val top = stack.peek()
+            val v = top[0]
+            if (top[1] < adj[v].size) {
+                val u = adj[v][top[1]]
+                top[1] += 1
+                Drill.compare(v, u)
+                count[colors[u] - 'a'] += 1
+                answer = maxOf(answer, count[colors[u] - 'a'])
+                stack.push(intArrayOf(u, 0))
+            } else {
+                count[colors[v] - 'a'] -= 1
+                stack.pop()
+            }
+        }
+    }
+    return answer
+}
+"""),
+    ],
+))
+
+
+# --- 201. 만들 수 있는 물건 --------------------------------------------------------------------
+
+def _craftable_items(n, recipes, supplies):
+    import collections
+    need = [0] * n
+    users = [[] for _ in range(n)]
+    for i in range(0, len(recipes), 2):
+        a, b = recipes[i], recipes[i + 1]
+        users[a].append(b)
+        need[b] += 1
+    have = [False] * n
+    queue = collections.deque()
+    for s in supplies:
+        have[s] = True
+        queue.append(s)
+    while queue:
+        x = queue.popleft()
+        for p in users[x]:
+            need[p] -= 1
+            if need[p] == 0 and not have[p]:
+                have[p] = True
+                queue.append(p)
+    supplied = set(supplies)
+    return [v for v in range(n) if have[v] and v not in supplied]
+
+
+def _raw_items(n, recipes, skip_every=0):
+    """재료가 없는 물건들. skip_every 가 있으면 그중 몇을 일부러 빼 만들 수 없는 갈래를 남긴다."""
+    products = set(recipes[1::2])
+    raw = [v for v in range(n) if v not in products]
+    return [v for i, v in enumerate(raw) if not skip_every or i % skip_every]
+
+
+def _recipe_dag(n, m, salt):
+    """서로 다른 (재료, 물건) 쌍 m 개. 재료는 언제나 더 큰 번호라 순환이 없다 — 번호를 섞어 쓴다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    seen = set()
+    out = []
+    while len(out) < 2 * m:
+        b = source.randint(0, n - 2)
+        a = source.randint(b + 1, min(n - 1, b + 6))
+        if (a, b) not in seen:
+            seen.add((a, b))
+            out += [a, b]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="craftable-items",
+    title="만들 수 있는 물건",
+    summary="""
+물건이 `0..n-1` 번까지 있다. `recipes = [a1, b1, a2, b2, ...]` 의 한 쌍은 "물건 `b` 를 만들려면 재료 `a` 가
+필요하다"는 뜻이고, 한 물건의 재료는 여럿일 수 있다. 처음에는 `supplies` 의 물건을 **얼마든지** 가지고 있다.
+
+재료가 하나 이상 있고 그 재료를 **모두** 가졌거나 만들 수 있는 물건은 만들 수 있다. 재료가 없는 물건은
+처음부터 가진 것이 아니면 만들 수 없다. 처음 가진 물건이 아니면서 **만들 수 있는 물건**의 번호를 오름차순으로
+반환한다.
+""",
+    notes="""
+물건마다 "아직 갖추지 못한 재료의 수"를 센다. 가진 물건에서 출발해, 하나를 갖출 때마다 그것을 재료로 쓰는
+물건의 수를 하나씩 줄이고, 0 이 된 물건을 새로 갖춘다 — 들어오는 간선이 모두 풀린 정점을 꺼내는 위상
+정렬이다. 시작점이 "재료가 없는 정점"이 아니라 **가진 물건**이라는 것만 다르다.
+
+서로를 재료로 쓰는 물건들은 그 수가 끝내 0 이 되지 않으므로 저절로 빠진다.
+""",
+    drill_doc="""
+Drill.dequeue(x)          // x 를 갖췄다
+Drill.write(p, missing)   // p 에 아직 모자란 재료의 수
+""",
+    constraints="""
+- `1 <= n <= 100_000`, 쌍 `0..200_000` 개, 같은 쌍은 두 번 나오지 않고 `a != b` 다
+- `supplies` 의 번호는 서로 다르다
+""",
+    signature=dict(
+        name="craftableItems",
+        parameters=[("n", "INT"), ("recipes", "INT_ARRAY"), ("supplies", "INT_ARRAY")],
+        returns="INT_ARRAY",
+    ),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_craftable_items,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4_000_000},
+    cases={
+        "sample": [
+            # 빵(2)은 밀가루(0)·효모(1), 샌드위치(3)는 빵·고기(4) — 고기가 없다.
+            ("01", [5, [0, 2, 1, 2, 2, 3, 4, 3], [0, 1]]),
+            ("02", [4, [3, 2, 2, 1, 1, 0], [3]]),
+        ],
+        "boundary": [
+            ("01-nothing-supplied", [3, [0, 1, 1, 2], []]),
+            ("02-only-supplies", [3, [], [0, 1, 2]]),
+            # 재료가 없는 물건은 가진 것이 아니면 만들 수 없다.
+            ("03-raw-item-not-supplied", [3, [0, 2, 1, 2], [0]]),
+            # 재료 하나만으로는 모자라다.
+            ("04-needs-all", [4, [0, 3, 1, 3, 2, 3], [0, 1]]),
+            # 서로를 재료로 쓰면 둘 다 만들 수 없다.
+            ("05-mutual", [3, [0, 1, 1, 0, 2, 0], [2]]),
+            # 가진 물건이 다른 물건의 결과이기도 하다 — 답에는 넣지 않는다.
+            ("06-supply-also-craftable", [3, [0, 1, 1, 2], [0, 1]]),
+            # 만든 순서와 번호 순서가 거꾸로다.
+            ("07-reverse-numbered-chain", [5, [4, 3, 3, 2, 2, 1, 1, 0], [4]]),
+            ("08-supply-in-cycle", [3, [0, 1, 1, 0, 1, 2], [0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [12, _relabel(12, _recipe_dag(12, 14, salt=10063), salt=10065), _raw_items(12, _relabel(12, _recipe_dag(12, 14, salt=10063), salt=10065))]),
+            ("02-random-medium", [500, _relabel(500, _recipe_dag(500, 900, salt=10067), salt=10069), _raw_items(500, _relabel(500, _recipe_dag(500, 900, salt=10067), salt=10069), skip_every=5)]),
+            ("03-random-large", [20_000, _relabel(20_000, _recipe_dag(20_000, 30_000, salt=10071), salt=10073), _raw_items(20_000, _relabel(20_000, _recipe_dag(20_000, 30_000, salt=10071), salt=10073), skip_every=9)]),
+            ("04-cycle-with-exit", [6, [0, 1, 1, 2, 2, 1, 3, 4, 4, 5], [0, 3]]),
+            ("05-wide-recipe", [1001, flat([i, 1000] for i in range(1000)), list(range(1000))]),
+        ],
+        "performance": [
+            # 번호가 거꾸로 이어진 사슬 — 한 바퀴에 하나씩만 새로 만드는 풀이는 n 바퀴를 돈다.
+            ("01-reverse-chain", [100_000, flat([i + 1, i] for i in range(99_999)), [99_999]]),
+            ("02-random-large", [100_000, _relabel(100_000, _recipe_dag(100_000, 200_000, salt=10075), salt=10077), _raw_items(100_000, _relabel(100_000, _recipe_dag(100_000, 200_000, salt=10075), salt=10077), skip_every=50)]),
+            ("03-reverse-chain-with-side", [100_000, flat([i + 1, i] for i in range(99_999)) + flat([99_999, i] for i in range(0, 99_999, 2)), [99_999]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 가진 물건에서 출발하는 위상 정렬 — 모자란 재료의 수를 줄여 간다.
+fun craftableItems(n: Int, recipes: IntArray, supplies: IntArray): IntArray {
+    val m = recipes.size / 2
+    val head = IntArray(n) { -1 }
+    val next = IntArray(m)
+    val to = IntArray(m)
+    val missing = IntArray(n)
+    for (e in 0 until m) {
+        val a = recipes[2 * e]; val b = recipes[2 * e + 1]
+        to[e] = b; next[e] = head[a]; head[a] = e
+        missing[b] += 1
+    }
+    val have = BooleanArray(n)
+    val supplied = BooleanArray(n)
+    val queue = IntArray(n)
+    var tail = 0
+    for (s in supplies) { have[s] = true; supplied[s] = true; queue[tail] = s; tail += 1 }
+    var front = 0
+    while (front < tail) {
+        val x = queue[front]
+        front += 1
+        Drill.dequeue(x)
+        var e = head[x]
+        while (e != -1) {
+            val p = to[e]
+            missing[p] -= 1
+            Drill.write(p, missing[p])
+            if (missing[p] == 0 && !have[p]) { have[p] = true; queue[tail] = p; tail += 1 }
+            e = next[e]
+        }
+    }
+    var count = 0
+    for (v in 0 until n) if (have[v] && !supplied[v]) count += 1
+    val out = IntArray(count)
+    var k = 0
+    for (v in 0 until n) if (have[v] && !supplied[v]) { out[k] = v; k += 1 }
+    return out
+}
+""",
+    mutants=[
+        ("raw-items-free", "WRONG_BRANCH",
+         "재료가 없는 물건을 처음부터 가진 것으로 본다. 재료가 없으면 가진 것만 쓸 수 있다.",
+         """
+fun craftableItems(n: Int, recipes: IntArray, supplies: IntArray): IntArray {
+    val users = Array(n) { ArrayList<Int>() }
+    val missing = IntArray(n)
+    for (i in recipes.indices step 2) { users[recipes[i]].add(recipes[i + 1]); missing[recipes[i + 1]] += 1 }
+    val have = BooleanArray(n)
+    val supplied = BooleanArray(n)
+    for (s in supplies) supplied[s] = true
+    val queue = java.util.ArrayDeque<Int>()
+    for (v in 0 until n) if (supplied[v] || missing[v] == 0) { have[v] = true; queue.add(v) }
+    while (queue.isNotEmpty()) {
+        val x = queue.poll()
+        for (p in users[x]) { missing[p] -= 1; if (missing[p] == 0 && !have[p]) { have[p] = true; queue.add(p) } }
+    }
+    return (0 until n).filter { have[it] && !supplied[it] }.toIntArray()
+}
+"""),
+        ("any-ingredient", "WRONG_ALGORITHM",
+         "재료 하나만 갖춰도 만들 수 있다고 본다. 재료를 모두 갖춰야 한다.",
+         """
+fun craftableItems(n: Int, recipes: IntArray, supplies: IntArray): IntArray {
+    val users = Array(n) { ArrayList<Int>() }
+    for (i in recipes.indices step 2) users[recipes[i]].add(recipes[i + 1])
+    val have = BooleanArray(n)
+    val supplied = BooleanArray(n)
+    val queue = java.util.ArrayDeque<Int>()
+    for (s in supplies) { have[s] = true; supplied[s] = true; queue.add(s) }
+    while (queue.isNotEmpty()) {
+        val x = queue.poll()
+        for (p in users[x]) if (!have[p]) { have[p] = true; queue.add(p) }
+    }
+    return (0 until n).filter { have[it] && !supplied[it] }.toIntArray()
+}
+"""),
+        ("craft-order", "WRONG_BRANCH",
+         "만든 순서대로 내놓는다. 답은 번호 오름차순이다.",
+         """
+fun craftableItems(n: Int, recipes: IntArray, supplies: IntArray): IntArray {
+    val users = Array(n) { ArrayList<Int>() }
+    val missing = IntArray(n)
+    for (i in recipes.indices step 2) { users[recipes[i]].add(recipes[i + 1]); missing[recipes[i + 1]] += 1 }
+    val have = BooleanArray(n)
+    val queue = java.util.ArrayDeque<Int>()
+    for (s in supplies) { have[s] = true; queue.add(s) }
+    val made = ArrayList<Int>()
+    while (queue.isNotEmpty()) {
+        val x = queue.poll()
+        for (p in users[x]) { missing[p] -= 1; if (missing[p] == 0 && !have[p]) { have[p] = true; made.add(p); queue.add(p) } }
+    }
+    return made.toIntArray()
+}
+"""),
+        ("sweeps-until-stable", "PERFORMANCE",
+         "더 만들 것이 없을 때까지 모든 물건을 처음부터 다시 훑는다. 한 바퀴에 하나씩만 늘면 물건 수만큼 돈다.",
+         """
+fun craftableItems(n: Int, recipes: IntArray, supplies: IntArray): IntArray {
+    val ingredients = Array(n) { ArrayList<Int>() }
+    for (i in recipes.indices step 2) ingredients[recipes[i + 1]].add(recipes[i])
+    val have = BooleanArray(n)
+    val supplied = BooleanArray(n)
+    for (s in supplies) { have[s] = true; supplied[s] = true }
+    var changed = true
+    while (changed) {
+        changed = false
+        for (p in 0 until n) {
+            if (have[p] || ingredients[p].isEmpty()) continue
+            var ready = true
+            for (a in ingredients[p]) { Drill.compare(p, a); if (!have[a]) { ready = false; break } }
+            if (ready) { have[p] = true; changed = true }
+        }
+    }
+    return (0 until n).filter { have[it] && !supplied[it] }.toIntArray()
+}
+"""),
+    ],
+))
