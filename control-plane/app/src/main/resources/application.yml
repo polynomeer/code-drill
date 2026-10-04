@@ -36,6 +36,11 @@ codedrill:
     origin-salt: ${AUTH_ORIGIN_SALT:dev}
     # 세지 않는 출처. 개발 스택의 것이고 배포에서는 비운다.
     exempt-origins: ${AUTH_EXEMPT_ORIGINS:}
+    # 비밀번호 재설정 (PasswordReset). 링크가 가리킬 웹 주소.
+    reset-link-base: ${AUTH_RESET_LINK_BASE:http://localhost:5173}
+    # 개발 스택만 켠다 — 재설정 링크를 로그에 남긴다. 운영에서 켜면 로그를 읽는 사람이 남의 계정을 연다.
+    log-reset-links: ${AUTH_LOG_RESET_LINKS:false}
+    resets-per-hour: ${AUTH_RESETS_PER_HOUR:3}
   admin:
     # 첫 SECURITY_ADMIN 을 받을 계정의 이메일 (§11.2).
     #

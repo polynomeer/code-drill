@@ -166,6 +166,9 @@ def env_for(ports: dict) -> dict:
         # 프록시를 믿게 해 스모크가 X-Forwarded-For 로 남의 출처를 흉내 내 한도를 시험한다.
         AUTH_TRUSTED_PROXY="true",
         AUTH_EXEMPT_ORIGINS="127.0.0.1,::1,0:0:0:0:0:0:0:1",
+        # 메일 발송이 없다. 개발 스택만 재설정 링크를 로그에 남겨 흐름을 끝까지 시험한다 (PasswordReset).
+        AUTH_LOG_RESET_LINKS="true",
+        AUTH_RESET_LINK_BASE=f"http://localhost:{ports['web']}",
     )
     return env
 

@@ -173,7 +173,11 @@ class IdentitySecurityConfig(
                 "/api/v1/admin/**",
             )
             // 로그인과 가입 자체는 토큰 없이 부를 수 있어야 한다.
-            .excludePathPatterns("/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh")
+            .excludePathPatterns(
+                "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
+                // 비밀번호를 잊은 사람은 토큰이 없다
+                "/api/v1/auth/password/forgot", "/api/v1/auth/password/reset",
+            )
             .order(AUTHENTICATION_ORDER)
 
         // 공개 경로지만 로그인했다면 알아본다. 목록에 "푼 문제"를 표시하기 위해서다. 공개 프로필도 같다 —

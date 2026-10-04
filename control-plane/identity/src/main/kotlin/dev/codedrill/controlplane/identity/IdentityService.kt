@@ -6,12 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.security.MessageDigest
-import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-import java.util.Base64
 import java.util.UUID
 
 /**
@@ -36,7 +33,6 @@ class IdentityService(
 
     private val log = LoggerFactory.getLogger(javaClass)
     private val passwords = BCryptPasswordEncoder()
-    private val random = SecureRandom()
 
     @Transactional
     fun register(email: String, displayName: String, password: String): Registration {
@@ -282,14 +278,9 @@ class IdentityService(
         return IssuedSession(access, refresh, accessExpiry, refreshExpiry, user)
     }
 
-    /** 256비트 난수. 추측할 수 없어야 하므로 UUID 가 아니라 [SecureRandom] 이다. */
-    private fun token(): String = ByteArray(TOKEN_BYTES)
-        .also(random::nextBytes)
-        .let { Base64.getUrlEncoder().withoutPadding().encodeToString(it) }
+    private fun token(): String = Tokens.issue()
 
-    private fun hash(token: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(token.toByteArray())
-        .joinToString("") { "%02x".format(it) }
+    private fun hash(token: String): String = Tokens.hash(token)
 
     /** 대소문자와 앞뒤 공백만 정규화한다. 그 이상 손대면 남의 주소가 될 수 있다. */
     private fun normalize(email: String): String = email.trim().lowercase()
@@ -307,8 +298,7 @@ class IdentityService(
         data object Unknown : Resolution
     }
 
-    private companion object {
-        const val TOKEN_BYTES = 32
+    internal companion object {
         const val MIN_PASSWORD_LENGTH = 10
 
         /**
@@ -344,4 +334,13 @@ data class IdentityProperties(
     val originSalt: String = "dev",
     /** 세지 않는 출처. 개발 스택의 것이고 배포에서는 비운다. */
     val exemptOrigins: List<String> = emptyList(),
+    // --- 비밀번호 재설정 (PasswordReset) ---
+    /** 재설정 링크의 수명. 메일함에서 꺼내 누를 만큼, 그러나 잊힌 링크가 오래 살지 않게. */
+    val resetTtl: Duration = Duration.ofMinutes(30),
+    /** 링크가 가리킬 웹 주소. 배포마다 준다. */
+    val resetLinkBase: String = "http://localhost:5173",
+    /** 개발 스택만 켠다 — 링크를 로그에 남긴다. 운영에서 켜면 로그를 읽는 사람이 남의 계정을 연다. */
+    val logResetLinks: Boolean = false,
+    /** 한 이메일·한 출처가 한 시간에 몇 번 재설정을 요청할 수 있나. 남의 메일함을 두드리는 것을 막는다. */
+    val resetsPerHour: Int = 3,
 )

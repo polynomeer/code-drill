@@ -56,6 +56,15 @@ class AbuseGuard(
         return retryAfter(Kind.LOGIN_FAILED, origin.hash, null, properties.loginFailuresPerOrigin, QUARTER)
     }
 
+    /** 이 이메일로, 이 출처에서 지금 재설정을 요청해도 되나. 남의 메일함을 링크로 채우는 것을 막는다. */
+    fun resetAllowed(origin: Origin, subject: String): Long? {
+        retryAfter(Kind.RESET, null, subject, properties.resetsPerHour, HOUR)?.let { return it }
+        if (origin.exempt) return null
+        return retryAfter(Kind.RESET, origin.hash, null, properties.resetsPerHour * 3, HOUR)
+    }
+
+    fun recordReset(origin: Origin, subject: String) = record(Kind.RESET, origin, subject)
+
     fun recordSignup(origin: Origin) = record(Kind.REGISTER, origin, null)
 
     fun recordLoginFailure(origin: Origin, subject: String) = record(Kind.LOGIN_FAILED, origin, subject)
@@ -97,7 +106,7 @@ class AbuseGuard(
 
     data class Origin(val hash: String, val exempt: Boolean)
 
-    private enum class Kind { REGISTER, LOGIN_FAILED }
+    private enum class Kind { REGISTER, LOGIN_FAILED, RESET }
 
     private companion object {
         val HOUR: Duration = Duration.ofHours(1)

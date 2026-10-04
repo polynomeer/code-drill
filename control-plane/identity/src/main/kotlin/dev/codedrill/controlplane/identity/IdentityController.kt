@@ -35,6 +35,7 @@ class IdentityController(
     private val identity: IdentityService,
     private val sanctions: SanctionService,
     private val guard: AbuseGuard,
+    private val reset: PasswordReset,
 ) {
 
     /** 가입. 같은 곳에서 한 시간에 다섯 번까지다 (§10.2 남용 방어) — 계정을 여러 개 만들어 쿼터를 늘리는 길을 막는다. */
@@ -76,6 +77,28 @@ class IdentityController(
         }
         return ResponseEntity.ok(SessionResponse.of(session))
     }
+
+    /**
+     * 비밀번호 재설정 요청. **언제나 202 다** — 있는 계정이든 없는 계정이든 같은 답이어야 어떤 이메일이
+     * 가입돼 있는지 이것으로 알 수 없다. 한도에 닿으면 429 지만 그것도 계정 유무와 무관하다.
+     */
+    @PostMapping("/password/forgot")
+    fun forgotPassword(@Valid @RequestBody request: ForgotPasswordRequest, http: HttpServletRequest): ResponseEntity<Any> {
+        val origin = guard.originOf(http)
+        val subject = request.email.trim().lowercase()
+        guard.resetAllowed(origin, subject)?.let { return throttled(it, "재설정 요청이 잦다. ${it}초 뒤에 다시 시도한다") }
+        guard.recordReset(origin, subject)
+        reset.request(request.email)
+        return ResponseEntity.accepted().build()
+    }
+
+    /** 링크의 토큰으로 새 비밀번호를 정한다. 성공하면 열린 세션이 전부 끊기고 다시 로그인한다. */
+    @PostMapping("/password/reset")
+    fun resetPassword(@Valid @RequestBody request: ResetPasswordRequest): ResponseEntity<Any> =
+        when (val outcome = reset.reset(request.token, request.newPassword)) {
+            PasswordReset.Outcome.Done -> ResponseEntity.ok(mapOf("reset" to true))
+            is PasswordReset.Outcome.Invalid -> ResponseEntity.badRequest().body(error(ErrorCode.INVALID_SIGNATURE, outcome.reason))
+        }
 
     private fun throttled(retryAfterSeconds: Long, message: String): ResponseEntity<Any> =
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -249,6 +272,10 @@ data class DeleteAccountRequest(@field:NotBlank val password: String)
 data class AppealRequest(@field:NotBlank val text: String)
 
 data class RenameRequest(@field:NotBlank val displayName: String)
+
+data class ForgotPasswordRequest(@field:NotBlank val email: String)
+
+data class ResetPasswordRequest(@field:NotBlank val token: String, @field:NotBlank val newPassword: String)
 
 data class ProfileRequest(val handle: String?, val public: Boolean = false)
 
