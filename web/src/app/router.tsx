@@ -35,6 +35,7 @@ const SubmissionDetailPage = lazy(() =>
   import('../features/submissions/SubmissionDetailPage').then((m) => ({ default: m.SubmissionDetailPage })),
 )
 const ComparePage = lazy(() => import('../features/submissions/ComparePage').then((m) => ({ default: m.ComparePage })))
+const MePage = lazy(() => import('../features/me/MePage').then((m) => ({ default: m.MePage })))
 const WelcomePage = lazy(() => import('../features/onboarding/WelcomePage').then((m) => ({ default: m.WelcomePage })))
 const ForgotPasswordPage = lazy(() => import('../features/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage })))
 const ResetPasswordPage = lazy(() => import('../features/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage })))
@@ -127,6 +128,13 @@ function Shell() {
               <ProblemReadPage key={params.slug} slug={params.slug} />
             </Suspense>
           )}
+        </Route>
+        <Route path="/me">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <MePage />
+            </Suspense>
+          </RequireSession>
         </Route>
         <Route path="/welcome">
           <RequireSession>

@@ -6,6 +6,7 @@ import type {
   ContestView,
   FinishedContests,
   LearnerProfile,
+  NotificationFeed,
   ProfileSettings,
   PublicProfile,
   Contributions,
@@ -259,6 +260,17 @@ export async function skipPrescribed(problemId: string): Promise<Prescription> {
 /** 미루기 — 며칠 동안 권하지 않는다. 오늘의 빈자리는 교체처럼 채워진다. */
 export async function deferPrescribed(problemId: string): Promise<Prescription> {
   return json<Prescription>(await authed(`/me/prescription/${problemId}/defer`, { method: 'POST' }))
+}
+
+/** 내 알림과 안 읽은 수. 알림은 서버가 사실에서 그때그때 만든다. */
+export async function getNotifications(): Promise<NotificationFeed> {
+  return json<NotificationFeed>(await authed('/me/notifications'))
+}
+
+/** 지금까지를 읽음으로. */
+export async function markNotificationsRead(): Promise<void> {
+  const response = await authed('/me/notifications/read', { method: 'POST' })
+  if (!response.ok) await json(response)
 }
 
 /** 온보딩 세 문항의 답. 아직 답하지 않았으면 null. */

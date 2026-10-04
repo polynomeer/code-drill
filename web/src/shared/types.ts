@@ -934,3 +934,12 @@ export interface LearnerProfile {
   language: SubmissionLanguage
   level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED'
 }
+
+// --- 알림 (docs/ui-overhaul.md §4) ---
+
+export type NotificationKind = 'CONTEST_STARTING' | 'RATING_CHANGED' | 'ANSWERED' | 'HELPFUL' | 'TRANSFER_DONE' | 'SANCTION' | 'APPEAL_RESOLVED'
+
+export interface NotificationFeed {
+  items: { id: string; kind: NotificationKind; title: string; body: string | null; link: string; at: string; unread: boolean }[]
+  unread: number
+}
