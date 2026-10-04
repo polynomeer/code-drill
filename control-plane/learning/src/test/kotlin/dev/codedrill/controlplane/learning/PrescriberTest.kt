@@ -157,6 +157,68 @@ class PrescriberTest {
         assertTrue(streak.atRisk)
     }
 
+    // --- 진단 (docs/ui-overhaul.md §6.9) ---
+
+    /** 진단을 보기 위한 목록 — 난이도와 역량군이 고루 섞였다. */
+    private val diagnosticCatalogs = mapOf(
+        "intro-read" to catalog(Difficulty.INTRO, listOf(Competency.READING)),
+        "easy-read" to catalog(Difficulty.EASY, listOf(Competency.CONSTRAINTS)),
+        "easy-design" to catalog(Difficulty.EASY, listOf(Competency.MODELING)),
+        "easy-verify" to catalog(Difficulty.EASY, listOf(Competency.EDGE_CASES)),
+        "medium-exec" to catalog(Difficulty.MEDIUM, listOf(Competency.IMPLEMENTATION)),
+        "medium-design" to catalog(Difficulty.MEDIUM, listOf(Competency.ALGORITHM_CHOICE)),
+        "hard-verify" to catalog(Difficulty.HARD, listOf(Competency.COUNTEREXAMPLE)),
+    )
+
+    private fun profile(level: LearnerProfile.Level, goal: Int = 3) = LearnerProfile(goal, "PYTHON", level)
+
+    @Test
+    fun `근거가 없으면 고른 수준의 띠에서 역량군이 다른 문제로 진단한다`() {
+        val facts = facts(profile = profile(LearnerProfile.Level.BEGINNER), catalogs = diagnosticCatalogs)
+
+        val items = Prescriber.prescribe(facts, now, zone).items
+
+        assertEquals(listOf("intro-read", "easy-design", "easy-verify"), items.map { it.problemId })
+        assertTrue(items.all { it.reason == Reason.DIAGNOSTIC })
+    }
+
+    @Test
+    fun `수준이 높으면 띠가 올라간다`() {
+        val facts = facts(profile = profile(LearnerProfile.Level.ADVANCED), catalogs = diagnosticCatalogs)
+
+        val ids = Prescriber.prescribe(facts, now, zone).items.map { it.problemId }
+
+        assertEquals(listOf("medium-design", "medium-exec", "hard-verify"), ids)
+    }
+
+    @Test
+    fun `세 문제를 시도하면 진단은 끝나고 예전 규칙이 이어받는다`() {
+        val attempts = listOf("intro-read", "easy-design", "easy-verify").map { attempt(it, accepted = true, ago = Duration.ofHours(2)) }
+        val facts = facts(
+            attempts = attempts,
+            solved = attempts.map { it.problemId }.toSet(),
+            profile = profile(LearnerProfile.Level.BEGINNER),
+            catalogs = diagnosticCatalogs,
+        )
+
+        assertTrue(Prescriber.prescribe(facts, now, zone).items.none { it.reason == Reason.DIAGNOSTIC })
+    }
+
+    @Test
+    fun `하루 목표가 칸 수다`() {
+        val facts = facts(profile = profile(LearnerProfile.Level.BEGINNER, goal = 1), catalogs = diagnosticCatalogs)
+
+        assertEquals(1, Prescriber.prescribe(facts, now, zone).items.size)
+    }
+
+    @Test
+    fun `세 문항에 답하지 않았으면 진단 없이 예전처럼`() {
+        val items = Prescriber.prescribe(facts(catalogs = diagnosticCatalogs), now, zone).items
+
+        assertTrue(items.none { it.reason == Reason.DIAGNOSTIC })
+        assertEquals(Reason.NEXT_ON_PATH, items.single().reason)
+    }
+
     private fun facts(
         attempts: List<Attempt> = emptyList(),
         solved: Set<String> = emptySet(),
@@ -164,7 +226,9 @@ class PrescriberTest {
         pendingTransfer: String? = null,
         standing: Map<Competency, Standing> = emptyMap(),
         skipped: Set<String> = emptySet(),
-    ) = Prescriber.Facts(attempts, solved, helpLevel, pendingTransfer, standing, catalogs, skipped)
+        profile: LearnerProfile? = null,
+        catalogs: Map<String, ProblemCatalog> = this.catalogs,
+    ) = Prescriber.Facts(attempts, solved, helpLevel, pendingTransfer, standing, catalogs, skipped, profile)
 
     private fun attempt(problemId: String, accepted: Boolean, ago: Duration) =
         Attempt(problemId, accepted, if (accepted) "ACCEPTED" else "WRONG_ANSWER", now.minus(ago))

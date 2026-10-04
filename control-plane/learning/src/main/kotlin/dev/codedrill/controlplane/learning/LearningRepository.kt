@@ -22,6 +22,23 @@ class LearningRepository(private val jdbc: JdbcTemplate) {
         userId, java.sql.Date.valueOf(on),
     ).toSet()
 
+    // --- 온보딩 (docs/ui-overhaul.md §6.9) ---
+
+    fun profile(userId: String): LearnerProfile? = jdbc.query(
+        "SELECT daily_goal, language, level FROM learner_profile WHERE user_id = ?",
+        { rs, _ -> LearnerProfile(rs.getInt("daily_goal"), rs.getString("language"), LearnerProfile.Level.valueOf(rs.getString("level"))) },
+        userId,
+    ).firstOrNull()
+
+    fun saveProfile(userId: String, profile: LearnerProfile): Int = jdbc.update(
+        """
+        INSERT INTO learner_profile (user_id, daily_goal, language, level) VALUES (?, ?, ?, ?)
+        ON CONFLICT (user_id) DO UPDATE
+           SET daily_goal = EXCLUDED.daily_goal, language = EXCLUDED.language, level = EXCLUDED.level, updated_at = now()
+        """.trimIndent(),
+        userId, profile.dailyGoal, profile.language, profile.level.name,
+    )
+
     // --- 문제집 (FR-205) ---
 
     fun createCollection(id: UUID, userId: String, name: String): Int = jdbc.update(
@@ -69,6 +86,7 @@ class LearningRepository(private val jdbc: JdbcTemplate) {
     /** 개인 데이터 (§11.3). 문제집도 처방 조정도 사용자의 것이다. */
     fun export(userId: String): Map<String, Any?> = mapOf(
         "collections" to collections(userId),
+        "profile" to profile(userId),
         "skips" to jdbc.query(
             "SELECT problem_id, skipped_on FROM prescription_skip WHERE user_id = ? ORDER BY skipped_on",
             { rs, _ -> mapOf("problemId" to rs.getString(1), "on" to rs.getDate(2).toLocalDate().toString()) },
@@ -78,6 +96,7 @@ class LearningRepository(private val jdbc: JdbcTemplate) {
 
     fun erase(userId: String): Map<String, Int> = mapOf(
         "collections" to jdbc.update("DELETE FROM collection WHERE user_id = ?", userId),
+        "profile" to jdbc.update("DELETE FROM learner_profile WHERE user_id = ?", userId),
         "skips" to jdbc.update("DELETE FROM prescription_skip WHERE user_id = ?", userId),
     )
 }

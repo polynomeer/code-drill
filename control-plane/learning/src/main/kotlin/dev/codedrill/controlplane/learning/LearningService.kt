@@ -29,6 +29,17 @@ class LearningService(
     fun prescription(userId: String, now: Instant = Instant.now()): Prescription =
         Prescriber.prescribe(facts(userId, now), now, zone)
 
+    fun profile(userId: String): LearnerProfile? = repository.profile(userId)
+
+    /** 세 문항을 적는다. 다시 답하면 덮어쓴다 — 목표와 언어는 바뀐다. 처방을 돌려준다. */
+    @Transactional
+    fun saveProfile(userId: String, profile: LearnerProfile, now: Instant = Instant.now()): Prescription {
+        require(profile.dailyGoal in 1..Prescriber.DAILY_LIMIT) { "하루 목표는 1~${Prescriber.DAILY_LIMIT} 문제다" }
+        require(profile.language in LearnerProfile.LANGUAGES) { "모르는 언어다: ${profile.language}" }
+        repository.saveProfile(userId, profile)
+        return prescription(userId, now)
+    }
+
     /**
      * 교체 — 오늘의 처방에서 문제를 밀어낸다 (FR-808). 빈자리는 다음 후보가 채우고, 내일이면 다시
      * 권할 수 있다.
@@ -162,6 +173,7 @@ class LearningService(
         standing = sources.standing(userId, now),
         catalogs = catalogs(),
         skipped = repository.skipped(userId, LocalDate.ofInstant(now, zone)),
+        profile = repository.profile(userId),
     )
 
     /** 공개된 문제의 카탈로그. 읽지 못하는 문제는 권하지 않는다. */

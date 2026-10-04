@@ -56,5 +56,7 @@ class LearningServiceTest {
 
         override fun skipped(userId: String, on: LocalDate): Set<String> =
             skips.filter { it.second == on }.map { it.first }.toSet()
+
+        override fun profile(userId: String): LearnerProfile? = null
     }
 }

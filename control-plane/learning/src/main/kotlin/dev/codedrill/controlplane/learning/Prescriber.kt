@@ -2,6 +2,8 @@ package dev.codedrill.controlplane.learning
 
 import dev.codedrill.platform.common.LearningRhythm
 import dev.codedrill.platform.problempackage.Competency
+import dev.codedrill.platform.problempackage.CompetencyGroup
+import dev.codedrill.platform.problempackage.Difficulty
 import dev.codedrill.platform.problempackage.ProblemCatalog
 import java.time.Duration
 import java.time.Instant
@@ -27,6 +29,25 @@ object Prescriber {
     /** 하루에 몇 문제까지. 셋을 넘기면 처방이 아니라 숙제다. */
     const val DAILY_LIMIT = 3
 
+    /** 진단 문제 수. 시도한 문제가 이만큼이 되면 진단이 끝난다. */
+    const val DIAGNOSTIC_SIZE = 3
+
+    /** 자기 보고 수준 → 진단의 난이도 띠. 띠를 둘로 두어 "생각보다 쉽다/어렵다"가 한 번에 드러나게. */
+    private val BANDS = mapOf(
+        LearnerProfile.Level.BEGINNER to setOf(Difficulty.INTRO, Difficulty.EASY),
+        LearnerProfile.Level.INTERMEDIATE to setOf(Difficulty.EASY, Difficulty.MEDIUM),
+        LearnerProfile.Level.ADVANCED to setOf(Difficulty.MEDIUM, Difficulty.HARD),
+    )
+
+    private val GROUP_LABEL = mapOf(
+        CompetencyGroup.UNDERSTANDING to "이해",
+        CompetencyGroup.DESIGN to "설계",
+        CompetencyGroup.EXECUTION to "실행",
+        CompetencyGroup.VERIFICATION to "검증",
+        CompetencyGroup.EXTENSION to "확장",
+        CompetencyGroup.ENGINEERING to "실무",
+    )
+
     /** "최근"의 기준. 이 안에 틀린 문제는 원인이 아직 손에 있다. */
     val RECENT: Duration = Duration.ofDays(7)
 
@@ -39,20 +60,25 @@ object Prescriber {
         val catalogs: Map<String, ProblemCatalog>,
         /** 오늘 사용자가 밀어낸 문제. 조정할 수 있어야 처방이다 (FR-808). */
         val skipped: Set<String>,
+        /** 가입 직후 세 문항의 답. 없으면 진단 없이 예전 규칙대로 간다. */
+        val profile: LearnerProfile? = null,
     )
 
     fun prescribe(facts: Facts, now: Instant, zone: ZoneId): Prescription {
         val picked = linkedMapOf<String, PrescribedProblem>()
         val taken = { id: String -> id in picked || id in facts.skipped }
+        // 하루 목표가 칸 수다. 목표보다 많이 권하면 처방이 아니라 숙제다
+        val limit = facts.profile?.dailyGoal?.coerceIn(1, DAILY_LIMIT) ?: DAILY_LIMIT
 
         fun offer(candidate: PrescribedProblem?) {
-            if (candidate == null || picked.size >= DAILY_LIMIT || taken(candidate.problemId)) return
+            if (candidate == null || picked.size >= limit || taken(candidate.problemId)) return
             if (candidate.problemId !in facts.catalogs) return
             picked[candidate.problemId] = candidate
         }
 
         offer(recentFailure(facts, now))
         offer(transfer(facts, now))
+        diagnostic(facts, now, taken).forEach(::offer)
         offer(reviewDue(facts, now))
         offer(weakCompetency(facts, now, taken))
         offer(nextOnPath(facts, now, taken))
@@ -149,6 +175,49 @@ object Prescriber {
             competency = competency,
             nextMeasurement = now.plus(LearningRhythm.REVIEW_INTERVAL),
         )
+    }
+
+    /**
+     * 진단 — 근거가 없는 사람의 첫 처방 (docs/ui-overhaul.md §6.9).
+     *
+     * 고른 수준의 난이도 띠에서, **역량군이 서로 다른** 문제를 고른다. 같은 군의 문제 셋을 풀면 근거는
+     * 셋이지만 지도는 한 칸만 채워진다. 시도한 문제가 [DIAGNOSTIC_SIZE] 개가 되면 진단은 끝나고 예전
+     * 규칙(약점·다음 단계)이 이어받는다 — 그때는 근거가 있다.
+     */
+    private fun diagnostic(facts: Facts, now: Instant, taken: (String) -> Boolean): List<PrescribedProblem> {
+        val profile = facts.profile ?: return emptyList()
+        val attempted = facts.attempts.map { it.problemId }.toSet()
+        val remaining = DIAGNOSTIC_SIZE - attempted.size
+        if (remaining <= 0) return emptyList()
+
+        val band = BANDS.getValue(profile.level)
+        val candidates = openProblems(facts, taken)
+            .filter { (id, catalog) -> id !in attempted && catalog.difficulty in band && catalog.competencies.isNotEmpty() }
+            .sortedWith(compareBy<Map.Entry<String, ProblemCatalog>> { it.value.difficulty }.thenBy { it.key })
+
+        // 역량군이 겹치지 않게 먼저 고르고, 모자라면 겹쳐도 채운다
+        val chosen = mutableListOf<Map.Entry<String, ProblemCatalog>>()
+        val groups = mutableSetOf<CompetencyGroup>()
+        for (entry in candidates) {
+            if (chosen.size >= remaining) break
+            if (groups.add(entry.value.competencies.first().group)) chosen += entry
+        }
+        for (entry in candidates) {
+            if (chosen.size >= remaining) break
+            if (entry !in chosen) chosen += entry
+        }
+
+        return chosen.map { (id, catalog) ->
+            val competency = catalog.competencies.first()
+            PrescribedProblem(
+                problemId = id,
+                reason = Reason.DIAGNOSTIC,
+                detail = "진단 — ${GROUP_LABEL[competency.group] ?: competency.group.name} 역량의 첫 근거를 만듭니다. " +
+                    "맞히든 틀리든 기록이 되고, 다음 처방이 그 근거에서 나옵니다.",
+                competency = competency,
+                nextMeasurement = now,
+            )
+        }
     }
 
     /** 선수를 다 풀어 열린 문제 중 가장 쉬운 것 (§8.1 선수 관계 기반 학습 경로). */

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -42,6 +43,23 @@ class LearningController(private val service: LearningService) {
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @PathVariable problemId: String,
     ): Prescription = service.defer(principal.id, problemId)
+
+    /** 온보딩 세 문항의 답. 아직 답하지 않았으면 204 — 화면이 온보딩으로 데려간다. */
+    @GetMapping("/onboarding")
+    fun onboarding(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): ResponseEntity<LearnerProfile> =
+        service.profile(principal.id)?.let { ResponseEntity.ok(it) } ?: ResponseEntity.noContent().build()
+
+    /** 답한다. 진단이 든 첫 처방을 돌려준다. */
+    @PutMapping("/onboarding")
+    fun answer(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @Valid @RequestBody request: OnboardingRequest,
+    ): ResponseEntity<Any> {
+        val level = runCatching { LearnerProfile.Level.valueOf(request.level) }.getOrNull()
+            ?: return ResponseEntity.badRequest().body(mapOf("message" to "모르는 수준이다: ${request.level}"))
+        return runCatching { service.saveProfile(principal.id, LearnerProfile(request.dailyGoal, request.language, level)) }
+            .fold({ ResponseEntity.ok(it) }, { ResponseEntity.badRequest().body(mapOf("message" to (it.message ?: "잘못된 답이다"))) })
+    }
 
     @GetMapping("/report/weekly")
     fun weekly(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): WeeklyReport =
@@ -93,3 +111,9 @@ class LearningController(private val service: LearningService) {
 }
 
 data class CreateCollectionRequest(@field:NotBlank @field:Size(max = 60) val name: String)
+
+data class OnboardingRequest(
+    val dailyGoal: Int,
+    @field:NotBlank val language: String,
+    @field:NotBlank val level: String,
+)
