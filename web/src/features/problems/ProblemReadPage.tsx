@@ -8,6 +8,7 @@ import { EmptyState, Skeleton } from '../../design'
 import { StatementView } from '../workspace/StatementView'
 import { splitStatement } from '../workspace/statement'
 import styles from './ProblemReadPage.module.css'
+import { markOpenSource } from '../../shared/analytics'
 
 /**
  * 문제 읽기 `/problems/:slug` — 로그인 없이 열리는 공개 본문 (디자인 설계서 §2.3, §11.1).
@@ -66,7 +67,7 @@ export function ProblemReadPage({ slug }: { slug: string }) {
         ) : (
           <Skeleton width="50%" height={30} />
         )}
-        <Link href={solve} className={styles.solve}>
+        <Link href={solve} className={styles.solve} onClick={() => markOpenSource('link')}>
           <Code size={16} aria-hidden="true" />
           {session ? '풀기' : '풀어 보기'}
         </Link>

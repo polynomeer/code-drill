@@ -30,6 +30,7 @@ import { useReplayPlayer } from './useReplayPlayer'
 import { kindsIn, useTrace } from './useTrace'
 import type { Problem, Submission } from '../../shared/types'
 import styles from './ReplayPage.module.css'
+import { track, trackOnce } from '../../shared/analytics'
 
 /**
  * R-01 실행 리플레이 `/submissions/:id/replay?step=` (UI 디자인 문서 §5, 디자인 설계서 §8).
@@ -196,19 +197,31 @@ function Replay({
 
   const onLine = (line: number) => {
     const next = nextOnLine(events, manifest.summary, line, step)
-    if (next !== null) seek(next)
+    if (next === null) return
+    const target = events[next - 1] ?? manifest.summary.find((event) => event.seq === next)
+    // 코드 → 상태 (§16.1 code_trace_link_used — 양방향 연결 가치)
+    track('code_trace_link_used', { direction: 'code-to-state', eventType: target?.eventType ?? 'unknown' })
+    seek(next, 'line')
   }
 
   const onSelect = (key: string) => {
     player.pause()
-    setSelected((current) => (current === key ? null : key))
+    const selecting = selected !== key
+    setSelected(selecting ? key : null)
+    // 상태 → 코드: 고른 칸을 건드린 줄이 칠해진다
+    if (selecting) track('code_trace_link_used', { direction: 'state-to-code', eventType: key.split(':')[0] ?? 'unknown' })
   }
 
+  // 리플레이를 열었다 — 주소에 걸음이 있으면 누가 건넨 링크로 온 것이다 (§16.1 replay_opened)
+  useEffect(() => {
+    trackOnce(`replay:${id}`, 'replay_opened', { entry: initialStep > 0 ? 'link' : 'page', traceType: manifest.status })
+  }, [id])
+
   useReplayKeys({
-    onStep: (delta) => seek(step + delta),
-    onImportant: (direction) => seek(nextMarker(summaryMarkers, step, direction)),
-    onHome: () => seek(0),
-    onEnd: () => seek(total),
+    onStep: (delta) => seek(step + delta, 'key'),
+    onImportant: (direction) => seek(nextMarker(summaryMarkers, step, direction), 'key'),
+    onHome: () => seek(0, 'key'),
+    onEnd: () => seek(total, 'key'),
     onToggle: player.toggle,
   })
 
@@ -270,13 +283,13 @@ function Replay({
       divergedAtSeq={divergedAtSeq}
       selected={selected}
       onClearSelection={() => setSelected(null)}
-      onSeek={seek}
+      onSeek={(target) => seek(target, 'list')}
       onShowLine={showLine}
       warnings={warnings}
     >
       {mine && (
         <>
-          <DivergenceCard submissionId={id} onSeek={seek} onShowLine={showLine} caseLabel={caseLabel} />
+          <DivergenceCard submissionId={id} onSeek={(target) => seek(target, 'divergence')} onShowLine={showLine} caseLabel={caseLabel} />
           {/* 재생 위치 곁에 둔다. 다음을 누르기 전에 눈에 들어와야 예측이지, 지나간 뒤에 물으면 회상이다 */}
           <PredictNext
             submissionId={id}

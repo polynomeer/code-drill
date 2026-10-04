@@ -18,6 +18,7 @@ import type { CoachingSession, PrescribedProblem, Prescription, TransferTask } f
 import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import styles from './TrainingPage.module.css'
 import { monthDay } from '../../shared/format'
+import { markOpenSource } from '../../shared/analytics'
 
 /**
  * 훈련 `/training` (UI 디자인 문서 §9.4 Daily prescription, docs/ui-overhaul.md §6.5).
@@ -163,7 +164,7 @@ function Prescribed({ prescription }: { prescription: Prescription }) {
             {rest.map((item) => (
               <li key={item.problemId}>
                 <Badge>{REASON_LABEL[item.reason]}</Badge>
-                <Link href={`/problems/${item.problemId}/solve`} className={styles.restLink}>
+                <Link href={`/problems/${item.problemId}/solve`} className={styles.restLink} onClick={() => markOpenSource('prescription')}>
                   {problemLabel(index, item.problemId)}
                 </Link>
                 <span className={styles.muted}>{item.detail}</span>
@@ -209,7 +210,7 @@ function PrescriptionCard({
         다음 측정 {monthDay(item.nextMeasurement)}
       </p>
       <div className={styles.actions}>
-        <Link href={`/problems/${item.problemId}/solve`} className={styles.start}>
+        <Link href={`/problems/${item.problemId}/solve`} className={styles.start} onClick={() => markOpenSource('prescription')}>
           <Play size={16} aria-hidden="true" />
           시작
         </Link>

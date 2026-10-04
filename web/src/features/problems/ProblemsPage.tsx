@@ -23,6 +23,7 @@ import { TodaySummary } from '../training/TodaySummary'
 import { clearFilters, isEmpty, readFilter, toggle, writeFilter } from './problemFilter'
 import styles from './ProblemsPage.module.css'
 import { count } from '../../shared/format'
+import { markOpenSource, trackOnce } from '../../shared/analytics'
 
 /**
  * P-01 문제 탐색 `/problems` (UI 디자인 문서 §3, docs/ui-overhaul.md §6.1).
@@ -67,6 +68,13 @@ export function ProblemsPage() {
   const page = query.data
   const loading = query.isFetching || typed !== filter.query
 
+  // 목록을 봤다 — 같은 조건은 이 탭에서 한 번 (§16.1 problem_list_view, 탐색 마찰)
+  useEffect(() => {
+    if (!page || query.isPlaceholderData) return
+    const filters = [filter.query.trim() !== '', filter.difficulty.length > 0, filter.tags.length > 0, filter.status !== null].filter(Boolean).length
+    trackOnce(`list:${JSON.stringify(filter)}`, 'problem_list_view', { filters, resultCount: page.total ?? 0, sort: filter.sort })
+  }, [page, query.isPlaceholderData, filter])
+
   /** 거르는 조건이 바뀌면 1쪽으로 돌아간다. 3쪽을 보다 태그를 바꾸면 3쪽이 없을 수 있다. */
   const update = (patch: Partial<ProblemFilter>) => setFilter((prev) => ({ ...prev, ...patch, page: 1 }))
 
@@ -87,7 +95,10 @@ export function ProblemsPage() {
   const pick = async () => {
     try {
       const picked = await randomProblem(filter)
-      if (picked) navigate(problemHref(picked.id, session !== null))
+      if (picked) {
+        markOpenSource('list')
+        navigate(problemHref(picked.id, session !== null))
+      }
       else toast.show('조건에 맞는 문제가 없습니다', 'warning')
     } catch {
       toast.show('문제를 고르지 못했습니다', 'danger')
@@ -288,7 +299,7 @@ function ProblemTable({
             <td className={styles.colNumber}>{item.number ?? '—'}</td>
             <td className={styles.colTitle}>
               {/* 행 전체가 링크다. 진짜 <a> 라서 새 탭으로도 열린다 */}
-              <Link href={problemHref(item.id, signedIn)} className={styles.rowLink}>
+              <Link href={problemHref(item.id, signedIn)} className={styles.rowLink} onClick={() => markOpenSource('list')}>
                 {item.title}
               </Link>
               <span className={styles.tags}>{item.tags.join(' · ')}</span>

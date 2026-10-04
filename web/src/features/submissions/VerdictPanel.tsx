@@ -13,6 +13,7 @@ import { diffValues } from './outputDiff'
 import type { Segment } from './outputDiff'
 import { decodeWire, returnKind } from './wire'
 import styles from './VerdictPanel.module.css'
+import { markOpenSource, track } from '../../shared/analytics'
 
 /**
  * 판정 결과 (UI 디자인 문서 §4.3 Result Drawer 상태, §7.2 — docs/ui-overhaul.md §6.3).
@@ -385,17 +386,38 @@ function AcceptedNext({
       <p className={styles.nextTitle}>다음에 할 것</p>
       <div className={styles.nextActions}>
         {hasTrace && onOpenReplay && (
-          <Button size="dense" icon={<Clapperboard size={14} />} onClick={onOpenReplay}>
+          <Button
+            size="dense"
+            icon={<Clapperboard size={14} />}
+            onClick={() => {
+              track('post_ac_action', { action: 'replay' })
+              onOpenReplay()
+            }}
+          >
             내 실행 리플레이
           </Button>
         )}
         {onOpenEditorial && (
-          <Button size="dense" icon={<BookOpen size={14} />} onClick={onOpenEditorial}>
+          <Button
+            size="dense"
+            icon={<BookOpen size={14} />}
+            onClick={() => {
+              track('post_ac_action', { action: 'editorial' })
+              onOpenEditorial()
+            }}
+          >
             해설과 다른 풀이
           </Button>
         )}
         {next && (
-          <Link href={`/problems/${next.problemId}/solve`} className={styles.nextLink}>
+          <Link
+            href={`/problems/${next.problemId}/solve`}
+            className={styles.nextLink}
+            onClick={() => {
+              track('post_ac_action', { action: 'next' })
+              markOpenSource('prescription')
+            }}
+          >
             처방의 다음 문제 <code>{next.problemId}</code>
           </Link>
         )}

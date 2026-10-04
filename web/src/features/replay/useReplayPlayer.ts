@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { setParam } from '../../shared/url'
 import { SPEEDS, intervalOf, nextPlayStep } from './timeline'
 import type { Marker, Speed } from './timeline'
+import { track } from '../../shared/analytics'
+import type { SeekMethod } from '../../shared/analytics'
 
 const SPEED_KEY = 'codedrill.replay.speed'
 const MODE_KEY = 'codedrill.replay.mode'
@@ -36,11 +38,31 @@ export function useReplayPlayer({
 
   useEffect(() => setParam('step', String(step)), [step])
 
-  /** 사용자가 옮긴 걸음. 재생을 멈춘다. */
+  const scrubbing = useRef<{ from: number; timer: ReturnType<typeof setTimeout> } | null>(null)
+
+  /**
+   * 사용자가 옮긴 걸음. 재생을 멈춘다. [method] 는 어떻게 옮겼나 — 스크러버·키·단추·코드 줄·마커·분기·목록
+   * (§16.1 replay_seeked). 스크러버는 끄는 동안 수십 번 바뀌므로 멈춘 뒤 한 번으로 센다.
+   */
   const seek = useCallback(
-    (next: number) => {
+    (next: number, method: SeekMethod = 'button') => {
       setPlaying(false)
-      setStepState(clamp(next, total))
+      const to = clamp(next, total)
+      const from = latest.current.step
+      setStepState(to)
+      if (method === 'scrub') {
+        const start = scrubbing.current?.from ?? from
+        if (scrubbing.current) clearTimeout(scrubbing.current.timer)
+        scrubbing.current = {
+          from: start,
+          timer: setTimeout(() => {
+            scrubbing.current = null
+            if (start !== to) track('replay_seeked', { from: start, to, method })
+          }, 500),
+        }
+      } else if (to !== from) {
+        track('replay_seeked', { from, to, method })
+      }
     },
     [total],
   )

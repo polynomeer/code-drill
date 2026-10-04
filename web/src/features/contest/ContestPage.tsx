@@ -9,6 +9,7 @@ import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import { KIND_LABEL, STATUS_LABEL, clock, countdownOf, remaining, signed } from './contestView'
 import { useNow } from './useNow'
 import styles from './ContestPage.module.css'
+import { markOpenSource } from '../../shared/analytics'
 
 /**
  * 대회 화면 `/contests/:id` (docs/ui-overhaul.md §6.6).
@@ -186,7 +187,7 @@ function Contest({ view }: { view: ContestView }) {
                   <span className={styles.problemLetter} aria-hidden="true">
                     {String.fromCharCode(65 + position)}
                   </span>
-                  <Link href={problemHref(problemId)} className={styles.problemLink}>
+                  <Link href={problemHref(problemId)} className={styles.problemLink} onClick={() => markOpenSource('contest')}>
                     {problemLabel(index, problemId)}
                   </Link>
                   <span className={styles.problemScore}>

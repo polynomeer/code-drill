@@ -5,6 +5,7 @@ import { MutationCheckPanel } from './MutationCheckPanel'
 import { returnKind, showWire } from '../submissions/wire'
 import { VERDICT_LABEL } from '../../shared/types'
 import type { Problem, SubmissionLanguage, Trial } from '../../shared/types'
+import { track } from '../../shared/analytics'
 
 /**
  * 테스트 패널 (PRD §5.2, 기획서 부록 A 실행 도메인).
@@ -58,6 +59,9 @@ export function TestPanel({
     setError(null)
     setRunning(true)
     try {
+      // 예제를 손대지 않고 돌렸나, 내 케이스를 넣었나 (§16.1 run_requested)
+      const samples = problem.samples.map((sample) => JSON.stringify(sample.args)).join('\n')
+      track('run_requested', { type: text.trim() === samples.trim() ? 'sample' : 'custom', language })
       const started = await startTrial(problem.id, language, source, parsed.cases)
       setTrial(started)
       poll(started.id)

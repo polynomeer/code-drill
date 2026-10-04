@@ -44,6 +44,7 @@ import { splitStatement } from './statement'
 import { ALT, MOD, useShortcuts } from './useShortcuts'
 import { useWorkspaceSource } from './useWorkspaceSource'
 import styles from './SolvePage.module.css'
+import { takeOpenSource, track, trackOnce } from '../../shared/analytics'
 
 /**
  * S-01 풀이 Workspace (UI 디자인 문서 §4, 디자인 설계서 §6 — docs/ui-overhaul.md §6.2).
@@ -147,6 +148,9 @@ export function SolvePage({ slug }: { slug: string }) {
   const [viewingCode, setViewingCode] = useState<string | null>(null)
 
   const [submitting, setSubmitting] = useState(false)
+  /** 이 화면에서 낸 제출과 낸 시각 — 판정까지 걸린 시간을 잰다 */
+  const submittedAt = useRef(new Map<string, number>())
+  const [mountId] = useState(() => Math.random().toString(36).slice(2))
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -193,7 +197,28 @@ export function SolvePage({ slug }: { slug: string }) {
   )
 
   // 판정이 끝나면 결과 창을 펼치고 판정을 보여 준다 (UI 디자인 문서 §8.3). 기록도 새로 읽는다.
+  // 문제를 열었다 — 이 화면이 설 때 한 번, 어디서 왔는지와 함께 (§16.1 problem_open)
+  useEffect(() => {
+    if (problem) trackOnce(`open:${problem.id}:${mountId}`, 'problem_open', { source: takeOpenSource(), problemId: problem.id })
+  }, [problem?.id])
+
+  // 결과 창의 리플레이 탭을 실제로 열었을 때 (§16.1 replay_opened — 진입 경로 drawer). 탭이 숨은 채로 그려진
+  // 것은 연 것이 아니다
+  const replayShown = drawerTab === 'replay' && (!isMobile || mobileTab === 'result')
+  useEffect(() => {
+    if (replayShown && submissionId && trace) trackOnce(`replay-drawer:${submissionId}`, 'replay_opened', { entry: 'drawer', traceType: trace.status })
+  }, [replayShown, submissionId, trace?.traceId])
+
   const completed = submission?.status === 'COMPLETED' || submission?.status === 'SYSTEM_ERROR'
+  // 판정을 봤다 — 이 화면에서 낸 제출만, 낸 때부터 판정이 보일 때까지 (§16.1 verdict_viewed, 결과 전달)
+  useEffect(() => {
+    if (!completed || !submission) return
+    const sentAt = submittedAt.current.get(submission.id)
+    if (sentAt === undefined) return
+    submittedAt.current.delete(submission.id)
+    track('verdict_viewed', { verdict: submission.verdict ?? submission.status, latency: Date.now() - sentAt })
+  }, [completed, submission?.id])
+
   useEffect(() => {
     if (!completed) return
     void queryClient.invalidateQueries({ queryKey: ['submissions', slug] })
@@ -219,6 +244,8 @@ export function SolvePage({ slug }: { slug: string }) {
     setError(null)
     try {
       const created = await createSubmission(problem.id, problem.version, language, workspace.source)
+      submittedAt.current.set(created.id, Date.now())
+      track('submission_created', { problem: problem.id, language })
       openSubmission(created.id)
       void queryClient.invalidateQueries({ queryKey: ['submissions', slug] })
     } catch (e) {

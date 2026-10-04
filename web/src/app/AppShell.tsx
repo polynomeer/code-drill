@@ -14,6 +14,7 @@ import { NotificationBell } from '../features/notifications/NotificationBell'
 import CommandPalette from '../features/search/CommandPalette'
 import type { Command } from '../features/search/search'
 import styles from './AppShell.module.css'
+import { markOpenSource } from '../shared/analytics'
 
 
 /** 모바일 하단 탭 (ui-overhaul.md §4 "하단 탭 4개(문제·훈련·역량·나)"). 나머지는 "나"에서 간다 */
@@ -267,7 +268,10 @@ export function AppShell({
             open={paletteOpen}
             onClose={() => setPaletteOpen(false)}
             commands={commands}
-            onOpenProblem={(id) => navigate(`/problems/${id}/solve`)}
+            onOpenProblem={(id) => {
+              markOpenSource('search')
+              navigate(`/problems/${id}/solve`)
+            }}
           />
       )}
 

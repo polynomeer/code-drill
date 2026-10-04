@@ -4,6 +4,7 @@ import { SPEEDS, nextMarker } from './timeline'
 import type { Marker, Speed } from './timeline'
 import type { TimelineMode } from './useReplayPlayer'
 import styles from './ReplayPage.module.css'
+import type { SeekMethod } from '../../shared/analytics'
 
 const TIER_LABEL = { normal: '일반', important: '중요', error: '분기' } as const
 
@@ -40,7 +41,7 @@ export function ReplayTimeline({
   valueText: string
   /** 지금 걸음의 구간을 받는 중 */
   loading: boolean
-  onSeek: (step: number) => void
+  onSeek: (step: number, method: SeekMethod) => void
   onToggle: () => void
   onSpeed: (speed: Speed) => void
   onMode: (mode: TimelineMode) => void
@@ -72,7 +73,7 @@ export function ReplayTimeline({
           min={0}
           max={total}
           value={step}
-          onChange={(event) => onSeek(Number(event.target.value))}
+          onChange={(event) => onSeek(Number(event.target.value), 'scrub')}
           aria-label="재생 위치"
           aria-valuetext={valueText}
         />
@@ -80,14 +81,14 @@ export function ReplayTimeline({
 
       <div className={styles.playback}>
         <div className={styles.buttons}>
-          <IconButton label="처음 (Home)" icon={<ChevronFirst size={18} />} onClick={() => onSeek(0)} disabled={step === 0} />
+          <IconButton label="처음 (Home)" icon={<ChevronFirst size={18} />} onClick={() => onSeek(0, 'button')} disabled={step === 0} />
           <IconButton
             label="이전 중요 이벤트 (Shift+←)"
             icon={<ChevronsLeft size={18} />}
-            onClick={() => onSeek(nextMarker(important, step, -1))}
+            onClick={() => onSeek(nextMarker(important, step, -1), 'marker')}
             disabled={nextMarker(important, step, -1) === step}
           />
-          <IconButton label="이전 (←)" icon={<ChevronLeft size={18} />} onClick={() => onSeek(step - 1)} disabled={step === 0} />
+          <IconButton label="이전 (←)" icon={<ChevronLeft size={18} />} onClick={() => onSeek(step - 1, 'button')} disabled={step === 0} />
           <IconButton
             label={playing ? '일시 정지 (Space)' : '재생 (Space)'}
             icon={playing ? <Pause size={18} /> : <Play size={18} />}
@@ -95,14 +96,14 @@ export function ReplayTimeline({
             className={styles.play}
             disabled={total === 0}
           />
-          <IconButton label="다음 (→)" icon={<ChevronRight size={18} />} onClick={() => onSeek(step + 1)} disabled={step >= total} />
+          <IconButton label="다음 (→)" icon={<ChevronRight size={18} />} onClick={() => onSeek(step + 1, 'button')} disabled={step >= total} />
           <IconButton
             label="다음 중요 이벤트 (Shift+→)"
             icon={<ChevronsRight size={18} />}
-            onClick={() => onSeek(nextMarker(important, step, 1))}
+            onClick={() => onSeek(nextMarker(important, step, 1), 'marker')}
             disabled={nextMarker(important, step, 1) === step}
           />
-          <IconButton label="끝 (End)" icon={<ChevronLast size={18} />} onClick={() => onSeek(total)} disabled={step >= total} />
+          <IconButton label="끝 (End)" icon={<ChevronLast size={18} />} onClick={() => onSeek(total, 'button')} disabled={step >= total} />
         </div>
 
         <span className={styles.counter}>

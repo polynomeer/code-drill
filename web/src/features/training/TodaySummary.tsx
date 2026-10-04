@@ -6,6 +6,7 @@ import { Badge, Panel, Skeleton } from '../../design'
 import { REASON_LABEL } from '../../shared/types'
 import { problemLabel, useProblemIndex } from '../problems/useProblemIndex'
 import styles from './TodaySummary.module.css'
+import { markOpenSource } from '../../shared/analytics'
 
 /**
  * 오늘의 처방 요약 — 홈과 문제 목록 보조 열의 자리 (UI 디자인 문서 §3.2 "학습 맥락은 보조 열에만").
@@ -45,7 +46,7 @@ export function TodaySummary() {
               {prescription.items.slice(0, 3).map((item) => (
                 <li key={item.problemId}>
                   <Badge>{REASON_LABEL[item.reason]}</Badge>
-                  <Link href={`/problems/${item.problemId}/solve`} className={styles.link}>
+                  <Link href={`/problems/${item.problemId}/solve`} className={styles.link} onClick={() => markOpenSource('prescription')}>
                     {problemLabel(index, item.problemId)}
                   </Link>
                 </li>
