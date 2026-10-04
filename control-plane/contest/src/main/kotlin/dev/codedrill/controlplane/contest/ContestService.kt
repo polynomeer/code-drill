@@ -28,6 +28,20 @@ class ContestService(
     fun list(userId: String): List<ContestSummary> =
         repository.visible(userId, LIST_LIMIT).map { it.summary(repository.entry(it.id, userId) != null, repository.entryCount(it.id)) }
 
+    /** 끝나지 않은 대회 — 진행 중·예정·대기. */
+    fun active(userId: String, now: Instant = Instant.now()): List<ContestSummary> =
+        repository.active(userId, now, LIST_LIMIT).map { it.summary(repository.entry(it.id, userId) != null, repository.entryCount(it.id)) }
+
+    /** 끝난 대회 한 쪽 (1부터). */
+    fun finished(userId: String, page: Int, now: Instant = Instant.now()): FinishedPage {
+        val total = repository.finishedCount(userId, now)
+        val pageCount = maxOf(1, (total + PAGE_SIZE - 1) / PAGE_SIZE)
+        val current = page.coerceIn(1, pageCount)
+        val items = repository.finished(userId, now, PAGE_SIZE, (current - 1) * PAGE_SIZE)
+            .map { it.summary(repository.entry(it.id, userId) != null, repository.entryCount(it.id)) }
+        return FinishedPage(items, current, pageCount, total)
+    }
+
     fun view(userId: String, id: UUID): ContestView? {
         repository.find(id)?.let { if (it.rated && it.ratedAt == null && it.status() == Contest.Status.FINISHED) applyRating(it) }
         val contest = repository.find(id) ?: return null
@@ -241,6 +255,8 @@ class ContestService(
         val rated: Boolean, val ratedAt: Instant?,
     )
 
+    data class FinishedPage(val items: List<ContestSummary>, val page: Int, val pageCount: Int, val total: Int)
+
     data class ContestView(
         val contest: ContestSummary, val problems: List<String>, val standings: List<Standing>, val joinCode: String?,
         /** 끝난 대회에서, 내가 돌고 있는 가상 참가의 id. 없으면 null — 열 수 있다는 뜻은 contest.status 가 말한다. */
@@ -269,6 +285,9 @@ class ContestService(
         /** 운영자가 열고 누구나 보는 종류. 대결과 가상 참가는 참가한 사람에게만 있다. */
         val PUBLIC = setOf(Contest.Kind.CONTEST, Contest.Kind.HACK)
         const val LIST_LIMIT = 50
+
+        /** 끝난 대회 한 쪽. */
+        const val PAGE_SIZE = 20
         const val MAX_PROBLEMS = 10
         const val MIN_DUEL_MINUTES = 5
         const val MAX_DUEL_MINUTES = 120

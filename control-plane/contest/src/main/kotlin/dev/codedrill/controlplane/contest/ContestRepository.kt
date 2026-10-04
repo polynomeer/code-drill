@@ -32,12 +32,38 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
     fun visible(userId: String, limit: Int): List<Contest> = jdbc.query(
         """
         SELECT c.* FROM contest c
-         WHERE (c.kind IN ('CONTEST', 'HACK') AND c.published)
-            OR (c.kind IN ('DUEL', 'VIRTUAL') AND EXISTS (SELECT 1 FROM contest_entry e WHERE e.contest_id = c.id AND e.user_id = ?))
+         WHERE $VISIBLE
          ORDER BY c.starts_at DESC NULLS FIRST, c.created_at DESC LIMIT ?
         """.trimIndent(),
         CONTEST, userId, limit,
     )
+
+    /** 끝나지 않은 것만 (진행 중·예정·대기). 로비의 위 두 구획이다. */
+    fun active(userId: String, now: Instant, limit: Int): List<Contest> = jdbc.query(
+        """
+        SELECT c.* FROM contest c
+         WHERE ($VISIBLE)
+           AND (c.ends_at IS NULL OR c.ends_at > ?)
+         ORDER BY c.starts_at NULLS FIRST, c.created_at DESC LIMIT ?
+        """.trimIndent(),
+        CONTEST, userId, Timestamp.from(now), limit,
+    )
+
+    /** 끝난 것, 최근에 끝난 것부터 한 쪽. 로비의 "끝남" 구획 — 쌓이기만 하므로 쪽으로 나눈다. */
+    fun finished(userId: String, now: Instant, limit: Int, offset: Int): List<Contest> = jdbc.query(
+        """
+        SELECT c.* FROM contest c
+         WHERE ($VISIBLE)
+           AND c.ends_at <= ?
+         ORDER BY c.ends_at DESC, c.created_at DESC LIMIT ? OFFSET ?
+        """.trimIndent(),
+        CONTEST, userId, Timestamp.from(now), limit, offset,
+    )
+
+    fun finishedCount(userId: String, now: Instant): Int = jdbc.queryForObject(
+        "SELECT count(*) FROM contest c WHERE ($VISIBLE) AND c.ends_at <= ?",
+        Int::class.java, userId, Timestamp.from(now),
+    ) ?: 0
 
     /** 이 사람이 이 대회로 연 가상 참가 중 아직 도는 것. 하나면 된다. */
     fun runningVirtual(parentId: UUID, userId: String, now: Instant): Contest? = jdbc.query(
@@ -207,6 +233,10 @@ class ContestRepository(private val jdbc: JdbcTemplate) {
     }
 
     private companion object {
+        /** 누구에게 보이는 대회인가 — 공개된 대회·반례 대전, 그리고 내가 참가한 대결·가상 참가. 바인딩 하나(userId). */
+        const val VISIBLE = "(c.kind IN ('CONTEST', 'HACK') AND c.published)" +
+            " OR (c.kind IN ('DUEL', 'VIRTUAL') AND EXISTS (SELECT 1 FROM contest_entry e WHERE e.contest_id = c.id AND e.user_id = ?))"
+
         val CONTEST = RowMapper { rs, _ ->
             Contest(
                 id = rs.getObject("id", UUID::class.java),

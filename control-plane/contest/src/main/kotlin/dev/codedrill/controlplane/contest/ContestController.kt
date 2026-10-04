@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 /** 대회 API (§8.4). */
@@ -21,8 +22,22 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/contests")
 class ContestController(private val service: ContestService) {
 
+    /**
+     * 대회 목록. `scope=active` 면 끝나지 않은 것만 (로비의 진행 중·예정). 없으면 예전처럼 최근 것 50개.
+     */
     @GetMapping
-    fun list(@RequestAttribute(Principal.ATTRIBUTE) principal: Principal): List<ContestService.ContestSummary> = service.list(principal.id)
+    fun list(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @RequestParam(required = false) scope: String?,
+    ): List<ContestService.ContestSummary> =
+        if (scope == "active") service.active(principal.id) else service.list(principal.id)
+
+    /** 끝난 대회, 최근에 끝난 것부터 한 쪽 (로비의 "끝남"). */
+    @GetMapping("/finished")
+    fun finished(
+        @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
+        @RequestParam(defaultValue = "1") page: Int,
+    ): ContestService.FinishedPage = service.finished(principal.id, page)
 
     /** 내 레이팅 (§8.4). 변화의 이력까지. */
     @GetMapping("/me/rating")
