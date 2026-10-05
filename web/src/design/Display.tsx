@@ -157,7 +157,7 @@ export function ProgressBar({
       aria-valuemin={0}
       aria-valuemax={max}
     >
-      <span className={styles.progressFill} style={{ width: `${ratio * 100}%`, background: `var(--color-${tone})` }} />
+      <span className={styles.progressFill} style={{ width: `${ratio * 100}%`, backgroundColor: `var(--color-${tone})` }} />
     </span>
   )
 }

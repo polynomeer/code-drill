@@ -67,7 +67,6 @@
 .bar,
 .barOn {
   width: 3px;
-  border-radius: 1px;
 }
 
 .bars > :nth-child(1) {
@@ -162,7 +161,7 @@
 .progress {
   display: block;
   width: 100%;
-  height: 6px;
+  height: 8px;
   overflow: hidden;
   background: var(--color-bg-subtle);
   border-radius: var(--radius-full);
@@ -172,5 +171,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
+  /* 칸으로 끊긴 게이지 — 퀘스트 테마의 경험치 막대 모양. 값은 여전히 폭이 말한다 */
+  background-image: repeating-linear-gradient(90deg, transparent 0 10px, rgb(0 0 0 / 25%) 10px 12px);
   transition: width var(--motion-state);
 }

@@ -1,8 +1,8 @@
 /*
  * 디자인 토큰 — 색·글꼴·간격·반경·그림자·모션의 단일 출처 (docs/ui-overhaul.md §5.1).
  *
- * 값의 원본은 디자인 설계서 §13.1~13.3 과 UI 디자인 문서 §9.1 이다. 둘이 어긋나는 곳은
- * ui-overhaul.md §2 에서 고른 쪽을 따른다. 컴포넌트 CSS 는 hex 를 직접 쓰지 않는다.
+ * 간격·컨트롤·모션의 원본은 디자인 설계서 §13.3 과 UI 디자인 문서 §9.1 이다. 색·제목 글꼴·반경·그림자는
+ * 퀘스트 테마(시안 H)로 바꿨다 — 그 결정과 이유는 ui-overhaul.md §2. 컴포넌트 CSS 는 hex 를 직접 쓰지 않는다.
  *
  * 테마는 <html data-theme> 이 정한다. index.html 의 인라인 스크립트가 첫 페인트 전에
  * 저장된 선택 또는 시스템 설정으로 채운다 — 미디어 쿼리로 두 번 적으면 다크 값이 두 벌이
@@ -16,101 +16,109 @@
   color-scheme: light;
 
   /* 표면. app 은 페이지 바탕, surface 는 패널, inset 은 코드·입력처럼 한 단 들어간 곳 */
-  --color-bg-app: #f6f8f9;
+  --color-bg-app: #eceef8;
   --color-bg-surface: #ffffff;
-  --color-bg-subtle: #f0f3f5;
-  --color-bg-inset: #f1f4f6;
+  --color-bg-subtle: #e4e7f5;
+  --color-bg-inset: #e9ebf7;
   --color-bg-elevated: #ffffff;
-  --color-bg-editor: #0f171d;
+  --color-bg-editor: #0b0c1c;
 
-  --color-text-primary: #1d252c;
-  --color-text-muted: #62717a;
+  --color-text-primary: #12142b;
+  --color-text-muted: #4c5180;
   --color-text-on-brand: #ffffff;
 
   /* 경계: default 는 패널 구분(장식), strong 은 입력·컨트롤 경계(UI 경계 3:1) */
-  --color-border-default: #dce5e8;
-  --color-border-strong: #808f99;
+  --color-border-default: #c9cde6;
+  --color-border-strong: #6b70a0;
+  /* 픽셀 외곽선 — 단추·패널의 굵은 테두리와 딱딱한 그림자 (§5.1 퀘스트 테마) */
+  --color-pixel-line: #12142b;
 
-  --color-brand: #265f7a;
-  --color-brand-hover: #1d4d63;
-  --color-brand-subtle: #e3eff4;
-  --color-trace: #168b8c;
-  --color-trace-subtle: #dff2f1;
+  /* 브랜드는 금화. 라이트에서는 흰 바탕 위 글자가 되어야 해서 청동으로 내린다 */
+  --color-brand: #835800;
+  --color-brand-hover: #6a4700;
+  --color-brand-subtle: #fbefcf;
+  --color-trace: #0a7590;
+  --color-trace-subtle: #dbf2f8;
 
-  --color-success: #1e6a4a;
-  --color-success-subtle: #e2f2ea;
-  --color-warning: #8a5a00;
-  --color-warning-subtle: #fbf0dc;
-  --color-danger: #a33a3a;
-  --color-danger-subtle: #f9e5e5;
+  --color-success: #1d6f37;
+  --color-success-subtle: #def2e3;
+  --color-warning: #974d00;
+  --color-warning-subtle: #fdead6;
+  --color-danger: #b0243a;
+  --color-danger-subtle: #fbe2e6;
   /* System Error 는 사용자 잘못이 아니다 — 오답색을 쓰지 않는다 (디자인 설계서 §7.4) */
-  --color-system: #5a6670;
-  --color-system-subtle: #eceff1;
+  --color-system: #4c5180;
+  --color-system-subtle: #e6e8f4;
 
   /* 난이도 1(입문)~5(최상). 배지는 글자를 함께 쓰므로 색은 보조 신호다 */
-  --color-difficulty-1: #5a6670;
-  --color-difficulty-2: #1e6a4a;
-  --color-difficulty-3: #265f7a;
-  --color-difficulty-4: #8a5a00;
-  --color-difficulty-5: #a33a3a;
+  --color-difficulty-1: #4c5180;
+  --color-difficulty-2: #1d6f37;
+  --color-difficulty-3: #0a6a83;
+  --color-difficulty-4: #974d00;
+  --color-difficulty-5: #b0243a;
 
-  --shadow-popover: 0 8px 28px rgb(16 22 26 / 14%);
-  --shadow-dialog: 0 18px 55px rgb(16 22 26 / 18%);
-  --color-backdrop: rgb(16 22 26 / 40%);
+  --shadow-popover: 4px 4px 0 rgb(18 20 43 / 85%);
+  --shadow-dialog: 6px 6px 0 rgb(18 20 43 / 90%);
+  --shadow-pixel: 3px 3px 0 var(--color-pixel-line);
+  --color-backdrop: rgb(18 20 43 / 45%);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --color-bg-app: #10161a;
-  --color-bg-surface: #172128;
-  --color-bg-subtle: #1e2a32;
-  --color-bg-inset: #0c1216;
-  --color-bg-elevated: #1e2a32;
-  --color-bg-editor: #0f171d;
+  --color-bg-app: #12142b;
+  --color-bg-surface: #1d2042;
+  --color-bg-subtle: #272b57;
+  --color-bg-inset: #0e1026;
+  --color-bg-elevated: #232651;
+  --color-bg-editor: #0b0c1c;
 
-  --color-text-primary: #edf2f4;
-  --color-text-muted: #a9b5bb;
-  --color-text-on-brand: #0b1418;
+  --color-text-primary: #f3f0ff;
+  --color-text-muted: #b3b8dc;
+  --color-text-on-brand: #1a1300;
 
-  --color-border-default: #2a3a45;
-  --color-border-strong: #627784;
+  --color-border-default: #3b4080;
+  --color-border-strong: #7f86c8;
+  --color-pixel-line: #07081a;
 
-  --color-brand: #6ab3cf;
-  --color-brand-hover: #8cc6dc;
-  --color-brand-subtle: #1b3440;
-  --color-trace: #54c9c4;
-  --color-trace-subtle: #163634;
+  --color-brand: #ffcc4d;
+  --color-brand-hover: #ffd970;
+  --color-brand-subtle: #3a3321;
+  --color-trace: #4de1ff;
+  --color-trace-subtle: #123447;
 
-  --color-success: #61c48b;
-  --color-success-subtle: #173326;
-  --color-warning: #e6b85c;
-  --color-warning-subtle: #3a2e14;
-  --color-danger: #f07c7c;
-  --color-danger-subtle: #3d1f21;
-  --color-system: #a9b5bb;
-  --color-system-subtle: #26323a;
+  --color-success: #6ee07a;
+  --color-success-subtle: #173a26;
+  --color-warning: #ffa857;
+  --color-warning-subtle: #3d2a16;
+  --color-danger: #ff7a7a;
+  --color-danger-subtle: #3f1d2a;
+  --color-system: #b3b8dc;
+  --color-system-subtle: #2a2d55;
 
-  --color-difficulty-1: #a9b5bb;
-  --color-difficulty-2: #61c48b;
-  --color-difficulty-3: #6ab3cf;
-  --color-difficulty-4: #e6b85c;
-  --color-difficulty-5: #f07c7c;
+  --color-difficulty-1: #b3b8dc;
+  --color-difficulty-2: #6ee07a;
+  --color-difficulty-3: #4de1ff;
+  --color-difficulty-4: #ffa857;
+  --color-difficulty-5: #ff7a7a;
 
-  --shadow-popover: 0 8px 28px rgb(0 0 0 / 40%);
-  --shadow-dialog: 0 18px 55px rgb(0 0 0 / 50%);
-  --color-backdrop: rgb(0 0 0 / 55%);
+  --shadow-popover: 4px 4px 0 rgb(0 0 0 / 60%);
+  --shadow-dialog: 6px 6px 0 rgb(0 0 0 / 70%);
+  --shadow-pixel: 3px 3px 0 var(--color-pixel-line);
+  --color-backdrop: rgb(4 5 16 / 65%);
 }
 
 :root {
   /* 글꼴 (디자인 설계서 §13.2, 굵기는 ui-overhaul.md §2) */
   --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Malgun Gothic',
     'Segoe UI', sans-serif;
+  /* 제목 — 퀘스트 테마의 굵은 한글 표제 글꼴. 굵기가 400 하나뿐이라 제목 토큰은 400 으로 쓴다 */
+  --font-display: 'Do Hyeon', var(--font-sans);
   --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --text-display: 600 28px/36px var(--font-sans);
-  --text-h1: 600 22px/30px var(--font-sans);
-  --text-h2: 600 17px/24px var(--font-sans);
+  --text-display: 400 32px/38px var(--font-display);
+  --text-h1: 400 26px/32px var(--font-display);
+  --text-h2: 400 20px/26px var(--font-display);
   --text-h3: 600 15px/22px var(--font-sans);
   --text-body: 400 14px/22px var(--font-sans);
   --text-reading: 400 15px/24px var(--font-sans);
@@ -131,9 +139,9 @@
   --space-6: 32px;
   --space-7: 48px;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
   --radius-full: 999px;
 
   --control-dense: 28px;

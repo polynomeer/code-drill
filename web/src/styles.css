@@ -55,7 +55,7 @@
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px;
 }
 
@@ -97,7 +97,7 @@ select {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 5px 8px;
 }
 
@@ -121,7 +121,7 @@ select {
 .score-bar {
   height: 6px;
   background: var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   min-width: 80px;
 }
@@ -139,7 +139,7 @@ select {
 .editor {
   height: 340px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -147,7 +147,7 @@ button {
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 12px;
   cursor: pointer;
 }
@@ -208,7 +208,7 @@ button.primary {
 .log {
   background: var(--color-bg-inset);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 10px;
   overflow: auto;
   max-height: 200px;
@@ -255,7 +255,7 @@ table.groups td {
   min-width: 52px;
   padding: 8px 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--color-bg-inset);
 }
 
@@ -306,7 +306,7 @@ table.groups td {
   background: var(--color-bg-inset);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   margin-bottom: 8px;
 }
@@ -439,7 +439,7 @@ table.groups td {
 
 .conflict {
   border: 1px solid var(--bad);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   margin: 8px 0;
 }
@@ -502,7 +502,7 @@ table.groups td {
   min-width: 44px;
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--color-bg-inset);
   font-variant-numeric: tabular-nums;
 }
@@ -640,7 +640,7 @@ table.groups td {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 8px;
   font-size: 12px;
   resize: vertical;
@@ -649,7 +649,7 @@ table.groups td {
 .compile-log {
   background: var(--bg);
   border: 1px solid var(--bad);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px;
   font-size: 11px;
   max-height: 140px;
@@ -705,7 +705,7 @@ table.groups td {
 .code {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px;
   font-size: 11px;
   line-height: 1.5;
@@ -1084,7 +1084,7 @@ table.groups td {
   align-items: center;
   gap: 2px;
   border: 1px solid var(--border);
-  border-radius: 6px 6px 0 0;
+  border-radius: 0;
   padding: 0 4px;
 }
 
@@ -1148,7 +1148,7 @@ table.groups td {
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 4px 10px;
   cursor: pointer;
   font-size: 12px;
@@ -1167,7 +1167,7 @@ table.groups td {
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .panel h3 {
