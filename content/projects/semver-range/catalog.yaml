@@ -1,0 +1,7 @@
+difficulty: MEDIUM
+tags:
+  - string
+  - sorting
+summary: 유의적 버전을 읽고 순서를 매기고, 캐럿·물결·비교식·합집합으로 된 범위에 맞춘다 — 프리릴리스의 순서와 범위에 들어오는 조건이 요구사항의 절반이다.
+competencies:
+  - SPECIFICATION
