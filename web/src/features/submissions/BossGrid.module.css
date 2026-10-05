@@ -1,0 +1,129 @@
+.boss {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font: var(--text-h2);
+}
+
+.status {
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.defeated {
+  color: var(--color-success);
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rows {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rows th,
+.rows td {
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border-default);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rows thead th {
+  padding-top: 0;
+  border-top: 0;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.rows tbody th {
+  white-space: nowrap;
+  font-weight: inherit;
+}
+
+.rows code {
+  font: var(--text-code);
+}
+
+.lock {
+  margin-left: var(--space-1);
+  color: var(--color-text-muted);
+  vertical-align: -1px;
+}
+
+.cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+/* 칸 — 픽셀 하나처럼 각지게. 뜻은 색과 무늬 둘로 */
+.cell {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-pixel-line);
+}
+
+.passed {
+  background: var(--color-success);
+  box-shadow: inset -2px -2px 0 rgb(0 0 0 / 22%);
+}
+
+.failed {
+  background: var(--color-danger)
+    repeating-linear-gradient(45deg, transparent 0 3px, rgb(0 0 0 / 35%) 3px 5px);
+}
+
+.limit {
+  background: var(--color-warning)
+    repeating-linear-gradient(0deg, transparent 0 3px, rgb(0 0 0 / 35%) 3px 5px);
+}
+
+.system {
+  background: var(--color-system);
+}
+
+.pending {
+  background: var(--color-bg-subtle);
+  border: 2px dashed var(--color-border-strong);
+}
+
+/* 아래 입력·기댓값·실행값이 말하는 그 칸 */
+.first {
+  outline: 2px solid var(--color-text-primary);
+  outline-offset: 1px;
+}
+
+.folded {
+  align-self: center;
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.label {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+@media (max-width: 520px) {
+  .rows thead {
+    display: none;
+  }
+}

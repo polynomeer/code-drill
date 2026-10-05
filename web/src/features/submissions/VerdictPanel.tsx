@@ -2,11 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { BookOpen, Check, Clapperboard, Copy, CornerDownRight, RotateCcw } from 'lucide-react'
 import { Link } from 'wouter'
 import { getPrescription } from '../../api/client'
-import { Button, InlineAlert, ProgressBar, VerdictBadge, useToast } from '../../design'
+import { Button, InlineAlert, VerdictBadge, useToast } from '../../design'
 import { IN_FLIGHT, VERDICT_LABEL } from '../../shared/types'
 import type { CaseResult, GroupResult, Problem, Submission, SubmissionStatus, Verdict } from '../../shared/types'
 import { DonatePanel } from '../arena/DonatePanel'
 import { SharePanel } from '../discussion/SharePanel'
+import { BossGrid } from './BossGrid'
+import { bossHp, bossRows, pendingRows } from './bossModel'
 import { CounterexamplePanel } from './CounterexamplePanel'
 import { parseCompileLog } from './compileLog'
 import { diffValues } from './outputDiff'
@@ -88,7 +90,12 @@ export function VerdictPanel({
         />
       )}
 
-      {submission.groups && submission.groups.length > 0 && <GroupTable groups={submission.groups} />}
+      {/* 보스 체력 — 채점 중에는 아직 치지 않은 칸을, 끝나면 케이스마다의 결과를 */}
+      {submission.groups && submission.groups.length > 0 ? (
+        <BossGrid rows={bossRows(submission.groups, problem?.groups)} hp={bossHp(submission.groups)} />
+      ) : (
+        inFlight && problem && problem.groups.length > 0 && <BossGrid rows={pendingRows(problem.groups)} hp={null} judging />
+      )}
 
       {/* 다음 행동 — 반례 줄이기와 내놓기는 소유자의 일이다 (§8.3, §8.5) */}
       {!inFlight && (
@@ -424,48 +431,5 @@ function AcceptedNext({
       </div>
       <p className={styles.meta}>맞힌 문제는 잊을 즈음 오늘의 처방이 복습으로 다시 꺼냅니다.</p>
     </div>
-  )
-}
-
-/* ─── 그룹 ─── */
-
-function GroupTable({ groups }: { groups: GroupResult[] }) {
-  return (
-    <table className={styles.groups}>
-      <caption className={styles.caption}>그룹별 결과</caption>
-      <thead>
-        <tr>
-          <th scope="col">그룹</th>
-          <th scope="col">판정</th>
-          <th scope="col">점수</th>
-          <th scope="col">
-            <span className="visually-hidden">비율</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {groups.map((group) => (
-          <tr key={group.groupId}>
-            <td>
-              <code>{group.groupId}</code>
-            </td>
-            <td>
-              <VerdictBadge verdict={group.verdict} />
-            </td>
-            <td className={styles.num}>{group.maxScore > 0 ? `${group.score} / ${group.maxScore}` : '예제'}</td>
-            <td className={styles.bar}>
-              {group.maxScore > 0 && (
-                <ProgressBar
-                  label={`${group.groupId} 그룹 점수`}
-                  value={group.score}
-                  max={group.maxScore}
-                  tone={group.score === group.maxScore ? 'success' : group.score > 0 ? 'warning' : 'danger'}
-                />
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
   )
 }
