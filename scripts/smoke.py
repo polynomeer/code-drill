@@ -28,9 +28,11 @@ import uuid
 
 import accounts
 import operators
+import stack
 
-# 제어 영역 주소. scripts/up.py 가 포트를 비켜 갔으면 그 값을 넘겨 준다.
-BASE = os.environ.get("CODEDRILL_BASE", "http://localhost:8080").rstrip("/") + "/api/v1"
+# 제어 영역 주소. scripts/up.py 가 비켜 간 포트를 stack 이 찾아 준다 — 손으로 export 하지
+# 않아도 맞는 스택을 두드린다. CODEDRILL_BASE 가 있으면 그것이 이긴다.
+BASE = stack.base_url() + "/api/v1"
 
 # 이 스모크가 쓰는 계정. main() 이 새로 만든다. 제출·초안·기록은 전부 인증을 요구하므로,
 # Authorization 을 따로 주지 않은 요청에는 이 계정의 토큰이 붙는다.

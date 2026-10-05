@@ -96,11 +96,20 @@ python3 scripts/up.py --down     # 앱을 내린다 (--all 이면 컨테이너�
 값을 쓴다 — 매번 달라지면 컨테이너가 다시 만들어지고 DB 가 날아간다. 이미 떠 있는
 우리 컨테이너의 포트는 그대로 물려받는다.
 
-비켜 간 포트는 스크립트가 알아서 넘겨 준다. 손으로 부를 때는 이렇게 맞춘다.
+**비켜 간 포트는 스크립트가 알아서 찾는다.** `scripts/stack.py` 가 `.codedrill-stack.json` 을
+읽어 주므로 `smoke.py`·`loadtest.py`·`drill.py`·`publish-content.py` 를 그냥 부르면 된다.
 
 ```bash
-export CODEDRILL_BASE=http://localhost:8085   # scripts/up.py --status 가 알려 준다
-python3 scripts/smoke.py
+python3 scripts/smoke.py          # 비켜 간 포트로 알아서 붙는다
+```
+
+찾는 순서는 셋이고 앞엣것이 이긴다 — ① 환경 변수 `CODEDRILL_BASE`(원격 스택이나 CI 가
+쓰는 길), ② `.codedrill-stack.json`(이 머신에서 `up.py` 가 띄운 것), ③ 기본 포트. 예전에는
+②가 없어서 export 를 잊으면 **남의 스택이나 빈 포트**를 두드렸고, 화면에는 "연결 거부"나
+엉뚱한 401 로만 보였다.
+
+```bash
+export CODEDRILL_BASE=http://other-host:8080   # 다른 스택을 부를 때만 필요하다
 ```
 
 아래는 그 스크립트가 무엇을 하는지, 그리고 손으로 할 때 무엇이 필요한지다.

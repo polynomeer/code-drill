@@ -31,16 +31,19 @@ import urllib.request
 import uuid
 
 import accounts
+import stack
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-BASE = "http://localhost:8080/api/v1"
+# 제어 영역 주소. scripts/up.py 가 비켜 간 포트를 stack 이 찾아 준다 — 여기는 포트가 아예
+# 박혀 있어서, 비켜 간 스택에 부하를 걸려면 코드를 고쳐야 했다.
+BASE = stack.base_url() + "/api/v1"
 
 # SLI 는 배포 단위마다 다른 프로세스에서 난다. 큐 대기는 오케스트레이터만 알고, 제출
 # 수락은 제어 영역만 안다. 한 곳만 긁으면 절반은 "표본 없음"으로 보인다.
 METRICS = [
-    "http://localhost:8080/actuator/prometheus",
-    "http://localhost:8081/actuator/prometheus",
+    f"{stack.url_of('control-plane')}/actuator/prometheus",
+    f"{stack.url_of('orchestrator')}/actuator/prometheus",
 ]
 
 # §12.1 의 목표. alerts.yml 의 임계값과 같아야 한다.

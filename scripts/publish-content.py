@@ -24,8 +24,11 @@ import urllib.error
 import urllib.request
 
 import operators
+import stack
 
-BASE = os.environ.get("CODEDRILL_BASE", "http://localhost:8080").rstrip("/") + "/api/v1/admin"
+# 제어 영역 주소. scripts/up.py 가 비켜 간 포트를 stack 이 찾아 준다 — 손으로 export 하지
+# 않아도 맞는 스택을 두드린다. CODEDRILL_BASE 가 있으면 그것이 이긴다.
+BASE = stack.base_url() + "/api/v1/admin"
 REPORT_DIR = pathlib.Path("content/reports")
 
 
