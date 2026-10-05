@@ -10,6 +10,7 @@
 |---|---|---|
 | [../CLAUDE.md](../CLAUDE.md) | 이 저장소에서 에이전트는 어떻게 일하는가 | Claude Code (매 턴 로드) |
 | [project-context.md](project-context.md) | 이 제품은 무엇이고 어떤 용어·스택을 쓰는가 | 에이전트·신규 기여자 |
+| [tech-selection.md](tech-selection.md) | 초기 스택은 왜 그것이고 대안과 견줘 무엇을 감수했나 | 스택을 바꾸거나 재검토할 때 |
 | [commit-convention.md](commit-convention.md) | 커밋 메시지를 어떻게 쓰는가 | 에이전트·기여자 |
 | [running-locally.md](running-locally.md) | 내 머신에서 어떻게 띄우고 확인하는가 | 에이전트·기여자 |
 | [runbook.md](runbook.md) | 경보가 울리면 무엇을 보고 무엇을 하는가 | 당번·에이전트 |
