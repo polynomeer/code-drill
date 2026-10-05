@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { Link, useLocation } from 'wouter'
 import { logout } from '../api/client'
 import type { Session } from '../api/session'
-import { Dialog, getThemePreference, setThemePreference } from '../design'
+import { Dialog, LogoMark, getThemePreference, setThemePreference } from '../design'
 import type { ThemePreference } from '../design'
 import { AccountSettings } from '../features/auth/AccountSettings'
 import { SanctionBanner } from '../features/auth/SanctionBanner'
@@ -136,8 +136,8 @@ export function AppShell({
       <header className={styles.header} hidden={immersive}>
         <div className={styles.headerInner}>
           <Link href="/" className={styles.logo} aria-label="CodeDrill 홈">
-            <span className={styles.logoMark} aria-hidden="true">
-              CD
+            <span className={styles.logoMark}>
+              <LogoMark size={28} />
             </span>
             <span className={styles.logoText}>CodeDrill</span>
           </Link>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'wouter'
+import { LogoMark } from '../../design'
 import styles from './AuthLayout.module.css'
 
 /** 로그인·가입·재설정이 함께 쓰는 틀 — 가운데 카드 하나, 위에 이름과 한 줄. */
@@ -8,8 +9,8 @@ export function AuthLayout({ title, lead, children, footer }: { title: string; l
     <main className={styles.page} id="main">
       <div className={styles.card}>
         <Link href="/problems" className={styles.brand} aria-label="CodeDrill — 문제 둘러보기">
-          <span className={styles.logo} aria-hidden="true">
-            CD
+          <span className={styles.logo}>
+            <LogoMark size={28} />
           </span>
           CodeDrill
         </Link>
