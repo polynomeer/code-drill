@@ -1,0 +1,16 @@
+# city-fewest-neighbors 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - graph
+  - shortest-path
+competencies:
+  - READING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - cheapest-paths
+complexity:
+  time: CUBIC
+  space: QUADRATIC
+  note: "플로이드–워셜, 도시가 100 개 이하"

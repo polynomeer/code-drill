@@ -4842,3 +4842,154 @@ fun longestZeroSum(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 207. 순환 암호 풀기 ------------------------------------------------------------------------
+
+def _defuse_code(code, k):
+    n = len(code)
+    out = [0] * n
+    if k == 0:
+        return out
+    lo, hi = (1, k) if k > 0 else (n + k, n - 1)
+    window = sum(code[j % n] for j in range(lo, hi + 1))
+    for i in range(n):
+        out[i] = window
+        window -= code[(i + lo) % n]
+        window += code[(i + hi + 1) % n]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="defuse-code",
+    title="순환 암호 풀기",
+    summary="""
+원형으로 놓인 수 `code` 와 정수 `k` 가 주어진다. 모든 자리를 **동시에** 다음 값으로 바꾼 배열을 반환한다.
+
+- `k > 0` 이면 그 자리 **다음** `k` 개의 합.
+- `k < 0` 이면 그 자리 **앞** `|k|` 개의 합.
+- `k == 0` 이면 `0`.
+
+원형이라 마지막 다음은 첫째이고, 첫째 앞은 마지막이다. 자기 자신은 더하지 않는다.
+""",
+    notes="""
+자리마다 `|k|` 개를 새로 더하면 `n × |k|` 다. 바로 옆 자리의 창은 한 칸만 다르다 — 앞에서 하나 빼고 뒤에서
+하나 더하면 된다. 원형은 번호를 `n` 으로 나눈 나머지로 다룬다. `k < 0` 인 창은 `i - |k|` 부터 `i - 1` 까지,
+즉 `i + n + k` 부터 `i + n - 1` 까지다.
+""",
+    drill_doc="""
+Drill.pointer("from", start)   // 창의 시작
+Drill.write(i, sum)            // i 의 새 값
+""",
+    constraints="""
+- `1 <= code.length <= 100_000`, `1 <= code[i] <= 100`, `-(n-1) <= k <= n-1`
+""",
+    signature=dict(name="defuseCode", parameters=[("code", "INT_ARRAY"), ("k", "INT")], returns="INT_ARRAY"),
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_defuse_code,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4_000_000},
+    cases={
+        "sample": [("01", [[5, 7, 1, 4], 3]), ("02", [[2, 4, 9, 3], -2])],
+        "boundary": [
+            ("01-single", [[42], 0]),
+            ("02-zero-k", [[1, 2, 3], 0]),
+            ("03-one-forward", [[1, 2, 3], 1]),
+            ("04-one-backward", [[1, 2, 3], -1]),
+            # 창이 배열 끝을 넘어 처음으로 돈다.
+            ("05-wraps-forward", [[10, 20, 30, 40, 50], 4]),
+            ("06-wraps-backward", [[10, 20, 30, 40, 50], -4]),
+            ("07-uneven", [[100, 1, 1, 1, 1, 1, 7], -3]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 100, salt=10157), 3]),
+            ("02-random-negative", [randoms(50, 1, 100, salt=10159), -17]),
+            ("03-random-large", [randoms(20_000, 1, 100, salt=10161), 777]),
+            ("04-large-negative", [randoms(20_000, 1, 100, salt=10163), -19_999]),
+            ("05-two-elements", [[3, 8], -1]),
+        ],
+        "performance": [
+            # 창이 거의 원 전체다 — 창마다 새로 더하는 풀이는 10^10 번 더한다.
+            ("01-wide-forward", [randoms(100_000, 1, 100, salt=10165), 99_999]),
+            ("02-wide-backward", [randoms(100_000, 1, 100, salt=10167), -99_999]),
+            ("03-half", [randoms(100_000, 1, 100, salt=10169), 50_000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 창 하나를 한 칸씩 밀며 앞에서 빼고 뒤에서 더한다.
+fun defuseCode(code: IntArray, k: Int): IntArray {
+    val n = code.size
+    val out = IntArray(n)
+    if (k == 0) return out
+    val lo = if (k > 0) 1 else n + k
+    val hi = if (k > 0) k else n - 1
+    var window = 0
+    for (j in lo..hi) window += code[j % n]
+    for (i in 0 until n) {
+        out[i] = window
+        Drill.pointer("from", (i + lo) % n)
+        Drill.write(i, window)
+        window -= code[(i + lo) % n]
+        window += code[(i + hi + 1) % n]
+    }
+    return out
+}
+""",
+    mutants=[
+        ("no-wrap", "MISSING_EDGE_CASE",
+         "창이 배열 끝에서 멈춘다. 원형이라 끝 다음은 처음이다.",
+         """
+fun defuseCode(code: IntArray, k: Int): IntArray {
+    val n = code.size
+    return IntArray(n) { i ->
+        var sum = 0
+        if (k > 0) { for (j in i + 1..i + k) if (j < n) sum += code[j] }
+        else if (k < 0) { for (j in i + k until i) if (j >= 0) sum += code[j] }
+        sum
+    }
+}
+"""),
+        ("backward-includes-self", "OFF_BY_ONE",
+         "k 가 음수일 때 자기 자신까지 더하고 가장 먼 하나를 뺀다. 창은 바로 앞에서 끝난다.",
+         """
+fun defuseCode(code: IntArray, k: Int): IntArray {
+    val n = code.size
+    val out = IntArray(n)
+    if (k == 0) return out
+    val lo = if (k > 0) 1 else n + k + 1
+    val hi = if (k > 0) k else n
+    var window = 0
+    for (j in lo..hi) window += code[j % n]
+    for (i in 0 until n) { out[i] = window; window -= code[(i + lo) % n]; window += code[(i + hi + 1) % n] }
+    return out
+}
+"""),
+        ("backward-as-forward", "WRONG_BRANCH",
+         "k 가 음수여도 다음 자리들을 더한다. 음수면 앞 자리들이다.",
+         """
+fun defuseCode(code: IntArray, k: Int): IntArray {
+    val n = code.size
+    val out = IntArray(n)
+    if (k == 0) return out
+    val width = if (k > 0) k else -k
+    var window = 0
+    for (j in 1..width) window += code[j % n]
+    for (i in 0 until n) { out[i] = window; window -= code[(i + 1) % n]; window += code[(i + width + 1) % n] }
+    return out
+}
+"""),
+        ("sums-each-window", "PERFORMANCE",
+         "자리마다 창을 처음부터 다시 더한다. 창이 넓으면 n × |k| 번 더한다.",
+         """
+fun defuseCode(code: IntArray, k: Int): IntArray {
+    val n = code.size
+    return IntArray(n) { i ->
+        var sum = 0
+        if (k > 0) for (j in 1..k) sum += code[(i + j) % n]
+        else if (k < 0) for (j in 1..-k) sum += code[(i - j + n) % n]
+        Drill.write(i, sum)
+        sum
+    }
+}
+"""),
+    ],
+))

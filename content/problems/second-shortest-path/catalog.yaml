@@ -1,0 +1,17 @@
+# second-shortest-path 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - graph
+  - shortest-path
+  - heap
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - shortest-path-count
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "정점마다 거리 둘 — 각 정점이 많아야 두 번 꺼내진다"

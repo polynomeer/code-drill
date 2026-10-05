@@ -6314,3 +6314,822 @@ fun craftableItems(n: Int, recipes: IntArray, supplies: IntArray): IntArray {
 """),
     ],
 ))
+
+
+def _weighted_graph(n, m, salt, low=1, high=100):
+    """무방향 가중 간선 m 개 — [a, b, w, ...]. 같은 쌍이 여러 번 나올 수 있다."""
+    pairs = _random_graph(n, m, salt)
+    w = randoms(m, low, high, salt=salt + 2)
+    return flat([pairs[2 * i], pairs[2 * i + 1], w[i]] for i in range(m))
+
+
+# --- 203. 이웃이 가장 적은 도시 -----------------------------------------------------------------
+
+def _city_fewest_neighbors(n, edges, threshold):
+    inf = float("inf")
+    dist = [[inf] * n for _ in range(n)]
+    for i in range(n):
+        dist[i][i] = 0
+    for i in range(0, len(edges), 3):
+        a, b, w = edges[i], edges[i + 1], edges[i + 2]
+        if w < dist[a][b]:
+            dist[a][b] = dist[b][a] = w
+    for k in range(n):
+        dk = dist[k]
+        for i in range(n):
+            di = dist[i]
+            via = di[k]
+            if via == inf:
+                continue
+            for j in range(n):
+                if via + dk[j] < di[j]:
+                    di[j] = via + dk[j]
+    best, answer = None, -1
+    for i in range(n):
+        count = sum(1 for j in range(n) if j != i and dist[i][j] <= threshold)
+        if best is None or count <= best:
+            best, answer = count, i
+    return answer
+
+
+PROBLEMS.append(Problem(
+    id="city-fewest-neighbors",
+    title="이웃이 가장 적은 도시",
+    summary="""
+도시 `n` 개와 양방향 도로 `edges = [a1, b1, w1, ...]` 가 있다(`w` 는 길이). 도시 `i` 에서 **최단 거리가
+`threshold` 이하**인 다른 도시를 `i` 의 이웃이라 한다. 이웃이 가장 적은 도시의 번호를 반환한다. 그런
+도시가 여럿이면 **번호가 가장 큰** 것이다.
+""",
+    notes="""
+모든 도시 쌍의 최단 거리가 필요하다. 도시가 100 개 이하라 플로이드–워셜(`n³`)이면 충분하다 — 다만 바깥
+반복이 **거쳐 가는 도시 `k`** 여야 한다. `k` 를 안쪽에 두면 아직 확정되지 않은 거리를 이어 붙여 먼 쌍을 놓친다.
+""",
+    drill_doc="""
+Drill.write(i * n + j, distance)   // i 에서 j 까지 더 짧은 길을 찾았다
+""",
+    constraints="""
+- `2 <= n <= 100`, 도로 `0..n(n-1)/2` 개, `1 <= w <= 10_000`, `1 <= threshold <= 10_000`
+- 같은 두 도시 사이에 도로가 여럿일 수 있다
+""",
+    signature=dict(name="cityFewestNeighbors", parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("threshold", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_city_fewest_neighbors,
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 3, 1, 2, 1, 1, 3, 4, 2, 3, 1], 4]),
+            ("02", [5, [0, 1, 2, 0, 4, 8, 1, 2, 3, 1, 4, 2, 2, 3, 1, 3, 4, 1], 2]),
+        ],
+        "boundary": [
+            ("01-no-roads", [3, [], 5]),
+            # 이웃 수가 모두 같으면 가장 큰 번호다.
+            ("02-all-tied", [3, [0, 1, 1, 1, 2, 1, 0, 2, 1], 1]),
+            # 거리가 문턱과 꼭 같으면 이웃이다.
+            ("03-exactly-threshold", [3, [0, 1, 5, 1, 2, 5], 5]),
+            # 직접 도로는 길고 돌아가는 길이 짧다.
+            ("04-detour-shorter", [4, [0, 3, 100, 0, 1, 1, 1, 2, 1, 2, 3, 1], 3]),
+            ("05-parallel-roads", [3, [0, 1, 9, 0, 1, 2, 1, 2, 9], 2]),
+            # 큰 번호에서 작은 번호로 이어진 사슬 — 거쳐 가는 순서를 틀리면 먼 쌍을 놓친다.
+            ("06-reverse-chain", [6, [5, 4, 1, 4, 3, 1, 3, 2, 1, 2, 1, 1, 1, 0, 1], 4]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _weighted_graph(8, 12, salt=10093, low=1, high=10), 8]),
+            ("02-random-medium", [40, _weighted_graph(40, 120, salt=10095, low=1, high=50), 60]),
+            ("03-random-large", [100, _weighted_graph(100, 600, salt=10097, low=1, high=1000), 1500]),
+            ("04-dense-short", [100, _weighted_graph(100, 3000, salt=10099, low=1, high=20), 15]),
+            # 번호를 섞은 사슬 — 거쳐 가는 순서를 틀리면 먼 쌍을 놓친다.
+            ("05-shuffled-chain", [60, flat([a, b, 1] for a, b in zip(shuffled(range(60), salt=10103), shuffled(range(60), salt=10103)[1:])), 20]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 플로이드–워셜 — 바깥이 거쳐 가는 도시다.
+fun cityFewestNeighbors(n: Int, edges: IntArray, threshold: Int): Int {
+    val inf = Int.MAX_VALUE / 2
+    val dist = Array(n) { i -> IntArray(n) { j -> if (i == j) 0 else inf } }
+    for (e in edges.indices step 3) {
+        val a = edges[e]; val b = edges[e + 1]; val w = edges[e + 2]
+        if (w < dist[a][b]) { dist[a][b] = w; dist[b][a] = w }
+    }
+    for (k in 0 until n) {
+        for (i in 0 until n) {
+            val via = dist[i][k]
+            if (via == inf) continue
+            for (j in 0 until n) {
+                if (via + dist[k][j] < dist[i][j]) {
+                    dist[i][j] = via + dist[k][j]
+                    Drill.write(i * n + j, dist[i][j])
+                }
+            }
+        }
+    }
+    var best = Int.MAX_VALUE
+    var answer = -1
+    for (i in 0 until n) {
+        var count = 0
+        for (j in 0 until n) if (j != i && dist[i][j] <= threshold) count += 1
+        if (count <= best) { best = count; answer = i }
+    }
+    return answer
+}
+""",
+    mutants=[
+        ("smallest-id-on-tie", "WRONG_BRANCH",
+         "이웃 수가 같으면 번호가 작은 도시를 고른다. 같으면 가장 큰 번호다.",
+         """
+fun cityFewestNeighbors(n: Int, edges: IntArray, threshold: Int): Int {
+    val inf = Int.MAX_VALUE / 2
+    val dist = Array(n) { i -> IntArray(n) { j -> if (i == j) 0 else inf } }
+    for (e in edges.indices step 3) { val a = edges[e]; val b = edges[e + 1]; val w = edges[e + 2]; if (w < dist[a][b]) { dist[a][b] = w; dist[b][a] = w } }
+    for (k in 0 until n) for (i in 0 until n) for (j in 0 until n) if (dist[i][k] + dist[k][j] < dist[i][j]) dist[i][j] = dist[i][k] + dist[k][j]
+    var best = Int.MAX_VALUE; var answer = -1
+    for (i in 0 until n) {
+        var count = 0
+        for (j in 0 until n) if (j != i && dist[i][j] <= threshold) count += 1
+        if (count < best) { best = count; answer = i }
+    }
+    return answer
+}
+"""),
+        ("direct-roads-only", "WRONG_ALGORITHM",
+         "도로 하나로 닿는 도시만 센다. 여러 도로를 이어 문턱 안에 닿는 도시도 이웃이다.",
+         """
+fun cityFewestNeighbors(n: Int, edges: IntArray, threshold: Int): Int {
+    val near = Array(n) { BooleanArray(n) }
+    for (e in edges.indices step 3) if (edges[e + 2] <= threshold) { near[edges[e]][edges[e + 1]] = true; near[edges[e + 1]][edges[e]] = true }
+    var best = Int.MAX_VALUE; var answer = -1
+    for (i in 0 until n) {
+        val count = near[i].count { it }
+        if (count <= best) { best = count; answer = i }
+    }
+    return answer
+}
+"""),
+        ("via-innermost", "WRONG_ALGORITHM",
+         "거쳐 가는 도시를 가장 안쪽 반복에 둔다. 아직 확정되지 않은 거리를 이어 붙여 먼 쌍을 놓친다.",
+         """
+fun cityFewestNeighbors(n: Int, edges: IntArray, threshold: Int): Int {
+    val inf = Int.MAX_VALUE / 2
+    val dist = Array(n) { i -> IntArray(n) { j -> if (i == j) 0 else inf } }
+    for (e in edges.indices step 3) { val a = edges[e]; val b = edges[e + 1]; val w = edges[e + 2]; if (w < dist[a][b]) { dist[a][b] = w; dist[b][a] = w } }
+    for (i in 0 until n) for (j in 0 until n) for (k in 0 until n) if (dist[i][k] + dist[k][j] < dist[i][j]) dist[i][j] = dist[i][k] + dist[k][j]
+    var best = Int.MAX_VALUE; var answer = -1
+    for (i in 0 until n) {
+        var count = 0
+        for (j in 0 until n) if (j != i && dist[i][j] <= threshold) count += 1
+        if (count <= best) { best = count; answer = i }
+    }
+    return answer
+}
+"""),
+        ("strict-threshold", "OFF_BY_ONE",
+         "거리가 문턱보다 작을 때만 이웃으로 센다. 문턱과 같아도 이웃이다.",
+         """
+fun cityFewestNeighbors(n: Int, edges: IntArray, threshold: Int): Int {
+    val inf = Int.MAX_VALUE / 2
+    val dist = Array(n) { i -> IntArray(n) { j -> if (i == j) 0 else inf } }
+    for (e in edges.indices step 3) { val a = edges[e]; val b = edges[e + 1]; val w = edges[e + 2]; if (w < dist[a][b]) { dist[a][b] = w; dist[b][a] = w } }
+    for (k in 0 until n) for (i in 0 until n) for (j in 0 until n) if (dist[i][k] + dist[k][j] < dist[i][j]) dist[i][j] = dist[i][k] + dist[k][j]
+    var best = Int.MAX_VALUE; var answer = -1
+    for (i in 0 until n) {
+        var count = 0
+        for (j in 0 until n) if (j != i && dist[i][j] < threshold) count += 1
+        if (count <= best) { best = count; answer = i }
+    }
+    return answer
+}
+"""),
+    ],
+))
+
+
+# --- 204. 두 번째로 짧은 길 --------------------------------------------------------------------
+
+def _second_shortest(n, edges):
+    import heapq
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        a, b, w = edges[i], edges[i + 1], edges[i + 2]
+        adj[a].append((b, w))
+        adj[b].append((a, w))
+    inf = float("inf")
+    first = [inf] * n
+    second = [inf] * n
+    first[0] = 0
+    heap = [(0, 0)]
+    while heap:
+        d, v = heapq.heappop(heap)
+        if d > second[v]:
+            continue
+        for u, w in adj[v]:
+            nd = d + w
+            if nd < first[u]:
+                first[u], nd = nd, first[u]
+                heapq.heappush(heap, (first[u], u))
+            if first[u] < nd < second[u]:
+                second[u] = nd
+                heapq.heappush(heap, (nd, u))
+    return second[n - 1] if second[n - 1] < inf else -1
+
+
+PROBLEMS.append(Problem(
+    id="second-shortest-path",
+    title="두 번째로 짧은 길",
+    summary="""
+정점 `n` 개와 무방향 간선 `edges = [a1, b1, w1, ...]` 가 있다. 정점 `0` 에서 `n-1` 로 가는 길 가운데 길이가
+**가장 짧은 길이보다 엄격히 긴 것 중 가장 짧은 길이**를 반환한다. 길은 같은 정점과 간선을 몇 번이고 다시
+지나도 된다. 그런 길이 없으면 `-1` 이다.
+""",
+    notes="""
+정점마다 거리를 **둘** 들고 다닌다 — 가장 짧은 것과, 그보다 엄격히 긴 것 중 가장 짧은 것. 꺼낸 거리에서
+나아간 새 거리가 첫째보다 짧으면 첫째를 밀어내 둘째로 내리고, 첫째와 둘째 사이면 둘째가 된다. 같은 정점을
+두 번 꺼내야 하므로 "한 번 꺼내면 닫는다"를 쓰면 안 된다. 같은 간선을 되돌아오는 길도 길이다.
+""",
+    drill_doc="""
+Drill.write(v, distance)   // v 의 첫째 또는 둘째 거리가 줄었다
+""",
+    constraints="""
+- `1 <= n <= 20_000`, 간선 `0..100_000` 개, `1 <= w <= 10_000`
+- 같은 쌍의 간선이 여럿일 수 있고, 자기 자신으로 가는 간선은 없다
+""",
+    signature=dict(name="secondShortestPath", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_second_shortest,
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 1, 1, 3, 1, 0, 2, 1, 2, 3, 2]]),
+            ("02", [2, [0, 1, 3]]),
+        ],
+        "boundary": [
+            ("01-single-vertex", [1, []]),
+            # 이웃을 다녀오면 둘째 길이다.
+            ("02-single-vertex-with-edge", [2, [0, 1, 4]]),
+            ("03-unreachable", [3, [0, 1, 2]]),
+            # 가장 짧은 길이 둘이면 그 길이는 둘째가 아니다.
+            ("04-two-shortest", [4, [0, 1, 1, 1, 3, 1, 0, 2, 1, 2, 3, 1]]),
+            # 되돌아가는 것이 다른 길보다 짧다.
+            ("05-back-and-forth-wins", [3, [0, 1, 1, 1, 2, 1, 0, 2, 10]]),
+            ("06-parallel-edges", [2, [0, 1, 5, 0, 1, 6]]),
+            ("07-parallel-equal-edges", [2, [0, 1, 5, 0, 1, 5]]),
+            # 둘째가 지나는 정점은 첫째를 지나는 정점과 같다 — 같은 정점을 두 번 꺼내야 한다.
+            ("08-second-through-same-vertex", [5, [0, 1, 1, 0, 2, 2, 1, 3, 1, 2, 3, 1, 3, 4, 10]]),
+        ],
+        "hidden": [
+            ("01-random-small", [10, _weighted_graph(10, 20, salt=10105, low=1, high=5)]),
+            ("02-random-medium", [500, _weighted_graph(500, 2000, salt=10107, low=1, high=100)]),
+            ("03-random-large", [20_000, _weighted_graph(20_000, 100_000, salt=10109, low=1, high=10_000)]),
+            ("04-path-graph", [1000, flat([i, i + 1, 7] for i in range(999))]),
+            ("05-equal-weights", [2000, _weighted_graph(2000, 8000, salt=10111, low=3, high=3)]),
+            ("06-grid-like", [900, flat([r * 30 + c, r * 30 + c + 1, 1] for r in range(30) for c in range(29)) + flat([r * 30 + c, (r + 1) * 30 + c, 1] for r in range(29) for c in range(30))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 정점마다 거리 둘을 들고 다니는 다익스트라.
+fun secondShortestPath(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }
+    val next = IntArray(2 * m)
+    val to = IntArray(2 * m)
+    val weight = IntArray(2 * m)
+    var count = 0
+    for (e in 0 until m) {
+        val a = edges[3 * e]; val b = edges[3 * e + 1]; val w = edges[3 * e + 2]
+        to[count] = b; weight[count] = w; next[count] = head[a]; head[a] = count; count += 1
+        to[count] = a; weight[count] = w; next[count] = head[b]; head[b] = count; count += 1
+    }
+    val inf = Long.MAX_VALUE / 4
+    val first = LongArray(n) { inf }
+    val second = LongArray(n) { inf }
+    first[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll()
+        val d = top[0]
+        val v = top[1].toInt()
+        if (d > second[v]) continue
+        var e = head[v]
+        while (e != -1) {
+            val u = to[e]
+            var candidate = d + weight[e]
+            if (candidate < first[u]) {
+                val pushed = first[u]
+                first[u] = candidate
+                heap.add(longArrayOf(candidate, u.toLong()))
+                Drill.write(u, candidate.toInt())
+                candidate = pushed
+            }
+            if (candidate > first[u] && candidate < second[u]) {
+                second[u] = candidate
+                heap.add(longArrayOf(candidate, u.toLong()))
+                Drill.write(u, candidate.toInt())
+            }
+            e = next[e]
+        }
+    }
+    return if (second[n - 1] >= inf) -1 else second[n - 1].toInt()
+}
+""",
+    mutants=[
+        ("equal-counts-as-second", "WRONG_BRANCH",
+         "가장 짧은 길과 길이가 같은 다른 길을 둘째로 센다. 둘째는 엄격히 길어야 한다.",
+         """
+fun secondShortestPath(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (i in edges.indices step 3) { adj[edges[i]].add(intArrayOf(edges[i + 1], edges[i + 2])); adj[edges[i + 1]].add(intArrayOf(edges[i], edges[i + 2])) }
+    val inf = Long.MAX_VALUE / 4
+    val first = LongArray(n) { inf }; val second = LongArray(n) { inf }
+    first[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val d = top[0]; val v = top[1].toInt()
+        if (d > second[v]) continue
+        for (e in adj[v]) {
+            val u = e[0]; var candidate = d + e[1]
+            if (candidate < first[u]) { val pushed = first[u]; first[u] = candidate; heap.add(longArrayOf(candidate, u.toLong())); candidate = pushed }
+            else if (candidate == first[u] && second[u] > candidate) { second[u] = candidate; heap.add(longArrayOf(candidate, u.toLong())); continue }
+            if (candidate > first[u] && candidate < second[u]) { second[u] = candidate; heap.add(longArrayOf(candidate, u.toLong())) }
+        }
+    }
+    return if (second[n - 1] >= inf) -1 else second[n - 1].toInt()
+}
+"""),
+        ("closes-after-first-pop", "WRONG_BRANCH",
+         "정점을 한 번 꺼내면 닫는다. 둘째 거리는 그 정점을 두 번째로 꺼낼 때 퍼진다.",
+         """
+fun secondShortestPath(n: Int, edges: IntArray): Int {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (i in edges.indices step 3) { adj[edges[i]].add(intArrayOf(edges[i + 1], edges[i + 2])); adj[edges[i + 1]].add(intArrayOf(edges[i], edges[i + 2])) }
+    val inf = Long.MAX_VALUE / 4
+    val first = LongArray(n) { inf }; val second = LongArray(n) { inf }
+    val done = BooleanArray(n)
+    first[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val d = top[0]; val v = top[1].toInt()
+        if (done[v]) continue
+        done[v] = true
+        for (e in adj[v]) {
+            val u = e[0]; var candidate = d + e[1]
+            if (candidate < first[u]) { val pushed = first[u]; first[u] = candidate; heap.add(longArrayOf(candidate, u.toLong())); candidate = pushed }
+            if (candidate > first[u] && candidate < second[u]) second[u] = candidate
+            val alt = second[v] + e[1]
+            if (alt > first[u] && alt < second[u]) second[u] = alt
+        }
+    }
+    return if (second[n - 1] >= inf) -1 else second[n - 1].toInt()
+}
+"""),
+        ("simple-detours-only", "WRONG_ALGORITHM",
+         "가장 짧은 길의 간선을 하나씩 빼고 다시 구한다. 같은 간선을 되돌아오는 길을 놓친다.",
+         """
+fun secondShortestPath(n: Int, edges: IntArray): Int {
+    val m = edges.size / 3
+    val inf = Long.MAX_VALUE / 4
+    fun dijkstra(banned: Int, parent: IntArray?): LongArray {
+        val adj = Array(n) { ArrayList<IntArray>() }
+        for (e in 0 until m) if (e != banned) { adj[edges[3 * e]].add(intArrayOf(edges[3 * e + 1], edges[3 * e + 2], e)); adj[edges[3 * e + 1]].add(intArrayOf(edges[3 * e], edges[3 * e + 2], e)) }
+        val dist = LongArray(n) { inf }
+        dist[0] = 0
+        val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+        heap.add(longArrayOf(0, 0))
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val v = top[1].toInt()
+            if (top[0] > dist[v]) continue
+            for (e in adj[v]) if (dist[v] + e[1] < dist[e[0]]) { dist[e[0]] = dist[v] + e[1]; parent?.set(e[0], e[2]); heap.add(longArrayOf(dist[e[0]], e[0].toLong())) }
+        }
+        return dist
+    }
+    val parent = IntArray(n) { -1 }
+    val base = dijkstra(-1, parent)
+    if (base[n - 1] >= inf) return -1
+    var best = inf
+    var v = n - 1
+    while (v != 0) {
+        val e = parent[v]
+        val d = dijkstra(e, null)[n - 1]
+        if (d > base[n - 1] && d < best) best = d
+        v = if (edges[3 * e] == v) edges[3 * e + 1] else edges[3 * e]
+    }
+    return if (best >= inf) -1 else best.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 205. 가장 작은 글자열로 바꾸기 ------------------------------------------------------------
+
+def _smallest_with_swaps(s, pairs):
+    n = len(s)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(0, len(pairs), 2):
+        a, b = find(pairs[i]), find(pairs[i + 1])
+        if a != b:
+            parent[a] = b
+    groups = {}
+    for i in range(n):
+        groups.setdefault(find(i), []).append(i)
+    out = list(s)
+    for idx in groups.values():
+        for i, ch in zip(idx, sorted(s[i] for i in idx)):
+            out[i] = ch
+    return "".join(out)
+
+
+def _letters(n, letters, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return "".join(source.choice(letters) for _ in range(n))
+
+
+PROBLEMS.append(Problem(
+    id="smallest-string-with-swaps",
+    title="바꿔서 만드는 가장 앞선 글자열",
+    summary="""
+소문자 글자열 `s` 와 자리 쌍 `pairs = [a1, b1, a2, b2, ...]` 가 주어진다. 쌍 `(a, b)` 는 `s[a]` 와 `s[b]` 를
+**몇 번이든** 맞바꿀 수 있다는 뜻이다. 맞바꾸기를 원하는 만큼 해서 만들 수 있는 글자열 중 **사전순으로 가장
+앞선 것**을 반환한다.
+""",
+    notes="""
+`(a, b)` 와 `(b, c)` 를 쓸 수 있으면 `a` 와 `c` 도 사실상 맞바꿀 수 있다 — 맞바꿀 수 있는 자리는 **무리**를
+이루고, 한 무리 안에서는 글자를 어떤 순서로든 늘어놓을 수 있다. 무리를 유니온 파인드로 묶고, 무리마다 글자를
+정렬해 그 무리의 자리를 앞에서부터 채운다.
+""",
+    drill_doc="""
+Drill.edge("a", "b")   // 두 자리를 한 무리로 묶었다
+Drill.write(i, ch)     // 자리 i 에 글자를 놓았다
+""",
+    constraints="""
+- `1 <= s.length <= 100_000`, 쌍 `0..100_000` 개, `0 <= a, b < s.length`
+- `a == b` 인 쌍, 같은 쌍의 반복이 있을 수 있다
+""",
+    signature=dict(name="smallestStringWithSwaps", parameters=[("s", "STRING"), ("pairs", "INT_ARRAY")], returns="STRING"),
+    groups=perf_groups(),
+    reference=_smallest_with_swaps,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 1_000_000},
+    cases={
+        "sample": [
+            ("01", ["dcab", [0, 3, 1, 2]]),
+            ("02", ["dcab", [0, 3, 1, 2, 0, 2]]),
+        ],
+        "boundary": [
+            ("01-no-pairs", ["zyx", []]),
+            ("02-single-letter", ["q", [0, 0]]),
+            # 맞바꾸기를 이어 붙여야 닿는다.
+            ("03-chain", ["cba", [0, 1, 1, 2]]),
+            # 한 번 바꾸면 손해처럼 보여도 끝은 더 앞선다.
+            ("04-needs-worse-step", ["bca", [0, 1, 1, 2]]),
+            ("05-two-groups", ["dcbaz", [0, 2, 1, 3]]),
+            ("06-repeated-letters", ["bbaa", [0, 3, 1, 2]]),
+            # 무리의 자리가 흩어져 있다 — 정렬된 글자를 정렬된 자리에 놓는다.
+            ("07-scattered-group", ["zaybxc", [4, 0, 2, 4]]),
+            # 이미 무리에 붙은 자리를 다시 다른 자리에 잇는다 — 뿌리끼리 이어야 무리가 지켜진다.
+            ("08-relink", ["dcba", [0, 1, 0, 2, 0, 3]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_letters(12, "abcde", salt=10113), _random_graph(12, 6, salt=10115)]),
+            ("02-random-medium", [_letters(1000, "abcdefghij", salt=10117), _random_graph(1000, 400, salt=10119)]),
+            ("03-random-large", [_letters(50_000, "abcdefghijklmnopqrstuvwxyz", salt=10121), _random_graph(50_000, 30_000, salt=10123)]),
+            ("04-all-connected", [_letters(2000, "zyxw", salt=10125), flat([i, i + 1] for i in range(1999))]),
+            ("05-self-pairs", ["edcba", [0, 0, 1, 1, 2, 2]]),
+        ],
+        "performance": [
+            # 한 무리가 십만 자리다 — 자리마다 무리를 다시 찾는 풀이가 끝나지 않는다.
+            ("01-one-group", [_letters(100_000, "abcdefghijklmnopqrstuvwxyz", salt=10127), flat([i, i + 1] for i in range(99_999))]),
+            ("02-one-group-shuffled", [_letters(100_000, "abc", salt=10129), _relabel(100_000, flat([i, i + 1] for i in range(99_999)), salt=10131)]),
+            ("03-random-large", [_letters(100_000, "abcdefghijklmnopqrstuvwxyz", salt=10133), _random_graph(100_000, 100_000, salt=10135)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 무리를 유니온 파인드로 묶고, 무리마다 글자를 세어 자리 순서대로 채운다.
+fun smallestStringWithSwaps(s: String, pairs: IntArray): String {
+    val n = s.length
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    for (i in pairs.indices step 2) {
+        val a = find(pairs[i]); val b = find(pairs[i + 1])
+        if (a != b) {
+            parent[a] = b
+            Drill.edge(a.toString(), b.toString())
+        }
+    }
+    val counts = HashMap<Int, IntArray>()
+    for (i in 0 until n) counts.getOrPut(find(i)) { IntArray(26) }[s[i] - 'a'] += 1
+    val out = CharArray(n)
+    for (i in 0 until n) {
+        val c = counts.getValue(find(i))
+        var k = 0
+        while (c[k] == 0) k += 1
+        c[k] -= 1
+        out[i] = 'a' + k
+        Drill.write(i, k)
+    }
+    return String(out)
+}
+""",
+    mutants=[
+        ("swaps-each-pair-once", "WRONG_ALGORITHM",
+         "쌍마다 한 번씩, 나아질 때만 맞바꾼다. 맞바꾸기를 이어 붙여야 닿는 자리가 있다.",
+         """
+fun smallestStringWithSwaps(s: String, pairs: IntArray): String {
+    val out = s.toCharArray()
+    for (i in pairs.indices step 2) {
+        val a = minOf(pairs[i], pairs[i + 1]); val b = maxOf(pairs[i], pairs[i + 1])
+        if (out[b] < out[a]) { val t = out[a]; out[a] = out[b]; out[b] = t }
+    }
+    return String(out)
+}
+"""),
+        ("links-slots-not-roots", "WRONG_BRANCH",
+         "뿌리가 아니라 자리 자체를 잇는다. 이미 다른 자리에 붙어 있던 자리의 옛 연결이 끊긴다.",
+         """
+fun smallestStringWithSwaps(s: String, pairs: IntArray): String {
+    val n = s.length
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; return r }
+    for (i in pairs.indices step 2) if (find(pairs[i]) != find(pairs[i + 1])) parent[pairs[i]] = pairs[i + 1]
+    val counts = HashMap<Int, IntArray>()
+    for (i in 0 until n) counts.getOrPut(find(i)) { IntArray(26) }[s[i] - 'a'] += 1
+    val out = CharArray(n)
+    for (i in 0 until n) {
+        val c = counts.getValue(find(i))
+        var k = 0
+        while (c[k] == 0) k += 1
+        c[k] -= 1
+        out[i] = 'a' + k
+    }
+    return String(out)
+}
+"""),
+        ("discovery-order-slots", "WRONG_BRANCH",
+         "글자는 정렬하지만 자리는 무리를 훑은 순서대로 채운다. 가장 앞선 글자는 가장 앞 자리에 가야 한다.",
+         """
+fun smallestStringWithSwaps(s: String, pairs: IntArray): String {
+    val n = s.length
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in pairs.indices step 2) { adj[pairs[i]].add(pairs[i + 1]); adj[pairs[i + 1]].add(pairs[i]) }
+    val seen = BooleanArray(n)
+    val out = CharArray(n)
+    for (start in 0 until n) {
+        if (seen[start]) continue
+        val slots = ArrayList<Int>()
+        val stack = java.util.ArrayDeque<Int>()
+        stack.push(start); seen[start] = true
+        while (stack.isNotEmpty()) {
+            val v = stack.pop(); slots.add(v)
+            for (u in adj[v]) if (!seen[u]) { seen[u] = true; stack.push(u) }
+        }
+        val letters = slots.map { s[it] }.sorted()
+        for (k in slots.indices) out[slots[k]] = letters[k]
+    }
+    return String(out)
+}
+"""),
+        ("regroups-per-slot", "PERFORMANCE",
+         "자리마다 그 자리가 속한 무리를 처음부터 다시 찾는다. 무리가 크면 자리 수의 제곱이 된다.",
+         """
+fun smallestStringWithSwaps(s: String, pairs: IntArray): String {
+    val n = s.length
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in pairs.indices step 2) { adj[pairs[i]].add(pairs[i + 1]); adj[pairs[i + 1]].add(pairs[i]) }
+    val out = CharArray(n)
+    val mark = IntArray(n) { -1 }
+    for (i in 0 until n) {
+        val slots = ArrayList<Int>()
+        val stack = java.util.ArrayDeque<Int>()
+        stack.push(i); mark[i] = i
+        while (stack.isNotEmpty()) {
+            val v = stack.pop(); slots.add(v)
+            for (u in adj[v]) if (mark[u] != i) { mark[u] = i; stack.push(u) }
+        }
+        slots.sort()
+        val letters = slots.map { s[it] }.sorted()
+        out[i] = letters[slots.binarySearch(i)]
+    }
+    return String(out)
+}
+"""),
+    ],
+))
+
+
+# --- 206. 무게 제한이 있는 길 묻기 -------------------------------------------------------------
+
+def _limited_path_queries(n, edges, queries):
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    order = sorted(range(len(edges) // 3), key=lambda e: edges[3 * e + 2])
+    asked = sorted(range(len(queries) // 3), key=lambda q: queries[3 * q + 2])
+    out = [0] * (len(queries) // 3)
+    k = 0
+    for q in asked:
+        p, t, limit = queries[3 * q], queries[3 * q + 1], queries[3 * q + 2]
+        while k < len(order) and edges[3 * order[k] + 2] < limit:
+            e = order[k]
+            a, b = find(edges[3 * e]), find(edges[3 * e + 1])
+            if a != b:
+                parent[a] = b
+            k += 1
+        out[q] = 1 if find(p) == find(t) else 0
+    return out
+
+
+def _queries(n, q, salt, low, high):
+    a = randoms(q, 0, n - 1, salt=salt)
+    b = randoms(q, 0, n - 1, salt=salt + 1)
+    limit = randoms(q, low, high, salt=salt + 2)
+    return flat([a[i], b[i], limit[i]] for i in range(q))
+
+
+PROBLEMS.append(Problem(
+    id="limited-path-queries",
+    title="무게 제한이 있는 길 묻기",
+    summary="""
+정점 `n` 개와 무방향 간선 `edges = [a1, b1, w1, ...]` 가 있다. 질문 `queries = [p1, q1, limit1, ...]` 마다
+`p` 에서 `q` 로 가는 길 중 **모든 간선의 무게가 `limit` 보다 엄격히 작은** 길이 있으면 `1`, 없으면 `0` 을
+질문 순서대로 담아 반환한다.
+""",
+    notes="""
+질문마다 길을 찾으면 질문 수 × 그래프 크기다. 대신 **질문을 `limit` 순으로 정렬**해 두고, 간선도 무게 순으로
+정렬해 지금 질문의 `limit` 보다 가벼운 간선만 유니온 파인드에 더해 가면, 질문마다 "같은 무리인가" 한 번으로
+답한다. 답은 원래 질문 순서로 돌려놓는다.
+""",
+    drill_doc="""
+Drill.edge("a", "b")    // 무게가 limit 보다 작은 간선을 더했다
+Drill.match(p, q)       // 질문 하나에 답했다
+""",
+    constraints="""
+- `2 <= n <= 100_000`, 간선 `0..100_000` 개, 질문 `1..100_000` 개
+- `1 <= w, limit <= 1_000_000_000`, 같은 쌍의 간선이 여럿일 수 있다. `p == q` 인 질문은 언제나 `1` 이다
+""",
+    signature=dict(name="limitedPathQueries", parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_limited_path_queries,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 1_000_000},
+    cases={
+        "sample": [
+            ("01", [3, [0, 1, 2, 1, 2, 4, 2, 0, 8, 1, 0, 16], [0, 1, 2, 0, 2, 5]]),
+            ("02", [5, [0, 1, 10, 1, 2, 5, 2, 3, 9, 3, 4, 13], [0, 4, 14, 1, 4, 13]]),
+        ],
+        "boundary": [
+            ("01-no-edges", [2, [], [0, 1, 5, 0, 0, 1]]),
+            # 무게가 limit 과 같으면 쓸 수 없다.
+            ("02-weight-equals-limit", [2, [0, 1, 5], [0, 1, 5, 0, 1, 6]]),
+            # 질문의 limit 이 거꾸로 온다 — 답은 질문 순서대로.
+            ("03-descending-limits", [3, [0, 1, 1, 1, 2, 10], [0, 2, 11, 0, 2, 5, 0, 1, 2]]),
+            # 직접 이어진 간선은 무겁지만 돌아가는 길은 가볍다.
+            ("04-detour-light", [3, [0, 2, 100, 0, 1, 1, 1, 2, 1], [0, 2, 2]]),
+            ("05-parallel-edges", [2, [0, 1, 9, 0, 1, 3], [0, 1, 4]]),
+            ("06-max-weights", [3, [0, 1, 1_000_000_000, 1, 2, 999_999_999], [0, 2, 1_000_000_000, 0, 1, 1_000_000_000]]),
+        ],
+        "hidden": [
+            ("01-random-small", [10, _weighted_graph(10, 15, salt=10137, low=1, high=20), _queries(10, 20, salt=10139, low=1, high=25)]),
+            ("02-random-medium", [500, _weighted_graph(500, 800, salt=10141, low=1, high=1000), _queries(500, 1000, salt=10143, low=1, high=1200)]),
+            ("03-random-large", [50_000, _weighted_graph(50_000, 80_000, salt=10145, low=1, high=1_000_000_000), _queries(50_000, 50_000, salt=10147, low=1, high=1_000_000_000)]),
+            ("04-same-limit", [100, _weighted_graph(100, 300, salt=10149, low=1, high=50), _queries(100, 300, salt=10151, low=25, high=25)]),
+        ],
+        "performance": [
+            # 긴 사슬과 많은 질문 — 질문마다 길을 찾는 풀이는 사슬을 매번 끝까지 걷는다.
+            ("01-long-chain", [100_000, flat([i, i + 1, 1] for i in range(99_999)), flat([0, 99_999, 2] for _ in range(100_000))]),
+            ("02-random-large", [100_000, _weighted_graph(100_000, 100_000, salt=10153, low=1, high=1_000_000), _queries(100_000, 100_000, salt=10155, low=1, high=1_000_000)]),
+            ("03-chain-unreachable", [100_000, flat([i, i + 1, 1] for i in range(99_998)), flat([0, 99_999, 2] for _ in range(100_000))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 질문과 간선을 무게 순으로 정렬하고 가벼운 간선부터 유니온 파인드에 더한다.
+fun limitedPathQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    val m = edges.size / 3
+    val q = queries.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val asked = (0 until q).sortedBy { queries[3 * it + 2] }
+    val out = IntArray(q)
+    var k = 0
+    for (i in asked) {
+        val limit = queries[3 * i + 2]
+        while (k < m && edges[3 * order[k] + 2] < limit) {
+            val e = order[k]
+            val a = find(edges[3 * e]); val b = find(edges[3 * e + 1])
+            if (a != b) {
+                parent[a] = b
+                Drill.edge(edges[3 * e].toString(), edges[3 * e + 1].toString())
+            }
+            k += 1
+        }
+        out[i] = if (find(queries[3 * i]) == find(queries[3 * i + 1])) 1 else 0
+        Drill.match(queries[3 * i], queries[3 * i + 1])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("inclusive-limit", "OFF_BY_ONE",
+         "무게가 limit 과 같은 간선도 쓴다. 엄격히 작아야 한다.",
+         """
+fun limitedPathQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val m = edges.size / 3; val q = queries.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val asked = (0 until q).sortedBy { queries[3 * it + 2] }
+    val out = IntArray(q)
+    var k = 0
+    for (i in asked) {
+        while (k < m && edges[3 * order[k] + 2] <= queries[3 * i + 2]) { val e = order[k]; val a = find(edges[3 * e]); val b = find(edges[3 * e + 1]); if (a != b) parent[a] = b; k += 1 }
+        out[i] = if (find(queries[3 * i]) == find(queries[3 * i + 1])) 1 else 0
+    }
+    return out
+}
+"""),
+        ("answers-in-sorted-order", "WRONG_BRANCH",
+         "답을 정렬한 질문의 순서대로 담는다. 답은 원래 질문 순서다.",
+         """
+fun limitedPathQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val m = edges.size / 3; val q = queries.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val asked = (0 until q).sortedBy { queries[3 * it + 2] }
+    val out = IntArray(q)
+    var k = 0
+    for ((slot, i) in asked.withIndex()) {
+        while (k < m && edges[3 * order[k] + 2] < queries[3 * i + 2]) { val e = order[k]; val a = find(edges[3 * e]); val b = find(edges[3 * e + 1]); if (a != b) parent[a] = b; k += 1 }
+        out[slot] = if (find(queries[3 * i]) == find(queries[3 * i + 1])) 1 else 0
+    }
+    return out
+}
+"""),
+        ("direct-edge-only", "WRONG_ALGORITHM",
+         "두 정점을 바로 잇는 간선만 본다. 여러 간선을 이어 가는 길도 길이다.",
+         """
+fun limitedPathQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val lightest = HashMap<Long, Int>()
+    for (e in edges.indices step 3) {
+        val a = minOf(edges[e], edges[e + 1]).toLong(); val b = maxOf(edges[e], edges[e + 1]).toLong()
+        val key = a * 1_000_000 + b
+        lightest[key] = minOf(lightest[key] ?: Int.MAX_VALUE, edges[e + 2])
+    }
+    val q = queries.size / 3
+    return IntArray(q) { i ->
+        val p = queries[3 * i]; val t = queries[3 * i + 1]
+        if (p == t) 1 else {
+            val w = lightest[minOf(p, t).toLong() * 1_000_000 + maxOf(p, t)]
+            if (w != null && w < queries[3 * i + 2]) 1 else 0
+        }
+    }
+}
+"""),
+        ("searches-per-query", "PERFORMANCE",
+         "질문마다 가벼운 간선으로 너비 우선 탐색을 한다. 질문 수 × 그래프 크기다.",
+         """
+fun limitedPathQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (e in edges.indices step 3) { adj[edges[e]].add(intArrayOf(edges[e + 1], edges[e + 2])); adj[edges[e + 1]].add(intArrayOf(edges[e], edges[e + 2])) }
+    val q = queries.size / 3
+    val seen = IntArray(n) { -1 }
+    val queue = IntArray(n)
+    return IntArray(q) { i ->
+        val p = queries[3 * i]; val t = queries[3 * i + 1]; val limit = queries[3 * i + 2]
+        var head = 0; var tail = 0
+        queue[tail++] = p; seen[p] = i
+        var found = p == t
+        while (head < tail && !found) {
+            val v = queue[head++]
+            for (e in adj[v]) {
+                if (e[1] < limit && seen[e[0]] != i) {
+                    Drill.compare(v, e[0])
+                    if (e[0] == t) { found = true; break }
+                    seen[e[0]] = i; queue[tail++] = e[0]
+                }
+            }
+        }
+        if (found) 1 else 0
+    }
+}
+"""),
+    ],
+))

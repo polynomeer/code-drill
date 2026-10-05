@@ -2537,3 +2537,141 @@ fun maxWidthRamp(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 208. 상원 투표 -----------------------------------------------------------------------------
+
+def _senate_vote(senate):
+    import collections
+    n = len(senate)
+    radiant = collections.deque(i for i, c in enumerate(senate) if c == "R")
+    dire = collections.deque(i for i, c in enumerate(senate) if c == "D")
+    while radiant and dire:
+        r, d = radiant.popleft(), dire.popleft()
+        if r < d:
+            radiant.append(r + n)
+        else:
+            dire.append(d + n)
+    return "Radiant" if radiant else "Dire"
+
+
+def _senate(n, salt, weight_r=1, weight_d=1):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return "".join(source.choices("RD", weights=[weight_r, weight_d])[0] for _ in range(n))
+
+
+PROBLEMS.append(Problem(
+    id="senate-vote",
+    title="상원 투표",
+    summary="""
+두 정당 `R`(Radiant)과 `D`(Dire)의 의원이 `senate` 순서로 앉아 있다. 투표는 차례로 돈다 — 자기 차례가 온
+의원은 **상대 정당 의원 한 명의 권리를 영원히 빼앗거나**, 남은 의원이 모두 같은 정당이면 승리를 선언한다.
+권리를 잃은 의원은 이후 차례를 건너뛴다. 한 바퀴가 끝나면 남은 의원들이 같은 순서로 다시 돈다.
+
+모든 의원이 자기 정당에 가장 유리하게 행동할 때 이기는 정당을 `"Radiant"` 또는 `"Dire"` 로 반환한다.
+""",
+    notes="""
+가장 유리한 행동은 **자기 뒤에서 가장 먼저 차례가 올 상대 의원**의 권리를 빼앗는 것이다 — 그 의원이 곧
+우리 편 누군가를 막을 것이기 때문이다. 정당마다 의원 번호의 큐를 두고 두 큐의 맨 앞을 꺼내, 번호가 작은
+쪽이 상대를 막고 **번호에 `n` 을 더해** 다음 바퀴의 줄 끝에 선다.
+""",
+    drill_doc="""
+Drill.dequeue(senator)   // 차례가 온 의원
+Drill.enqueue(senator)   // 다음 바퀴의 줄에 섰다 (번호 + n)
+""",
+    constraints="""
+- `1 <= senate.length <= 100_000`, 글자는 `R` 과 `D` 뿐
+""",
+    signature=dict(name="senateVote", parameters=[("senate", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_senate_vote,
+    cases={
+        "sample": [("01", ["RD"]), ("02", ["RDD"])],
+        "boundary": [
+            ("01-single-r", ["R"]),
+            ("02-single-d", ["D"]),
+            ("03-all-r", ["RRRR"]),
+            # 적은 쪽이 먼저 움직여 이긴다.
+            ("04-minority-wins", ["RRDDD"]),
+            ("05-alternating", ["DRDRDR"]),
+            # 두 바퀴째의 순서가 답을 정한다.
+            ("06-second-round", ["DDRRR"]),
+            ("07-late-majority", ["RDRDDRDD"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_senate(12, salt=10171)]),
+            ("02-random-medium", [_senate(1000, salt=10173)]),
+            ("03-random-large", [_senate(100_000, salt=10175)]),
+            ("04-r-heavy-front", ["R" * 40_000 + "D" * 60_000]),
+            ("05-d-slightly-more", [_senate(50_000, salt=10177, weight_r=48, weight_d=52)]),
+            ("06-blocks", [("RRRDDDD" * 5000)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 정당마다 번호의 큐. 작은 번호가 상대를 막고 번호 + n 으로 줄 끝에 선다.
+fun senateVote(senate: String): String {
+    val n = senate.length
+    val radiant = java.util.ArrayDeque<Int>()
+    val dire = java.util.ArrayDeque<Int>()
+    for (i in 0 until n) if (senate[i] == 'R') radiant.add(i) else dire.add(i)
+    while (radiant.isNotEmpty() && dire.isNotEmpty()) {
+        val r = radiant.poll()
+        val d = dire.poll()
+        Drill.dequeue(minOf(r, d))
+        if (r < d) { radiant.add(r + n); Drill.enqueue(r + n) } else { dire.add(d + n); Drill.enqueue(d + n) }
+    }
+    return if (radiant.isNotEmpty()) "Radiant" else "Dire"
+}
+""",
+    mutants=[
+        ("majority-wins", "WRONG_ALGORITHM",
+         "의원이 많은 정당이 이긴다고 본다. 먼저 움직이는 쪽이 수를 뒤집을 수 있다.",
+         """
+fun senateVote(senate: String): String {
+    val r = senate.count { it == 'R' }
+    return if (r * 2 > senate.length || (r * 2 == senate.length && senate[0] == 'R')) "Radiant" else "Dire"
+}
+"""),
+        ("winner-leaves-line", "WRONG_BRANCH",
+         "상대를 막은 의원을 다시 줄에 세우지 않는다. 그 의원도 다음 바퀴에 차례가 온다.",
+         """
+fun senateVote(senate: String): String {
+    val radiant = java.util.ArrayDeque<Int>(); val dire = java.util.ArrayDeque<Int>()
+    for (i in senate.indices) if (senate[i] == 'R') radiant.add(i) else dire.add(i)
+    while (radiant.isNotEmpty() && dire.isNotEmpty()) {
+        val r = radiant.poll(); val d = dire.poll()
+        if (r < d) { if (dire.isEmpty()) radiant.add(r) } else { if (radiant.isEmpty()) dire.add(d) }
+    }
+    return if (radiant.isNotEmpty()) "Radiant" else "Dire"
+}
+"""),
+        ("requeue-same-number", "WRONG_BRANCH",
+         "다음 바퀴의 줄에 설 때 번호를 그대로 둔다. 다음 바퀴의 차례는 이번 바퀴의 모든 의원 뒤다.",
+         """
+fun senateVote(senate: String): String {
+    val radiant = java.util.PriorityQueue<Int>(); val dire = java.util.PriorityQueue<Int>()
+    for (i in senate.indices) if (senate[i] == 'R') radiant.add(i) else dire.add(i)
+    while (radiant.isNotEmpty() && dire.isNotEmpty()) {
+        val r = radiant.poll(); val d = dire.poll()
+        if (r < d) radiant.add(r) else dire.add(d)
+    }
+    return if (radiant.isNotEmpty()) "Radiant" else "Dire"
+}
+"""),
+        ("one-round-only", "WRONG_ALGORITHM",
+         "한 바퀴만 돌고 남은 수로 정한다. 막는 일은 한 정당이 다 사라질 때까지 이어진다.",
+         """
+fun senateVote(senate: String): String {
+    var banR = 0; var banD = 0
+    var aliveR = 0; var aliveD = 0
+    for (c in senate) {
+        if (c == 'R') { if (banR > 0) banR -= 1 else { aliveR += 1; banD += 1 } }
+        else { if (banD > 0) banD -= 1 else { aliveD += 1; banR += 1 } }
+    }
+    return if (aliveR >= aliveD) "Radiant" else "Dire"
+}
+"""),
+    ],
+))

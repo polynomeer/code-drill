@@ -1,0 +1,18 @@
+# senate-vote 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - queue
+  - greedy
+  - simulation
+competencies:
+  - READING
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+prerequisites:
+  - ticket-queue-time
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "막을 때마다 한 명이 빠진다 — 꺼내기가 많아야 n 번"
