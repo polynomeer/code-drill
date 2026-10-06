@@ -48,8 +48,9 @@
   gap: var(--space-3);
   padding: var(--space-4);
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pixel);
 }
 
 .filterRow {
@@ -108,7 +109,7 @@
   padding: var(--space-4);
   overflow-y: auto;
   background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-pixel-line);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-dialog);
   color: var(--color-text-primary);
@@ -136,10 +137,11 @@
   border-collapse: separate;
   border-spacing: 0;
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: opacity var(--motion-micro);
+  box-shadow: var(--shadow-pixel);
 }
 
 .table[aria-busy='true'] {
@@ -298,8 +300,9 @@
 
 .empty {
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pixel);
 }
 
 /* ─── 보조 열 ─── */

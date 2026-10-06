@@ -46,9 +46,10 @@
   border-collapse: separate;
   border-spacing: 0;
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-pixel);
 }
 
 .table th {
@@ -128,8 +129,9 @@
 
 .empty {
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pixel);
 }
 
 .more {

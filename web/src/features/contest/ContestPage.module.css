@@ -75,8 +75,9 @@
   margin: 0;
   padding: var(--space-2) var(--space-3);
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-strong);
+  border: 2px solid var(--color-border-strong);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pixel);
 }
 
 .countdownLabel {
@@ -139,8 +140,9 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pixel);
 }
 
 .problemLetter {
@@ -184,8 +186,9 @@
   max-height: 70vh;
   overflow: auto;
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-default);
+  border: 2px solid var(--color-border-default);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pixel);
 }
 
 .table {
