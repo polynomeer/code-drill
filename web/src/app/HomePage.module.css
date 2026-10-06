@@ -1,0 +1,23 @@
+/* 홈 퀘스트 보드 — 넓으면 세 열(플레이어 · 퀘스트 · 대회), 좁으면 한 줄로 쌓인다 */
+.board {
+  display: grid;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr) minmax(0, 320px);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.board[hidden] {
+  display: none;
+}
+
+.column {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -233,3 +233,43 @@ test.describe('역량', () => {
     expect(await axe(page)).toEqual([])
   })
 })
+
+test.describe('홈 퀘스트 보드', () => {
+  test('처방의 첫 칸이 메인 퀘스트, 나머지가 사이드 퀘스트다', async ({ page }) => {
+    await mockApi(page)
+    await page.goto('/')
+    const board = page.getByRole('region', { name: '오늘의 퀘스트' })
+    await expect(board.getByText('메인 퀘스트 · 최근에 틀린 문제')).toBeVisible()
+    await expect(board.getByRole('heading', { name: '1000. 두 수의 합' })).toBeVisible()
+    await expect(board.getByRole('link', { name: '도전하기' })).toHaveAttribute('href', '/problems/two-sum/solve')
+    await expect(board.getByRole('list', { name: '사이드 퀘스트' }).getByRole('link')).toHaveText(['1001. 최대 부분합', '1002. 구간 합치기'])
+    // 바꾸기·미루기는 훈련 화면 한 곳에만 있다
+    await expect(board.getByRole('button')).toHaveCount(0)
+  })
+
+  test('플레이어 카드는 서버가 센 숫자만, 스킬 트리는 잰 것만 별로 그린다', async ({ page }) => {
+    await mockApi(page)
+    await page.goto('/')
+    const player = page.getByRole('region', { name: '시험' })
+    await expect(player.getByText('3일 연속 · 오늘 안 하면 끊깁니다')).toBeVisible()
+    await expect(player.getByText('이번 주 출석 2 / 7일')).toBeVisible()
+    await expect(player.getByText(/레벨|XP/)).toHaveCount(0)
+
+    const skills = page.getByRole('region', { name: '스킬 트리' })
+    await expect(skills.getByText('역량 1 / 2 잼 · 1개 추가 확인 필요')).toBeVisible()
+    await expect(skills.getByRole('listitem').filter({ hasText: '검증' })).toContainText('근거 부족 — 잠김')
+  })
+
+  test('아직 재지 않았으면 스킬 트리는 진단 퀘스트를 권한다', async ({ page }) => {
+    await mockApi(page, { diagnosed: false })
+    await page.goto('/')
+    await expect(page.getByRole('region', { name: '스킬 트리' }).getByRole('link', { name: '진단 퀘스트' })).toHaveAttribute('href', '/training')
+  })
+
+  test('홈에 접근성 위반이 없다', async ({ page }) => {
+    await mockApi(page)
+    await page.goto('/')
+    await expect(page.getByRole('link', { name: '도전하기' })).toBeVisible()
+    expect(await axe(page)).toEqual([])
+  })
+})

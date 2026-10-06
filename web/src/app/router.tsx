@@ -101,7 +101,7 @@ function Shell() {
         <Route path="/">
           {session ? (
             <LegacySubmissionLink>
-              <HomePage />
+              <HomePage session={session} />
             </LegacySubmissionLink>
           ) : (
             // 둘러보는 사람의 첫 화면은 문제 목록이다. 예전 제출 링크는 로그인으로 보낸다.

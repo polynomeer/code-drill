@@ -1,0 +1,247 @@
+/* 홈 퀘스트 보드 (docs/ui-overhaul.md §6.10) — 픽셀 카드 위에 처방·역량·기록 */
+
+.card {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-5);
+  background: var(--color-bg-surface);
+  border: 2px solid var(--color-border-default);
+  box-shadow: var(--shadow-pixel);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cardTitle {
+  margin: 0;
+  font: var(--text-h2);
+}
+
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-primary);
+  font: var(--text-label);
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* ─── 플레이어 ─── */
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  background: var(--color-bg-inset);
+  border: 2px solid var(--color-border-strong);
+  color: var(--color-brand);
+  font: 400 28px/1 var(--font-display);
+}
+
+.playerName {
+  margin: 0;
+  font: var(--text-h1);
+  overflow-wrap: anywhere;
+}
+
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.atRisk {
+  color: var(--color-warning);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.tiles div {
+  padding: var(--space-2);
+  background: var(--color-bg-subtle);
+  text-align: center;
+}
+
+.tiles dt {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
+
+.tiles dd {
+  margin: 0;
+  font: 400 24px/1.2 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.week {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.weekLabel {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-label);
+}
+
+.weekLabel strong {
+  color: var(--color-text-primary);
+}
+
+/* ─── 퀘스트 ─── */
+
+.mainQuest {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  background: var(--color-bg-inset);
+  border: 2px solid var(--color-brand);
+}
+
+.questKind,
+.sideKind {
+  margin: 0;
+  color: var(--color-brand);
+  font: var(--text-label);
+}
+
+.questTitle {
+  margin: 0;
+  font: var(--text-display);
+}
+
+.questDetail {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-reading);
+}
+
+/* 도전하기 — 주 단추와 같은 빗면. 링크라 새 탭으로도 열린다 */
+.challenge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-touch);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-5);
+  background: var(--color-brand);
+  border: 2px solid var(--color-pixel-line);
+  box-shadow:
+    inset -3px -3px 0 rgb(0 0 0 / 22%),
+    inset 3px 3px 0 rgb(255 255 255 / 28%);
+  color: var(--color-text-on-brand);
+  font: 400 18px/1 var(--font-display);
+  text-decoration: none;
+}
+
+.challenge:hover {
+  background: var(--color-brand-hover);
+}
+
+.challenge:active {
+  box-shadow: inset 3px 3px 0 rgb(0 0 0 / 22%);
+}
+
+.sideQuests {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sideQuests li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-top: 2px dashed var(--color-border-default);
+}
+
+.sideLink {
+  color: var(--color-text-primary);
+  font: var(--text-h3);
+}
+
+/* ─── 스킬 ─── */
+
+.skills {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skill {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-3);
+  background: var(--color-bg-subtle);
+  border: 2px solid var(--color-border-default);
+}
+
+.locked {
+  background: transparent;
+  border-style: dashed;
+  color: var(--color-text-muted);
+}
+
+.skillName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font: 400 17px/1.2 var(--font-display);
+}
+
+.stars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+/* 별의 수준은 채움으로도 갈린다 — 단단하다는 꽉 찬 금, 해낸다는 꽉 찬 청록, 기르는 중은 빈 별 */
+.starSTRONG {
+  color: var(--color-brand);
+  fill: currentColor;
+}
+
+.starPROFICIENT {
+  color: var(--color-trace);
+  fill: currentColor;
+}
+
+.starDEVELOPING {
+  color: var(--color-text-muted);
+}
+
+.skillNote {
+  color: var(--color-text-muted);
+  font: var(--text-caption);
+}
