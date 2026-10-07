@@ -1,0 +1,17 @@
+# reverse-pairs 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - array
+  - divide-conquer
+  - sorting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - CORRECTNESS
+prerequisites:
+  - count-inversions
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "병합 정렬의 각 단계에서 한 번 세고 한 번 합친다"

@@ -2114,3 +2114,220 @@ fun distanceSums(parent: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 212. 트리의 최대 경로 합 -------------------------------------------------------------------
+
+def _tree_max_path_sum(parent, values):
+    import collections
+    n = len(parent)
+    children = [[] for _ in range(n)]
+    root = 0
+    for v, p in enumerate(parent):
+        if p == -1:
+            root = v
+        else:
+            children[p].append(v)
+    order = [root]
+    for v in order:
+        order.extend(children[v])
+    gain = [0] * n
+    best = None
+    for v in reversed(order):
+        top = sorted((gain[c] for c in children[v] if gain[c] > 0), reverse=True)[:2]
+        gain[v] = values[v] + (top[0] if top else 0)
+        through = values[v] + sum(top)
+        best = through if best is None else max(best, through)
+    return best
+
+
+def _relabel_tree(parent, salt):
+    """정점 번호를 섞는다. 부모가 자식보다 먼저 온다는 순서를 믿는 풀이가 우연히 맞지 않게."""
+    n = len(parent)
+    perm = shuffled(range(n), salt=salt)
+    out = [0] * n
+    for v, p in enumerate(parent):
+        out[perm[v]] = -1 if p == -1 else perm[p]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="tree-max-path-sum",
+    title="트리의 최대 경로 합",
+    summary="""
+정점 `0..n-1` 의 트리가 부모 배열 `parent` 로 주어진다(루트는 `-1`). 정점 `i` 의 값은 `values[i]` 다. 간선으로
+이어진 서로 다른 정점들의 열을 **경로**라 하고, 경로의 합은 그 정점 값의 합이다. 정점 하나도 경로다. 합이 가장
+큰 경로의 합을 반환한다.
+""",
+    notes="""
+어떤 경로든 **가장 높은 정점**이 하나 있고, 거기서 아래로 많아야 두 갈래로 내려간다. 정점마다 "여기서 아래로
+한 갈래만 내려가는 경로의 최대 합"(이득)을 아래에서부터 구하면, 그 정점을 꼭대기로 하는 가장 좋은 경로는 자기
+값 + 양수인 자식 이득 중 큰 둘이다. 음수인 이득은 붙이지 않는다. 값이 모두 음수일 수 있다 — 답이 `0` 이라는 법은
+없다. 트리는 20 만 깊이의 사슬일 수 있으니 재귀 대신 순서를 정해 훑는다.
+""",
+    drill_doc="""
+Drill.write(v, gain)   // v 에서 아래로 한 갈래의 최대 합
+""",
+    constraints="""
+- `1 <= n <= 200_000`, `-1000 <= values[i] <= 1000`
+- 정확히 하나의 `-1`, 나머지는 유효한 정점 번호, 순환 없음
+""",
+    signature=dict(name="treeMaxPathSum", parameters=[("parent", "INT_ARRAY"), ("values", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_tree_max_path_sum,
+    cases={
+        "sample": [
+            ("01", [[-1, 0, 0], [1, 2, 3]]),
+            ("02", [[-1, 0, 0, 2, 2], [-10, 9, 20, 15, 7]]),
+        ],
+        "boundary": [
+            ("01-single", [[-1], [5]]),
+            ("02-single-negative", [[-1], [-5]]),
+            # 모두 음수면 가장 덜 나쁜 정점 하나다.
+            ("03-all-negative", [[-1, 0, 0, 1], [-3, -1, -4, -2]]),
+            # 음수 자식은 붙이지 않는다.
+            ("04-negative-child", [[-1, 0, 0], [5, -2, 3]]),
+            # 꼭대기가 루트가 아니다.
+            ("05-peak-below-root", [[-1, 0, 1, 1], [-100, 1, 10, 10]]),
+            # 한 갈래가 아니라 두 갈래로 꺾는 것이 크다.
+            ("06-bends", [[-1, 0, 0], [1, 10, 10]]),
+            ("07-root-last", [[2, 2, -1], [4, 6, -1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_relabel_tree(_random_parents(15, salt=10201), salt=10203), randoms(15, -10, 10, salt=10205)]),
+            ("02-random-medium", [_relabel_tree(_random_parents(2000, salt=10207), salt=10209), randoms(2000, -1000, 1000, salt=10211)]),
+            ("03-random-large", [_relabel_tree(_random_parents(200_000, salt=10213), salt=10215), randoms(200_000, -1000, 1000, salt=10217)]),
+            # 20 만 깊이의 사슬 — 재귀는 스택을 넘긴다.
+            ("04-deep-chain", [_relabel_tree([-1] + list(range(199_999)), salt=10219), randoms(200_000, -5, 10, salt=10221)]),
+            ("05-all-negative-large", [_relabel_tree(_random_parents(5000, salt=10223), salt=10225), randoms(5000, -1000, -1, salt=10227)]),
+            ("06-star", [[-1] + [0] * 999, randoms(1000, -1000, 1000, salt=10229)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 너비 우선 순서를 거꾸로 훑어 자식의 이득부터 정한다 — 재귀 없이.
+fun treeMaxPathSum(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val head = IntArray(n) { -1 }
+    val next = IntArray(n)
+    var root = 0
+    for (v in 0 until n) {
+        val p = parent[v]
+        if (p == -1) root = v else { next[v] = head[p]; head[p] = v }
+    }
+    val order = IntArray(n)
+    order[0] = root
+    var tail = 1
+    for (i in 0 until n) {
+        var c = head[order[i]]
+        while (c != -1) { order[tail] = c; tail += 1; c = next[c] }
+    }
+    val gain = IntArray(n)
+    var best = Int.MIN_VALUE
+    for (i in n - 1 downTo 0) {
+        val v = order[i]
+        var first = 0
+        var second = 0
+        var c = head[v]
+        while (c != -1) {
+            val g = gain[c]
+            if (g > first) { second = first; first = g } else if (g > second) second = g
+            c = next[c]
+        }
+        gain[v] = values[v] + first
+        Drill.write(v, gain[v])
+        best = maxOf(best, values[v] + first + second)
+    }
+    return best
+}
+""",
+    mutants=[
+        ("adds-negative-branches", "WRONG_BRANCH",
+         "음수인 자식 이득도 붙인다. 손해인 갈래는 버려야 한다.",
+         """
+fun treeMaxPathSum(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val children = Array(n) { ArrayList<Int>() }
+    var root = 0
+    for (v in 0 until n) if (parent[v] == -1) root = v else children[parent[v]].add(v)
+    val order = ArrayList<Int>(); order.add(root)
+    var i = 0
+    while (i < order.size) { order.addAll(children[order[i]]); i += 1 }
+    val gain = IntArray(n)
+    var best = Int.MIN_VALUE
+    for (k in n - 1 downTo 0) {
+        val v = order[k]
+        val sorted = children[v].map { gain[it] }.sortedDescending()
+        val first = sorted.getOrNull(0) ?: 0
+        val second = sorted.getOrNull(1) ?: 0
+        gain[v] = values[v] + first
+        best = maxOf(best, values[v] + first + second)
+    }
+    return best
+}
+"""),
+        ("one-branch-only", "WRONG_ALGORITHM",
+         "꼭대기에서 한 갈래로만 내려가는 경로를 본다. 두 갈래로 꺾는 경로가 더 클 수 있다.",
+         """
+fun treeMaxPathSum(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val children = Array(n) { ArrayList<Int>() }
+    var root = 0
+    for (v in 0 until n) if (parent[v] == -1) root = v else children[parent[v]].add(v)
+    val order = ArrayList<Int>(); order.add(root)
+    var i = 0
+    while (i < order.size) { order.addAll(children[order[i]]); i += 1 }
+    val gain = IntArray(n)
+    var best = Int.MIN_VALUE
+    for (k in n - 1 downTo 0) {
+        val v = order[k]
+        val first = children[v].maxOfOrNull { maxOf(gain[it], 0) } ?: 0
+        gain[v] = values[v] + first
+        best = maxOf(best, gain[v])
+    }
+    return best
+}
+"""),
+        ("answer-starts-at-zero", "MISSING_EDGE_CASE",
+         "가장 큰 합을 0 에서 시작한다. 값이 모두 음수면 답은 0 이 아니라 가장 큰 값이다.",
+         """
+fun treeMaxPathSum(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val children = Array(n) { ArrayList<Int>() }
+    var root = 0
+    for (v in 0 until n) if (parent[v] == -1) root = v else children[parent[v]].add(v)
+    val order = ArrayList<Int>(); order.add(root)
+    var i = 0
+    while (i < order.size) { order.addAll(children[order[i]]); i += 1 }
+    val gain = IntArray(n)
+    var best = 0
+    for (k in n - 1 downTo 0) {
+        val v = order[k]
+        var first = 0; var second = 0
+        for (c in children[v]) { val g = gain[c]; if (g > first) { second = first; first = g } else if (g > second) second = g }
+        gain[v] = values[v] + first
+        best = maxOf(best, values[v] + first + second)
+    }
+    return best
+}
+"""),
+        ("recursive-descent", "MISSING_EDGE_CASE",
+         "재귀로 내려간다. 트리가 20 만 깊이의 사슬이면 스택이 넘친다.",
+         """
+fun treeMaxPathSum(parent: IntArray, values: IntArray): Int {
+    val n = parent.size
+    val children = Array(n) { ArrayList<Int>() }
+    var root = 0
+    for (v in 0 until n) if (parent[v] == -1) root = v else children[parent[v]].add(v)
+    var best = Int.MIN_VALUE
+    fun gain(v: Int): Int {
+        var first = 0; var second = 0
+        for (c in children[v]) { val g = gain(c); if (g > first) { second = first; first = g } else if (g > second) second = g }
+        best = maxOf(best, values[v] + first + second)
+        return values[v] + first
+    }
+    gain(root)
+    return best
+}
+"""),
+    ],
+))

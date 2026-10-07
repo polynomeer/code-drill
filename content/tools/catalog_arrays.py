@@ -4993,3 +4993,254 @@ fun defuseCode(code: IntArray, k: Int): IntArray {
 """),
     ],
 ))
+
+
+# --- 209. 값 지우기 -----------------------------------------------------------------------------
+
+def _remove_element(nums, value):
+    return [x for x in nums if x != value]
+
+
+PROBLEMS.append(Problem(
+    id="remove-element",
+    title="값 지우기",
+    summary="""
+정수 배열 `nums` 에서 `value` 와 같은 원소를 **모두** 지운 배열을 반환한다. 남은 원소의 순서는 그대로다.
+""",
+    notes="""
+읽는 자리와 쓰는 자리를 따로 둔다. 읽은 값이 `value` 가 아니면 쓰는 자리에 옮기고 쓰는 자리를 한 칸 민다. 다
+읽으면 쓰는 자리까지가 답이다 — 배열을 하나 더 만들지 않고 제자리에서 끝난다.
+""",
+    drill_doc="""
+Drill.write(i, x)   // 남길 값을 i 에 옮겼다
+""",
+    constraints="""
+- `0 <= nums.length <= 100_000`, `-100 <= nums[i], value <= 100`
+""",
+    signature=dict(name="removeElement", parameters=[("nums", "INT_ARRAY"), ("value", "INT")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_remove_element,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2_000_000},
+    cases={
+        "sample": [("01", [[3, 2, 2, 3], 3]), ("02", [[0, 1, 2, 2, 3, 0, 4, 2], 2])],
+        "boundary": [
+            ("01-empty", [[], 1]),
+            ("02-all-removed", [[5, 5, 5], 5]),
+            ("03-none-removed", [[1, 2, 3], 9]),
+            # 지울 값이 연달아 있다 — 지운 자리로 당겨 온 값도 지울 값이다.
+            ("04-consecutive", [[1, 7, 7, 7, 2], 7]),
+            ("05-at-both-ends", [[4, 1, 2, 4], 4]),
+            ("06-negative", [[-1, 0, -1, 1], -1]),
+            # 순서가 지켜져야 한다 — 끝에서 메우면 순서가 바뀐다.
+            ("07-order-matters", [[9, 1, 2, 3, 9, 4], 9]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, 0, 3, salt=10179), 2]),
+            ("02-random-medium", [randoms(1000, -5, 5, salt=10181), 0]),
+            ("03-random-large", [randoms(100_000, -100, 100, salt=10183), 7]),
+            ("04-mostly-removed", [[1] * 50_000 + [2] + [1] * 49_999, 1]),
+            ("05-single-kept", [[8], 3]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 읽는 자리와 쓰는 자리를 따로 둔다.
+fun removeElement(nums: IntArray, value: Int): IntArray {
+    var write = 0
+    for (read in nums.indices) {
+        if (nums[read] != value) {
+            nums[write] = nums[read]
+            Drill.write(write, nums[read])
+            write += 1
+        }
+    }
+    return nums.copyOf(write)
+}
+""",
+    mutants=[
+        ("first-only", "WRONG_BRANCH",
+         "처음 나온 하나만 지운다. 같은 값은 모두 지워야 한다.",
+         """
+fun removeElement(nums: IntArray, value: Int): IntArray {
+    val at = nums.indexOf(value)
+    if (at < 0) return nums
+    return nums.filterIndexed { i, _ -> i != at }.toIntArray()
+}
+"""),
+        ("skips-pulled-in", "MISSING_EDGE_CASE",
+         "지운 자리로 당겨 온 값을 건너뛴다. 같은 값이 연달아 있으면 하나가 남는다.",
+         """
+fun removeElement(nums: IntArray, value: Int): IntArray {
+    val list = nums.toMutableList()
+    var i = 0
+    while (i < list.size) {
+        if (list[i] == value) list.removeAt(i)
+        i += 1
+    }
+    return list.toIntArray()
+}
+"""),
+        ("fills-from-end", "WRONG_ALGORITHM",
+         "지운 자리를 끝 원소로 메운다. 남은 원소의 순서가 바뀐다.",
+         """
+fun removeElement(nums: IntArray, value: Int): IntArray {
+    var i = 0
+    var n = nums.size
+    while (i < n) {
+        if (nums[i] == value) { nums[i] = nums[n - 1]; n -= 1 } else i += 1
+    }
+    return nums.copyOf(n)
+}
+"""),
+        ("returns-full-length", "OFF_BY_ONE",
+         "남긴 개수가 아니라 원래 길이만큼 돌려준다. 뒤에 지운 값의 흔적이 남는다.",
+         """
+fun removeElement(nums: IntArray, value: Int): IntArray {
+    var write = 0
+    for (read in nums.indices) if (nums[read] != value) { nums[write] = nums[read]; write += 1 }
+    return nums
+}
+"""),
+    ],
+))
+
+
+# --- 210. 카풀 ----------------------------------------------------------------------------------
+
+def _car_pooling(trips, capacity):
+    diff = [0] * 1_000_002
+    for i in range(0, len(trips), 3):
+        k, a, b = trips[i], trips[i + 1], trips[i + 2]
+        diff[a] += k
+        diff[b] -= k
+    load = 0
+    for d in diff:
+        load += d
+        if load > capacity:
+            return 0
+    return 1
+
+
+def _trips(count, salt, length=1000, people=10, end=1_000_000):
+    a = randoms(count, 0, end - 1, salt=salt)
+    span = randoms(count, 1, length, salt=salt + 1)
+    k = randoms(count, 1, people, salt=salt + 2)
+    return flat([k[i], a[i], min(end, a[i] + span[i])] for i in range(count))
+
+
+PROBLEMS.append(Problem(
+    id="car-pooling",
+    title="카풀",
+    summary="""
+차 한 대가 동쪽으로만 달린다. 여정 `trips = [k1, from1, to1, k2, from2, to2, ...]` 은 "`from` km 에서 `k` 명을
+태우고 `to` km 에서 내려 준다"는 뜻이다. 좌석이 `capacity` 개일 때 모든 여정을 태울 수 있으면 `1`, 아니면 `0` 을
+반환한다. `to` km 에서 내리는 사람과 같은 자리에서 타는 사람은 겹치지 않는다.
+""",
+    notes="""
+km 마다 몇 명이 타 있는지만 알면 된다. 여정마다 그 구간의 모든 km 에 더하면 여정 길이만큼 걸린다 — 대신
+`from` 에 `+k`, `to` 에 `-k` 만 적어 두고 앞에서부터 누적하면 각 km 의 인원이 나온다(차분 배열). 누적이 한
+번이라도 `capacity` 를 넘으면 `0` 이다.
+""",
+    drill_doc="""
+Drill.write(km, load)   // km 에서 타 있는 인원
+""",
+    constraints="""
+- 여정 `1..100_000` 개, `1 <= k <= 100`, `0 <= from < to <= 1_000_000`, `1 <= capacity <= 100_000_000`
+""",
+    signature=dict(name="carPooling", parameters=[("trips", "INT_ARRAY"), ("capacity", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_car_pooling,
+    cases={
+        "sample": [
+            ("01", [[2, 1, 5, 3, 3, 7], 4]),
+            ("02", [[2, 1, 5, 3, 3, 7], 5]),
+        ],
+        "boundary": [
+            ("01-single-trip-fits", [[3, 0, 1], 3]),
+            ("02-single-trip-too-many", [[4, 0, 1], 3]),
+            # 내리는 자리에서 다른 사람이 탄다 — 겹치지 않는다.
+            ("03-drop-then-pick", [[3, 2, 5, 3, 5, 9], 3]),
+            # 좌석과 꼭 같으면 태울 수 있다.
+            ("04-exactly-full", [[2, 0, 4, 2, 1, 3], 4]),
+            # 여정 하나하나는 들어가지만 겹치는 구간에서 넘친다.
+            ("05-overlap-overflows", [[3, 0, 10, 3, 9, 12], 5]),
+            ("06-far-end", [[1, 999_999, 1_000_000, 1, 0, 1_000_000], 2]),
+            ("07-unsorted-trips", [[1, 50, 60, 2, 10, 55, 2, 52, 70], 4]),
+        ],
+        "hidden": [
+            ("01-random-small", [_trips(10, salt=10185, length=20, people=3, end=50), 6]),
+            ("02-random-fits", [_trips(1000, salt=10187), 100]),
+            ("03-random-overflows", [_trips(1000, salt=10187), 20]),
+            ("04-nested", [flat([1, i, 1000 - i] for i in range(500)), 500]),
+            ("05-nested-overflow", [flat([1, i, 1000 - i] for i in range(500)), 499]),
+        ],
+        "performance": [
+            # 여정마다 km 를 하나씩 더하면 10만 × 100만 번이다.
+            ("01-long-trips", [flat([1, i % 10, 1_000_000 - (i % 10)] for i in range(100_000)), 100_000]),
+            ("02-random-long", [_trips(100_000, salt=10189, length=1_000_000, people=100), 100_000_000]),
+            ("03-long-overflow-at-end", [flat([1, 0, 1_000_000] for _ in range(99_999)) + [5, 999_998, 1_000_000], 100_002]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 차분 배열에 오르고 내리는 인원을 적고 앞에서부터 누적한다.
+fun carPooling(trips: IntArray, capacity: Int): Int {
+    val diff = IntArray(1_000_002)
+    for (i in trips.indices step 3) {
+        diff[trips[i + 1]] += trips[i]
+        diff[trips[i + 2]] -= trips[i]
+    }
+    var load = 0
+    for (km in diff.indices) {
+        load += diff[km]
+        if (diff[km] != 0) Drill.write(km, load)
+        if (load > capacity) return 0
+    }
+    return 1
+}
+""",
+    mutants=[
+        ("rides-through-drop-off", "OFF_BY_ONE",
+         "내리는 km 에서도 그 사람이 타 있다고 센다. 내리는 자리에서 타는 사람과 겹치지 않는다.",
+         """
+fun carPooling(trips: IntArray, capacity: Int): Int {
+    val diff = IntArray(1_000_003)
+    for (i in trips.indices step 3) { diff[trips[i + 1]] += trips[i]; diff[trips[i + 2] + 1] -= trips[i] }
+    var load = 0
+    for (d in diff) { load += d; if (load > capacity) return 0 }
+    return 1
+}
+"""),
+        ("full-means-over", "WRONG_BRANCH",
+         "인원이 좌석 수와 같아도 넘쳤다고 본다. 꼭 차는 것은 태울 수 있다.",
+         """
+fun carPooling(trips: IntArray, capacity: Int): Int {
+    val diff = IntArray(1_000_002)
+    for (i in trips.indices step 3) { diff[trips[i + 1]] += trips[i]; diff[trips[i + 2]] -= trips[i] }
+    var load = 0
+    for (d in diff) { load += d; if (load >= capacity) return 0 }
+    return 1
+}
+"""),
+        ("trips-one-by-one", "WRONG_ALGORITHM",
+         "여정마다 좌석에 들어가는지만 본다. 겹치는 여정의 인원은 더해진다.",
+         """
+fun carPooling(trips: IntArray, capacity: Int): Int {
+    for (i in trips.indices step 3) if (trips[i] > capacity) return 0
+    return 1
+}
+"""),
+        ("adds-every-kilometer", "PERFORMANCE",
+         "여정마다 지나는 km 를 하나씩 더한다. 여정이 길면 여정 수 × 거리만큼 돈다.",
+         """
+fun carPooling(trips: IntArray, capacity: Int): Int {
+    val load = IntArray(1_000_001)
+    for (i in trips.indices step 3) {
+        for (km in trips[i + 1] until trips[i + 2]) {
+            load[km] += trips[i]
+            if (load[km] > capacity) return 0
+        }
+    }
+    return 1
+}
+"""),
+    ],
+))

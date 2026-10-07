@@ -2675,3 +2675,162 @@ fun senateVote(senate: String): String {
 """),
     ],
 ))
+
+
+# --- 214. 줄에서 보이는 사람 --------------------------------------------------------------------
+
+def _visible_people(heights):
+    n = len(heights)
+    out = [0] * n
+    stack = []
+    for i in range(n - 1, -1, -1):
+        seen = 0
+        while stack and stack[-1] < heights[i]:
+            stack.pop()
+            seen += 1
+        if stack:
+            seen += 1
+        out[i] = seen
+        stack.append(heights[i])
+    return out
+
+
+def _distinct_heights(n, salt):
+    from author import shuffled
+    return shuffled(range(1, n + 1), salt=salt)
+
+
+PROBLEMS.append(Problem(
+    id="visible-people",
+    title="줄에서 보이는 사람",
+    summary="""
+사람들이 한 줄로 서 있고 `heights[i]` 는 `i` 번째 사람의 키다(모두 다르다). `i` 는 오른쪽의 `j` 를, 둘 사이의
+사람이 모두 `min(heights[i], heights[j])` 보다 작을 때 볼 수 있다. 사람마다 오른쪽에서 볼 수 있는 사람의 수를
+담은 배열을 반환한다.
+""",
+    notes="""
+오른쪽에서부터 훑으며 키가 줄어드는 스택을 둔다. `i` 보다 작은 사람은 `i` 가 모두 볼 수 있고, 그 뒤로는 `i` 에
+가려 왼쪽 누구도 볼 수 없으니 꺼낸다. 꺼낸 수가 본 사람 수이고, 꺼내고도 스택에 누가 남아 있으면 그 사람(`i`
+보다 큰 첫 사람)도 하나 더 보인다. 그 뒤는 그 사람에게 가린다.
+""",
+    drill_doc="""
+Drill.pop(height)    // i 가 보고, 그 뒤로는 가려지는 사람
+Drill.push(height)   // i 를 스택에 올렸다
+""",
+    constraints="""
+- `1 <= heights.length <= 200_000`, `1 <= heights[i] <= 1_000_000_000`, 모두 다르다
+""",
+    signature=dict(name="visiblePeople", parameters=[("heights", "INT_ARRAY")], returns="INT_ARRAY"),
+    # 줄어드는 줄을 끝까지 훑는 오답은 안쪽이 늘 거짓인 비교 둘이라 빠르다 — 10 만에서는 2초 안에 들었다.
+    # 20 만으로 늘리고(일이 4배) 성능 그룹의 시계를 절반으로 조인다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_visible_people,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8_000_000},
+    cases={
+        "sample": [("01", [[10, 6, 8, 5, 11, 9]]), ("02", [[5, 1, 2, 3, 10]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-two-increasing", [[1, 2]]),
+            ("03-two-decreasing", [[2, 1]]),
+            # 큰 사람 뒤는 가린다.
+            ("04-blocked", [[5, 9, 1, 2]]),
+            ("05-increasing", [[1, 2, 3, 4, 5]]),
+            ("06-decreasing", [[5, 4, 3, 2, 1]]),
+            ("07-valley", [[9, 1, 2, 3, 8]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_distinct_heights(12, salt=10231)]),
+            ("02-random-medium", [_distinct_heights(2000, salt=10233)]),
+            ("03-random-large", [[h * 7919 % 1_000_000_007 for h in _distinct_heights(50_000, salt=10235)]]),
+            ("04-zigzag", [[(i // 2 + 1) * 2 + (i % 2) * 100_000 for i in range(1000)]]),
+        ],
+        "performance": [
+            # 줄어들기만 하면 누구에게도 가려지지 않는다 — 오른쪽을 끝까지 훑는 풀이가 모든 쌍을 본다.
+            ("01-decreasing", [list(range(200_000, 0, -1))]),
+            ("02-decreasing-large-values", [list(range(1_000_000_000, 1_000_000_000 - 200_000, -1))]),
+            ("03-random-large", [_distinct_heights(200_000, salt=10237)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오른쪽에서부터 키가 줄어드는 스택.
+fun visiblePeople(heights: IntArray): IntArray {
+    val n = heights.size
+    val out = IntArray(n)
+    val stack = IntArray(n)
+    var top = 0
+    for (i in n - 1 downTo 0) {
+        var seen = 0
+        while (top > 0 && stack[top - 1] < heights[i]) {
+            top -= 1
+            Drill.pop(stack[top])
+            seen += 1
+        }
+        if (top > 0) seen += 1
+        out[i] = seen
+        stack[top] = heights[i]
+        top += 1
+        Drill.push(heights[i])
+    }
+    return out
+}
+""",
+    mutants=[
+        ("forgets-the-taller", "MISSING_EDGE_CASE",
+         "자기보다 큰 첫 사람을 세지 않는다. 그 사람은 가려지지 않고 보인다.",
+         """
+fun visiblePeople(heights: IntArray): IntArray {
+    val n = heights.size
+    val out = IntArray(n)
+    val stack = ArrayDeque<Int>()
+    for (i in n - 1 downTo 0) {
+        var seen = 0
+        while (stack.isNotEmpty() && stack.last() < heights[i]) { stack.removeLast(); seen += 1 }
+        out[i] = seen
+        stack.addLast(heights[i])
+    }
+    return out
+}
+"""),
+        ("counts-every-shorter", "WRONG_ALGORITHM",
+         "오른쪽의 자기보다 작은 사람을 모두 센다. 사이에 더 큰 사람이 있으면 가려진다.",
+         """
+fun visiblePeople(heights: IntArray): IntArray {
+    val n = heights.size
+    return IntArray(n) { i ->
+        var seen = 0
+        for (j in i + 1 until n) {
+            if (heights[j] < heights[i]) seen += 1 else { seen += 1; break }
+        }
+        seen
+    }
+}
+"""),
+        ("stops-at-first-blocker", "WRONG_BRANCH",
+         "오른쪽의 첫 사람만 보고 멈춘다. 그보다 큰 사람이 뒤에 오면 그 사람도 보인다.",
+         """
+fun visiblePeople(heights: IntArray): IntArray {
+    val n = heights.size
+    return IntArray(n) { i -> if (i + 1 < n) 1 else 0 }
+}
+"""),
+        ("scans-rightward", "PERFORMANCE",
+         "사람마다 오른쪽을 훑으며 지금까지 본 가장 큰 키를 넘는 사람을 센다. 키가 줄어들면 끝까지 훑는다.",
+         """
+fun visiblePeople(heights: IntArray): IntArray {
+    val n = heights.size
+    return IntArray(n) { i ->
+        var seen = 0
+        var tallest = 0
+        var j = i + 1
+        while (j < n) {
+            Drill.compare(i, j)
+            if (heights[j] > tallest) { seen += 1; tallest = heights[j] }
+            if (heights[j] > heights[i]) break
+            j += 1
+        }
+        seen
+    }
+}
+"""),
+    ],
+))

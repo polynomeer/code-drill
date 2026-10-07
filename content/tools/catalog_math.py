@@ -2268,3 +2268,176 @@ fun digitSumSteps(n: Int): Int {
 """),
     ],
 ))
+
+
+# --- 213. n! 의 b진법 끝자리 0 -----------------------------------------------------------------
+
+def _factor(b):
+    out = []
+    d = 2
+    while d * d <= b:
+        if b % d == 0:
+            e = 0
+            while b % d == 0:
+                b //= d
+                e += 1
+            out.append((d, e))
+        d += 1
+    if b > 1:
+        out.append((b, 1))
+    return out
+
+
+def _legendre(n, p):
+    count = 0
+    while n:
+        n //= p
+        count += n
+    return count
+
+
+def _trailing_zeros_in_base(n, base):
+    return min(_legendre(n, p) // e for p, e in _factor(base))
+
+
+PROBLEMS.append(Problem(
+    id="trailing-zeros-in-base",
+    title="n! 의 b진법 끝자리 0",
+    summary="""
+`n!` 을 `base` 진법으로 적었을 때 끝에 이어진 `0` 의 개수를 반환한다. `0! = 1` 이다.
+""",
+    notes="""
+끝자리 0 의 개수는 `n!` 을 `base` 로 몇 번 나눌 수 있는가다. `base` 를 소인수분해해 `p^e` 들의 곱으로 적으면,
+`n!` 에 든 `p` 의 지수(르장드르 공식 — `n/p + n/p² + …`)를 `e` 로 나눈 몫이 그 소인수가 허락하는 횟수이고,
+답은 그 중 가장 작은 것이다. 가장 큰 소인수가 늘 답을 정하지는 않는다(`base = 12 = 2²·3`).
+
+`p^k` 를 곱해 나가면 `Int` 를 넘는다. 대신 `n` 을 `p` 로 거듭 나눈다. 소인수분해는 `√base` 까지만 나눠 보면 된다.
+""",
+    drill_doc="""
+Drill.write(p, exponent)   // n! 에 든 소인수 p 의 지수
+""",
+    constraints="""
+- `0 <= n <= 2_000_000_000`, `2 <= base <= 1_000_000_000`
+""",
+    signature=dict(name="trailingZerosInBase", parameters=[("n", "INT"), ("base", "INT")], returns="INT"),
+    # base 까지 나눠 보는 오답은 10 억 번의 나머지 연산이 500ms 에서도 1.3배였다. 정답은 3 만 번 남짓이라 한도의
+    # 0% 를 쓰므로 성능 그룹의 시계를 100ms 로 조인다.
+    groups=perf_groups(time_multiplier=0.05),
+    reference=_trailing_zeros_in_base,
+    cases={
+        "sample": [("01", [5, 10]), ("02", [6, 12])],
+        "boundary": [
+            ("01-zero-factorial", [0, 10]),
+            ("02-one-factorial", [1, 2]),
+            ("03-base-two", [10, 2]),
+            # 가장 큰 소인수가 아니라 작은 소인수가 묶는다.
+            ("04-small-prime-binds", [3, 12]),
+            # 지수로 나눠야 한다.
+            ("05-prime-power-base", [10, 8]),
+            ("06-large-n", [2_000_000_000, 10]),
+            ("07-large-n-power-of-two", [2_000_000_000, 1 << 29]),
+        ],
+        "hidden": [
+            ("01-small", [20, 6]),
+            ("02-base-larger-than-n", [10, 97]),
+            ("03-square-free", [1_000_000, 30]),
+            ("04-large-prime-power", [1_999_999_999, 3 ** 18]),
+            ("05-mixed", [123_456_789, 360]),
+        ],
+        "performance": [
+            # 큰 소수 base — 나눠 볼 수를 base 까지 늘리면 10 억 번을 나눈다.
+            ("01-large-prime-base", [2_000_000_000, 999_999_937]),
+            # 두 소수의 곱은 작은 쪽으로 나누고 나면 금방 끝난다 — 소수 셋 모두 큰 소수다.
+            ("02-another-large-prime", [2_000_000_000, 999_999_893]),
+            ("03-prime-near-limit", [1_500_000_000, 999_999_929]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). √base 까지 소인수분해하고, 소인수마다 르장드르 공식.
+fun trailingZerosInBase(n: Int, base: Int): Int {
+    fun legendre(p: Int): Int {
+        var q = n
+        var count = 0
+        while (q > 0) { q /= p; count += q }
+        return count
+    }
+    var b = base
+    var best = Int.MAX_VALUE
+    var d = 2
+    while (d.toLong() * d <= b) {
+        if (b % d == 0) {
+            var e = 0
+            while (b % d == 0) { b /= d; e += 1 }
+            val times = legendre(d) / e
+            Drill.write(d, times)
+            best = minOf(best, times)
+        }
+        d += 1
+    }
+    if (b > 1) best = minOf(best, legendre(b))
+    return best
+}
+""",
+    mutants=[
+        ("largest-prime-only", "WRONG_ALGORITHM",
+         "가장 큰 소인수만 본다. 작은 소인수가 더 적게 들어 있으면 그것이 답을 정한다.",
+         """
+fun trailingZerosInBase(n: Int, base: Int): Int {
+    var b = base; var largest = 1; var exponent = 0
+    var d = 2
+    while (d.toLong() * d <= b) {
+        if (b % d == 0) { var e = 0; while (b % d == 0) { b /= d; e += 1 }; largest = d; exponent = e }
+        d += 1
+    }
+    if (b > 1) { largest = b; exponent = 1 }
+    var q = n; var count = 0
+    while (q > 0) { q /= largest; count += q }
+    return count / exponent
+}
+"""),
+        ("ignores-exponent", "WRONG_BRANCH",
+         "소인수의 지수로 나누지 않는다. base 가 p 의 거듭제곱을 품으면 p 가 그만큼 더 필요하다.",
+         """
+fun trailingZerosInBase(n: Int, base: Int): Int {
+    var b = base; var best = Int.MAX_VALUE
+    var d = 2
+    fun legendre(p: Int): Int { var q = n; var c = 0; while (q > 0) { q /= p; c += q }; return c }
+    while (d.toLong() * d <= b) {
+        if (b % d == 0) { while (b % d == 0) b /= d; best = minOf(best, legendre(d)) }
+        d += 1
+    }
+    if (b > 1) best = minOf(best, legendre(b))
+    return best
+}
+"""),
+        ("power-overflows", "MISSING_EDGE_CASE",
+         "p 의 거듭제곱을 Int 로 곱해 나간다. n 이 크면 넘쳐 음수가 된다.",
+         """
+fun trailingZerosInBase(n: Int, base: Int): Int {
+    fun legendre(p: Int): Int { var pk = p; var c = 0; var guard = 0; while (pk in 1..n && guard < 64) { c += n / pk; pk *= p; guard += 1 }; return c }
+    var b = base; var best = Int.MAX_VALUE
+    var d = 2
+    while (d.toLong() * d <= b) {
+        if (b % d == 0) { var e = 0; while (b % d == 0) { b /= d; e += 1 }; best = minOf(best, legendre(d) / e) }
+        d += 1
+    }
+    if (b > 1) best = minOf(best, legendre(b))
+    return best
+}
+"""),
+        ("divides-up-to-base", "PERFORMANCE",
+         "나눠 볼 수를 √base 가 아니라 base 까지 늘린다. base 가 큰 소수면 10 억 번을 나눈다.",
+         """
+fun trailingZerosInBase(n: Int, base: Int): Int {
+    fun legendre(p: Int): Int { var q = n; var c = 0; while (q > 0) { q /= p; c += q }; return c }
+    var b = base; var best = Int.MAX_VALUE
+    var d = 2
+    while (d <= base && b > 1) {
+        if (b % d == 0) { var e = 0; while (b % d == 0) { b /= d; e += 1 }; best = minOf(best, legendre(d) / e) }
+        d += 1
+    }
+    return best
+}
+"""),
+    ],
+))

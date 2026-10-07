@@ -1,0 +1,17 @@
+# tree-max-path-sum 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - tree
+  - dynamic-programming
+competencies:
+  - MODELING
+  - EDGE_CASES
+  - CORRECTNESS
+  - IMPLEMENTATION
+prerequisites:
+  - max-subtree-sum
+  - tree-diameter
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "아래에서부터 정점마다 한 번 — 재귀 없이"

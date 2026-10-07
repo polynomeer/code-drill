@@ -2205,3 +2205,167 @@ fun skyline(buildings: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 211. 뒤집힌 쌍 세기 ------------------------------------------------------------------------
+
+def _reverse_pairs(nums):
+    def sort(lo, hi):
+        if hi - lo <= 1:
+            return 0
+        mid = (lo + hi) // 2
+        count = sort(lo, mid) + sort(mid, hi)
+        j = mid
+        for i in range(lo, mid):
+            while j < hi and nums[i] > 2 * nums[j]:
+                j += 1
+            count += j - mid
+        nums[lo:hi] = sorted(nums[lo:hi])
+        return count
+    nums = list(nums)
+    return sort(0, len(nums))
+
+
+PROBLEMS.append(Problem(
+    id="reverse-pairs",
+    title="뒤집힌 쌍 세기",
+    summary="""
+정수 배열 `nums` 에서 `i < j` 이고 `nums[i] > 2 × nums[j]` 인 쌍 `(i, j)` 의 수를 반환한다.
+""",
+    notes="""
+모든 쌍을 보면 `n²/2` 다. 병합 정렬로 반씩 나누면, 왼쪽 반의 `i` 와 오른쪽 반의 `j` 로 이루어진 쌍은 **두 반이
+각각 정렬된 뒤에** 셀 수 있다 — 왼쪽을 앞에서부터 보며 오른쪽의 포인터를 앞으로만 민다. 세는 일과 합치는 일은
+비교 기준이 달라(`> 2×` 와 `<=`) **따로 한 번씩** 훑어야 한다. `2 × nums[j]` 는 `Int` 를 넘을 수 있다.
+""",
+    drill_doc="""
+Drill.compare(i, j)   // 왼쪽 i 와 오른쪽 j 를 견줬다
+""",
+    constraints="""
+- `1 <= nums.length <= 65_000`, `-2^31 <= nums[i] <= 2^31 - 1` — 쌍은 많아야 21 억 남짓이라 `Int` 에 든다
+""",
+    signature=dict(name="reversePairs", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    # 모든 쌍을 보는 오답은 5 만에서 한도의 2.4배였다. 쌍의 수가 Int 에 드는 한(n²/2 < 2^31) 65 000 까지 늘린다.
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_reverse_pairs,
+    cases={
+        "sample": [("01", [[1, 3, 2, 3, 1]]), ("02", [[2, 4, 3, 5, 1]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-equal-to-double", [[4, 2]]),
+            ("03-just-over-double", [[5, 2]]),
+            # 2 × nums[j] 가 Int 를 넘는다.
+            ("04-overflow-positive", [[2147483647, 2147483647]]),
+            ("05-overflow-negative", [[-2147483648, -1073741825]]),
+            ("06-negatives", [[-5, -5]]),
+            ("07-mixed-signs", [[0, -1, 3, -2, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -10, 10, salt=10191)]),
+            ("02-random-medium", [randoms(2000, -1000, 1000, salt=10193)]),
+            ("03-random-extreme", [randoms(5000, -2147483648, 2147483647, salt=10195)]),
+            ("04-descending", [list(range(3000, 0, -1))]),
+            ("05-all-equal", [[3] * 1000]),
+        ],
+        "performance": [
+            ("01-random-large", [randoms(65_000, -2147483648, 2147483647, salt=10197)]),
+            ("02-descending-large", [list(range(1_000_000_000, 1_000_000_000 - 65_000, -1))]),
+            ("03-small-values-large", [randoms(65_000, -1000, 1000, salt=10199)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 병합 정렬 — 정렬된 두 반에서 먼저 세고, 그다음 합친다.
+fun reversePairs(nums: IntArray): Int {
+    val a = nums.copyOf()
+    val buffer = IntArray(a.size)
+    fun sort(lo: Int, hi: Int): Long {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) ushr 1
+        var count = sort(lo, mid) + sort(mid, hi)
+        var j = mid
+        for (i in lo until mid) {
+            while (j < hi && a[i].toLong() > 2L * a[j]) j += 1
+            Drill.compare(i, j)
+            count += j - mid
+        }
+        var l = lo; var r = mid; var k = lo
+        while (l < mid || r < hi) {
+            if (r >= hi || (l < mid && a[l] <= a[r])) { buffer[k] = a[l]; l += 1 } else { buffer[k] = a[r]; r += 1 }
+            k += 1
+        }
+        System.arraycopy(buffer, lo, a, lo, hi - lo)
+        return count
+    }
+    return sort(0, a.size).toInt()
+}
+""",
+    mutants=[
+        ("doubles-in-int", "MISSING_EDGE_CASE",
+         "2 × nums[j] 를 Int 로 계산한다. 값이 크면 넘쳐 부호가 뒤집힌다.",
+         """
+fun reversePairs(nums: IntArray): Int {
+    val a = nums.copyOf()
+    fun sort(lo: Int, hi: Int): Int {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) ushr 1
+        var count = sort(lo, mid) + sort(mid, hi)
+        var j = mid
+        for (i in lo until mid) { while (j < hi && a[i] > 2 * a[j]) j += 1; count += j - mid }
+        a.sort(lo, hi)
+        return count
+    }
+    return sort(0, a.size)
+}
+"""),
+        ("counts-while-merging", "WRONG_ALGORITHM",
+         "합치는 포인터로 함께 센다. 세는 기준(2 배보다 큼)과 합치는 기준(작거나 같음)이 달라 쌍을 놓친다.",
+         """
+fun reversePairs(nums: IntArray): Int {
+    val a = nums.copyOf()
+    val buffer = IntArray(a.size)
+    fun sort(lo: Int, hi: Int): Long {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) ushr 1
+        var count = sort(lo, mid) + sort(mid, hi)
+        var l = lo; var r = mid; var k = lo
+        while (l < mid || r < hi) {
+            if (r >= hi || (l < mid && a[l] <= a[r])) { buffer[k] = a[l]; l += 1 }
+            else { if (l < mid && a[l].toLong() > 2L * a[r]) count += mid - l; buffer[k] = a[r]; r += 1 }
+            k += 1
+        }
+        System.arraycopy(buffer, lo, a, lo, hi - lo)
+        return count
+    }
+    return sort(0, a.size).toInt()
+}
+"""),
+        ("at-least-double", "OFF_BY_ONE",
+         "nums[i] 가 2 × nums[j] 와 같아도 센다. 엄격히 커야 한다.",
+         """
+fun reversePairs(nums: IntArray): Int {
+    val a = nums.copyOf()
+    fun sort(lo: Int, hi: Int): Long {
+        if (hi - lo <= 1) return 0
+        val mid = (lo + hi) ushr 1
+        var count = sort(lo, mid) + sort(mid, hi)
+        var j = mid
+        for (i in lo until mid) { while (j < hi && a[i].toLong() >= 2L * a[j]) j += 1; count += j - mid }
+        a.sort(lo, hi)
+        return count
+    }
+    return sort(0, a.size).toInt()
+}
+"""),
+        ("every-pair", "PERFORMANCE",
+         "모든 쌍을 견준다. n 이 6 만 5 천이면 21 억 번이다.",
+         """
+fun reversePairs(nums: IntArray): Int {
+    var count = 0
+    for (i in nums.indices) for (j in i + 1 until nums.size) {
+        Drill.compare(i, j)
+        if (nums[i].toLong() > 2L * nums[j]) count += 1
+    }
+    return count
+}
+"""),
+    ],
+))

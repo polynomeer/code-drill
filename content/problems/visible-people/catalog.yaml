@@ -1,0 +1,16 @@
+# visible-people 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - array
+  - monotonic-stack
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - next-greater-distance
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "사람마다 한 번 올리고 많아야 한 번 꺼낸다"
