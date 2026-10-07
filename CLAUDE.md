@@ -54,4 +54,8 @@ cd web && pnpm e2e:visual   # 시각 회귀 — CI 와 같은 리눅스 컨테�
 cd web && pnpm dev     # :8080 으로 /api 프록시
 ```
 
+```bash
+cd cli && go test ./...   # codedrill CLI — 키트 고르기 규칙, 기기 승인 폴링, 판정 출력
+```
+
 세 앱을 띄우는 절차와 함정은 → [docs/running-locally.md](docs/running-locally.md)

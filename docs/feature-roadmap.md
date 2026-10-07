@@ -954,9 +954,24 @@ WRONG_ANSWER(숨은 8/9, 6/9)·WRONG_ANSWER(0/1) 를 확인했다.
   사본이면 "로컬에선 통과했는데 채점은 다르다"가 생긴다. 제출은 작업 공간의 "폴더 가져오기"로 받은 폴더를
   올린다; 키트 파일·빌드 산출물은 빼고 읽는다(`kitFiles.ts` = `ProjectKit.KIT_PATHS`). 검증: 숨은 테스트가
   키트에 없는지 열여덟 문제 전부, 그리고 세 언어의 키트를 실제로 풀어 돌려 본다(`ProjectKitTest`).
-- **2단계 — CLI(`codedrill login·get·test·submit`) + 기기 승인(RFC 8628) + 제출 출처.** 남았다. 시안은
-  디자인 캔버스 20~24. 정할 것: CLI 의 언어와 배포 채널(단일 실행 파일 권장 — JVM 이면 Python 문제만 푸는
-  사람도 Java 를 깔아야 한다).
+- **2단계 — CLI(`codedrill login·get·test·submit`) + 기기 승인(RFC 8628) + 제출 출처. 닫힘.** 시안은
+  디자인 캔버스 20~24.
+  - **기기 승인**: `POST /auth/device/code` → 사람이 `/device` 에서 코드를 맞춰 승인 → `POST /auth/device/token`
+    이 `authorization_pending`·`slow_down`·`access_denied`·`expired_token` 을 돌려주다 세션을 낸다
+    (`DeviceAuthorization` — 규칙은 순수 함수, 시험은 `DeviceAuthorizationTest`). 코드는 모음·숫자가 없는
+    여덟 글자, 기기 코드는 해시로만 저장, 한 출처에서 한 시간에 스무 번.
+  - **기기 세션은 좁다**: `user_session.kind = DEVICE` 는 프로젝트형 API 와 `me`·`logout` 만 부른다
+    (`DeviceAuthorization.allows`, 나머지는 403). 갱신 수명 90일 — 쓸 때마다 `last_used_at` 이 움직이고,
+    계정 설정의 "연결된 기기"에서 끊는다. 내 데이터 내보내기·지우기에 들어간다(`DevicePersonalData`).
+  - **제출 출처**: `project_submission.source`(WEB·CLI)와 기기 이름 — 작업 공간 기록과 결과에 보인다.
+    제출에 `projectVersion` 을 실으면 문제가 새 판일 때 409 `PROBLEM_VERSION_STALE` — 받은 키트가 낡았다는 뜻이다.
+  - **CLI** (`cli/`, [README](../cli/README.md)): Go 단일 실행 파일, 표준 라이브러리만 — JVM 이면 Python 문제만
+    푸는 사람도 Java 를 깔아야 한다. `test` 는 키트의 실행 명령을 그대로 부르고, `submit` 은 웹과 같은 규칙으로
+    키트·빌드 파일을 빼고 한도를 미리 재서 `projectVersion` 과 함께 올린 뒤 판정을 기다린다. 배포는 `v*` 태그 →
+    GoReleaser(Releases·Homebrew 탭·Scoop 버킷·install.sh), `checksums.txt` 는 cosign 키 없는 서명.
+  - **남긴 것 (2단계)**: Homebrew 탭·Scoop 버킷 저장소와 `TAP_GITHUB_TOKEN` 은 아직 없다 — 만들기 전까지는
+    Releases 와 install.sh 만. 공개 주소가 정해지면 CLI 의 기본 서버(`http://localhost:8080`)를 바꾼다. CLI 판이
+    너무 낡았을 때 서버가 막는 장치(최소 판)는 아직 없다 — User-Agent 에 판을 싣고 있으니 필요해지면 거기서 건다.
 - **남긴 것 (1단계)**: 로컬 툴체인 판이 채점기와 다르면 결과가 갈릴 수 있다 — Kotlin 판은 빌드 파일에 고정했고
   JDK 는 17~21 을 권한다(Gradle 의 Kotlin 스크립트가 JDK 25 에서 읽히지 않았다). 받은 판보다 문제가 새 판이
   되어도 1단계에서는 막지 않는다 — 판을 실어 보내는 것은 CLI 의 일이다.

@@ -1,0 +1,82 @@
+# codedrill CLI 릴리스 (feature-roadmap 11단계 이어서, 2단계). `v*` 태그를 밀면 .github/workflows/cli.yml 이 돌린다.
+# 앱은 커밋 해시로 배포하고 태그를 쓰지 않는다 — 그래서 `v*` 태그는 CLI 의 것이다 (`cli-` 접두사는 Pro 판의 기능).
+#
+# 단일 실행 파일 — JVM 이면 Python 문제만 푸는 사람도 Java 를 깔아야 한다. 받는 길은 넷:
+# GitHub Releases(직접), Homebrew 탭, Scoop 버킷, install.sh. 어느 길이든 checksums.txt 와 그 cosign 서명
+# (키 없이, GitHub OIDC)으로 확인할 수 있다.
+version: 2
+
+project_name: codedrill
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: codedrill
+    main: .
+    binary: codedrill
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: codedrill
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "codedrill_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args: ["sign-blob", "--yes", "--output-signature=${signature}", "--output-certificate=${certificate}", "${artifact}"]
+    artifacts: checksum
+
+release:
+  github:
+    owner: polynomeer
+    name: code-drill
+  name_template: "codedrill {{ .Version }}"
+  extra_files:
+    - glob: ./install.sh
+
+changelog:
+  filters:
+    include: ["^feat\\(cli\\)", "^fix\\(cli\\)"]
+
+# 탭·버킷 저장소에 쓸 토큰이 없으면 올리지 않는다 — 릴리스 자체는 막지 않는다
+homebrew_casks:
+  - name: codedrill
+    repository:
+      owner: polynomeer
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if isEnvSet "TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+    homepage: https://github.com/polynomeer/code-drill
+    description: Solve CodeDrill project problems in your own IDE
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/codedrill"]
+          end
+
+scoops:
+  - name: codedrill
+    repository:
+      owner: polynomeer
+      name: scoop-bucket
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if isEnvSet "TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+    homepage: https://github.com/polynomeer/code-drill
+    description: Solve CodeDrill project problems in your own IDE
+    license: Proprietary

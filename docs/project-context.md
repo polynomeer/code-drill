@@ -36,6 +36,7 @@
 | Realtime | SSE 우선, 필요 시 WebSocket |
 | Observability | OpenTelemetry + Prometheus + Grafana |
 | 채점 지원 언어 | Java, Kotlin, Python (언어별 `RuntimeAdapter` 구현 하나씩) |
+| CLI (`cli/`) | Go 단일 실행 파일, 표준 라이브러리만 — 프로젝트형을 개인 IDE 에서 받고 내는 클라이언트 |
 
 MVP에서 **선택하지 않은 것**: 마이크로서비스 전면 분리, Kafka, 서비스 메시,
 요청마다 Kubernetes Job 생성(상시 워커 풀을 쓴다).

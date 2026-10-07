@@ -22,6 +22,7 @@
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | 사람이 처음 무엇을 읽고 설정하는가 | 사람 기여자 |
 | [../content/tools/README.md](../content/tools/README.md) | 문제 패키지를 어떻게 만들고 다시 뽑나 | 문제를 추가할 때 |
 | [../content/projects/README.md](../content/projects/README.md) | 프로젝트형 문제 패키지의 모양과 검증 | 프로젝트형 문제를 추가할 때 |
+| [../cli/README.md](../cli/README.md) | codedrill CLI 를 어떻게 쓰고 설치하고 릴리스하나 | CLI 를 고치거나 내보낼 때 |
 | [specs/](specs/) | 제품·기술·디자인 결정의 원본은 어디 있나 | 상세가 필요할 때 |
 | [archive/](archive/) | 예전 규칙은 무엇이었나 | 이력 추적 시에만 |
 
@@ -71,6 +72,7 @@
 | UI 개편 단계를 닫거나 프런트엔드 기반 라이브러리를 바꿈 | `ui-overhaul.md` (진단이 낡았으면 `ux-benchmark.md` 도) |
 | 문제 저작 절차나 패키지 스키마가 바뀜 | `content/tools/README.md` |
 | 프로젝트형 패키지의 모양이나 검증 규칙이 바뀜 | `content/projects/README.md` |
+| CLI 명령·설치 길·릴리스 절차가 바뀜 | `cli/README.md` |
 | SLO 목표값이 바뀜 | `deploy/observability/alerts.yml` (문서에 옮겨 적지 않는다) |
 | 스택 선택, 모듈 경계, 도메인 용어가 바뀜 | `project-context.md` |
 | 기획 `.docx`가 개정됨 | `project-context.md`에서 어긋난 항목만 |
