@@ -199,6 +199,9 @@ test('제출 상세에 접근성 위반이 없다', async ({ page }) => {
   await mockApi(page)
   await page.goto('/submissions/wrong')
   await expect(page.getByText('예제 01 에서 틀렸습니다')).toBeVisible()
+  // 다 뜬 화면을 잰다. 판정 문구가 먼저 뜨고 코드·사례 패널의 뼈대가 아직 깜빡이는 순간에 재면, CI 에서
+  // 한 번 `color-contrast: :root` 로 떨어졌다(재시도에서 통과, 로컬 재현 안 됨). 다크 검수와 같은 기준이다.
+  await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
   const result = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
     .exclude('.monaco-editor')

@@ -25,6 +25,8 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? 'github' : 'list',
   expect: {
+    // 찍기 전에 웹 글꼴을 다시 기다린다. 퀘스트 테마의 제목 글꼴까지 더해지자 두 워커에서 5초를 넘긴 적이 있다
+    timeout: 15_000,
     toHaveScreenshot: {
       animations: 'disabled',
       caret: 'hide',

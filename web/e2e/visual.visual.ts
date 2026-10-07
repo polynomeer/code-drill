@@ -28,6 +28,9 @@ async function settle(page: Page, path: string, ready: string) {
   await expect(page.getByText(ready, { exact: false }).first()).toBeVisible({ timeout: 20_000 })
   // 카탈로그는 불러오는 중 상태(Skeleton)를 견본으로 늘 보여 준다 — 그 화면만 이 조건을 뺀다
   if (path !== '/design') await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
+  // 편집기는 늦게 불러와 늦게 자란다. 다 자라기 전에 찍으면 가림막이 작은 점만 덮고, 그 뒤에 그려진 편집기
+  // 전체가 차이로 잡힌다 — 풀이 화면이 기준과 4할 가까이 달라진 것이 그것이다.
+  if (path.endsWith('/solve')) await expect(page.locator('.monaco-editor .view-lines')).toBeVisible({ timeout: 20_000 })
   await page.evaluate(() => document.fonts.ready)
 }
 
