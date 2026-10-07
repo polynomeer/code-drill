@@ -24,13 +24,16 @@ const SCREENS: { name: string; path: string; ready: string }[] = [
   { name: 'training', path: '/training', ready: '오늘 집중할 것' },
 ]
 
-async function settle(page: Page, path: string, ready: string) {
+async function settle(page: Page, path: string, ready: string, width: number) {
   await expect(page.getByText(ready, { exact: false }).first()).toBeVisible({ timeout: 20_000 })
   // 카탈로그는 불러오는 중 상태(Skeleton)를 견본으로 늘 보여 준다 — 그 화면만 이 조건을 뺀다
   if (path !== '/design') await expect(page.locator('[aria-busy="true"]')).toHaveCount(0)
   // 편집기는 늦게 불러와 늦게 자란다. 다 자라기 전에 찍으면 가림막이 작은 점만 덮고, 그 뒤에 그려진 편집기
   // 전체가 차이로 잡힌다 — 풀이 화면이 기준과 4할 가까이 달라진 것이 그것이다.
-  if (path.endsWith('/solve')) await expect(page.locator('.monaco-editor .view-lines')).toBeVisible({ timeout: 20_000 })
+  // 768 아래는 문제·코드·결과가 탭이고 문제 탭으로 시작한다 — 편집기가 화면에 없으니 기다리면 끝나지 않는다.
+  if (path.endsWith('/solve') && width >= 768) {
+    await expect(page.locator('.monaco-editor .view-lines')).toBeVisible({ timeout: 20_000 })
+  }
   await page.evaluate(() => document.fonts.ready)
 }
 
@@ -44,7 +47,7 @@ for (const theme of ['light', 'dark'] as const) {
           await page.clock.setFixedTime(new Date(NOW))
           await mockApi(page, theme)
           await page.goto(screen.path)
-          await settle(page, screen.path, screen.ready)
+          await settle(page, screen.path, screen.ready, size.width)
           await expect(page).toHaveScreenshot(`${screen.name}-${theme}-${size.name}.png`, {
             mask: [page.locator('.monaco-editor')],
           })
