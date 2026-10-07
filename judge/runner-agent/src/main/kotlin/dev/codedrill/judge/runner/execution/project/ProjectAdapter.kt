@@ -2,6 +2,7 @@ package dev.codedrill.judge.runner.execution.project
 
 import dev.codedrill.judge.protocol.Language
 import dev.codedrill.judge.runner.execution.adapter.PythonAdapter
+import dev.codedrill.platform.problempackage.ProjectHarness
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 
@@ -53,7 +54,7 @@ class PythonProjectAdapter(private val interpreter: String = PythonAdapter.DEFAU
 
     override val language = Language.PYTHON
 
-    override fun harnessFiles(): Map<String, String> = mapOf(HARNESS to harnessSource)
+    override fun harnessFiles(): Map<String, String> = ProjectHarness.files("PYTHON")
 
     /**
      * 워크스페이스의 모든 .py 를 컴파일해 본다. 바이트코드는 쓰지 않는다 — 소스 디렉터리가
@@ -74,14 +75,8 @@ class PythonProjectAdapter(private val interpreter: String = PythonAdapter.DEFAU
 
     override fun env() = PythonAdapter.DETERMINISM_ENV
 
-    private val harnessSource: String by lazy {
-        PythonProjectAdapter::class.java.getResourceAsStream("/project/$HARNESS")
-            ?.bufferedReader()?.readText()
-            ?: error("프로젝트 하네스가 리소스에 없다: /project/$HARNESS")
-    }
-
     companion object {
-        const val HARNESS = "python_harness.py"
+        const val HARNESS = ProjectHarness.PYTHON
 
         private const val SYNTAX_CHECK =
             "import pathlib, sys\n" +
@@ -112,7 +107,7 @@ class KotlinProjectAdapter(
 
     override val language = Language.KOTLIN
 
-    override fun harnessFiles(): Map<String, String> = mapOf(HARNESS to harnessSource)
+    override fun harnessFiles(): Map<String, String> = ProjectHarness.files("KOTLIN")
 
     override fun buildCommand(workspace: Path): List<String> = listOf(
         "java",
@@ -151,15 +146,9 @@ class KotlinProjectAdapter(
 
     override fun buildMemoryMb(limitMb: Int): Int = maxOf(limitMb, COMPILER_HEAP_MB)
 
-    private val harnessSource: String by lazy {
-        KotlinProjectAdapter::class.java.getResourceAsStream("/project/kotlin_harness.kt")
-            ?.bufferedReader()?.readText()
-            ?: error("프로젝트 하네스가 리소스에 없다: /project/kotlin_harness.kt")
-    }
-
     companion object {
         /** 하네스 파일 이름. 클래스 `codedrill.CodedrillHarnessKt` 가 여기서 나온다. */
-        const val HARNESS = "CodedrillHarness.kt"
+        const val HARNESS = ProjectHarness.KOTLIN
         const val CLASSES = "classes"
 
         /** 알고리즘 판정의 컴파일러와 같은 값. 컴파일러는 문제의 한도와 무관하게 이만큼 쓴다. */
@@ -176,10 +165,7 @@ class JavaProjectAdapter : ProjectAdapter {
 
     override val language = Language.JAVA
 
-    override fun harnessFiles(): Map<String, String> = mapOf(
-        "codedrill/CodedrillHarness.java" to resource("java_harness.java"),
-        "codedrill/Assertions.java" to resource("java_assertions.java"),
-    )
+    override fun harnessFiles(): Map<String, String> = ProjectHarness.files("JAVA")
 
     /** javac 는 디렉터리를 받지 않는다. 파일을 훑어 넘긴다 — 워크스페이스는 이미 만들어져 있다. */
     override fun buildCommand(workspace: Path): List<String> {
@@ -214,10 +200,6 @@ class JavaProjectAdapter : ProjectAdapter {
         java.nio.file.Files.walk(root).use { stream ->
             stream.filter { java.nio.file.Files.isRegularFile(it) && it.toString().endsWith(".java") }.sorted().toList()
         }
-
-    private fun resource(name: String): String =
-        JavaProjectAdapter::class.java.getResourceAsStream("/project/$name")?.bufferedReader()?.readText()
-            ?: error("프로젝트 하네스가 리소스에 없다: /project/$name")
 
     companion object {
         const val CLASSES = "classes"

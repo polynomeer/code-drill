@@ -10,6 +10,8 @@ dependencies {
     implementation(project(":platform:messaging"))
     implementation(project(":platform:storage"))
     implementation(project(":platform:observability"))
+    // 프로젝트형 테스트 하네스 — 사용자 키트와 같은 파일을 쓴다 (ProjectHarness)
+    implementation(project(":platform:problem-package"))
     implementation(libs.spring.boot.starter)
     implementation(libs.spring.boot.starter.actuator)
     // health·prometheus 엔드포인트를 노출하려면 web 이 필요하다 (§13.2 기본 대시보드).
