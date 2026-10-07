@@ -51,6 +51,7 @@ const ProfilePage = lazy(() => import('../features/profile/ProfilePage').then((m
 const AdminPage = lazy(() => import('../features/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
 // 프로젝트형 작업 공간 — 편집기와 지문 렌더러를 끌고 오므로 따로 청크로 (ui-overhaul.md §6.11)
 const ProjectPage = lazy(() => import('../features/project/ProjectPage').then((m) => ({ default: m.ProjectPage })))
+const DevicePage = lazy(() => import('../features/devices/DevicePage').then((m) => ({ default: m.DevicePage })))
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
@@ -151,6 +152,14 @@ function Shell() {
           <RequireSession>
             <Suspense fallback={<RouteLoading />}>
               <TrainingPage />
+            </Suspense>
+          </RequireSession>
+        </Route>
+        {/* CLI 로그인 승인 (RFC 8628). 로그인한 사람이 자기 계정에 기기를 잇는다 */}
+        <Route path="/device">
+          <RequireSession>
+            <Suspense fallback={<RouteLoading />}>
+              <DevicePage />
             </Suspense>
           </RequireSession>
         </Route>

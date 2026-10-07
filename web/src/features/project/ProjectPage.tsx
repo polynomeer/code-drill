@@ -292,6 +292,7 @@ function History({ history, selected, onOpen }: { history: ProjectSubmission[]; 
             <span className={styles.historyTime}>{fullTime(item.createdAt)}</span>
             {item.status !== 'COMPLETED' ? <Badge tone="warning">채점 중</Badge> : item.verdict && <VerdictBadge verdict={item.verdict} />}
             {item.score !== null && <span className={styles.historyScore}>{item.score}점</span>}
+            <Source submission={item} />
           </button>
         </li>
       ))}
@@ -362,6 +363,7 @@ function Outcome({ project, result }: { project: ProjectView; result: ProjectSub
         <div className={styles.verdict}>
           {result.verdict && <VerdictBadge verdict={result.verdict} />}
           {result.score !== null && <span className={styles.score}>{result.score}점</span>}
+          <Source submission={result} />
           {result.revision > 1 && <span className={styles.muted}>재채점 {result.revision - 1}회</span>}
         </div>
         <TestList title="공개 테스트" tests={publicTests} />
@@ -438,4 +440,10 @@ function Probe({ probe }: { probe: ProjectProbeOutcome }) {
       {given > 0 && <span className={styles.muted}>공개 테스트가 이미 잡는 오답 {given}개는 세지 않았습니다</span>}
     </div>
   )
+}
+
+/** 어디서 낸 제출인가 (디자인 시안 24) — CLI 제출은 기기 이름까지. 웹 초안과 다를 수 있다는 단서다 */
+function Source({ submission }: { submission: ProjectSubmission }) {
+  if (submission.source !== 'CLI') return <span className={styles.source}>웹</span>
+  return <span className={`${styles.source} ${styles.sourceCli}`}>CLI{submission.device ? ` · ${submission.device}` : ''}</span>
 }

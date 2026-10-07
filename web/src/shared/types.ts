@@ -875,7 +875,28 @@ export interface ProjectSubmission {
   completedAt: string | null
   /** 재채점마다 오른다. 1 이면 사용자가 낸 그대로의 판정이다. */
   revision: number
+  /** 어디서 냈나 — CLI 면 그 기기의 이름이 [device] 에 (feature-roadmap 11단계 이어서 — 2단계) */
+  source?: 'WEB' | 'CLI'
+  device?: string | null
   files: Record<string, string> | null
+}
+
+/** CLI 가 기다리는 기기 승인 요청 (RFC 8628) — 승인 화면이 보여 준다 */
+export interface DeviceRequest {
+  userCode: string
+  deviceName: string
+  client: string
+  createdAt: string
+  expiresAt: string
+}
+
+/** 연결된 기기 — 살아 있는 CLI 세션 */
+export interface ConnectedDevice {
+  id: string
+  deviceName: string
+  client: string
+  connectedAt: string | null
+  lastUsedAt: string | null
 }
 
 export interface ProjectProbeOutcome {

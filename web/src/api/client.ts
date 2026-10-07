@@ -51,6 +51,8 @@ import type {
   ProjectSubmission,
   ProjectSummary,
   ProjectView,
+  DeviceRequest,
+  ConnectedDevice,
 } from '../shared/types'
 
 const BASE = '/api/v1'
@@ -929,4 +931,34 @@ export async function saveProjectDraft(
 
 export async function discardProjectDraft(projectId: string): Promise<void> {
   await authed(`/projects/${projectId}/draft`, { method: 'DELETE' })
+}
+
+// --- 기기 승인 (RFC 8628 — feature-roadmap 11단계 이어서, 2단계) ---
+
+/** 기다리는 요청. 없거나 만료됐으면 null */
+export async function getDeviceRequest(userCode: string): Promise<DeviceRequest | null> {
+  const response = await authed(`/auth/device/requests/${encodeURIComponent(userCode)}`)
+  if (response.status === 404) return null
+  return json<DeviceRequest>(response)
+}
+
+/** 승인·거절. 그 사이 만료됐거나 이미 결정됐으면 false */
+export async function decideDevice(userCode: string, approve: boolean): Promise<boolean> {
+  const response = await authed(`/auth/device/requests/${encodeURIComponent(userCode)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ approve }),
+  })
+  if (response.status === 404) return false
+  if (!response.ok) await json(response)
+  return true
+}
+
+export async function listDevices(): Promise<ConnectedDevice[]> {
+  return json<ConnectedDevice[]>(await authed('/auth/devices'))
+}
+
+export async function disconnectDevice(id: string): Promise<void> {
+  const response = await authed(`/auth/devices/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!response.ok && response.status !== 404) await json(response)
 }
