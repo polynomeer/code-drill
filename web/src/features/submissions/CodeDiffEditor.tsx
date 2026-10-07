@@ -1,4 +1,6 @@
 import { DiffEditor } from '@monaco-editor/react'
+import { useEditorTheme } from '../workspace/editorSettings'
+import { monacoThemeName } from '../workspace/editorThemes'
 import { setupMonaco } from '../workspace/monacoSetup'
 
 setupMonaco()
@@ -19,12 +21,13 @@ export default function CodeDiffEditor({
   language: string
   sideBySide: boolean
 }) {
+  const theme = useEditorTheme()
   return (
     <DiffEditor
       original={original}
       modified={modified}
       language={language}
-      theme="vs-dark"
+      theme={monacoThemeName(theme)}
       options={{
         readOnly: true,
         originalEditable: false,

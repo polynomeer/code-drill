@@ -5,6 +5,8 @@
  * 인라인 스크립트가 같은 키로 한다 — 여기서만 하면 다크 사용자가 흰 화면을 한 번 본다.
  * 키나 해석 규칙을 바꾸면 그 스크립트도 함께 고친다.
  */
+import { useSyncExternalStore } from 'react'
+
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 const KEY = 'codedrill.theme'
@@ -42,3 +44,16 @@ export function setThemePreference(preference: ThemePreference) {
 media.addEventListener('change', () => {
   if (getThemePreference() === 'system') apply('system')
 })
+
+/** 지금 그려진 테마. `<html data-theme>` 이 단일 출처다 — 선택·시스템 변경·첫 페인트 스크립트 모두 거기 쓴다 */
+export function getAppTheme(): 'light' | 'dark' {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
+}
+
+export function useAppTheme(): 'light' | 'dark' {
+  return useSyncExternalStore((listener) => {
+    const observer = new MutationObserver(listener)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
+    return () => observer.disconnect()
+  }, getAppTheme)
+}

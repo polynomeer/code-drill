@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Button, Dialog, Kbd, Select } from '../../design'
 import { FONT_SIZES, updateEditorSettings, useEditorSettings } from './editorSettings'
+import { EDITOR_THEMES, isEditorThemeChoice } from './editorThemes'
 import { ALT, MOD } from './useShortcuts'
 import styles from './SolvePage.module.css'
 
 /**
- * 에디터 설정과 단축키 안내 (디자인 설계서 §11.2 Editor, §6.4).
+ * 에디터 설정과 단축키 안내 (디자인 설계서 §11.2 Editor, §6.4). 테마 목록은 editorThemes.ts.
  *
  * 코드 초기화는 여기 안쪽에 둔다 — 위험 행동은 메뉴 안 + 확인 대화상자다 (§6.2 Danger).
  * 툴바에 바로 두면 실행 옆에서 잘못 눌린다.
@@ -26,6 +27,21 @@ export function EditorSettingsDialog({
     <>
       <Dialog open={open && !confirming} onClose={onClose} title="에디터 설정" description="이 기기에 저장됩니다.">
         <div className={styles.settingsGrid}>
+          <Select
+            label="테마"
+            value={settings.theme}
+            onChange={(event) => {
+              const value = event.target.value
+              if (isEditorThemeChoice(value)) updateEditorSettings({ theme: value })
+            }}
+          >
+            <option value="auto">앱 테마 따라가기 (픽셀)</option>
+            {EDITOR_THEMES.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.label}
+              </option>
+            ))}
+          </Select>
           <Select
             label="글꼴 크기"
             value={settings.fontSize}

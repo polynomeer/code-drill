@@ -116,6 +116,30 @@ test.describe('데스크톱', () => {
     await expect(page.getByRole('region', { name: /문제 창/ })).toBeFocused()
   })
 
+  test('에디터 테마는 기본으로 앱 테마를 따르고, 설정에서 고르면 에디터 둘레도 함께 바뀐다', async ({ page }) => {
+    const editorBackground = () =>
+      page.locator('.monaco-editor .monaco-editor-background').first().evaluate((node) => getComputedStyle(node).backgroundColor)
+    const chrome = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-bg-editor').trim())
+
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.goto(`/problems/${PROBLEM.id}/solve`)
+    await expect(page.locator('.monaco-editor')).toBeVisible()
+    await expect.poll(editorBackground).toBe('rgb(11, 12, 28)') // 픽셀 · 어둡게
+
+    await page.emulateMedia({ colorScheme: 'light' })
+    await expect.poll(editorBackground).toBe('rgb(247, 248, 253)') // 픽셀 · 밝게
+
+    await page.getByRole('button', { name: '에디터 설정' }).first().click()
+    await page.getByLabel('테마').selectOption('forest')
+    await expect.poll(editorBackground).toBe('rgb(15, 26, 20)')
+    await expect.poll(chrome).toBe('#0f1a14')
+
+    // 기기에 남는다
+    await page.reload()
+    await expect(page.locator('.monaco-editor')).toBeVisible()
+    await expect.poll(editorBackground).toBe('rgb(15, 26, 20)')
+  })
+
   test('접근성 위반이 없다', async ({ page }) => {
     await page.goto(`/problems/${PROBLEM.id}/solve`)
     await expect(page.getByRole('article', { name: '문제' })).toBeVisible()

@@ -1,7 +1,9 @@
 import Editor from '@monaco-editor/react'
 import type { OnMount } from '@monaco-editor/react'
 import { setupMonaco } from './monacoSetup'
+import { useEditorTheme } from './editorSettings'
 import type { EditorSettings } from './editorSettings'
+import { monacoThemeName } from './editorThemes'
 
 // 모듈이 로드되는 시점 = 에디터가 실제로 필요해진 시점이다.
 setupMonaco()
@@ -28,6 +30,7 @@ export default function MonacoWorkspace({
   /** 제출한 코드처럼 고칠 수 없는 것을 보일 때 */
   readOnly?: boolean
 }) {
+  const theme = useEditorTheme()
   const handleMount: OnMount = (editor) => {
     onReady?.({
       focus: () => editor.focus(),
@@ -42,8 +45,8 @@ export default function MonacoWorkspace({
   return (
     <Editor
       language={language}
-      // 에디터는 두 테마 모두 어둡다 (docs/ui-overhaul.md §2 — editor.base).
-      theme="vs-dark"
+      // 기본은 앱 테마를 따르는 픽셀 테마, 설정에서 바꾼다 (docs/ui-overhaul.md §2 — 에디터 테마)
+      theme={monacoThemeName(theme)}
       value={source}
       onChange={(next) => onChange(next ?? '')}
       onMount={handleMount}

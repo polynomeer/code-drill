@@ -1,6 +1,7 @@
 import { loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor/editor.js'
 import editorWorker from 'monaco-editor/editor/editor.worker.js?worker'
+import { EDITOR_THEMES, monacoThemeName } from './editorThemes'
 
 // 에디터 기능(접기, 괄호 짝 맞추기, 여러 커서 …). 언어는 하나도 딸려 오지 않는다.
 import 'monaco-editor/features/register.all.js'
@@ -51,7 +52,55 @@ export function setupMonaco() {
     getWorker: () => new editorWorker(),
   }
   loader.config({ monaco })
+  defineThemes()
   // 에디터는 글자 폭을 처음 그릴 때 한 번 잰다. 웹 글꼴이 그 뒤에 도착하면 커서와 글자가
   // 어긋나므로, 글꼴이 다 오면 다시 잰다.
   void document.fonts?.ready.then(() => monaco.editor.remeasureFonts())
+}
+
+/**
+ * 우리 테마를 Monaco 에 등록한다 (editorThemes.ts). 토큰 이름은 Kotlin·Java·Python 의 monarch 정의가 내는 것이다.
+ * 여러 번 불러도 같은 이름을 덮어쓸 뿐이다.
+ */
+function defineThemes() {
+  const hex = (color: string) => color.replace('#', '')
+  for (const theme of EDITOR_THEMES.filter((item) => item.custom)) {
+    const c = theme.colors
+    monaco.editor.defineTheme(monacoThemeName(theme), {
+      base: theme.base,
+      inherit: true,
+      rules: [
+        { token: '', foreground: hex(c.foreground) },
+        { token: 'comment', foreground: hex(c.comment), fontStyle: 'italic' },
+        { token: 'keyword', foreground: hex(c.keyword) },
+        { token: 'string', foreground: hex(c.string) },
+        { token: 'string.escape', foreground: hex(c.number) },
+        { token: 'number', foreground: hex(c.number) },
+        { token: 'type', foreground: hex(c.type) },
+        { token: 'type.identifier', foreground: hex(c.type) },
+        { token: 'annotation', foreground: hex(c.type) },
+        { token: 'delimiter', foreground: hex(c.foreground) },
+        { token: 'operator', foreground: hex(c.foreground) },
+      ],
+      colors: {
+        'editor.background': c.background,
+        'editor.foreground': c.foreground,
+        'editorLineNumber.foreground': c.lineNumber,
+        'editorLineNumber.activeForeground': c.activeLineNumber,
+        'editor.lineHighlightBackground': c.lineHighlight,
+        'editor.lineHighlightBorder': c.lineHighlight,
+        'editor.selectionBackground': c.selection,
+        'editorCursor.foreground': c.cursor,
+        'editorGutter.background': c.background,
+        'editorWidget.background': c.lineHighlight,
+        'editorWidget.border': c.selection,
+        'editorBracketMatch.border': c.type,
+        // 괄호 짝 색 — 그대로 두면 바탕 테마(vs·vs-dark)의 파랑·노랑이 나와 팔레트와 따로 논다
+        'editorBracketHighlight.foreground1': c.keyword,
+        'editorBracketHighlight.foreground2': c.type,
+        'editorBracketHighlight.foreground3': c.number,
+        'editorBracketHighlight.unexpectedBracket.foreground': c.number,
+      },
+    })
+  }
 }

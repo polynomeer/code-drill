@@ -9,6 +9,7 @@ import type { ThemePreference } from '../design'
 import { AccountSettings } from '../features/auth/AccountSettings'
 import { SanctionBanner } from '../features/auth/SanctionBanner'
 import { NotificationBell } from '../features/notifications/NotificationBell'
+import { EditorChrome } from '../features/workspace/EditorChrome'
 // ⌘K 팔레트는 첫 화면과 함께 온다(2KB). 늦게 받아 오면 첫 ⌘K 직후에 친 글자가 그 사이에 사라진다.
 // 찾을 문제 목록은 처음 열 때 받는다
 import CommandPalette from '../features/search/CommandPalette'
@@ -130,6 +131,7 @@ export function AppShell({
 
   return (
     <div className={[styles.shell, immersive ? styles.immersive : '', session ? styles.member : ''].join(' ')}>
+      <EditorChrome />
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
