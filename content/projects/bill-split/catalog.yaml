@@ -1,0 +1,7 @@
+difficulty: EASY
+tags:
+  - math
+  - sorting
+summary: 계산서를 똑같이 또는 비율대로 나누고 봉사료를 더한다 — 나눈 몫의 합은 언제나 원래 금액이어야 하고, 남는 1원을 누가 내는지가 요구사항이다.
+competencies:
+  - SPECIFICATION
