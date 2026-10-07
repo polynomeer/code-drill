@@ -42,14 +42,14 @@
   background: var(--color-brand);
   border-color: var(--color-pixel-line);
   color: var(--color-text-on-brand);
-  /* 픽셀 단추의 빗면 — 오른쪽 아래는 그늘, 왼쪽 위는 빛 (픽셀 테마, ui-overhaul.md §2) */
-  box-shadow:
-    inset -3px -3px 0 rgb(0 0 0 / 22%),
-    inset 3px 3px 0 rgb(255 255 255 / 28%);
+  /* 딱딱한 그림자는 누를 것에만 — 화면에서 그림자가 있는 것이 곧 주 행동이다 (ui-overhaul.md §2 "정돈") */
+  box-shadow: var(--shadow-action);
 }
 
+/* 누르면 그림자만큼 내려앉는다 */
 .primary:active:not(:disabled) {
-  box-shadow: inset 3px 3px 0 rgb(0 0 0 / 22%);
+  box-shadow: none;
+  transform: translate(3px, 3px);
 }
 
 .primary:hover:not(:disabled) {
@@ -59,8 +59,8 @@
 .secondary {
   background: var(--color-bg-surface);
   border-color: var(--color-border-strong);
+  border-width: 1px;
   color: var(--color-text-primary);
-  box-shadow: inset -3px -3px 0 var(--color-bg-subtle);
 }
 
 .secondary:hover:not(:disabled) {

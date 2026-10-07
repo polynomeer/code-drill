@@ -63,6 +63,8 @@ const pairs = [
   ['color-danger', 'color-danger-subtle', TEXT],
   ['color-system', 'color-system-subtle', TEXT],
   ['color-text-primary', 'color-trace-subtle', TEXT],
+  ['color-accent-ink', 'color-accent-subtle', TEXT],
+  ['color-text-primary', 'color-accent-subtle', TEXT],
   ['color-text-primary', 'color-bg-subtle', TEXT],
   ['color-text-muted', 'color-bg-subtle', TEXT],
   ['color-text-primary', 'color-bg-inset', TEXT],

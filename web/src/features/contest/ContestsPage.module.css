@@ -55,11 +55,10 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   color: var(--color-text-primary);
   text-decoration: none;
-  box-shadow: var(--shadow-pixel);
 }
 
 .row:hover {
@@ -125,9 +124,8 @@
   gap: var(--space-4);
   padding: var(--space-4);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pixel);
 }
 
 .duel > div:first-child {

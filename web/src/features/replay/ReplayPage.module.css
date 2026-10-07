@@ -219,7 +219,9 @@
 
 /* 지금 걸음의 줄. 배경 + 화살표 + aria-current 로 세 번 알린다 */
 .lineActive {
-  background: color-mix(in srgb, var(--color-brand) 28%, transparent);
+  background: var(--color-editor-line);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+  color: var(--color-editor-text);
 }
 
 .arrow {

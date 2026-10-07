@@ -6,8 +6,7 @@
   align-content: start;
   padding: var(--space-5);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
-  box-shadow: var(--shadow-pixel);
+  border: 1px solid var(--color-border-default);
 }
 
 .cardHead {
@@ -120,14 +119,17 @@
   gap: var(--space-2);
   justify-items: start;
   padding: var(--space-4);
-  background: var(--color-bg-inset);
-  border: 2px solid var(--color-brand);
+  background: var(--color-bg-subtle);
 }
 
 .reason {
+  justify-self: start;
   margin: 0;
-  color: var(--color-brand);
-  font: var(--text-label);
+  padding: 1px var(--space-2);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-ink);
+  font: var(--text-caption);
+  font-weight: var(--weight-strong);
 }
 
 .focusTitle {
@@ -151,9 +153,7 @@
   padding: 0 var(--space-4);
   background: var(--color-brand);
   border: 2px solid var(--color-pixel-line);
-  box-shadow:
-    inset -3px -3px 0 rgb(0 0 0 / 22%),
-    inset 3px 3px 0 rgb(255 255 255 / 28%);
+  box-shadow: var(--shadow-action);
   color: var(--color-text-on-brand);
   font: var(--text-label);
   text-decoration: none;
@@ -164,7 +164,8 @@
 }
 
 .start:active {
-  box-shadow: inset 3px 3px 0 rgb(0 0 0 / 22%);
+  box-shadow: none;
+  transform: translate(3px, 3px);
 }
 
 .rest {
@@ -178,7 +179,7 @@
   display: grid;
   gap: var(--space-1);
   padding: var(--space-3) 0;
-  border-top: 2px dashed var(--color-border-default);
+  border-top: 1px solid var(--color-border-default);
 }
 
 .restLink {
@@ -203,7 +204,7 @@
   align-content: start;
   padding: var(--space-3);
   background: var(--color-bg-subtle);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
 }
 
 .unmeasured {

@@ -56,7 +56,6 @@
   background: var(--panel);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-pixel);
   padding: 16px;
 }
 

@@ -25,10 +25,9 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-left: 4px solid var(--color-danger);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pixel);
 }
 
 .title {

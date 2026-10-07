@@ -149,11 +149,10 @@
   gap: var(--space-2);
   padding: var(--space-4);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   color: var(--color-text-primary);
   text-decoration: none;
-  box-shadow: var(--shadow-pixel);
 }
 
 .overviewCard:hover {
@@ -188,10 +187,9 @@
   gap: var(--space-3);
   padding: var(--space-4);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
   min-width: 0;
-  box-shadow: var(--shadow-pixel);
 }
 
 .cardHead {
@@ -276,9 +274,8 @@
   gap: var(--space-3);
   padding: var(--space-4);
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pixel);
 }
 
 .formRow {
@@ -339,9 +336,8 @@
   position: relative;
   overflow-x: auto;
   background: var(--color-bg-surface);
-  border: 2px solid var(--color-border-default);
+  border: 1px solid var(--color-border-default);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-pixel);
 }
 
 .table {
@@ -352,12 +348,12 @@
 
 .table th {
   padding: var(--space-2) var(--space-3);
-  background: var(--color-bg-subtle);
   color: var(--color-text-muted);
   font: var(--text-caption);
   font-weight: var(--weight-strong);
   text-align: left;
   white-space: nowrap;
+  border-bottom: 2px solid var(--color-rule);
 }
 
 .table td {

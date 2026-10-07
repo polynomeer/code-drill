@@ -14,6 +14,9 @@ export function EditorChrome() {
     const root = document.documentElement.style
     root.setProperty('--color-bg-editor', theme.colors.background)
     root.setProperty('--color-text-on-editor', theme.colors.muted)
+    // 리플레이 코드 창의 현재 줄 — 에디터의 현재 줄과 같은 색, 그 위 글자는 본문색 (둘은 대비 시험을 거친 쌍이다)
+    root.setProperty('--color-editor-line', theme.colors.lineHighlight)
+    root.setProperty('--color-editor-text', theme.colors.foreground)
   }, [theme])
   return null
 }
