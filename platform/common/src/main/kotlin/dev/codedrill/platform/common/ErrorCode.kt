@@ -15,6 +15,14 @@ enum class ErrorCode(val category: Category, val retry: Retry) {
     TOKEN_EXPIRED(Category.AUTH, Retry.AFTER_REFRESH),
     /** 인증은 됐지만 그 자원의 주인이 아니다. */
     FORBIDDEN(Category.AUTH, Retry.AFTER_FIX),
+    /** 기기 승인 (RFC 8628) — 사람이 아직 승인하지 않았다. CLI 는 간격을 두고 다시 묻는다 */
+    AUTHORIZATION_PENDING(Category.AUTH, Retry.AUTOMATIC),
+    /** 기기 승인 — 너무 자주 물었다. 간격을 늘려 다시 묻는다 */
+    SLOW_DOWN(Category.POLICY, Retry.AUTOMATIC),
+    /** 기기 승인 — 사람이 거절했다 */
+    ACCESS_DENIED(Category.AUTH, Retry.AFTER_FIX),
+    /** 기기 승인 — 코드가 만료됐거나 이미 썼다. 처음부터 다시 */
+    DEVICE_CODE_EXPIRED(Category.AUTH, Retry.AFTER_FIX),
 
     LANGUAGE_NOT_ALLOWED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
     QUOTA_EXCEEDED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),

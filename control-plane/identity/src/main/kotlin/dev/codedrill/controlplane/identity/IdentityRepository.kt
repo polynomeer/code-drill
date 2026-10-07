@@ -55,18 +55,42 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         refreshHash: String,
         accessExpiresAt: Instant,
         refreshExpiresAt: Instant,
+        device: Device? = null,
     ) {
         jdbc.update(
             """
             INSERT INTO user_session (
                 id, user_id, access_token_hash, refresh_token_hash,
-                access_expires_at, refresh_expires_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                access_expires_at, refresh_expires_at, kind, device_name, client
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             id, userId, accessHash, refreshHash,
             java.sql.Timestamp.from(accessExpiresAt), java.sql.Timestamp.from(refreshExpiresAt),
+            if (device == null) "WEB" else "DEVICE", device?.name, device?.client,
         )
     }
+
+    /** 기기 세션의 마지막 사용 시각. 요청마다 쓰지 않으려고 1분에 한 번만 바꾼다 */
+    fun touch(id: UUID): Int = jdbc.update(
+        "UPDATE user_session SET last_used_at = now() WHERE id = ? AND (last_used_at IS NULL OR last_used_at < now() - interval '1 minute')",
+        id,
+    )
+
+    /** 연결된 기기 — 살아 있는 기기 세션. refresh 회전마다 새 행이 생기고 앞 행은 끊기므로 기기 하나에 행 하나다 */
+    fun devices(userId: UUID): List<Session> = jdbc.query(
+        """
+        SELECT * FROM user_session
+         WHERE user_id = ? AND kind = 'DEVICE' AND revoked_at IS NULL AND refresh_expires_at > now()
+         ORDER BY created_at DESC
+        """.trimIndent(),
+        SESSION, userId,
+    )
+
+    /** 내 기기 하나를 끊는다. 남의 세션 id 를 대도 0 이다 */
+    fun revokeDevice(userId: UUID, sessionId: UUID): Int = jdbc.update(
+        "UPDATE user_session SET revoked_at = now(), revoked_reason = '기기 연결 끊기' WHERE id = ? AND user_id = ? AND kind = 'DEVICE' AND revoked_at IS NULL",
+        sessionId, userId,
+    )
 
     fun findByAccessHash(hash: String): Session? = jdbc.query(
         "SELECT * FROM user_session WHERE access_token_hash = ?", SESSION, hash,
@@ -133,7 +157,15 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
         val accessExpiresAt: Instant,
         val refreshExpiresAt: Instant,
         val revokedAt: Instant?,
+        val revokedReason: String? = null,
+        /** 기기 세션이면 그 기기. 웹 세션이면 null */
+        val device: Device? = null,
+        val createdAt: Instant? = null,
+        val lastUsedAt: Instant? = null,
     )
+
+    /** 기기 세션의 기기 — 사람이 알아볼 이름과 클라이언트 판 */
+    data class Device(val name: String, val client: String)
 
     private companion object {
         val USER = RowMapper { rs, _ ->
@@ -154,6 +186,10 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
                 accessExpiresAt = rs.getTimestamp("access_expires_at").toInstant(),
                 refreshExpiresAt = rs.getTimestamp("refresh_expires_at").toInstant(),
                 revokedAt = rs.getTimestamp("revoked_at")?.toInstant(),
+                revokedReason = rs.getString("revoked_reason"),
+                device = if (rs.getString("kind") == "DEVICE") Device(rs.getString("device_name") ?: "이름 없는 기기", rs.getString("client") ?: "") else null,
+                createdAt = rs.getTimestamp("created_at")?.toInstant(),
+                lastUsedAt = rs.getTimestamp("last_used_at")?.toInstant(),
             )
         }
     }

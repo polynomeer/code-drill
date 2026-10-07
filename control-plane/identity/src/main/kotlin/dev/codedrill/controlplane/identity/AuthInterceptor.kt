@@ -61,6 +61,10 @@ class AuthInterceptor(
 
         return when (resolution) {
             is IdentityService.Resolution.Active -> {
+                // 기기(CLI) 세션은 목록에 있는 경로만 — 새 API 를 만든 사람이 기기를 잊어도 열리지 않는다
+                if (required && resolution.user.device != null && !DeviceAuthorization.allows(request.method, request.requestURI)) {
+                    return forbidden(response, "기기 연결로는 이 일을 할 수 없다. 웹에서 한다")
+                }
                 request.setAttribute(Principal.ATTRIBUTE, resolution.user)
                 sanctioned(request, resolution.user.id)?.let { return blocked(response, it) }
                 true
@@ -130,6 +134,13 @@ class AuthInterceptor(
         return false
     }
 
+    private fun forbidden(response: HttpServletResponse, message: String): Boolean {
+        response.status = HttpStatus.FORBIDDEN.value()
+        response.contentType = "application/json;charset=UTF-8"
+        response.writer.write(json.writeValueAsString(ApiError(ErrorCode.FORBIDDEN, message, UUID.randomUUID().toString())))
+        return false
+    }
+
     private fun reject(response: HttpServletResponse, code: ErrorCode, message: String): Boolean {
         response.status = HttpStatus.UNAUTHORIZED.value()
         response.contentType = "application/json;charset=UTF-8"
@@ -177,6 +188,8 @@ class IdentitySecurityConfig(
                 "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh",
                 // 비밀번호를 잊은 사람은 토큰이 없다
                 "/api/v1/auth/password/forgot", "/api/v1/auth/password/reset",
+                // CLI 가 기기 승인을 시작하고 기다린다 — 아직 토큰이 없다 (RFC 8628)
+                "/api/v1/auth/device/code", "/api/v1/auth/device/token",
             )
             .order(AUTHENTICATION_ORDER)
 

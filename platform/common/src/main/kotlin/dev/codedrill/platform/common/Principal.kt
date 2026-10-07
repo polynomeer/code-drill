@@ -12,8 +12,11 @@ package dev.codedrill.platform.common
  *
  * 이메일은 담지 않는다. 소유자 비교에 필요한 것은 [id] 뿐이고, 표시에 필요한 것은
  * [displayName] 뿐이다. 담아 두면 로그나 응답 어딘가로 실려 나갈 길이 생긴다 (§11.3).
+ *
+ * [device] 는 CLI 의 기기 세션으로 왔을 때 그 기기의 이름이다 (웹이면 null). 할 수 있는 일은 Identity 가 이미
+ * 좁혔다 — 도메인 모듈은 출처를 기록할 때만 쓴다 (프로젝트형 제출의 "CLI · 기기").
  */
-data class Principal(val id: String, val displayName: String) {
+data class Principal(val id: String, val displayName: String, val device: String? = null) {
     companion object {
         const val ATTRIBUTE = "codedrill.principal"
     }

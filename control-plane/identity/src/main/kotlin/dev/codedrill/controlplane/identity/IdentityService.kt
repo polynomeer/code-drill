@@ -228,7 +228,8 @@ class IdentityService(
         if (clock.instant().isAfter(session.accessExpiresAt)) return Resolution.Expired
 
         val user = repository.findById(session.userId) ?: return Resolution.Unknown
-        return Resolution.Active(Principal(user.id.toString(), user.displayName))
+        if (session.device != null) repository.touch(session.id)
+        return Resolution.Active(Principal(user.id.toString(), user.displayName, session.device?.name))
     }
 
     /**
@@ -242,16 +243,18 @@ class IdentityService(
     fun refresh(refreshToken: String): IssuedSession? {
         val session = repository.findByRefreshHash(hash(refreshToken)) ?: return null
 
-        if (session.revokedAt != null) {
+        if (isReplay(session)) {
             log.warn("이미 쓴 refresh token 이 다시 왔다. 세션을 전부 끊는다: user={}", session.userId)
             repository.revokeAllFor(session.userId, "refresh 재사용 탐지")
             return null
         }
+        if (session.revokedAt != null) return null
         if (clock.instant().isAfter(session.refreshExpiresAt)) return null
 
-        repository.revoke(session.id, "회전")
+        repository.revoke(session.id, ROTATED)
         val user = repository.findById(session.userId) ?: return null
-        return issue(user)
+        // 기기 세션은 회전해도 기기 세션이다 — 연결된 기기 목록에 그대로 남고, 할 수 있는 일도 그대로 좁다
+        return issue(user, session.device)
     }
 
     @Transactional
@@ -260,12 +263,22 @@ class IdentityService(
         return repository.revoke(session.id, "로그아웃") > 0
     }
 
-    private fun issue(user: User): IssuedSession {
+    /**
+     * 승인된 기기에 세션을 낸다 ([DeviceService]). refresh 수명이 웹보다 길다 — 회전할 때마다 다시 늘어나므로,
+     * [IdentityProperties.deviceRefreshTtl] 동안 쓰지 않은 기기만 저절로 끊긴다.
+     */
+    @Transactional
+    fun issueDevice(userId: UUID, device: IdentityRepository.Device): IssuedSession? {
+        val user = repository.findById(userId) ?: return null
+        return issue(user, device)
+    }
+
+    private fun issue(user: User, device: IdentityRepository.Device? = null): IssuedSession {
         val access = token()
         val refresh = token()
         val now = clock.instant()
         val accessExpiry = now.plus(properties.accessTtl)
-        val refreshExpiry = now.plus(properties.refreshTtl)
+        val refreshExpiry = now.plus(if (device == null) properties.refreshTtl else properties.deviceRefreshTtl)
 
         repository.insertSession(
             id = UUID.randomUUID(),
@@ -274,6 +287,7 @@ class IdentityService(
             refreshHash = hash(refresh),
             accessExpiresAt = accessExpiry,
             refreshExpiresAt = refreshExpiry,
+            device = device,
         )
         return IssuedSession(access, refresh, accessExpiry, refreshExpiry, user)
     }
@@ -301,6 +315,17 @@ class IdentityService(
     internal companion object {
         const val MIN_PASSWORD_LENGTH = 10
 
+        /** 회전으로 끝난 세션의 revoked_reason */
+        const val ROTATED = "회전"
+
+        /**
+         * 재사용 탐지 — **회전으로 이미 바뀐** refresh 가 다시 오면 누가 훔쳐 쓴 것이다. 로그아웃·기기 연결 끊기로
+         * 끝난 세션의 refresh 는 그냥 낡은 것이다: 끊긴 CLI 가 한 번 더 갱신을 시도하거나, 로그아웃한 탭이
+         * 늦게 묻는 것을 도둑으로 보면 그 사람의 다른 세션(웹까지)이 모두 끊긴다.
+         */
+        fun isReplay(session: IdentityRepository.Session): Boolean =
+            session.revokedAt != null && session.revokedReason == ROTATED
+
         /**
          * 없는 계정에도 검증 비용을 들이기 위한 더미 해시.
          *
@@ -321,6 +346,14 @@ class IdentityService(
 data class IdentityProperties(
     val accessTtl: Duration = Duration.ofMinutes(30),
     val refreshTtl: Duration = Duration.ofDays(14),
+    /** 기기(CLI) 세션의 refresh 수명. 회전마다 다시 늘어나므로 "이만큼 안 쓰면 끊긴다"는 뜻이다 */
+    val deviceRefreshTtl: Duration = Duration.ofDays(90),
+    /** 기기 승인 코드의 수명 — 사람이 브라우저로 가서 승인할 시간 (RFC 8628) */
+    val deviceCodeTtl: Duration = Duration.ofMinutes(10),
+    /** CLI 가 승인 여부를 묻는 간격 */
+    val devicePollInterval: Duration = Duration.ofSeconds(5),
+    /** 같은 출처가 한 시간에 받을 수 있는 기기 코드 수 */
+    val deviceCodesPerHour: Int = 20,
     // --- 남용 방어 (§10.2, A6). 이유와 함정은 [AbuseGuard] 에. ---
     /** 같은 출처에서 한 시간에 몇 번 가입할 수 있나. 사람은 한 번이다. */
     val signupsPerHour: Int = 5,
