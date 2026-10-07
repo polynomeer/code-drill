@@ -683,8 +683,10 @@ Drill.write(0, shift)         // 한 자리 밀었다
 """,
     signature=dict(name="bitwiseAndOfRange", parameters=[("left", "INT"), ("right", "INT")], returns="INT"),
     # 구간을 도는 오답은 10 억 번의 AND 로 1초 안에 들었고 200ms 에서도 1.9배였다 — 정답은 비트 31 개라
-    # 한도를 100ms 로 조인다.
-    groups=perf_groups(time_multiplier=0.05),
+    # 한도를 100ms 로 조였는데, CI 러너에서 다시 3.0배 경계에 걸렸다. 반복은 Int 범위(2^30) 위로 늘릴 수
+    # 없으므로 40ms 로 더 조인다(v2). 정답은 한도의 0% 를 쓴다.
+    groups=perf_groups(time_multiplier=0.02),
+    version=2,
     reference=_range_and,
     cases={
         "sample": [("01", [5, 7]), ("02", [1, 2147483647])],
