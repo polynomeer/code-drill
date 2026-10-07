@@ -107,7 +107,10 @@ test.describe('로그인 전 풀이', () => {
 
     await typeInEditor(page, '# typed before sign-in')
     await expect(page.getByText('이 기기에 저장됨')).toBeVisible()
-    expect(await page.evaluate(() => localStorage.getItem('codedrill.local-draft.two-sum.PYTHON'))).toContain('# typed before sign-in')
+    // 치는 도중에 한 번 저장됐으면 표시는 이미 떠 있다 — 마지막 저장을 기다린다
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('codedrill.local-draft.two-sum.PYTHON')))
+      .toContain('# typed before sign-in')
     // 서버에는 아무것도 보내지 않았다
     expect(calls.filter((c) => c.path.startsWith('/workspaces'))).toEqual([])
 
@@ -124,6 +127,23 @@ test.describe('로그인 전 풀이', () => {
       .poll(() => (calls.find((c) => c.method === 'PUT' && c.path === '/workspaces/two-sum/PYTHON')?.body as { code?: string } | undefined)?.code ?? '', { timeout: 10_000 })
       .toContain('# typed before sign-in')
     expect(await page.evaluate(() => localStorage.getItem('codedrill.local-draft.two-sum.PYTHON'))).toBeNull()
+  })
+
+  test('느린 기기에서 몰아쳐 쳐도 글자를 잃지 않는다', async ({ page }) => {
+    await mockApi(page)
+    await page.goto('/problems/two-sum/solve?lang=PYTHON')
+    const editor = page.locator('.monaco-editor .view-lines')
+    await expect(editor).toBeVisible({ timeout: 15_000 })
+    await editor.click()
+    // 편집기 값이 상태를 한 바퀴 돌아 되돌아오면, 그 사이에 친 글자를 지난 값이 덮어쓴다 — CPU 를 늦춰 그 틈을 벌린다
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 })
+    const text = 'abcdefghijklmnopqrstuvwxyz0123456789 the quick brown fox'
+    await page.keyboard.type(text, { delay: 0 })
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 })
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('codedrill.local-draft.two-sum.PYTHON')), { timeout: 10_000 })
+      .toContain(text)
   })
 
   test('저장된 초안과 다르면 어느 쪽으로 갈지 묻는다', async ({ page }) => {
