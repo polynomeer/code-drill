@@ -36,7 +36,12 @@ data class ProjectSubmission(
     val version: Int = 0,
     /** 재채점마다 오른다. 종료는 불변이고 바뀌는 것은 "무엇으로 판정됐는가"다 (§4.2 INV-02). */
     val revision: Int = 1,
+    /** 어디서 냈나 — 웹이면 WEB, CLI 기기 세션이면 CLI 와 그 기기 이름. 판정과는 상관없다 */
+    val source: Source = Source.WEB,
+    val deviceName: String? = null,
 ) {
+    enum class Source { WEB, CLI }
+
     enum class Status {
         QUEUED, LEASED, COMPLETED;
 
@@ -61,6 +66,9 @@ data class ProjectSubmissionResponse(
     val createdAt: Instant,
     val completedAt: Instant?,
     val revision: Int,
+    val source: ProjectSubmission.Source,
+    /** CLI 로 냈으면 그 기기의 이름 ("MacBook-Pro (zsh)") */
+    val device: String?,
     val files: Map<String, String>? = null,
 ) {
     companion object {
@@ -80,6 +88,8 @@ data class ProjectSubmissionResponse(
             createdAt = submission.createdAt,
             completedAt = submission.completedAt,
             revision = submission.revision,
+            source = submission.source,
+            device = submission.deviceName,
             files = files,
         )
     }

@@ -133,7 +133,7 @@ class ProjectController(private val service: ProjectService) {
         @RequestAttribute(Principal.ATTRIBUTE) principal: Principal,
         @PathVariable id: String,
         @Valid @RequestBody request: SubmitProjectRequest,
-    ): ResponseEntity<Any> = when (val outcome = service.submit(principal.id, idempotencyKey, id, request.files)) {
+    ): ResponseEntity<Any> = when (val outcome = service.submit(principal.id, idempotencyKey, id, request.files, principal.device, request.projectVersion)) {
         is ProjectService.SubmitOutcome.Accepted ->
             ResponseEntity.status(HttpStatus.ACCEPTED).body(ProjectSubmissionResponse.of(outcome.submission))
         is ProjectService.SubmitOutcome.Invalid ->
@@ -141,13 +141,17 @@ class ProjectController(private val service: ProjectService) {
         is ProjectService.SubmitOutcome.Throttled ->
             ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error(ErrorCode.QUOTA_EXCEEDED, outcome.reason))
         ProjectService.SubmitOutcome.NotFound -> ResponseEntity.notFound().build()
+        is ProjectService.SubmitOutcome.VersionStale -> ResponseEntity.status(HttpStatus.CONFLICT).body(
+            error(ErrorCode.PROBLEM_VERSION_STALE, "문제가 새 판(v${outcome.current})이 됐다. 시작 저장소를 다시 받아 맞춘 뒤 제출한다"),
+        )
     }
 
     private fun error(code: ErrorCode, message: String) = ApiError(code, message, UUID.randomUUID().toString())
 }
 
 /** 제출 본문. 경로 → 내용. 한계는 [dev.codedrill.judge.protocol.Workspaces] 가 정한다. */
-data class SubmitProjectRequest(@field:NotEmpty val files: Map<String, String>)
+/** [projectVersion] 은 받아 간 판 — CLI 가 키트의 판을 싣는다. 웹은 늘 지금 판을 보고 있어 싣지 않는다 */
+data class SubmitProjectRequest(@field:NotEmpty val files: Map<String, String>, val projectVersion: Int? = null)
 
 data class SaveProjectDraftRequest(@field:NotEmpty val files: Map<String, String>, val version: Long?)
 

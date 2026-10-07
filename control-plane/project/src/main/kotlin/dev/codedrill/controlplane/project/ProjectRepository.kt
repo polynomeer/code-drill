@@ -22,12 +22,13 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
     fun insertWithOutbox(submission: ProjectSubmission, files: Map<String, String>, event: OutboxEvent): Int {
         val inserted = jdbc.update(
             """
-            INSERT INTO project_submission (id, user_id, idempotency_key, project_id, project_version, language, status, version)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            INSERT INTO project_submission (id, user_id, idempotency_key, project_id, project_version, language, status, version, source, device_name)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
             ON CONFLICT (user_id, idempotency_key) DO NOTHING
             """.trimIndent(),
             submission.id, submission.userId, submission.idempotencyKey, submission.projectId,
             submission.projectVersion, submission.language, submission.status.name,
+            submission.source.name, submission.deviceName,
         )
         if (inserted == 0) return 0
 
@@ -275,5 +276,7 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
         completedAt = rs.getTimestamp("completed_at")?.toInstant(),
         version = rs.getInt("version"),
         revision = rs.getInt("revision"),
+        source = ProjectSubmission.Source.valueOf(rs.getString("source")),
+        deviceName = rs.getString("device_name"),
     )
 }

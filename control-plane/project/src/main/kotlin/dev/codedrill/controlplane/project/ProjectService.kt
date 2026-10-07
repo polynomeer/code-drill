@@ -105,6 +105,8 @@ class ProjectService(
         data class Invalid(val reason: String) : SubmitOutcome
         data class Throttled(val reason: String) : SubmitOutcome
         data object NotFound : SubmitOutcome
+        /** 받아 간 판보다 문제가 새 판이다. [current] 를 받아 다시 시작해야 한다 */
+        data class VersionStale(val current: Int) : SubmitOutcome
     }
 
     /**
@@ -115,10 +117,21 @@ class ProjectService(
      * 어느 경로가 숨은 테스트인지 알려 주는 셈이다.
      */
     @Transactional
-    fun submit(userId: String, idempotencyKey: String, projectId: String, files: Map<String, String>): SubmitOutcome {
+    fun submit(
+        userId: String,
+        idempotencyKey: String,
+        projectId: String,
+        files: Map<String, String>,
+        /** CLI 기기 세션으로 왔으면 그 기기의 이름. 웹이면 null */
+        device: String? = null,
+        /** 받아 간 판. 주면 지금 공개된 판과 대조한다 — 키트로 받은 뒤 문제가 새 판이 됐으면 막는다 */
+        expectedVersion: Int? = null,
+    ): SubmitOutcome {
         val pkg = load(projectId) ?: return SubmitOutcome.NotFound
         val key = IdempotencyKey(idempotencyKey)
         repository.findByIdempotencyKey(userId, key.value)?.let { return SubmitOutcome.Accepted(it) }
+        // 예전 판의 요구사항으로 고친 파일을 새 판의 숨은 테스트로 채점하면, 사용자는 왜 떨어졌는지 모른다
+        if (expectedVersion != null && expectedVersion != pkg.manifest.version) return SubmitOutcome.VersionStale(pkg.manifest.version)
 
         val clean = try {
             Workspaces.validate(files)
@@ -138,6 +151,8 @@ class ProjectService(
             projectVersion = pkg.manifest.version,
             language = pkg.manifest.language,
             status = ProjectSubmission.Status.QUEUED,
+            source = if (device == null) ProjectSubmission.Source.WEB else ProjectSubmission.Source.CLI,
+            deviceName = device,
         )
         // 스토어가 먼저다. 올리기가 실패하면 제출도 실패다 — 참조 없는 메시지를 내보내면 Runner 가
         // 시스템 오류로 끝내고, 그건 사용자에게 우리 탓으로 보여야 한다.
