@@ -121,7 +121,7 @@ test('진행 중 대회는 남은 시간을 고정 헤더에 세고, 순위표�
 
   // 내 점수와 프로젝트형 문제의 길
   await expect(page.getByRole('link', { name: '1000. 두 수의 합' })).toHaveAttribute('href', '/problems/two-sum/solve')
-  await expect(page.getByRole('link', { name: 'bank-ledger' })).toHaveAttribute('href', '/?project=bank-ledger')
+  await expect(page.getByRole('link', { name: 'bank-ledger' })).toHaveAttribute('href', '/projects/bank-ledger')
   await expect(page.getByText('60점')).toBeVisible()
 
   const mine = page.locator('tr[data-mine="true"]')

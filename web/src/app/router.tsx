@@ -49,12 +49,15 @@ const ContestPage = lazy(() => import('../features/contest/ContestPage').then((m
 const ProfilePage = lazy(() => import('../features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 // 운영 콘솔은 자기 청크로만 온다 — 일반 사용자 번들에 운영 화면이 섞이지 않는다 (ui-overhaul.md §6.8)
 const AdminPage = lazy(() => import('../features/admin/AdminPage').then((m) => ({ default: m.AdminPage })))
+// 프로젝트형 작업 공간 — 편집기와 지문 렌더러를 끌고 오므로 따로 청크로 (ui-overhaul.md §6.11)
+const ProjectPage = lazy(() => import('../features/project/ProjectPage').then((m) => ({ default: m.ProjectPage })))
 const ProblemReadPage = lazy(() =>
   import('../features/problems/ProblemReadPage').then((m) => ({ default: m.ProblemReadPage })),
 )
 
 const SOLVE_PATH = '/problems/:slug/solve'
 const REPLAY_PATH = '/submissions/:id/replay'
+const PROJECT_PATH = '/projects/:id'
 
 export function AppRoutes() {
   return (
@@ -92,11 +95,12 @@ function Shell() {
   // 풀이·리플레이 화면은 전역 헤더를 접고 자기 툴바만 쓴다 (ui-overhaul.md §4).
   const [solving] = useRoute(SOLVE_PATH)
   const [replaying] = useRoute(REPLAY_PATH)
+  const [projecting] = useRoute(PROJECT_PATH)
 
   return (
     // 계정이 바뀌면 셸 아래 상태를 통째로 버린다. 앞 사람의 초안이 남으면 안 된다.
     // 풀이 화면은 로그인 전에도 몰입 모드다 — 로그인 안내는 화면의 툴바와 결과 창이 한다
-    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={solving || (replaying && session !== null)}>
+    <AppShell key={session?.userId ?? 'anonymous'} session={session} immersive={solving || ((replaying || projecting) && session !== null)}>
       <Switch>
         <Route path="/">
           {session ? (
@@ -149,6 +153,16 @@ function Shell() {
               <TrainingPage />
             </Suspense>
           </RequireSession>
+        </Route>
+        <Route path={PROJECT_PATH}>
+          {(params) => (
+            // 초안·제출이 계정의 것이라 로그인해야 연다. 목록과 키트는 로그인 없이 열린다
+            <RequireSession>
+              <Suspense fallback={<RouteLoading />}>
+                <ProjectPage key={params.id} id={params.id} />
+              </Suspense>
+            </RequireSession>
+          )}
         </Route>
         <Route path="/competencies">
           <RequireSession>

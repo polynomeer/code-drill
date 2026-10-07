@@ -1,14 +1,11 @@
-import { useState } from 'react'
-import { useLocation } from 'wouter'
+import { Redirect, useLocation } from 'wouter'
 import type { Session } from '../api/session'
 import { ContestSummaryPanel } from '../features/contest/ContestSummaryPanel'
 import { CollectionsPanel } from '../features/learning/CollectionsPanel'
-import { ProjectWorkspace } from '../features/project/ProjectWorkspace'
 import { ProjectsPanel } from '../features/project/ProjectsPanel'
 import { CompetencyCard } from '../features/home/CompetencyCard'
 import { RecordCard } from '../features/home/RecordCard'
 import { TodayCard } from '../features/home/TodayCard'
-import { setParam } from '../shared/url'
 import styles from './HomePage.module.css'
 
 /**
@@ -22,26 +19,15 @@ import styles from './HomePage.module.css'
  */
 export function HomePage({ session }: { session: Session }) {
   const [, navigate] = useLocation()
-  // 열린 프로젝트. 있으면 두 열 대신 프로젝트 작업 공간을 통째로 그린다 — 파일 여럿과
-  // 긴 요구사항은 목록 아래 패널에 들어가지 않는다. 대회 화면은 프로젝트형 문제를 `?project=` 로 연다.
-  const [openProject, setOpenProject] = useState<string | null>(() => new URLSearchParams(window.location.search).get('project'))
-  const [projectsJudged, setProjectsJudged] = useState(0)
+  // 프로젝트형 작업 공간은 전용 화면이 됐다 (`/projects/:id`, ui-overhaul.md §6.11). 예전 주소 `/?project=` 는 옮겨 준다
+  const legacyProject = new URLSearchParams(window.location.search).get('project')
+  if (legacyProject) return <Redirect to={`/projects/${encodeURIComponent(legacyProject)}`} replace />
 
   const openProblem = (slug: string) => navigate(`/problems/${slug}/solve`)
-  const open = (id: string | null) => {
-    setOpenProject(id)
-    setParam('project', id)
-  }
 
   return (
     <div className="app">
-      {openProject && (
-        <div>
-          <ProjectWorkspace id={openProject} onClose={() => open(null)} onJudged={() => setProjectsJudged((n) => n + 1)} />
-        </div>
-      )}
-      {/* 프로젝트가 열려 있으면 요약은 그리지 않는다 — 같은 화면에 작업 공간이 둘이면 어느 것이 내 일인지 헷갈린다. */}
-      <div className={styles.board} hidden={openProject !== null}>
+      <div className={styles.board}>
         <div className={styles.column}>
           <RecordCard session={session} />
         </div>
@@ -52,7 +38,7 @@ export function HomePage({ session }: { session: Session }) {
           <TodayCard />
           <CompetencyCard />
           {/* 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
-          <ProjectsPanel refreshKey={projectsJudged} onOpen={open} />
+          <ProjectsPanel onOpen={(id) => navigate(`/projects/${encodeURIComponent(id)}`)} />
         </div>
 
         <div className={styles.column}>

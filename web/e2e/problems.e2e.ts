@@ -130,7 +130,7 @@ test('프로젝트형 탭 — 둘러보는 사람도 목록을 보고, 고르면
   await expect(table.getByRole('row')).toHaveCount(PROJECTS.length + 1)
   await expect(table.getByRole('link', { name: '장바구니 가격 계산' })).toHaveAttribute(
     'href',
-    `/login?next=${encodeURIComponent('/?project=cart-pricing')}`,
+    `/login?next=${encodeURIComponent('/projects/cart-pricing')}`,
   )
   // 언어 칩은 목록에 있는 언어만, 누르면 화면에서 거른다
   await page.getByRole('button', { name: 'Kotlin' }).click()

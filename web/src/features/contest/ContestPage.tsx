@@ -85,7 +85,7 @@ function Contest({ view }: { view: ContestView }) {
   })
 
   // 프로젝트형 문제는 풀이 화면이 아니라 홈의 프로젝트 작업 공간에서 연다 (11단계)
-  const problemHref = (problemId: string) => (projectIds.has(problemId) ? `/?project=${problemId}` : `/problems/${problemId}/solve`)
+  const problemHref = (problemId: string) => (projectIds.has(problemId) ? `/projects/${encodeURIComponent(problemId)}` : `/problems/${problemId}/solve`)
   const hack = contest.kind === 'HACK'
 
   return (

@@ -34,7 +34,7 @@ describe('projectLanguages', () => {
 
 describe('projectHref', () => {
   it('둘러보는 사람은 로그인을 거쳐 작업 공간으로 돌아온다', () => {
-    expect(projectHref('cart-pricing', true)).toBe('/?project=cart-pricing')
-    expect(projectHref('cart-pricing', false)).toBe('/login?next=%2F%3Fproject%3Dcart-pricing')
+    expect(projectHref('cart-pricing', true)).toBe('/projects/cart-pricing')
+    expect(projectHref('cart-pricing', false)).toBe('/login?next=%2Fprojects%2Fcart-pricing')
   })
 })

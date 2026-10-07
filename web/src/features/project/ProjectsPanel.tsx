@@ -7,10 +7,10 @@ import type { ProjectSummary } from '../../shared/types'
  * 프로젝트형 문제의 목록 (feature-roadmap 11단계 — 두 번째 판정기).
  *
  * 알고리즘 문제 목록과 섞이지 않는다 — 두 번째 판정기의 문제라 필터도 태그도 다르다. 고르면
- * 화면이 [ProjectWorkspace] 로 바뀐다; 파일 여럿과 긴 요구사항은 목록 아래 패널에 들어가지
+ * 전용 작업 공간(`/projects/:id`)으로 간다; 파일 여럿과 긴 요구사항은 목록 아래 패널에 들어가지
  * 않는다.
  */
-export function ProjectsPanel({ refreshKey, onOpen }: { refreshKey: number; onOpen: (id: string) => void }) {
+export function ProjectsPanel({ onOpen }: { onOpen: (id: string) => void }) {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null)
 
   const refresh = useCallback(() => {
@@ -19,7 +19,7 @@ export function ProjectsPanel({ refreshKey, onOpen }: { refreshKey: number; onOp
       .catch(() => setProjects([]))
   }, [])
 
-  useEffect(refresh, [refresh, refreshKey])
+  useEffect(refresh, [refresh])
 
   return (
     <section className="panel projects">

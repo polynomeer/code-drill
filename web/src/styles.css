@@ -1020,37 +1020,6 @@ table.groups td {
   text-transform: uppercase;
 }
 
-/* 프로젝트형 문제 (11단계). 파일 탭이 편집기 위에 있고, 결과는 케이스가 아니라 테스트다.
-   열면 두 열 화면을 통째로 대신한다 — 왼쪽에 요구사항과 기록, 오른쪽에 파일·편집기·판정. */
-.project-workspace {
-  margin-top: 16px;
-}
-
-.project-header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.project-header h3 {
-  margin: 0;
-}
-
-.project-columns {
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(480px, 1.6fr);
-  gap: 16px;
-  align-items: start;
-}
-
-@media (max-width: 900px) {
-  .project-columns {
-    grid-template-columns: 1fr;
-  }
-}
-
 .project-list {
   list-style: none;
   padding: 0;
@@ -1066,97 +1035,6 @@ table.groups td {
   margin: 2px 0 0;
 }
 
-.project-statement {
-  max-height: 70vh;
-  overflow: auto;
-}
-
-.project-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 8px 0 4px;
-  font-size: 12px;
-}
-
-.file-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid var(--border);
-  border-radius: 0;
-  padding: 0 4px;
-}
-
-.file-tab button[role='tab'] {
-  border: none;
-  background: transparent;
-  padding: 4px 6px;
-  font-family: inherit;
-}
-
-.file-tab.active {
-  background: var(--panel);
-  border-bottom-color: transparent;
-  font-weight: 600;
-}
-
-.file-add {
-  display: inline-flex;
-  gap: 4px;
-  margin-left: auto;
-}
-
-.file-add input {
-  width: 160px;
-  font-size: 12px;
-}
-
-.project-editor {
-  height: 520px;
-}
-
-.project-result p:first-child {
-  margin-top: 0;
-}
-
-.project-probe {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.project-tests {
-  list-style: none;
-  padding: 0;
-  margin: 6px 0;
-  font-size: 12px;
-}
-
-.project-tests li {
-  padding: 2px 0;
-}
-
-.project-history ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 12px;
-}
-
-.import-label {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 4px 10px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.import-label input[type='file'] {
-  display: none;
-}
 
 /*
  * 컨트롤 경계는 UI 경계 대비 3:1 을 넘어야 한다 (디자인 설계서 §15.2) — 패널 경계(--border)와 다른

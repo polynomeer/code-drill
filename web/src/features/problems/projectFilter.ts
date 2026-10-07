@@ -28,8 +28,8 @@ export function projectLanguages(items: ProjectSummary[]): string[] {
   return [...new Set(items.map((item) => item.language))].sort((a, b) => order.indexOf(a) - order.indexOf(b))
 }
 
-/** 열 곳 — 작업 공간은 홈에 열린다. 둘러보는 사람은 로그인을 거쳐 그리로 돌아온다 */
+/** 열 곳 — 프로젝트형 작업 공간. 둘러보는 사람은 로그인을 거쳐 그리로 돌아온다 */
 export function projectHref(id: string, signedIn: boolean): string {
-  const target = `/?project=${encodeURIComponent(id)}`
+  const target = `/projects/${encodeURIComponent(id)}`
   return signedIn ? target : `/login?next=${encodeURIComponent(target)}`
 }
