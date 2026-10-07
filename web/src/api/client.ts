@@ -877,6 +877,11 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   return fetch(`${BASE}/projects`, { headers: optionalAuth() }).then(json<ProjectSummary[]>)
 }
 
+/** 개인 IDE 로 받는 키트(ZIP) 주소 — 시작 저장소·공개 테스트·채점기와 같은 하네스. 로그인 없이 열린다 */
+export function projectKitUrl(id: string): string {
+  return `${BASE}/projects/${encodeURIComponent(id)}/kit`
+}
+
 export async function getProject(id: string): Promise<ProjectView> {
   return json<ProjectView>(await authed(`/projects/${id}`))
 }

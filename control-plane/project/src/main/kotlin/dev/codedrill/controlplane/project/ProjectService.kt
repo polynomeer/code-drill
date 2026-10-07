@@ -357,6 +357,9 @@ class ProjectService(
         return packages.ids().filter { it in ids }.mapNotNull { id -> runCatching { packages.load(id) }.getOrNull() }
     }
 
+    /** 공개된 프로젝트의 패키지 — 키트([ProjectKit])가 쓴다. 숨은 테스트도 들어 있으니 밖으로 내보내지 않는다 */
+    fun publishedPackage(projectId: String): ProjectPackage? = load(projectId)
+
     private fun load(projectId: String): ProjectPackage? {
         if (projectId !in published.ids()) return null
         return runCatching { packages.load(projectId) }.getOrNull()

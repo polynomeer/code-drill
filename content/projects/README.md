@@ -99,3 +99,12 @@ unittest 를 손대는 오답, Kotlin·Java 는 리포트를 꾸며 쓰는 오�
 돌려보낸다. 오답의 내용은 어디에도 나가지 않는다. 사용자의 테스트 파일에는 공개 테스트가 그대로 들어
 있으므로, 떨어진 오답마다 판을 손대지 않은 채 한 번 더 돌려 **공개 테스트만으로도 떨어지는 오답은
 사용자의 몫에서 뺀다** — 그래서 위의 `probe-room` 이 있다.
+
+## 로컬에서 풀기 (키트)
+
+`GET /api/v1/projects/{id}/kit` 이 ZIP 을 준다 — `starter/` 전부, 채점기와 같은 하네스
+(`platform/problem-package` 의 `project-harness/`), 로컬 실행기, `.codedrill/project.json`, `CODEDRILL.md`,
+Kotlin·Java 는 Gradle 빌드 파일. **`hidden/`·`reference/`·`mutants/` 는 읽지도 않는다**
+(`ProjectKitTest` 가 저장소의 문제 전부로 확인한다). 그래서 시작 저장소에 공개 테스트 말고 다른 것을 숨겨
+두면 안 된다 — 시작 저장소는 그대로 사용자의 것이다. 계획 전체는 [feature-roadmap.md](../../docs/feature-roadmap.md)
+11단계 "이어서".

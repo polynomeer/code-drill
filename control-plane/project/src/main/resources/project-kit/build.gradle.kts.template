@@ -1,0 +1,56 @@
+// CodeDrill 키트 — IntelliJ 로 이 폴더를 열면 Gradle 프로젝트로 읽힌다.
+//
+//   gradle codedrillTest      공개 테스트를 채점기와 같은 하네스로 돌린다
+//
+// 숨은 테스트는 키트에 없다 — 채점은 서버가 한다. 채점기는 표준 라이브러리만 쓰므로 여기서도 의존성을 더하지 않는다.
+// 이 파일과 settings.gradle.kts 는 제출할 때 올리지 않는다 (웹의 "폴더 가져오기"가 빼고 읽는다).
+import java.util.UUID
+
+@@PLUGINS@@
+
+repositories { mavenCentral() }
+
+sourceSets {
+    main {
+        @@SOURCES@@
+    }
+}
+
+val codedrillTest by tasks.registering(JavaExec::class) {
+    group = "codedrill"
+    description = "공개 테스트를 채점기와 같은 하네스로 돌린다"
+    dependsOn("classes")
+    val classes = layout.buildDirectory.dir("@@CLASSES@@")
+    val report = layout.buildDirectory.file("codedrill/report.json")
+    val nonce = layout.buildDirectory.file("codedrill/nonce")
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("@@MAIN@@")
+    maxHeapSize = "@@MEMORY@@m"
+    doFirst {
+        val nonceFile = nonce.get().asFile
+        nonceFile.parentFile.mkdirs()
+        report.get().asFile.delete()
+        nonceFile.writeText(UUID.randomUUID().toString())
+        args(classes.get().asFile.path, report.get().asFile.path, nonceFile.path)
+    }
+    doLast {
+        val file = report.get().asFile
+        if (!file.exists()) throw GradleException("테스트를 돌리지 못했습니다 — 하네스가 리포트를 남기지 않았습니다")
+        @Suppress("UNCHECKED_CAST")
+        val data = groovy.json.JsonSlurper().parse(file) as Map<String, Any?>
+        if (data["tampered"] != null) throw GradleException("테스트 기반이 바뀌었습니다 — 채점에서는 전부 실패입니다: ${data["tampered"]}")
+        val publicTests = setOf(@@PUBLIC@@)
+        @Suppress("UNCHECKED_CAST")
+        val tests = data["tests"] as List<Map<String, Any?>>
+        println("공개 테스트")
+        for (test in tests) {
+            val ok = test["passed"] == true
+            val mine = if (test["module"] in publicTests) "" else "  (내가 쓴 테스트)"
+            println("  ${if (ok) "✓" else "✕"} ${test["module"]}.${test["name"]}$mine")
+            if (!ok && test["message"] != null) println("      ${test["message"]}")
+        }
+        val passed = tests.count { it["passed"] == true }
+        println("$passed / ${tests.size} 통과 — 숨은 테스트는 제출하면 서버에서 돕니다")
+        if (tests.isEmpty() || passed < tests.size) throw GradleException("공개 테스트 ${tests.size - passed}개 실패")
+    }
+}

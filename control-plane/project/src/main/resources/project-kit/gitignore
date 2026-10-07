@@ -1,0 +1,8 @@
+# CodeDrill 키트가 만든 것 — 제출하지 않는다
+.codedrill/out/
+build/
+.gradle/
+.idea/
+.vscode/
+__pycache__/
+*.class

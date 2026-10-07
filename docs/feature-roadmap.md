@@ -940,6 +940,27 @@ WRONG_ANSWER(숨은 8/9, 6/9)·WRONG_ANSWER(0/1) 를 확인했다.
 같은 경로를 탄다. 숨은 테스트가 API 로 새지 않는다. — **지났다.** 저작 검증·제출·채점·증거
 까지 한 경로이고, 숨은 테스트는 API 어디에도 없다(스모크가 상세와 결과에서 확인한다).
 
+#### 11단계 이어서 — 개인 IDE 에서 풀기
+
+**판정은 그대로 서버가 하고, 받기와 로컬 실행만 바깥으로 낸다.** 내려주는 것은 시작 저장소·공개 테스트·
+하네스뿐이고 숨은 테스트·참조·오답은 나가지 않는다 — 그래서 판정·가드·증거·테스트 점검이 달라지지 않는다.
+
+- **1단계 — ZIP 키트 + 웹으로 올리기. 닫힘.** `GET /api/v1/projects/{id}/kit` (공개 — 상세가 이미 시작
+  저장소를 공개한다). 키트는 시작 저장소, **채점기와 같은 하네스**, 로컬 실행기, 판 정보
+  (`.codedrill/project.json` — id·판·`packageDigest`·한도·공개 테스트), 안내(`CODEDRILL.md`), IDE 가 바로 여는
+  빌드 파일(Kotlin·Java 는 Gradle `codedrillTest`)이다. 실행: Python `python3 .codedrill/run.py`, Java
+  `java .codedrill/Run.java`, Kotlin `gradle codedrillTest`. 같은 패키지면 같은 바이트라 ETag 로 캐시된다
+  (`ProjectKit`). 하네스는 `platform/problem-package` 로 옮겨 Runner 와 키트가 **한 파일**을 본다 —
+  사본이면 "로컬에선 통과했는데 채점은 다르다"가 생긴다. 제출은 작업 공간의 "폴더 가져오기"로 받은 폴더를
+  올린다; 키트 파일·빌드 산출물은 빼고 읽는다(`kitFiles.ts` = `ProjectKit.KIT_PATHS`). 검증: 숨은 테스트가
+  키트에 없는지 열여덟 문제 전부, 그리고 세 언어의 키트를 실제로 풀어 돌려 본다(`ProjectKitTest`).
+- **2단계 — CLI(`codedrill login·get·test·submit`) + 기기 승인(RFC 8628) + 제출 출처.** 남았다. 시안은
+  디자인 캔버스 20~24. 정할 것: CLI 의 언어와 배포 채널(단일 실행 파일 권장 — JVM 이면 Python 문제만 푸는
+  사람도 Java 를 깔아야 한다).
+- **남긴 것 (1단계)**: 로컬 툴체인 판이 채점기와 다르면 결과가 갈릴 수 있다 — Kotlin 판은 빌드 파일에 고정했고
+  JDK 는 17~21 을 권한다(Gradle 의 Kotlin 스크립트가 JDK 25 에서 읽히지 않았다). 받은 판보다 문제가 새 판이
+  되어도 1단계에서는 막지 않는다 — 판을 실어 보내는 것은 CLI 의 일이다.
+
 ### 12단계. 교육기관·기업
 
 > 원본 §9, §14.2 단계 5.

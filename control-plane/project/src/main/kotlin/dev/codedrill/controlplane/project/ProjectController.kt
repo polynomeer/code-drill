@@ -5,7 +5,11 @@ import dev.codedrill.platform.common.ErrorCode
 import dev.codedrill.platform.common.Principal
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotEmpty
+import org.springframework.http.CacheControl
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -101,6 +105,26 @@ class ProjectController(private val service: ProjectService) {
     fun view(@PathVariable id: String): ResponseEntity<ProjectService.ProjectView> {
         val view = service.view(id) ?: return ResponseEntity.notFound().build()
         return ResponseEntity.ok(view)
+    }
+
+    /**
+     * 개인 IDE 로 받는 키트 (ZIP) — 시작 저장소·공개 테스트·하네스·로컬 실행기 ([ProjectKit]). 상세가 이미 시작
+     * 저장소를 공개하므로 이것도 로그인 없이 열린다. 같은 패키지면 같은 바이트라 ETag 로 다시 받지 않게 한다.
+     */
+    @GetMapping("/{id}/kit")
+    fun kit(
+        @PathVariable id: String,
+        @RequestHeader(HttpHeaders.IF_NONE_MATCH, required = false) ifNoneMatch: String?,
+    ): ResponseEntity<ByteArray> {
+        val pkg = service.publishedPackage(id) ?: return ResponseEntity.notFound().build()
+        val etag = ProjectKit.etag(pkg)
+        if (ifNoneMatch == etag) return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build()
+        return ResponseEntity.ok()
+            .contentType(MediaType("application", "zip"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(ProjectKit.fileName(pkg)).build().toString())
+            .eTag(etag)
+            .cacheControl(CacheControl.noCache())
+            .body(ProjectKit.zip(pkg))
     }
 
     @PostMapping("/{id}/submissions")

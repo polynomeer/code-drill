@@ -13,6 +13,8 @@ import type { ProjectDraft, ProjectProbeOutcome, ProjectSubmission, ProjectView 
 import { SaveIndicator } from '../workspace/SaveIndicator'
 import { useDraftSync } from '../workspace/useDraftSync'
 import { fullTime } from '../../shared/format'
+import { isKitOrBuildFile } from './kitFiles'
+import { LocalKitDialog } from './LocalKitDialog'
 
 const MonacoWorkspace = lazy(() => import('../workspace/MonacoWorkspace'))
 
@@ -70,6 +72,7 @@ export function ProjectWorkspace({
   const [error, setError] = useState<string | null>(null)
   const [fromDraft, setFromDraft] = useState(false)
   const [imported, setImported] = useState<string | null>(null)
+  const [kitOpen, setKitOpen] = useState(false)
   const [touched, setTouched] = useState(false)
   const poll = useRef<number | null>(null)
 
@@ -155,18 +158,26 @@ export function ProjectWorkspace({
    * 파일·폴더 가져오기 (§8.1). 브라우저가 고른 파일을 읽어 워크스페이스에 얹는다 — 서버는
    * 모른다. 폴더를 고르면 맨 위 폴더 이름을 떼고 그 아래 경로를 쓴다. 숨은 파일과 너무 큰
    * 파일은 건너뛰고 그 사실을 말한다; 조용히 빠지면 제출이 왜 다른지 아무도 모른다.
+   *
+   * 로컬 키트로 받은 폴더를 그대로 고를 수 있다 — 키트 파일과 빌드 산출물은 빼고 읽는다 ([isKitOrBuildFile]).
    */
   const importFiles = async (list: FileList | null) => {
     if (!list || !open) return
     const next = { ...files }
     let taken = 0
+    let kit = 0
     const skipped: string[] = []
     for (const file of Array.from(list)) {
       const relative = file.webkitRelativePath || file.name
       const parts = relative.split('/')
       const path = (file.webkitRelativePath ? parts.slice(1) : parts).join('/')
-      if (!path || parts.some((part) => part.startsWith('.'))) {
+      if (!path) {
         skipped.push(relative)
+        continue
+      }
+      // 키트 파일·빌드 산출물·숨은 파일은 하나하나 말하지 않고 수만 센다 — 받은 폴더면 수십 개다
+      if (isKitOrBuildFile(path)) {
+        kit += 1
         continue
       }
       if (file.size > MAX_IMPORT_BYTES) {
@@ -179,7 +190,11 @@ export function ProjectWorkspace({
     setFiles(next)
     setTouched(true)
     setCurrent((cur) => cur ?? Object.keys(next)[0] ?? null)
-    setImported(`${taken}개 파일을 가져왔습니다.` + (skipped.length ? ` 건너뜀: ${skipped.join(', ')}` : ''))
+    setImported(
+      `${taken}개 파일을 가져왔습니다.` +
+        (kit ? ` 키트·빌드 파일 ${kit}개는 빼고 읽었습니다.` : '') +
+        (skipped.length ? ` 건너뜀: ${skipped.join(', ')}` : ''),
+    )
   }
 
   const removeFile = (path: string) => {
@@ -220,6 +235,7 @@ export function ProjectWorkspace({
 
   return (
     <section className="project-workspace">
+      <LocalKitDialog project={open} open={kitOpen} onClose={() => setKitOpen(false)} />
       <header className="project-header">
         <button type="button" className="linklike" onClick={onClose}>
           ← 목록
@@ -229,6 +245,9 @@ export function ProjectWorkspace({
           {DIFFICULTY_LABEL[open.difficulty]} · {open.language} · 빌드 {open.limits.buildSeconds}초 · 테스트 {open.limits.testSeconds}초 ·{' '}
           {open.limits.memoryMb}MB · 파일 {Object.keys(files).length}/{open.limits.maxFiles}
         </span>
+        <button type="button" className="linklike" onClick={() => setKitOpen(true)}>
+          로컬에서 풀기
+        </button>
       </header>
       {error && <p className="warn small">{error}</p>}
 
