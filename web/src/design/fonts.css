@@ -1,5 +1,5 @@
 /*
- * 웹 글꼴 (디자인 설계서 §13.2 — Pretendard, JetBrains Mono. 제목의 Do Hyeon 은 퀘스트 테마, ui-overhaul.md §2).
+ * 웹 글꼴 (디자인 설계서 §13.2 — Pretendard, JetBrains Mono. 제목의 Do Hyeon 은 픽셀 테마, ui-overhaul.md §2).
  *
  * 셋 다 unicode-range 로 잘린 조각이라, 페이지에 실제로 나온 글자가 든 조각만 내려받는다.
  * Pretendard 동적 subset 이 92 조각인 이유다 (scripts/bundle-budget.mjs 가 글꼴을 따로 센다).

@@ -1,7 +1,7 @@
 import type { GroupInfo, GroupResult, Verdict } from '../../shared/types'
 
 /**
- * 보스 체력 — 테스트 케이스를 칸으로 늘어놓은 판정 그림 (docs/ui-overhaul.md §6.3).
+ * 케이스 격자 — 테스트 케이스를 칸으로 늘어놓은 판정 그림 (docs/ui-overhaul.md §6.3).
  *
  * 칸 하나가 케이스 하나다. **공개 그룹만 케이스별로 안다.** 숨은 그룹은 서버가 케이스를 비워 보내므로
  * (§8.3) 그룹 판정과 점수만으로 칠한다 — 몇 번째 케이스에서 떨어졌는지는 그리지 않는다. 그리면
@@ -9,7 +9,7 @@ import type { GroupInfo, GroupResult, Verdict } from '../../shared/types'
  */
 export type CellState = 'passed' | 'failed' | 'limit' | 'system' | 'pending'
 
-export interface BossCell {
+export interface CaseCell {
   state: CellState
   /** 공개 케이스일 때만 */
   caseId?: string
@@ -17,10 +17,10 @@ export interface BossCell {
   first?: boolean
 }
 
-export interface BossRow {
+export interface CaseRow {
   groupId: string
   hidden: boolean
-  cells: BossCell[]
+  cells: CaseCell[]
   /** 칸이 너무 많아 접은 수 */
   folded: number
   verdict: Verdict | null
@@ -53,12 +53,12 @@ export function cellState(verdict: Verdict): CellState {
  * 판정이 나온 제출의 줄들. `info` 는 문제의 그룹 정의 — 숨은 그룹의 케이스 수는 여기서만 안다.
  * 없으면 숨은 그룹은 칸 하나로 그린다.
  */
-export function bossRows(groups: GroupResult[], info: GroupInfo[] | undefined): BossRow[] {
+export function caseRows(groups: GroupResult[], info: GroupInfo[] | undefined): CaseRow[] {
   let firstMarked = false
   return groups.map((group) => {
     const count = info?.find((item) => item.id === group.groupId)?.caseCount ?? 0
     const hidden = group.cases.length === 0
-    let cells: BossCell[]
+    let cells: CaseCell[]
     let label: string
 
     if (!hidden) {
@@ -100,7 +100,7 @@ export function bossRows(groups: GroupResult[], info: GroupInfo[] | undefined): 
 }
 
 /** 채점 중 — 문제의 그룹 정의로 아직 치지 않은 칸만 늘어놓는다 */
-export function pendingRows(info: GroupInfo[]): BossRow[] {
+export function pendingRows(info: GroupInfo[]): CaseRow[] {
   return info.map((group) => {
     const size = Math.max(group.caseCount, 1)
     return {
@@ -114,15 +114,4 @@ export function pendingRows(info: GroupInfo[]): BossRow[] {
       label: `케이스 ${group.caseCount}개 채점 중`,
     }
   })
-}
-
-/**
- * 남은 체력 = 아직 얻지 못한 점수. 배점이 없는 문제(예제뿐)는 체력을 말하지 않는다 — null.
- * 케이스 수가 아니라 점수로 재는 것은 숨은 그룹의 케이스별 결과를 모르기 때문이다.
- */
-export function bossHp(groups: GroupResult[]): { remaining: number; total: number } | null {
-  const total = groups.reduce((sum, group) => sum + group.maxScore, 0)
-  if (total <= 0) return null
-  const earned = groups.reduce((sum, group) => sum + group.score, 0)
-  return { remaining: Math.max(0, total - earned), total }
 }

@@ -1,4 +1,4 @@
-/* 홈 퀘스트 보드 (docs/ui-overhaul.md §6.10) — 픽셀 카드 위에 처방·역량·기록 */
+/* 홈 요약 카드 (docs/ui-overhaul.md §6.10) — 픽셀 카드 위에 기록·처방·역량 */
 
 .card {
   display: grid;
@@ -35,9 +35,9 @@
   color: var(--color-text-muted);
 }
 
-/* ─── 플레이어 ─── */
+/* ─── 내 기록 ─── */
 
-.player {
+.person {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -55,7 +55,7 @@
   font: 400 28px/1 var(--font-display);
 }
 
-.playerName {
+.personName {
   margin: 0;
   font: var(--text-h1);
   overflow-wrap: anywhere;
@@ -113,9 +113,9 @@
   color: var(--color-text-primary);
 }
 
-/* ─── 퀘스트 ─── */
+/* ─── 오늘의 훈련 ─── */
 
-.mainQuest {
+.focus {
   display: grid;
   gap: var(--space-2);
   justify-items: start;
@@ -124,72 +124,71 @@
   border: 2px solid var(--color-brand);
 }
 
-.questKind,
-.sideKind {
+.reason {
   margin: 0;
   color: var(--color-brand);
   font: var(--text-label);
 }
 
-.questTitle {
+.focusTitle {
   margin: 0;
   font: var(--text-display);
 }
 
-.questDetail {
+.focusDetail {
   margin: 0;
   color: var(--color-text-muted);
   font: var(--text-reading);
 }
 
-/* 도전하기 — 주 단추와 같은 빗면. 링크라 새 탭으로도 열린다 */
-.challenge {
+/* 시작 — 주 단추와 같은 빗면. 링크라 새 탭으로도 열린다 */
+.start {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--control-touch);
+  min-height: var(--control-default);
   margin-top: var(--space-2);
-  padding: 0 var(--space-5);
+  padding: 0 var(--space-4);
   background: var(--color-brand);
   border: 2px solid var(--color-pixel-line);
   box-shadow:
     inset -3px -3px 0 rgb(0 0 0 / 22%),
     inset 3px 3px 0 rgb(255 255 255 / 28%);
   color: var(--color-text-on-brand);
-  font: 400 18px/1 var(--font-display);
+  font: var(--text-label);
   text-decoration: none;
 }
 
-.challenge:hover {
+.start:hover {
   background: var(--color-brand-hover);
 }
 
-.challenge:active {
+.start:active {
   box-shadow: inset 3px 3px 0 rgb(0 0 0 / 22%);
 }
 
-.sideQuests {
+.rest {
   display: grid;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.sideQuests li {
+.rest li {
   display: grid;
   gap: var(--space-1);
   padding: var(--space-3) 0;
   border-top: 2px dashed var(--color-border-default);
 }
 
-.sideLink {
+.restLink {
   color: var(--color-text-primary);
   font: var(--text-h3);
 }
 
-/* ─── 스킬 ─── */
+/* ─── 역량 요약 ─── */
 
-.skills {
+.groups {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--space-2);
@@ -198,7 +197,7 @@
   list-style: none;
 }
 
-.skill {
+.group {
   display: grid;
   gap: var(--space-2);
   align-content: start;
@@ -207,41 +206,24 @@
   border: 2px solid var(--color-border-default);
 }
 
-.locked {
+.unmeasured {
   background: transparent;
   border-style: dashed;
   color: var(--color-text-muted);
 }
 
-.skillName {
+.groupName {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
   font: 400 17px/1.2 var(--font-display);
 }
 
-.stars {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
+.levels {
+  font: var(--text-label);
 }
 
-/* 별의 수준은 채움으로도 갈린다 — 단단하다는 꽉 찬 금, 해낸다는 꽉 찬 청록, 기르는 중은 빈 별 */
-.starSTRONG {
-  color: var(--color-brand);
-  fill: currentColor;
-}
-
-.starPROFICIENT {
-  color: var(--color-trace);
-  fill: currentColor;
-}
-
-.starDEVELOPING {
-  color: var(--color-text-muted);
-}
-
-.skillNote {
+.groupNote {
   color: var(--color-text-muted);
   font: var(--text-caption);
 }

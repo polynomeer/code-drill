@@ -133,17 +133,16 @@ test('오답은 공개 예제의 입력·기댓값·실행값을 견주고 다�
   await expect(page.getByRole('heading', { name: '제출한 코드' })).toBeVisible()
 })
 
-test('보스 체력은 공개 케이스를 칸마다, 숨은 그룹은 판정만으로 그린다', async ({ page }) => {
+test('테스트 결과는 공개 케이스를 칸마다, 숨은 그룹은 판정만으로 그린다', async ({ page }) => {
   await mockApi(page)
   await page.goto('/submissions/wrong')
-  const boss = page.getByRole('region', { name: '보스 체력' })
-  await expect(boss.getByText('남은 체력')).toContainText('100 / 100')
-  await expect(boss.getByRole('img', { name: '공개 케이스 1개 중 0개 통과' })).toBeVisible()
+  const grid = page.getByRole('region', { name: '테스트 결과' })
+  await expect(grid.getByRole('img', { name: '공개 케이스 1개 중 0개 통과' })).toBeVisible()
   // 숨은 그룹의 케이스 수는 문제의 그룹 정의에서 온다. 어느 케이스에서 떨어졌는지는 말하지 않는다
-  await expect(boss.getByRole('img', { name: '숨은 케이스 2개 — 통과하지 못함' })).toBeVisible()
+  await expect(grid.getByRole('img', { name: '숨은 케이스 2개 — 통과하지 못함' })).toBeVisible()
 
   await page.goto('/submissions/accepted')
-  await expect(page.getByRole('region', { name: '보스 체력' }).getByText('격파!')).toBeVisible()
+  await expect(page.getByRole('region', { name: '테스트 결과' }).getByRole('img', { name: '숨은 케이스 2개 모두 통과' })).toBeVisible()
 })
 
 test('시스템 오류는 코드 탓이 아님을 말하고 신고 ID 를 준다', async ({ page }) => {

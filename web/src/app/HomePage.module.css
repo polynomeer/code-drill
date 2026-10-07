@@ -1,4 +1,4 @@
-/* 홈 퀘스트 보드 — 넓으면 세 열(플레이어 · 퀘스트 · 대회), 좁으면 한 줄로 쌓인다 */
+/* 홈 — 넓으면 세 열(내 기록 · 오늘의 훈련 · 대회), 좁으면 한 줄로 쌓인다 */
 .board {
   display: grid;
   grid-template-columns: minmax(0, 280px) minmax(0, 1fr) minmax(0, 320px);

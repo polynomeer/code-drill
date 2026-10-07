@@ -5,9 +5,9 @@ import { ContestSummaryPanel } from '../features/contest/ContestSummaryPanel'
 import { CollectionsPanel } from '../features/learning/CollectionsPanel'
 import { ProjectWorkspace } from '../features/project/ProjectWorkspace'
 import { ProjectsPanel } from '../features/project/ProjectsPanel'
-import { PlayerCard } from '../features/quest/PlayerCard'
-import { QuestBoard } from '../features/quest/QuestBoard'
-import { SkillTree } from '../features/quest/SkillTree'
+import { CompetencyCard } from '../features/home/CompetencyCard'
+import { RecordCard } from '../features/home/RecordCard'
+import { TodayCard } from '../features/home/TodayCard'
 import { setParam } from '../shared/url'
 import styles from './HomePage.module.css'
 
@@ -18,7 +18,7 @@ import styles from './HomePage.module.css'
  * `/problems` 로, 처방·역량·주간 리포트는 U5 에서 `/training`·`/competencies` 로, 대회는 U6 에서
  * `/contests` 로 나갔다. 여기에는 요약과 프로젝트·문제집만 남는다 (docs/ui-overhaul.md §9).
  *
- * 퀘스트 테마에서 요약이 퀘스트 보드가 됐다 (§6.10) — 플레이어 카드 · 오늘의 퀘스트 · 스킬 트리.
+ * 요약은 세 장의 카드다 (§6.10) — 내 기록 · 오늘의 훈련 · 역량 요약.
  */
 export function HomePage({ session }: { session: Session }) {
   const [, navigate] = useLocation()
@@ -40,17 +40,17 @@ export function HomePage({ session }: { session: Session }) {
           <ProjectWorkspace id={openProject} onClose={() => open(null)} onJudged={() => setProjectsJudged((n) => n + 1)} />
         </div>
       )}
-      {/* 프로젝트가 열려 있으면 보드는 그리지 않는다 — 같은 화면에 작업 공간이 둘이면 어느 것이 내 일인지 헷갈린다. */}
+      {/* 프로젝트가 열려 있으면 요약은 그리지 않는다 — 같은 화면에 작업 공간이 둘이면 어느 것이 내 일인지 헷갈린다. */}
       <div className={styles.board} hidden={openProject !== null}>
         <div className={styles.column}>
-          <PlayerCard session={session} />
+          <RecordCard session={session} />
         </div>
 
         <div className={styles.column}>
           {/* 맨 위다. "무엇을 풀지 모를 때 현재 수준과 약점을 기준으로 고른다"가
               PRD §2.3 의 첫 번째 JTBD 이고, 그 답은 목록이 아니라 처방이다 (FR-808). */}
-          <QuestBoard />
-          <SkillTree />
+          <TodayCard />
+          <CompetencyCard />
           {/* 두 번째 판정기의 문제라 알고리즘 문제와 섞이지 않는다 (11단계). */}
           <ProjectsPanel refreshKey={projectsJudged} onOpen={open} />
         </div>

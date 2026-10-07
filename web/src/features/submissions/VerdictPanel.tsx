@@ -7,8 +7,8 @@ import { IN_FLIGHT, VERDICT_LABEL } from '../../shared/types'
 import type { CaseResult, GroupResult, Problem, Submission, SubmissionStatus, Verdict } from '../../shared/types'
 import { DonatePanel } from '../arena/DonatePanel'
 import { SharePanel } from '../discussion/SharePanel'
-import { BossGrid } from './BossGrid'
-import { bossHp, bossRows, pendingRows } from './bossModel'
+import { CaseGrid } from './CaseGrid'
+import { caseRows, pendingRows } from './caseGridModel'
 import { CounterexamplePanel } from './CounterexamplePanel'
 import { parseCompileLog } from './compileLog'
 import { diffValues } from './outputDiff'
@@ -90,11 +90,11 @@ export function VerdictPanel({
         />
       )}
 
-      {/* 보스 체력 — 채점 중에는 아직 치지 않은 칸을, 끝나면 케이스마다의 결과를 */}
+      {/* 케이스 격자 — 채점 중에는 아직 돌리지 않은 칸을, 끝나면 케이스마다의 결과를 */}
       {submission.groups && submission.groups.length > 0 ? (
-        <BossGrid rows={bossRows(submission.groups, problem?.groups)} hp={bossHp(submission.groups)} />
+        <CaseGrid rows={caseRows(submission.groups, problem?.groups)} />
       ) : (
-        inFlight && problem && problem.groups.length > 0 && <BossGrid rows={pendingRows(problem.groups)} hp={null} judging />
+        inFlight && problem && problem.groups.length > 0 && <CaseGrid rows={pendingRows(problem.groups)} judging />
       )}
 
       {/* 다음 행동 — 반례 줄이기와 내놓기는 소유자의 일이다 (§8.3, §8.5) */}

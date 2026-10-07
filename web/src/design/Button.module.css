@@ -42,7 +42,7 @@
   background: var(--color-brand);
   border-color: var(--color-pixel-line);
   color: var(--color-text-on-brand);
-  /* 픽셀 단추의 빗면 — 오른쪽 아래는 그늘, 왼쪽 위는 빛 (퀘스트 테마, ui-overhaul.md §2) */
+  /* 픽셀 단추의 빗면 — 오른쪽 아래는 그늘, 왼쪽 위는 빛 (픽셀 테마, ui-overhaul.md §2) */
   box-shadow:
     inset -3px -3px 0 rgb(0 0 0 / 22%),
     inset 3px 3px 0 rgb(255 255 255 / 28%);
