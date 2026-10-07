@@ -34,6 +34,11 @@ const DETAIL = {
   groups: [{ id: 'sample', weight: 100, aggregation: 'ALL_OR_NOTHING', caseCount: 1 }],
 }
 
+const PROJECTS = [
+  { id: 'cart-pricing', version: 1, title: '장바구니 가격 계산', language: 'PYTHON', difficulty: 'EASY', tags: [], summary: '할인 규칙을 차례로 적용한다', solved: false },
+  { id: 'job-queue', version: 1, title: '재시도가 있는 작업 큐', language: 'KOTLIN', difficulty: 'MEDIUM', tags: [], summary: '실패한 작업을 물러섰다가 다시 한다', solved: false },
+]
+
 async function mockApi(page: Page, requests: URL[] = []) {
   await page.route('**/api/v1/**', async (route: Route) => {
     const url = new URL(route.request().url())
@@ -47,6 +52,7 @@ async function mockApi(page: Page, requests: URL[] = []) {
       return json({ items, nextCursor: null, total: items.length === 0 ? 0 : 120, tags: { array: 3, math: 2, graph: 1 }, page: Number(url.searchParams.get('page')), pageCount: 3 })
     }
     if (path === '/problems/p0') return json(DETAIL)
+    if (path === '/projects') return json(PROJECTS)
     return json({ errorCode: 'NOT_FOUND', message: '없음', traceId: '' }, 404)
   })
 }
@@ -113,4 +119,27 @@ test('접근성 위반이 없다', async ({ page }) => {
   await expect(page.getByRole('table')).toBeVisible()
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()
   expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
+})
+
+test('프로젝트형 탭 — 둘러보는 사람도 목록을 보고, 고르면 로그인을 거쳐 작업 공간으로 간다', async ({ page }) => {
+  await mockApi(page)
+  await page.goto('/problems')
+  await page.getByRole('tab', { name: '프로젝트형' }).click()
+  await expect(page).toHaveURL(/kind=project/)
+  const table = page.getByRole('table')
+  await expect(table.getByRole('row')).toHaveCount(PROJECTS.length + 1)
+  await expect(table.getByRole('link', { name: '장바구니 가격 계산' })).toHaveAttribute(
+    'href',
+    `/login?next=${encodeURIComponent('/?project=cart-pricing')}`,
+  )
+  // 언어 칩은 목록에 있는 언어만, 누르면 화면에서 거른다
+  await page.getByRole('button', { name: 'Kotlin' }).click()
+  await expect(table.getByRole('row')).toHaveCount(2)
+  await expect(table).toContainText('재시도가 있는 작업 큐')
+  await expect(page.getByRole('button', { name: 'Java', exact: true })).toHaveCount(0)
+
+  // 주소로 바로 들어와도 같은 탭이다
+  await page.goto('/problems?kind=project')
+  await expect(page.getByRole('tab', { name: '프로젝트형' })).toHaveAttribute('aria-selected', 'true')
+  expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze()).violations).toEqual([])
 })

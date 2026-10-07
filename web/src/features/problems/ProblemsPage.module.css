@@ -40,6 +40,19 @@
   font: var(--text-label);
 }
 
+/* ─── 종류 탭 (알고리즘 · 프로젝트형) ─── */
+
+.kindLead {
+  margin: 0;
+  color: var(--color-text-muted);
+  font: var(--text-body);
+}
+
+.colLanguage {
+  width: 100px;
+  white-space: nowrap;
+}
+
 /* ─── 필터 ─── */
 
 .filters {

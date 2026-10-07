@@ -872,8 +872,9 @@ export async function updateProfileSettings(settings: ProfileSettings): Promise<
 
 // --- 프로젝트형 문제 (feature-roadmap 11단계) ---
 
+/** 공개 경로다 — 둘러보는 사람도 목록을 본다. 로그인했으면 토큰을 실어 "완료"를 받는다. */
 export async function listProjects(): Promise<ProjectSummary[]> {
-  return json<ProjectSummary[]>(await authed('/projects'))
+  return fetch(`${BASE}/projects`, { headers: optionalAuth() }).then(json<ProjectSummary[]>)
 }
 
 export async function getProject(id: string): Promise<ProjectView> {

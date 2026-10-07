@@ -14,6 +14,7 @@ import {
   Pagination,
   SearchField,
   Skeleton,
+  Tabs,
   useToast,
 } from '../../design'
 import { DIFFICULTIES, DIFFICULTY_LABEL } from '../../shared/types'
@@ -21,6 +22,7 @@ import type { ProblemFilter, ProblemSort, ProblemSummary } from '../../shared/ty
 import { replaceParams } from '../../shared/url'
 import { TodaySummary } from '../training/TodaySummary'
 import { clearFilters, isEmpty, readFilter, toggle, writeFilter } from './problemFilter'
+import { ProjectList } from './ProjectList'
 import styles from './ProblemsPage.module.css'
 import { count } from '../../shared/format'
 import { markOpenSource, trackOnce } from '../../shared/analytics'
@@ -34,7 +36,14 @@ import { markOpenSource, trackOnce } from '../../shared/analytics'
  * 로그인하지 않아도 열린다 (디자인 설계서 §11.1). 로그인했으면 완료 상태 열과 상태 필터가 더 생긴다.
  *
  * 필터·정렬·쪽은 주소에 산다 (FR-201). 새로고침해도 같고 링크로 건넬 수 있다.
+ *
+ * 알고리즘 문제와 프로젝트형 문제는 탭으로 갈린다(`?kind=project`). 두 판정기의 문제라 필터가 다르다.
  */
+type Kind = 'algorithm' | 'project'
+const KINDS: { key: Kind; label: string }[] = [
+  { key: 'algorithm', label: '알고리즘' },
+  { key: 'project', label: '프로젝트형' },
+]
 const PAGE_SIZE = 50
 const TOP_TAGS = 8
 
@@ -46,6 +55,12 @@ export function ProblemsPage() {
   const [, navigate] = useLocation()
   const toast = useToast()
 
+  const [kind, setKind] = useState<Kind>(() =>
+    new URLSearchParams(window.location.search).get('kind') === 'project' ? 'project' : 'algorithm',
+  )
+  useEffect(() => {
+    replaceParams(new URLSearchParams(kind === 'project' ? { kind } : {}), ['kind'])
+  }, [kind])
   const [filter, setFilter] = useState<ProblemFilter>(() => readFilter(window.location.search))
   // 검색어는 타이핑마다 요청하지 않는다. 잠잠해지면 한 번 보낸다 (UI 디자인 문서 §3.3 — 250ms).
   const [typed, setTyped] = useState(filter.query)
@@ -111,103 +126,115 @@ export function ProblemsPage() {
         <header className={styles.head}>
           <div>
             <h1 className={styles.title}>문제</h1>
-            <p className={styles.count} role="status">
-              {page ? `${count(page.total)}문제` : ' '}
-              {!isEmpty(filter) && page && ' · 조건에 맞는 것'}
-            </p>
-          </div>
-          <Button icon={<Shuffle size={16} />} onClick={() => void pick()}>
-            아무 문제나
-          </Button>
-        </header>
-
-        <section className={styles.filters} aria-label="검색과 필터">
-          <SearchField
-            label="문제 검색"
-            placeholder="제목이나 번호로 검색 (예: 1042)"
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-          />
-          <div className={styles.filterRow}>
-            <FilterGroup label="난이도">
-              {DIFFICULTIES.map((level) => (
-                <Chip
-                  key={level}
-                  pressed={filter.difficulty.includes(level)}
-                  onClick={() => update({ difficulty: toggle(filter.difficulty, level) })}
-                >
-                  {DIFFICULTY_LABEL[level]}
-                </Chip>
-              ))}
-            </FilterGroup>
-            {session && (
-              <FilterGroup label="상태">
-                {(['UNSOLVED', 'SOLVED'] as const).map((value) => (
-                  <Chip
-                    key={value}
-                    pressed={filter.status === value}
-                    onClick={() => update({ status: filter.status === value ? null : value })}
-                  >
-                    {value === 'SOLVED' ? '푼 문제' : '안 푼 문제'}
-                  </Chip>
-                ))}
-              </FilterGroup>
+            {kind === 'algorithm' && (
+              <p className={styles.count} role="status">
+                {page ? `${count(page.total)}문제` : ' '}
+                {!isEmpty(filter) && page && ' · 조건에 맞는 것'}
+              </p>
             )}
           </div>
-          <TagFilter
-            counts={page?.tags ?? {}}
-            selected={filter.tags}
-            onToggle={(tag) => update({ tags: toggle(filter.tags, tag) })}
-          />
-          {!isEmpty(filter) && (
-            <button type="button" className={`linklike ${styles.reset}`} onClick={reset}>
-              필터 지우기
-            </button>
+          {kind === 'algorithm' && (
+            <Button icon={<Shuffle size={16} />} onClick={() => void pick()}>
+              아무 문제나
+            </Button>
           )}
-        </section>
+        </header>
 
-        {query.isError && (
-          <InlineAlert
-            tone="danger"
-            title="문제 목록을 불러오지 못했습니다"
-            action={
-              <Button size="dense" onClick={() => void query.refetch()}>
-                다시 시도
-              </Button>
-            }
-          />
-        )}
+        <Tabs label="문제 종류" items={KINDS} value={kind} onChange={setKind}>
+          {kind === 'project' ? (
+            <ProjectList />
+          ) : (
+            <div className={styles.main}>
+            <section className={styles.filters} aria-label="검색과 필터">
+              <SearchField
+                label="문제 검색"
+                placeholder="제목이나 번호로 검색 (예: 1042)"
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+              />
+              <div className={styles.filterRow}>
+                <FilterGroup label="난이도">
+                  {DIFFICULTIES.map((level) => (
+                    <Chip
+                      key={level}
+                      pressed={filter.difficulty.includes(level)}
+                      onClick={() => update({ difficulty: toggle(filter.difficulty, level) })}
+                    >
+                      {DIFFICULTY_LABEL[level]}
+                    </Chip>
+                  ))}
+                </FilterGroup>
+                {session && (
+                  <FilterGroup label="상태">
+                    {(['UNSOLVED', 'SOLVED'] as const).map((value) => (
+                      <Chip
+                        key={value}
+                        pressed={filter.status === value}
+                        onClick={() => update({ status: filter.status === value ? null : value })}
+                      >
+                        {value === 'SOLVED' ? '푼 문제' : '안 푼 문제'}
+                      </Chip>
+                    ))}
+                  </FilterGroup>
+                )}
+              </div>
+              <TagFilter
+                counts={page?.tags ?? {}}
+                selected={filter.tags}
+                onToggle={(tag) => update({ tags: toggle(filter.tags, tag) })}
+              />
+              {!isEmpty(filter) && (
+                <button type="button" className={`linklike ${styles.reset}`} onClick={reset}>
+                  필터 지우기
+                </button>
+              )}
+            </section>
 
-        {!page && !query.isError ? (
-          <TableSkeleton />
-        ) : page && page.total === 0 ? (
-          <div className={styles.empty}>
-            <EmptyState title="조건에 맞는 문제가 없습니다" action={<Button onClick={reset}>필터 초기화</Button>}>
-              {describeFilter(filter)}
-            </EmptyState>
-          </div>
-        ) : (
-          page && (
-            <ProblemTable
-              items={page.items}
-              signedIn={session !== null}
-              filter={filter}
-              onSort={sortBy}
-              busy={loading}
-            />
-          )
-        )}
+            {query.isError && (
+              <InlineAlert
+                tone="danger"
+                title="문제 목록을 불러오지 못했습니다"
+                action={
+                  <Button size="dense" onClick={() => void query.refetch()}>
+                    다시 시도
+                  </Button>
+                }
+              />
+            )}
 
-        {page?.page && page.pageCount ? (
-          <Pagination
-            page={page.page}
-            pageCount={page.pageCount}
-            onChange={(next) => {
-              setFilter((prev) => ({ ...prev, page: next }))
-              window.scrollTo({ top: 0 })
-            }}
-          />
-        ) : null}
+            {!page && !query.isError ? (
+              <TableSkeleton />
+            ) : page && page.total === 0 ? (
+              <div className={styles.empty}>
+                <EmptyState title="조건에 맞는 문제가 없습니다" action={<Button onClick={reset}>필터 초기화</Button>}>
+                  {describeFilter(filter)}
+                </EmptyState>
+              </div>
+            ) : (
+              page && (
+                <ProblemTable
+                  items={page.items}
+                  signedIn={session !== null}
+                  filter={filter}
+                  onSort={sortBy}
+                  busy={loading}
+                />
+              )
+            )}
+
+            {page?.page && page.pageCount ? (
+              <Pagination
+                page={page.page}
+                pageCount={page.pageCount}
+                onChange={(next) => {
+                  setFilter((prev) => ({ ...prev, page: next }))
+                  window.scrollTo({ top: 0 })
+                }}
+              />
+            ) : null}
+            </div>
+          )}
+        </Tabs>
       </div>
 
       {/* 보조 열 (UI 디자인 문서 §3.2 — 250~300px). 좁으면 표 아래로 내려간다. */}
