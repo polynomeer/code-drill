@@ -67,7 +67,7 @@ class PasswordReset(
             Timestamp.from(now), Tokens.hash(token), Timestamp.from(now),
         ).firstOrNull() ?: return Outcome.Invalid(INVALID)
         // 지운 계정은 바꾸지 않는다 (updatePassword 가 deleted_at 을 본다)
-        if (repository.updatePassword(userId, passwords.encode(next)) == 0) return Outcome.Invalid(INVALID)
+        if (repository.updatePassword(userId, checkNotNull(passwords.encode(next))) == 0) return Outcome.Invalid(INVALID)
         val revoked = repository.revokeAllFor(userId, "password-reset")
         log.info("비밀번호를 재설정했다: {} — 세션 {}개 끊음", userId, revoked)
         return Outcome.Done

@@ -167,7 +167,7 @@ class RedisLeaseRegistry(
         val ABANDON = script<Long>("abandon.lua")
         val ACCEPT = script<List<*>>("accept.lua")
 
-        private inline fun <reified T> script(name: String): DefaultRedisScript<T> {
+        private inline fun <reified T : Any> script(name: String): DefaultRedisScript<T> {
             val source = RedisLeaseRegistry::class.java.getResourceAsStream("/lease/$name")
                 ?.bufferedReader()?.readText()
                 ?: error("임대 스크립트가 없다: $name")

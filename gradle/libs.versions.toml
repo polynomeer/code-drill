@@ -1,22 +1,21 @@
 [versions]
-kotlin = "2.1.20"
-springBoot = "3.4.4"
-# Boot 3.4.4 가 고정하는 10.1.39 를 덮어쓴다. 그 판에 고칠 수 있는 CRITICAL 이 여섯 있다.
-tomcat = "10.1.59"
-# Boot 3.4.4 가 고정하는 4.1.119 를 덮어쓴다. netty-handler 에 고칠 수 있는 CRITICAL 이 있다 (CVE-2026-75595).
-# 오케스트레이터의 Redis 클라이언트(lettuce)가 쓰므로 뺄 수는 없다.
-netty = "4.1.137.Final"
+kotlin = "2.3.21"
+springBoot = "4.1.1"
 springDependencyManagement = "1.1.7"
 awsSdk = "2.31.16"
 
 [libraries]
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
+# 우리 코드의 직렬화(패키지 다이제스트·YAML·JSONB)는 Jackson 2 에 둔다 — 3 은 기본값이 달라(속성 정렬 등)
+# 저장된 다이제스트와 JSON 이 바뀐다. HTTP 와 브로커는 Boot 4 의 기본인 Jackson 3 이 맡는다.
 jackson-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+jackson3-kotlin = { module = "tools.jackson.module:jackson-module-kotlin" }
 jackson-yaml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml" }
 jackson-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" }
+jackson-jdk8 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jdk8" }
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 # 비밀번호 해싱만 쓴다. 필터 체인은 우리 인터셉터가 대신하므로 starter 전체는 넣지 않는다.
@@ -26,18 +25,15 @@ spring-boot-starter-data-redis = { module = "org.springframework.boot:spring-boo
 spring-boot-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
-flyway-core = { module = "org.flywaydb:flyway-core" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
 flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
 postgresql = { module = "org.postgresql:postgresql" }
-micrometer-tracing-otel = { module = "io.micrometer:micrometer-tracing-bridge-otel" }
+spring-boot-starter-opentelemetry = { module = "org.springframework.boot:spring-boot-starter-opentelemetry" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 otel-exporter-otlp = { module = "io.opentelemetry:opentelemetry-exporter-otlp" }
 aws-s3 = { module = "software.amazon.awssdk:s3", version.ref = "awsSdk" }
 aws-url-connection-client = { module = "software.amazon.awssdk:url-connection-client", version.ref = "awsSdk" }
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
-testcontainers-junit = { module = "org.testcontainers:junit-jupiter" }
-testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
-testcontainers-rabbitmq = { module = "org.testcontainers:rabbitmq" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

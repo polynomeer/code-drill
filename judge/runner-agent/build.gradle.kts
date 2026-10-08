@@ -5,6 +5,8 @@ plugins {
 }
 
 dependencies {
+    // HTTP 요청·응답은 Boot 4 의 Jackson 3 이 읽고 쓴다 — Kotlin 데이터 클래스를 위해 그 Kotlin 모듈
+    runtimeOnly(libs.jackson3.kotlin)
     implementation(project(":judge:protocol"))
     implementation(project(":platform:common"))
     implementation(project(":platform:messaging"))
@@ -15,7 +17,7 @@ dependencies {
     implementation(libs.spring.boot.starter)
     implementation(libs.spring.boot.starter.actuator)
     // health·prometheus 엔드포인트를 노출하려면 web 이 필요하다 (§13.2 기본 대시보드).
-    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.amqp)
     // 로컬 kotlinc 설치에 기대지 않고 in-process 로 컴파일한다.
     implementation(libs.kotlin.compiler.embeddable)

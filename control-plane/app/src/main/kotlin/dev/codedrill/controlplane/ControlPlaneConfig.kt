@@ -1,6 +1,10 @@
 package dev.codedrill.controlplane
 
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.MapperFeature
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import dev.codedrill.judge.protocol.ExecutionRequest
 import dev.codedrill.judge.protocol.ArenaRequest
@@ -125,8 +129,19 @@ import java.util.UUID
 @EnableScheduling
 class ControlPlaneConfig {
 
-    // ObjectMapper 는 Spring Boot 가 만든 것을 그대로 쓴다. 여기서 새로 만들면 Boot 가
-    // 등록해 주는 JavaTimeModule 이 빠져 Instant 직렬화가 런타임에 깨진다.
+    /**
+     * 도메인 모듈이 JSONB 를 읽고 쓰는 Jackson 2 매퍼. Boot 3 이 만들어 주던 것과 같은 설정이다 — Boot 4 는 HTTP 를
+     * Jackson 3 으로 옮기면서 이 빈을 만들지 않는다. 설정이 달라지면 이미 저장된 JSON 을 다르게 읽으므로, Boot 3 의
+     * 기본값(시간은 ISO 문자열, 모르는 필드는 무시, 클래스패스의 모듈 전부)을 그대로 옮겼다.
+     */
+    @Bean
+    fun objectMapper(): ObjectMapper = JsonMapper.builder()
+        .findAndAddModules()
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .disable(SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS)
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .disable(MapperFeature.DEFAULT_VIEW_INCLUSION)
+        .build()
 
     @Bean
     fun problemPackageLoader(@Value("\${codedrill.content.root}") root: String) =

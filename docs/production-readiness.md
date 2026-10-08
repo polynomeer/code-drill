@@ -392,6 +392,16 @@ push 를 한 적이 없어 images 워크플로가 돈 적이 없다. 첫 배포 
 **아무도 이것을 알고 있지 않았다.** 게이트를 붙이기 전까지 이 스무 건은 이미지 안에
 그냥 있었다.
 
+**덮어쓰기로 안 되는 것이 와서 Boot 를 올렸다 (2026-10).** `spring-webmvc` 6.2.5 의
+CVE-2026-47884 는 고친 판이 Spring 7.0.9 뿐이었다 — 프로퍼티 한 줄로 덮을 수 없는 메이저다.
+게이트는 한시 면제로 열어 두고 Boot 3.4.4 → 4.1.1 (Spring 7.0.9, Kotlin 2.3, Tomcat 11, Netty 4.2)로
+올린 뒤 면제를 지웠다. Tomcat·Netty 덮어쓰기도 함께 지웠다 — Boot 4 가 고정한 판이 더 새것이다.
+옮기며 정한 것: HTTP·브로커의 JSON 은 Boot 4 의 기본인 Jackson 3 이 쓰되
+`spring.jackson.use-jackson2-defaults` 로 응답 모양을 그대로 두고, 우리 코드의 직렬화(패키지
+다이제스트·YAML·JSONB)는 Jackson 2 에 남겼다 — 3 의 기본값(속성 이름순 등)으로 바뀌면 저장된
+다이제스트가 달라진다. Boot 4 가 만들지 않게 된 Jackson 2 `ObjectMapper` 빈은 Boot 3 의 설정
+그대로 `ControlPlaneConfig` 에서 만든다.
+
 ### 게이트 자신에게 있던 구멍
 
 스캐너가 못 돌면 **게이트가 초록으로 통과하고 있었다.** 빈 결과와 못 돈 것을 같게 다뤘기

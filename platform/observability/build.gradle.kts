@@ -4,6 +4,6 @@ dependencies {
     implementation(project(":platform:common"))
     implementation(libs.spring.boot.starter)
     implementation(libs.spring.boot.starter.actuator)
-    implementation(libs.micrometer.tracing.otel)
+    implementation(libs.spring.boot.starter.opentelemetry)
     implementation(libs.micrometer.registry.prometheus)
 }

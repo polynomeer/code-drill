@@ -6,6 +6,7 @@ dependencies {
     implementation(libs.spring.boot.starter.amqp)
     implementation(libs.jackson.kotlin)
     implementation(libs.jackson.jsr310)
+    implementation(libs.jackson3.kotlin)
 }
 
 // 배포용 브로커 정의를 코드에서 만든다. 손으로 고치지 않는다 (BrokerDefinitions).

@@ -128,7 +128,7 @@ class ExecutionEngine(
         // compile — 실행과 같은 샌드박스 안에서 (§5.5). 산출물 디렉터리만 쓸 수 있다.
         val compileStart = System.nanoTime()
         val cacheKey = compileCache?.key(request.language, sourceDir)
-        val compiled = if (cacheKey != null && compileCache!!.restore(cacheKey, outputDir)) {
+        val compiled = if (cacheKey != null && compileCache.restore(cacheKey, outputDir)) {
             onPhase("compile", request.language, "cached", System.nanoTime() - compileStart)
             RuntimeAdapter.CompileOutcome.Success
         } else {
@@ -138,7 +138,7 @@ class ExecutionEngine(
                     if (outcome is RuntimeAdapter.CompileOutcome.Success) "success" else "failure",
                     System.nanoTime() - compileStart,
                 )
-                if (cacheKey != null && outcome is RuntimeAdapter.CompileOutcome.Success) compileCache!!.store(cacheKey, outputDir)
+                if (cacheKey != null && outcome is RuntimeAdapter.CompileOutcome.Success) compileCache.store(cacheKey, outputDir)
             }
         }
         when (compiled) {

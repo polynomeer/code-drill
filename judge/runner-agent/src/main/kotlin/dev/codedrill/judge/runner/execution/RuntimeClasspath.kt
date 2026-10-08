@@ -36,7 +36,7 @@ object RuntimeClasspath {
             "kotlin.script.templates.standard.ScriptTemplateWithArgs", // kotlin-script-runtime
             "kotlin.reflect.jvm.internal.KClassImpl",                  // kotlin-reflect
             "kotlinx.coroutines.Dispatchers",                          // kotlinx-coroutines-core-jvm
-            "gnu.trove.THashMap",                                      // trove4j
+            // trove4j 는 Kotlin 2.3 의 컴파일러가 더는 쓰지 않는다
         ).map(::locate) + all
     }
 

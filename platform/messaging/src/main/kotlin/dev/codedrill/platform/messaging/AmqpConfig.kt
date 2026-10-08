@@ -1,10 +1,9 @@
 package dev.codedrill.platform.messaging
 
-import com.fasterxml.jackson.databind.DeserializationFeature
 import com.rabbitmq.client.DefaultSaslConfig
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.kotlinModule
 import org.springframework.amqp.core.BindingBuilder
 import org.springframework.amqp.core.Declarables
 import org.springframework.amqp.core.DirectExchange
@@ -12,12 +11,12 @@ import org.springframework.amqp.core.FanoutExchange
 import org.springframework.amqp.core.QueueBuilder
 import org.springframework.amqp.rabbit.connection.ConnectionFactory
 import org.springframework.amqp.rabbit.core.RabbitTemplate
-import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter
+import org.springframework.amqp.support.converter.DefaultJacksonJavaTypeMapper
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter
 import org.springframework.amqp.support.converter.MessageConverter
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.AutoConfiguration
-import org.springframework.boot.autoconfigure.amqp.ConnectionFactoryCustomizer
+import org.springframework.boot.amqp.autoconfigure.ConnectionFactoryCustomizer
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.ssl.SslBundle
 import org.springframework.boot.ssl.pem.PemSslStoreBundle
@@ -97,18 +96,21 @@ class AmqpConfig {
 
     @Bean
     fun jsonMessageConverter(): MessageConverter =
-        Jackson2JsonMessageConverter(
-            ObjectMapper()
-                .registerKotlinModule()
-                // 메시지에 시간 타입이 늘어나도 런타임에 깨지지 않게 미리 등록한다.
-                .registerModule(JavaTimeModule())
+        JacksonJsonMessageConverter(
+            // Jackson 3 — 시간 타입은 기본으로 읽고 쓴다. Jackson 2 의 숫자 타임스탬프로 쓴 메시지(배포 중
+            // 큐에 남은 것)도 읽는다.
+            JsonMapper.builder()
+                .addModule(kotlinModule())
                 // 소비자는 N/N-1 스키마를 함께 지원해야 한다. 새 필드가 생겼다고 구버전
                 // 소비자가 메시지를 거절하면 배포 중에 채점이 멈춘다 (§15.3).
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                // 구버전 생산자는 없는 숫자 필드를 null 로 보낼 수 있다 — Jackson 2 처럼 0 으로 받는다.
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .build(),
         ).apply {
             // 역직렬화 대상 패키지를 좁힌다. 브로커 메시지는 신뢰 경계를 넘어오므로,
             // 타입 헤더가 임의의 클래스를 지목하게 두면 안 된다 (§11.1 공급망).
-            javaTypeMapper = DefaultJackson2JavaTypeMapper().apply {
+            javaTypeMapper = DefaultJacksonJavaTypeMapper().apply {
                 // 제어 영역 내부 팬아웃 메시지도 여기로 온다 (SubmissionEvent).
                 setTrustedPackages("dev.codedrill.judge.protocol", "dev.codedrill.platform.messaging")
             }

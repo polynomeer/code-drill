@@ -120,7 +120,7 @@ class ProjectCoordinatorTest {
         // kind 가 없는 옛 JSON 은 알고리즘 제출이다 (N/N-1).
         val legacy: JudgeOrigin = mapper.readValue("""{"submissionId":"s","correlationId":"c","problemId":"two-sum","problemVersion":1,"language":"KOTLIN"}""")
         assertIs<SubmissionQueued>(legacy)
-        assertNull((legacy as SubmissionQueued).sourceRef)
+        assertNull(legacy.sourceRef)
     }
 
     private fun result(request: ProjectRequest, verdict: Verdict, tests: List<ProjectTestOutcome>) = ProjectResult(

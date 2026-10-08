@@ -390,7 +390,9 @@ data class SubmissionResponse(
             compileLog = submission.compileLog,
             // 숨은 그룹의 케이스 내역은 실행 영역에서 이미 잘려 왔다. 여기서 다시
             // 채우지 않는다 (§9.1 DTO 단계에서 제거).
-            groups = submission.groupsJson?.let { json.readTree(it) },
+            // 트리(JsonNode)가 아니라 리스트·맵으로 읽는다 — 응답은 Jackson 3 이 쓰는데, 그것은 Jackson 2 의 트리를
+            // 모르고 문자열로 내보낸다
+            groups = submission.groupsJson?.let { json.readValue(it, Any::class.java) },
             revision = submission.revision,
             createdAt = submission.createdAt,
             mine = mine,

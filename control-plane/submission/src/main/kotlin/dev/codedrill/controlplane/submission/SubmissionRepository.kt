@@ -319,7 +319,7 @@ class SubmissionPersonalData(
             userId,
         )
         // 스토어의 복제를 먼저 지운다 — DB 를 먼저 비우면 어느 것을 지워야 하는지 다시 알 길이 없다.
-        val ids = jdbc.queryForList("SELECT id FROM submission WHERE user_id = ? AND source IS NOT NULL", String::class.java, userId)
+        val ids = jdbc.queryForList("SELECT id FROM submission WHERE user_id = ? AND source IS NOT NULL", String::class.java, userId).filterNotNull()
         var stored = 0
         for (id in ids) runCatching { sources?.delete(id) }.onSuccess { if (sources != null) stored += 1 }
         val erased = jdbc.update(

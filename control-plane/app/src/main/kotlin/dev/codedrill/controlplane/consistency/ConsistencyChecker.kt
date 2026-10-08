@@ -68,7 +68,7 @@ class ConsistencyChecker(
 
     fun sweep(): List<CheckResult> {
         val results = CHECKS.map { check ->
-            val ids = runCatching { jdbc.queryForList(check.sql, String::class.java, *check.args) }
+            val ids = runCatching { jdbc.queryForList(check.sql, String::class.java, *check.args).filterNotNull() }
                 .getOrElse { error ->
                     log.warn("일관성 점검 {} 이 실패했다: {}", check.id, error.message)
                     return@map CheckResult(check.id, check.description, -1, emptyList())

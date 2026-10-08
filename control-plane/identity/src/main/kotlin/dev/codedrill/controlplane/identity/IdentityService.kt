@@ -45,7 +45,7 @@ class IdentityService(
             id = UUID.randomUUID(),
             email = normalized,
             displayName = displayName.ifBlank { normalized.substringBefore('@') },
-            passwordHash = passwords.encode(password),
+            passwordHash = checkNotNull(passwords.encode(password)),
         ) ?: return Registration.EmailTaken
 
         return Registration.Created(issue(user))
@@ -121,7 +121,7 @@ class IdentityService(
             ?: return PasswordChange.NotFound
         if (!passwords.matches(current, credentials.second)) return PasswordChange.WrongPassword
 
-        repository.updatePassword(id, passwords.encode(next))
+        repository.updatePassword(id, checkNotNull(passwords.encode(next)))
         val revoked = repository.revokeAllFor(id, "password-changed")
         return PasswordChange.Done(issue(user), revoked)
     }

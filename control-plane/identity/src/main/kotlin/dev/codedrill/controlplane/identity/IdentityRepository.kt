@@ -44,7 +44,7 @@ class IdentityRepository(private val jdbc: JdbcTemplate) {
      */
     fun findCredentials(email: String): Pair<User, String>? = jdbc.query(
         "SELECT * FROM app_user WHERE email = ? AND deleted_at IS NULL",
-        { rs, _ -> USER.mapRow(rs, 0)!! to rs.getString("password_hash") },
+        { rs, _ -> USER.mapRow(rs, 0) to rs.getString("password_hash") },
         email,
     ).firstOrNull()
 

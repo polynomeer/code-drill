@@ -45,7 +45,7 @@
 | Java + Spring Boot (재구성) | 같은 생태계라 트랜잭션·AMQP·JDBC 지원은 동일하다. 차이는 언어 표현력과 null 안전성 정도다. Kotlin은 Java 기반 프레임워크와 완전히 호환되므로 생태계를 잃지 않는다 |
 | Go (재구성) | Runner처럼 프로세스를 띄우고 자원을 재는 데몬에는 후보가 된다. 그러나 채점 언어 셋 중 둘(Java, Kotlin)이 JVM이고, 첫 슬라이스는 `kotlin-compiler-embeddable`로 Runner 프로세스 안에서 Kotlin을 컴파일했다(`857bf3f`). 제어·실행 영역이 언어를 달리하면 `judge/protocol` 계약을 두 언어로 유지해야 한다 |
 | Node.js + TypeScript (재구성) | 웹과 언어를 맞출 수 있지만, §3.2의 트랜잭션 경계(submission + outbox 한 트랜잭션, version 조건 갱신)와 RabbitMQ·Flyway 통합을 직접 조립해야 한다 |
-| 선택: Kotlin + Spring Boot 3.4 | Spring이 Kotlin을 1급으로 지원하고, 제어·Orchestrator·Runner 셋이 한 Gradle 빌드와 한 계약 모듈을 공유한다 |
+| 선택: Kotlin + Spring Boot (3.4 로 시작, 4.1 로 올림) | Spring이 Kotlin을 1급으로 지원하고, 제어·Orchestrator·Runner 셋이 한 Gradle 빌드와 한 계약 모듈을 공유한다 |
 
 감수한 것: JVM 기동과 메모리 비용. Kotlin 컴파일 지연은 §18.1이 가능성 "높음"으로 적은 위험이다. 첫날 Runner는 `kotlin-compiler-embeddable`이 fat jar 안에서 자기 설정을 찾지 못해 `installDist` 배포로 바꿔야 했다(`48b188a`).
 

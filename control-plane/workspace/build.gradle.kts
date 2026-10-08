@@ -8,7 +8,7 @@ dependencies {
     // 시험 실행에도 문제의 시그니처와 제한이 필요하다. 판정과 다른 제한으로 돌리면
     // 사용자가 본 결과와 채점 결과가 갈린다.
     implementation(project(":platform:problem-package"))
-    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.webmvc)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.jdbc)
     implementation(libs.spring.boot.starter.amqp)

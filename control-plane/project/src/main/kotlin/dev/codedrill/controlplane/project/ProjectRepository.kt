@@ -83,7 +83,7 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
     fun solvedBy(userId: String): Set<String> = jdbc.queryForList(
         "SELECT DISTINCT project_id FROM project_submission WHERE user_id = ? AND verdict = 'ACCEPTED'",
         String::class.java, userId,
-    ).toSet()
+    ).filterNotNull().toSet()
 
     fun transition(id: UUID, from: ProjectSubmission.Status, to: ProjectSubmission.Status, version: Int): Boolean =
         jdbc.update(
@@ -163,7 +163,7 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
 
     /** 재채점 대상 — 종료된 제출 (§8.1). */
     fun completedFor(projectId: String): List<UUID> =
-        jdbc.queryForList("SELECT id FROM project_submission WHERE project_id = ? AND status = 'COMPLETED'", UUID::class.java, projectId)
+        jdbc.queryForList("SELECT id FROM project_submission WHERE project_id = ? AND status = 'COMPLETED'", UUID::class.java, projectId).filterNotNull()
 
     fun enqueueOutbox(event: OutboxEvent) {
         jdbc.update(
@@ -242,7 +242,7 @@ class ProjectRepository(private val jdbc: JdbcTemplate, private val json: Object
     fun eraseDrafts(userId: String): Int = jdbc.update("DELETE FROM project_draft WHERE user_id = ?", userId)
 
     fun submissionIds(userId: String): List<String> =
-        jdbc.queryForList("SELECT id FROM project_submission WHERE user_id = ?", String::class.java, userId)
+        jdbc.queryForList("SELECT id FROM project_submission WHERE user_id = ?", String::class.java, userId).filterNotNull()
 
     /**
      * 사용자가 쓴 것을 지운다 — 파일과 로그. 제출 행은 남는다: 프로젝트의 통계가 여기서 나오고,

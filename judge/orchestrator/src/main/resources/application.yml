@@ -1,4 +1,8 @@
 spring:
+  # HTTP 의 JSON 은 Boot 4 부터 Jackson 3 이 쓴다. 3 의 기본값(속성 이름순 정렬, null 숫자 거절 등)으로 바뀌면
+  # 응답 모양과 받아 주는 요청이 달라진다 — Jackson 2 때와 같게 둔다.
+  jackson:
+    use-jackson2-defaults: true
   application:
     name: code-drill-judge-orchestrator
   rabbitmq:
