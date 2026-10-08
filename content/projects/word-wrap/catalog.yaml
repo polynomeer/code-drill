@@ -1,0 +1,7 @@
+difficulty: EASY
+tags:
+  - string
+  - greedy
+summary: 글을 정해진 폭으로 줄 바꿈한다 — 폭에 꼭 맞는 줄, 폭보다 긴 낱말 자르기, 탭과 줄바꿈도 낱말 경계, 빈 줄로 나뉘는 문단이 요구사항의 전부다.
+competencies:
+  - SPECIFICATION
