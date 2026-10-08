@@ -1602,6 +1602,9 @@ def main() -> int:
     results.append(check("내 프로젝트 제출 기록", len(history) >= 5 and all("files" not in h or h["files"] is None for h in history), True))
     # 필터 없이도. `? IS NULL` 하나만 있는 자리에 Postgres 가 타입을 못 정해 500 이 났었다.
     results.append(check("  프로젝트를 안 골라도 기록이 온다", len(request("GET", "/projects/submissions")) >= len(history), True))
+    # honest 는 한참 앞에서 만든 계정이다 — 프로젝트 재채점이 길어지면 그 사이 access token(30분)이 끝나
+    # 404 대신 401 이 온다. raw_request 는 갱신하지 않으니 여기서 갱신한다.
+    honest.refresh()
     status, _ = raw_request("GET", f"/projects/submissions/{accepted['id']}", None, honest.headers)
     results.append(check("남의 프로젝트 제출은 404", status, 404))
 
