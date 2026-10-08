@@ -1,0 +1,15 @@
+# max-vowels-window 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - sliding-window
+competencies:
+  - READING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+prerequisites:
+  - max-window-sum
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "창을 한 칸씩 밀며 하나 더하고 하나 뺀다"

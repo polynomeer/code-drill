@@ -1,0 +1,15 @@
+# count-leaves 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - tree
+  - array
+competencies:
+  - READING
+  - EDGE_CASES
+  - MODELING
+prerequisites:
+  - tree-height
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "부모로 나온 정점을 한 번 표시한다"

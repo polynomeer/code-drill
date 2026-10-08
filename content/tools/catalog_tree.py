@@ -2334,3 +2334,89 @@ fun treeMaxPathSum(parent: IntArray, values: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 224. 잎의 수 ------------------------------------------------------------------------------
+
+def _count_leaves(parent):
+    has_child = [False] * len(parent)
+    for p in parent:
+        if p != -1:
+            has_child[p] = True
+    return sum(1 for x in has_child if not x)
+
+
+PROBLEMS.append(Problem(
+    id="count-leaves",
+    title="잎의 수",
+    summary="""
+정점 `0..n-1` 의 트리가 부모 배열 `parent` 로 주어진다(루트는 `-1`). 자식이 없는 정점(잎)이 몇 개인지 반환한다.
+정점이 하나뿐이면 그 루트가 잎이다.
+""",
+    notes="""
+어떤 정점이 누군가의 부모로 한 번이라도 나오면 자식이 있는 것이다. 배열을 한 번 훑어 부모로 나온 정점을 표시하고,
+표시되지 않은 정점을 센다. 루트도 예외가 아니다 — 자식이 없으면 잎이다.
+""",
+    drill_doc="""
+Drill.node(i)   // i 는 잎이다
+""",
+    constraints="""
+- `1 <= parent.size <= 200_000`, 정확히 하나의 `-1`, 나머지는 유효한 정점 번호, 순환 없음
+""",
+    signature=dict(name="countLeaves", parameters=[("parent", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_count_leaves,
+    cases={
+        "sample": [("01", [[-1, 0, 0, 1, 1]]), ("02", [[-1, 0, 1, 2]])],
+        "boundary": [
+            # 정점 하나 — 루트가 잎이다.
+            ("01-single", [[-1]]),
+            ("02-two", [[-1, 0]]),
+            ("03-star", [[-1, 0, 0, 0, 0, 0]]),
+            ("04-root-last", [[2, 2, -1]]),
+            # 자식이 하나인 정점은 잎이 아니다.
+            ("05-one-child-each", [[1, 2, -1, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_relabel_tree(_random_parents(20, salt=10333), salt=10335)]),
+            ("02-random-large", [_relabel_tree(_random_parents(200_000, salt=10337), salt=10339)]),
+            ("03-chain", [_relabel_tree([-1] + list(range(199_999)), salt=10341)]),
+            ("04-binary", [[-1] + [(i - 1) // 2 for i in range(1, 1023)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 부모로 나온 정점을 표시하고, 표시되지 않은 정점을 센다.
+fun countLeaves(parent: IntArray): Int {
+    val hasChild = BooleanArray(parent.size)
+    for (p in parent) if (p != -1) hasChild[p] = true
+    var count = 0
+    for (v in parent.indices) if (!hasChild[v]) { count += 1; Drill.node(v.toString()) }
+    return count
+}
+""",
+    mutants=[
+        ("root-never-leaf", "MISSING_EDGE_CASE",
+         "루트는 잎으로 세지 않는다. 정점이 하나뿐이면 루트가 잎이다.",
+         """
+fun countLeaves(parent: IntArray): Int {
+    val hasChild = BooleanArray(parent.size)
+    for (p in parent) if (p != -1) hasChild[p] = true
+    return parent.indices.count { !hasChild[it] && parent[it] != -1 }
+}
+"""),
+        ("at-most-one-child", "WRONG_BRANCH",
+         "자식이 하나 이하인 정점을 센다. 잎은 자식이 없는 정점이다.",
+         """
+fun countLeaves(parent: IntArray): Int {
+    val children = IntArray(parent.size)
+    for (p in parent) if (p != -1) children[p] += 1
+    return children.count { it <= 1 }
+}
+"""),
+        ("vertices-minus-edges", "WRONG_ALGORITHM",
+         "정점 수에서 간선 수를 뺀다. 트리에서 그 값은 늘 1 이다 — 잎의 수가 아니다.",
+         """
+fun countLeaves(parent: IntArray): Int = parent.size - parent.count { it != -1 }
+"""),
+    ],
+))

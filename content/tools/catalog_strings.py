@@ -1482,3 +1482,144 @@ fun romanToInteger(text: String): Int {
 """),
     ],
 ))
+
+
+# --- 222. 길이 k 창의 최대 모음 수 --------------------------------------------------------------
+
+def _max_vowels(s, k):
+    vowels = set("aeiou")
+    count = sum(1 for ch in s[:k] if ch in vowels)
+    best = count
+    for i in range(k, len(s)):
+        count += (s[i] in vowels) - (s[i - k] in vowels)
+        best = max(best, count)
+    return best
+
+
+def _lowercase(n, salt, letters="abcdefghijklmnopqrstuvwxyz"):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return "".join(source.choice(letters) for _ in range(n))
+
+
+PROBLEMS.append(Problem(
+    id="max-vowels-window",
+    title="길이 k 창의 최대 모음 수",
+    summary="""
+소문자 문자열 `s` 의 길이 `k` 인 부분 문자열 중 모음(`a`·`e`·`i`·`o`·`u`)이 가장 많은 것의 모음 수를 반환한다.
+`y` 는 모음이 아니다.
+""",
+    notes="""
+창을 한 칸 밀면 들어오는 글자 하나와 나가는 글자 하나만 바뀐다. 첫 창의 모음 수를 세 두고, 밀 때마다 들어온 글자가
+모음이면 더하고 나간 글자가 모음이면 뺀다. 창마다 다시 세면 `n × k` 다.
+""",
+    drill_doc="""
+Drill.write(i, count)   // i 에서 끝나는 창의 모음 수
+""",
+    constraints="""
+- `1 <= k <= s.length <= 300_000`, 소문자만
+""",
+    signature=dict(name="maxVowelsWindow", parameters=[("s", "STRING"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_max_vowels,
+    cases={
+        "sample": [("01", ["abciiidef", 3]), ("02", ["leetcode", 3])],
+        "boundary": [
+            ("01-single", ["a", 1]),
+            ("02-no-vowels", ["bcdfg", 2]),
+            ("03-whole-string", ["education", 9]),
+            # y 는 모음이 아니다.
+            ("04-y-is-not-a-vowel", ["yyyyay", 3]),
+            # 창이 끝에 닿아야 가장 많다.
+            ("05-best-at-end", ["bbbbbaaa", 3]),
+            ("06-best-at-start", ["aaabbbbb", 3]),
+            ("07-k-one", ["xyzu", 1]),
+            # 모음이 붙어 있으면 창이 한 글자만 길어도 더 센다.
+            ("08-adjacent-vowels", ["baeb", 1]),
+        ],
+        "hidden": [
+            ("01-random-small", [_lowercase(30, salt=10307), 5]),
+            ("02-random-medium", [_lowercase(5000, salt=10309), 37]),
+            ("03-vowel-heavy", [_lowercase(5000, salt=10311, letters="aeiouy"), 100]),
+            ("04-large-k", [_lowercase(20_000, salt=10313), 19_999]),
+        ],
+        "performance": [
+            # 창마다 다시 세면 30 만 × 15 만 = 4.5×10^10 번이다.
+            ("01-half-window", [_lowercase(300_000, salt=10315), 150_000]),
+            ("02-third-window", [_lowercase(300_000, salt=10317, letters="aeioubcd"), 100_000]),
+            ("03-small-window", [_lowercase(300_000, salt=10319), 10]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 창을 밀며 들어온 글자를 더하고 나간 글자를 뺀다.
+fun maxVowelsWindow(s: String, k: Int): Int {
+    fun vowel(c: Char) = c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u'
+    var count = 0
+    for (i in 0 until k) if (vowel(s[i])) count += 1
+    var best = count
+    for (i in k until s.length) {
+        if (vowel(s[i])) count += 1
+        if (vowel(s[i - k])) count -= 1
+        Drill.write(i, count)
+        if (count > best) best = count
+    }
+    return best
+}
+""",
+    mutants=[
+        ("y-counts", "WRONG_BRANCH",
+         "y 도 모음으로 센다. 모음은 a·e·i·o·u 다섯뿐이다.",
+         """
+fun maxVowelsWindow(s: String, k: Int): Int {
+    fun vowel(c: Char) = c in "aeiouy"
+    var count = 0
+    for (i in 0 until k) if (vowel(s[i])) count += 1
+    var best = count
+    for (i in k until s.length) { if (vowel(s[i])) count += 1; if (vowel(s[i - k])) count -= 1; if (count > best) best = count }
+    return best
+}
+"""),
+        ("never-drops-left", "WRONG_ALGORITHM",
+         "들어온 글자만 더하고 나간 글자를 빼지 않는다. 창이 아니라 앞부분 전체를 센다.",
+         """
+fun maxVowelsWindow(s: String, k: Int): Int {
+    fun vowel(c: Char) = c in "aeiou"
+    var count = 0
+    for (i in 0 until k) if (vowel(s[i])) count += 1
+    var best = count
+    for (i in k until s.length) { if (vowel(s[i])) count += 1; if (count > best) best = count }
+    return best
+}
+"""),
+        ("window-one-long", "OFF_BY_ONE",
+         "나가는 글자를 한 칸 늦게 뺀다. 창이 k + 1 글자가 된다.",
+         """
+fun maxVowelsWindow(s: String, k: Int): Int {
+    fun vowel(c: Char) = c in "aeiou"
+    var count = 0
+    for (i in 0 until k) if (vowel(s[i])) count += 1
+    var best = count
+    for (i in k until s.length) { if (vowel(s[i])) count += 1; if (i - k - 1 >= 0 && vowel(s[i - k - 1])) count -= 1; if (count > best) best = count }
+    return best
+}
+"""),
+        ("recounts-each-window", "PERFORMANCE",
+         "창마다 모음을 처음부터 다시 센다. 길이 × 창 크기만큼 센다.",
+         """
+fun maxVowelsWindow(s: String, k: Int): Int {
+    var best = 0
+    for (start in 0..s.length - k) {
+        var count = 0
+        for (i in start until start + k) {
+            val c = s[i]
+            if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u') count += 1
+        }
+        Drill.write(start, count)
+        if (count > best) best = count
+    }
+    return best
+}
+"""),
+    ],
+))

@@ -5253,3 +5253,142 @@ fun carPooling(trips: IntArray, capacity: Int): Int {
 """),
     ],
 ))
+
+
+# --- 226. 0 겹쳐 쓰기 --------------------------------------------------------------------------
+
+def _duplicate_zeros(arr):
+    out = []
+    for x in arr:
+        out.append(x)
+        if x == 0:
+            out.append(0)
+    return out[:len(arr)]
+
+
+PROBLEMS.append(Problem(
+    id="duplicate-zeros",
+    title="0 겹쳐 쓰기",
+    summary="""
+정수 배열 `arr` 에서 `0` 이 나올 때마다 그 `0` 을 한 번 더 쓰고 뒤의 원소를 한 칸씩 오른쪽으로 민다. 배열의 길이는
+그대로이므로 끝을 넘어간 원소는 버린다. 그렇게 바꾼 배열을 반환한다.
+
+`[1,0,2,3,0,4,5,0]` → `[1,0,0,2,3,0,0,4]`
+""",
+    notes="""
+앞에서부터 제자리에서 밀면 아직 읽지 않은 원소를 덮어쓴다. 먼저 한 번 훑어 **몇 개의 원소가 살아남는지**(0 은 두
+칸을 차지한다) 세고, 그 마지막 원소부터 **뒤에서 앞으로** 제자리에 쓴다. 살아남는 마지막 원소가 `0` 인데 두 칸 중
+한 칸만 남았으면 그 `0` 은 한 번만 쓴다 — 이 경계가 이 문제의 함정이다.
+""",
+    drill_doc="""
+Drill.write(i, x)   // i 에 썼다
+""",
+    constraints="""
+- `1 <= arr.length <= 100_000`, `0 <= arr[i] <= 9`
+""",
+    signature=dict(name="duplicateZeros", parameters=[("arr", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_duplicate_zeros,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2_000_000},
+    cases={
+        "sample": [("01", [[1, 0, 2, 3, 0, 4, 5, 0]]), ("02", [[1, 2, 3]])],
+        "boundary": [
+            ("01-single-zero", [[0]]),
+            ("02-all-zeros", [[0, 0, 0, 0]]),
+            # 살아남는 마지막 0 이 한 칸만 차지한다.
+            ("03-zero-on-the-edge", [[8, 4, 5, 0, 0, 0, 0, 7]]),
+            ("04-last-zero-cut", [[1, 2, 0]]),
+            ("05-zero-first", [[0, 1, 2]]),
+            ("06-no-zeros", [[9, 9, 9]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(15, 0, 3, salt=10365)]),
+            ("02-random-medium", [randoms(1000, 0, 4, salt=10367)]),
+            ("03-random-large", [randoms(100_000, 0, 9, salt=10369)]),
+            ("04-mostly-zeros", [[0] * 50_001 + [1] * 49_999]),
+            ("05-edge-zero-large", [[1] * 99_998 + [0, 5]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 살아남는 원소를 센 뒤, 뒤에서 앞으로 제자리에 쓴다.
+fun duplicateZeros(arr: IntArray): IntArray {
+    val n = arr.size
+    var zeros = 0
+    var last = 0
+    var length = 0
+    // 몇 번째 원소까지 살아남나
+    while (last < n) {
+        val need = if (arr[last] == 0) 2 else 1
+        if (length + need > n) break
+        length += need
+        if (arr[last] == 0) zeros += 1
+        last += 1
+    }
+    var write = n - 1
+    // 마지막으로 살아남은 0 이 한 칸만 남았다
+    if (last < n && arr[last] == 0 && length == n - 1) {
+        arr[write] = 0
+        Drill.write(write, 0)
+        write -= 1
+    }
+    for (read in last - 1 downTo 0) {
+        arr[write] = arr[read]
+        Drill.write(write, arr[read])
+        write -= 1
+        if (arr[read] == 0) {
+            arr[write] = 0
+            write -= 1
+        }
+    }
+    return arr
+}
+""",
+    mutants=[
+        ("shifts-forward-in-place", "WRONG_ALGORITHM",
+         "앞에서부터 제자리에서 0 을 하나 더 쓴다. 아직 읽지 않은 원소를 덮어써 뒤가 모두 0 이 된다.",
+         """
+fun duplicateZeros(arr: IntArray): IntArray {
+    var i = 0
+    while (i < arr.size) {
+        if (arr[i] == 0 && i + 1 < arr.size) { arr[i + 1] = 0; i += 2 } else i += 1
+    }
+    return arr
+}
+"""),
+        ("edge-zero-doubled", "OFF_BY_ONE",
+         "마지막으로 살아남은 0 이 한 칸만 남아도 두 칸을 쓴다. 한 칸을 넘어 앞의 원소를 밀어낸다.",
+         """
+fun duplicateZeros(arr: IntArray): IntArray {
+    val n = arr.size
+    var last = 0
+    var length = 0
+    while (last < n && length < n) { length += if (arr[last] == 0) 2 else 1; last += 1 }
+    var write = n - 1
+    for (read in last - 1 downTo 0) {
+        if (write >= 0) arr[write] = arr[read]
+        write -= 1
+        if (arr[read] == 0 && write >= 0) { arr[write] = 0; write -= 1 }
+    }
+    return arr
+}
+"""),
+        ("keeps-the-overflow", "WRONG_BRANCH",
+         "밀려난 원소를 버리지 않고 늘어난 배열을 돌려준다. 길이는 그대로여야 한다.",
+         """
+fun duplicateZeros(arr: IntArray): IntArray {
+    val out = ArrayList<Int>()
+    for (x in arr) { out.add(x); if (x == 0) out.add(0) }
+    return out.toIntArray()
+}
+"""),
+        ("duplicates-every-element", "WRONG_BRANCH",
+         "0 이 아닌 원소도 두 번 쓴다. 겹쳐 쓰는 것은 0 뿐이다.",
+         """
+fun duplicateZeros(arr: IntArray): IntArray {
+    val out = ArrayList<Int>()
+    for (x in arr) { out.add(x); out.add(x) }
+    return out.subList(0, arr.size).toIntArray()
+}
+"""),
+    ],
+))

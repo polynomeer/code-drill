@@ -2377,3 +2377,167 @@ fun reversePairs(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 221. 회전된 정렬 배열에서 찾기 -------------------------------------------------------------
+
+def _search_rotated(nums, queries):
+    def find(t):
+        lo, hi = 0, len(nums) - 1
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            if nums[mid] == t:
+                return mid
+            if nums[lo] <= nums[mid]:
+                if nums[lo] <= t < nums[mid]:
+                    hi = mid - 1
+                else:
+                    lo = mid + 1
+            else:
+                if nums[mid] < t <= nums[hi]:
+                    lo = mid + 1
+                else:
+                    hi = mid - 1
+        return -1
+    return [find(t) for t in queries]
+
+
+def _rotated(n, shift, salt):
+    values = sorted(set(randoms(n * 2, -1_000_000_000, 1_000_000_000, salt=salt)))[:n]
+    shift %= len(values)
+    return values[shift:] + values[:shift]
+
+
+def _probe_queries(nums, count, salt):
+    """반은 있는 값, 반은 없는 값(있는 값에 1 을 더한 것 — 겹치면 그대로 있는 값이다)."""
+    picks = randoms(count, 0, len(nums) - 1, salt=salt)
+    return [nums[p] + (i % 2) for i, p in enumerate(picks)]
+
+
+PROBLEMS.append(Problem(
+    id="search-rotated",
+    title="회전된 정렬 배열에서 찾기",
+    summary="""
+서로 다른 정수를 오름차순으로 정렬한 배열을 어느 자리에서 잘라 앞뒤를 바꿔 붙인 `nums` 가 있다(`[0,1,2,4,5,6,7]` →
+`[4,5,6,7,0,1,2]`). 질문 `queries` 의 값마다 `nums` 에서의 자리를, 없으면 `-1` 을 담아 반환한다.
+""",
+    notes="""
+가운데를 보면 왼쪽 반과 오른쪽 반 중 **하나는 반드시 정렬돼 있다** — `nums[lo] <= nums[mid]` 면 왼쪽이다. 찾는 값이
+정렬된 쪽의 범위 안이면 그쪽으로, 아니면 다른 쪽으로 간다. 질문마다 `log n` 이다. 구간에 원소가 하나뿐일 때
+`lo == mid` 라 `<=` 여야 왼쪽이 정렬됐다고 본다.
+""",
+    drill_doc="""
+Drill.pointer("lo", lo)    // 찾는 구간의 왼쪽
+Drill.pointer("hi", hi)    // 오른쪽
+""",
+    constraints="""
+- `1 <= nums.length <= 200_000`, 값은 서로 다르고 `-10^9..10^9`, `1 <= queries.length <= 200_000`
+""",
+    signature=dict(name="searchRotated", parameters=[("nums", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_search_rotated,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8_000_000},
+    cases={
+        "sample": [
+            ("01", [[4, 5, 6, 7, 0, 1, 2], [0, 3, 4, 2]]),
+            ("02", [[1], [1, 0]]),
+        ],
+        "boundary": [
+            ("01-not-rotated", [[1, 2, 3, 4, 5], [1, 5, 3, 6]]),
+            ("02-rotated-by-one", [[5, 1, 2, 3, 4], [5, 4, 1]]),
+            ("03-two-elements", [[3, 1], [1, 3, 2]]),
+            # 구간에 하나만 남아 lo == mid 다.
+            ("04-single-left", [[3, 1], [1]]),
+            ("05-negatives", [[-1, 0, 3, -9, -5], [-9, -5, -1, 3, 4]]),
+            ("06-extremes", [[1_000_000_000, -1_000_000_000, 0], [-1_000_000_000, 1_000_000_000, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_rotated(20, 7, salt=10281), _probe_queries(_rotated(20, 7, salt=10281), 30, salt=10283)]),
+            ("02-random-medium", [_rotated(2000, 1500, salt=10285), _probe_queries(_rotated(2000, 1500, salt=10285), 2000, salt=10287)]),
+            ("03-pivot-at-end", [_rotated(1000, 999, salt=10289), _probe_queries(_rotated(1000, 999, salt=10289), 500, salt=10291)]),
+            ("04-pivot-at-start", [_rotated(1000, 0, salt=10293), _probe_queries(_rotated(1000, 0, salt=10293), 500, salt=10295)]),
+        ],
+        "performance": [
+            # 질문마다 훑으면 20 만 × 20 만 / 2 = 2×10^10 번이다 — 없는 값은 끝까지 훑는다.
+            ("01-large", [_rotated(200_000, 123_457, salt=10297), _probe_queries(_rotated(200_000, 123_457, salt=10297), 200_000, salt=10299)]),
+            ("02-all-missing", [_rotated(200_000, 77_777, salt=10301), [v + 1 for v in _rotated(200_000, 77_777, salt=10301)[::2]] * 2]),
+            ("03-unrotated-large", [_rotated(200_000, 0, salt=10303), _probe_queries(_rotated(200_000, 0, salt=10303), 200_000, salt=10305)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 가운데에서 정렬된 쪽을 골라 그 범위로 판단한다.
+fun searchRotated(nums: IntArray, queries: IntArray): IntArray = IntArray(queries.size) { q ->
+    val t = queries[q]
+    var lo = 0
+    var hi = nums.size - 1
+    var found = -1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        Drill.pointer("lo", lo)
+        Drill.pointer("hi", hi)
+        if (nums[mid] == t) { found = mid; break }
+        if (nums[lo] <= nums[mid]) {
+            if (nums[lo] <= t && t < nums[mid]) hi = mid - 1 else lo = mid + 1
+        } else {
+            if (nums[mid] < t && t <= nums[hi]) lo = mid + 1 else hi = mid - 1
+        }
+    }
+    found
+}
+""",
+    mutants=[
+        ("strict-left-sorted", "OFF_BY_ONE",
+         "nums[lo] < nums[mid] 일 때만 왼쪽이 정렬됐다고 본다. 원소가 하나 남아 lo == mid 면 왼쪽을 놓친다.",
+         """
+fun searchRotated(nums: IntArray, queries: IntArray): IntArray = IntArray(queries.size) { q ->
+    val t = queries[q]
+    var lo = 0; var hi = nums.size - 1; var found = -1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        if (nums[mid] == t) { found = mid; break }
+        if (nums[lo] < nums[mid]) { if (nums[lo] <= t && t < nums[mid]) hi = mid - 1 else lo = mid + 1 }
+        else { if (nums[mid] < t && t <= nums[hi]) lo = mid + 1 else hi = mid - 1 }
+    }
+    found
+}
+"""),
+        ("ignores-rotation", "WRONG_ALGORITHM",
+         "정렬된 배열처럼 이분 탐색한다. 잘라 붙인 자리 너머의 값을 찾지 못한다.",
+         """
+fun searchRotated(nums: IntArray, queries: IntArray): IntArray = IntArray(queries.size) { q ->
+    val t = queries[q]
+    var lo = 0; var hi = nums.size - 1; var found = -1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        if (nums[mid] == t) { found = mid; break }
+        if (nums[mid] < t) lo = mid + 1 else hi = mid - 1
+    }
+    found
+}
+"""),
+        ("insertion-point-for-missing", "MISSING_EDGE_CASE",
+         "없는 값에 끝난 자리를 돌려준다. 없으면 -1 이다.",
+         """
+fun searchRotated(nums: IntArray, queries: IntArray): IntArray = IntArray(queries.size) { q ->
+    val t = queries[q]
+    var lo = 0; var hi = nums.size - 1; var found = -1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        if (nums[mid] == t) { found = mid; break }
+        if (nums[lo] <= nums[mid]) { if (nums[lo] <= t && t < nums[mid]) hi = mid - 1 else lo = mid + 1 }
+        else { if (nums[mid] < t && t <= nums[hi]) lo = mid + 1 else hi = mid - 1 }
+    }
+    if (found == -1) minOf(lo, nums.size - 1) else found
+}
+"""),
+        ("scans-each-query", "PERFORMANCE",
+         "질문마다 배열을 앞에서부터 훑는다. 없는 값은 끝까지 훑어 질문 수 × 길이다.",
+         """
+fun searchRotated(nums: IntArray, queries: IntArray): IntArray = IntArray(queries.size) { q ->
+    var found = -1
+    for (i in nums.indices) { Drill.compare(i, q); if (nums[i] == queries[q]) { found = i; break } }
+    found
+}
+"""),
+    ],
+))

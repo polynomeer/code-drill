@@ -7143,3 +7143,229 @@ fun limitedPathQueries(n: Int, edges: IntArray, queries: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 225. 좋은 경로의 수 -----------------------------------------------------------------------
+
+def _good_paths(vals, edges):
+    n = len(vals)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 2):
+        a, b = edges[i], edges[i + 1]
+        adj[a].append(b)
+        adj[b].append(a)
+    by_value = {}
+    for v in range(n):
+        by_value.setdefault(vals[v], []).append(v)
+    total = 0
+    for value in sorted(by_value):
+        group = by_value[value]
+        for v in group:
+            for u in adj[v]:
+                if vals[u] <= value:
+                    ru, rv = find(u), find(v)
+                    if ru != rv:
+                        parent[ru] = rv
+        counts = {}
+        for v in group:
+            r = find(v)
+            counts[r] = counts.get(r, 0) + 1
+        for c in counts.values():
+            total += c * (c + 1) // 2
+    return total
+
+
+def _tree_edges(n, salt):
+    picks = randoms(n, 0, 10 ** 9, salt=salt)
+    order = shuffled(range(n), salt=salt + 1)
+    return flat([order[picks[i] % i], order[i]] for i in range(1, n))
+
+
+PROBLEMS.append(Problem(
+    id="good-paths",
+    title="좋은 경로의 수",
+    summary="""
+정점 `0..n-1` 의 트리가 간선 `edges = [a1, b1, a2, b2, ...]` 로 주어지고, 정점 `i` 의 값은 `vals[i]` 다. **좋은
+경로**는 양 끝 정점의 값이 같고, 경로 위의 모든 정점의 값이 그 값 이하인 경로다. 정점 하나도 좋은 경로다. 좋은
+경로의 수를 반환한다 — `a` 에서 `b` 로 가는 것과 `b` 에서 `a` 로 가는 것은 같은 경로다.
+""",
+    notes="""
+값이 작은 정점부터 차례로 그래프에 더해 간다고 하자. 값 `x` 의 정점들을 더할 때, 이웃 중 값이 `x` 이하인 정점(이미
+더해진 정점)과 잇는다. 그러면 이 순간 같은 무리에 든 두 정점 사이의 경로는 모두 `x` 이하의 정점만 지난다 — 무리는
+`x` 이하의 정점들로만 이어졌으니까. 그래서 값 `x` 의 정점들을 무리마다 세어 `c` 개면 `c(c+1)/2` 개의 좋은 경로가
+있다(자기 자신 포함). **같은 값의 정점을 모두 이은 뒤에** 센다.
+""",
+    drill_doc="""
+Drill.edge("a", "b")      // 두 무리를 이었다
+Drill.write(value, c)     // 이 값의 정점이 한 무리에 c 개
+""",
+    constraints="""
+- `1 <= n <= 30_000`, 간선은 `n - 1` 개(트리), `0 <= vals[i] <= 100_000`
+""",
+    signature=dict(name="goodPaths", parameters=[("vals", "INT_ARRAY"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_good_paths,
+    cases={
+        "sample": [
+            ("01", [[1, 3, 2, 1, 3], [0, 1, 0, 2, 2, 3, 2, 4]]),
+            ("02", [[1, 1, 2, 2, 3], [0, 1, 1, 2, 2, 3, 2, 4]]),
+        ],
+        "boundary": [
+            ("01-single", [[7], []]),
+            ("02-two-equal", [[5, 5], [0, 1]]),
+            ("03-two-different", [[5, 6], [0, 1]]),
+            # 사이에 더 큰 값이 끼면 좋은 경로가 아니다.
+            ("04-blocked-by-larger", [[2, 9, 2], [0, 1, 1, 2]]),
+            # 사이가 작으면 좋은 경로다.
+            ("05-valley-between", [[4, 1, 4], [0, 1, 1, 2]]),
+            # 같은 값이 셋 — 셋 다 이어지면 쌍이 셋이다.
+            ("06-three-equal-star", [[3, 3, 3, 3], [0, 1, 0, 2, 0, 3]]),
+            ("07-chain-of-equals", [[2, 2, 2, 2, 2], [0, 1, 1, 2, 2, 3, 3, 4]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 0, 3, salt=10343), _tree_edges(12, salt=10345)]),
+            ("02-random-medium", [randoms(1000, 0, 20, salt=10347), _tree_edges(1000, salt=10349)]),
+            ("03-all-equal", [[7] * 3000, _tree_edges(3000, salt=10351)]),
+            ("04-distinct", [shuffled(range(5000), salt=10353), _tree_edges(5000, salt=10355)]),
+        ],
+        "performance": [
+            # 정점마다 트리를 다 훑으면 3 만 × 3 만 = 9×10^8 걸음이다.
+            ("01-random-large", [randoms(30_000, 0, 50, salt=10357), _tree_edges(30_000, salt=10359)]),
+            ("02-all-equal-large", [[1] * 30_000, _tree_edges(30_000, salt=10361)]),
+            ("03-chain-large", [randoms(30_000, 0, 5, salt=10363), flat([i, i + 1] for i in range(29_999))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 값이 작은 정점부터 유니온 파인드에 더하고, 같은 값을 다 이은 뒤 무리마다 센다.
+fun goodPaths(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val order = (0 until n).sortedBy { vals[it] }
+    var total = 0L
+    var i = 0
+    while (i < n) {
+        var j = i
+        while (j < n && vals[order[j]] == vals[order[i]]) j += 1
+        val value = vals[order[i]]
+        for (k in i until j) {
+            val v = order[k]
+            for (u in adj[v]) {
+                if (vals[u] <= value) {
+                    val ru = find(u); val rv = find(v)
+                    if (ru != rv) { parent[ru] = rv; Drill.edge(u.toString(), v.toString()) }
+                }
+            }
+        }
+        val counts = HashMap<Int, Int>()
+        for (k in i until j) { val r = find(order[k]); counts[r] = (counts[r] ?: 0) + 1 }
+        for (c in counts.values) { total += c.toLong() * (c + 1) / 2; Drill.write(value, c) }
+        i = j
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("forgets-single-vertices", "OFF_BY_ONE",
+         "무리마다 c(c-1)/2 로 쌍만 센다. 정점 하나도 좋은 경로다.",
+         """
+fun goodPaths(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val order = (0 until n).sortedBy { vals[it] }
+    var total = 0L
+    var i = 0
+    while (i < n) {
+        var j = i
+        while (j < n && vals[order[j]] == vals[order[i]]) j += 1
+        val value = vals[order[i]]
+        for (k in i until j) for (u in adj[order[k]]) if (vals[u] <= value) { val ru = find(u); val rv = find(order[k]); if (ru != rv) parent[ru] = rv }
+        val counts = HashMap<Int, Int>()
+        for (k in i until j) { val r = find(order[k]); counts[r] = (counts[r] ?: 0) + 1 }
+        for (c in counts.values) total += c.toLong() * (c - 1) / 2
+        i = j
+    }
+    return total.toInt()
+}
+"""),
+        ("counts-while-joining", "WRONG_BRANCH",
+         "같은 값의 정점을 하나 이을 때마다 센다. 그 값의 정점을 모두 이은 뒤에 세야 나중에 이어지는 쌍을 놓치지 않는다.",
+         """
+fun goodPaths(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val order = (0 until n).sortedBy { vals[it] }
+    var total = 0L
+    val sameValueInRoot = HashMap<Int, Int>()
+    var current = -1
+    for (v in order) {
+        if (vals[v] != current) { sameValueInRoot.clear(); current = vals[v] }
+        for (u in adj[v]) if (vals[u] <= vals[v]) { val ru = find(u); val rv = find(v); if (ru != rv) parent[ru] = rv }
+        val r = find(v)
+        val before = sameValueInRoot[r] ?: 0
+        total += before + 1
+        sameValueInRoot[r] = before + 1
+    }
+    return total.toInt()
+}
+"""),
+        ("ignores-larger-between", "WRONG_ALGORITHM",
+         "트리 전체에서 같은 값의 쌍을 모두 센다. 사이에 더 큰 값이 있으면 좋은 경로가 아니다.",
+         """
+fun goodPaths(vals: IntArray, edges: IntArray): Int {
+    val counts = HashMap<Int, Long>()
+    for (v in vals) counts[v] = (counts[v] ?: 0L) + 1
+    var total = 0L
+    for (c in counts.values) total += c * (c + 1) / 2
+    return total.toInt()
+}
+"""),
+        ("walks-from-each-vertex", "PERFORMANCE",
+         "정점마다 트리를 훑으며 지나온 최댓값을 들고 같은 값의 정점을 센다. 정점 수의 제곱이다.",
+         """
+fun goodPaths(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    var total = 0L
+    val stack = IntArray(n); val from = IntArray(n)
+    for (s in 0 until n) {
+        total += 1
+        var top = 0
+        stack[top] = s; from[top] = -1; top += 1
+        while (top > 0) {
+            top -= 1
+            val v = stack[top]; val p = from[top]
+            for (u in adj[v]) {
+                if (u == p || vals[u] > vals[s]) continue
+                Drill.compare(s, u)
+                if (u > s && vals[u] == vals[s]) total += 1
+                stack[top] = u; from[top] = v; top += 1
+            }
+        }
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))

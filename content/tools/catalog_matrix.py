@@ -3842,3 +3842,163 @@ fun longestIncreasingPath(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 223. 합이 목표인 부분 행렬의 수 ------------------------------------------------------------
+
+def _submatrix_sum_target(grid, target):
+    rows, cols = len(grid), len(grid[0])
+    prefix = [[0] * (cols + 1) for _ in range(rows + 1)]
+    for r in range(rows):
+        for c in range(cols):
+            prefix[r + 1][c + 1] = grid[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c]
+    count = 0
+    for top in range(rows):
+        for bottom in range(top + 1, rows + 1):
+            seen = {0: 1}
+            for c in range(1, cols + 1):
+                running = prefix[bottom][c] - prefix[top][c]
+                count += seen.get(running - target, 0)
+                seen[running] = seen.get(running, 0) + 1
+    return count
+
+
+PROBLEMS.append(Problem(
+    id="submatrix-sum-target",
+    title="합이 목표인 부분 행렬의 수",
+    summary="""
+정수 격자 `grid` 에서 원소의 합이 `target` 인 **직사각형 부분 행렬**이 몇 개인지 반환한다. 위치가 다르면 다른 부분
+행렬이다. 답이 `2^31 - 1` 을 넘는 입력은 주어지지 않는다.
+""",
+    notes="""
+위아래 두 행을 고르면, 그 사이의 열마다 합을 내 한 줄짜리 배열이 된다 — 이제 "합이 목표인 부분 배열의 수"다. 그것은
+지금까지의 누적합을 해시맵에 세어 두고 `누적합 − target` 이 몇 번 나왔는지 더하면 한 번 훑기로 끝난다(맵은 `0` 이 한
+번 나온 것으로 시작한다). 열마다의 합은 2차원 누적합으로 상수 시간에 얻는다. 행 쌍 `r²/2` × 열 `c` 다. 행과 열 중
+작은 쪽을 쌍으로 고른다.
+""",
+    drill_doc="""
+Drill.write(top * rows + bottom, count)   // 이 행 쌍까지 센 수
+""",
+    constraints="""
+- `1 <= 행, 열`, `행 <= 50`, `열 <= 4_000`, `-1000 <= grid[r][c] <= 1000`, `-10^8 <= target <= 10^8`
+""",
+    signature=dict(name="submatrixSumTarget", parameters=[("grid", "INT_MATRIX"), ("target", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.25),
+    reference=_submatrix_sum_target,
+    cases={
+        "sample": [
+            ("01", [[[0, 1, 0], [1, 1, 1], [0, 1, 0]], 0]),
+            ("02", [[[1, -1], [-1, 1]], 0]),
+        ],
+        "boundary": [
+            ("01-single-hit", [[[5]], 5]),
+            ("02-single-miss", [[[5]], 4]),
+            # 한 행짜리 부분 행렬도 센다.
+            ("03-one-row-grid", [[[1, 2, 3]], 3]),
+            # 맨 왼쪽 열에서 시작하는 것도 센다.
+            ("04-starts-at-left-edge", [[[3, 0], [0, 0]], 3]),
+            ("05-rectangle", [[[1, 1, 1], [1, 1, 1]], 2]),
+            ("06-negative-target", [[[-2, 1], [1, -2]], -2]),
+        ],
+        "hidden": [
+            ("01-random-small", [_grid_of(4, 5, -3, 3, salt=10321), 2]),
+            ("02-random-medium", [_grid_of(20, 60, -10, 10, salt=10323), 7]),
+            ("03-zeros", [[[0] * 30 for _ in range(10)], 0]),
+            ("04-tall", [_grid_of(50, 3, -5, 5, salt=10325), 4]),
+        ],
+        "performance": [
+            # 모든 직사각형을 보면 행²/2 × 열²/2 다 — 30 × 4 000 이면 3.6×10^9 개. 정답은 행²/2 × 열 이라 열을 늘려도
+            # 정답은 조금만 무거워진다(행을 줄이고 열을 늘린 이유다).
+            ("01-wide", [_grid_of(30, 4000, -1000, 1000, salt=10327), 777]),
+            ("02-wide-small-values", [_grid_of(50, 2000, -2, 2, salt=10329), 3]),
+            ("03-wide-sparse", [_grid_of(30, 4000, -1000, 1000, salt=10331), 0]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 행 쌍을 고르고, 그 사이 열 합의 배열에서 누적합 해시맵으로 센다.
+fun submatrixSumTarget(grid: Array<IntArray>, target: Int): Int {
+    val rows = grid.size
+    val cols = grid[0].size
+    val prefix = Array(rows + 1) { LongArray(cols + 1) }
+    for (r in 0 until rows) for (c in 0 until cols) {
+        prefix[r + 1][c + 1] = grid[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c]
+    }
+    var count = 0L
+    val seen = HashMap<Long, Int>()
+    for (top in 0 until rows) for (bottom in top + 1..rows) {
+        seen.clear()
+        seen[0L] = 1
+        for (c in 1..cols) {
+            val running = prefix[bottom][c] - prefix[top][c]
+            count += seen[running - target] ?: 0
+            seen[running] = (seen[running] ?: 0) + 1
+        }
+        Drill.write(top * rows + bottom, count.toInt())
+    }
+    return count.toInt()
+}
+""",
+    mutants=[
+        ("rows-only", "WRONG_ALGORITHM",
+         "한 행 안의 구간만 센다. 여러 행에 걸친 직사각형도 부분 행렬이다.",
+         """
+fun submatrixSumTarget(grid: Array<IntArray>, target: Int): Int {
+    var count = 0
+    for (row in grid) {
+        val seen = HashMap<Long, Int>(); seen[0L] = 1
+        var running = 0L
+        for (v in row) { running += v; count += seen[running - target] ?: 0; seen[running] = (seen[running] ?: 0) + 1 }
+    }
+    return count
+}
+"""),
+        ("map-not-seeded", "MISSING_EDGE_CASE",
+         "누적합 맵을 비운 채 시작한다. 맨 왼쪽 열에서 시작하는 직사각형을 놓친다.",
+         """
+fun submatrixSumTarget(grid: Array<IntArray>, target: Int): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val prefix = Array(rows + 1) { LongArray(cols + 1) }
+    for (r in 0 until rows) for (c in 0 until cols) prefix[r + 1][c + 1] = grid[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c]
+    var count = 0L
+    for (top in 0 until rows) for (bottom in top + 1..rows) {
+        val seen = HashMap<Long, Int>()
+        for (c in 1..cols) { val running = prefix[bottom][c] - prefix[top][c]; count += seen[running - target] ?: 0; seen[running] = (seen[running] ?: 0) + 1 }
+    }
+    return count.toInt()
+}
+"""),
+        ("skips-single-rows", "OFF_BY_ONE",
+         "아래 행을 위 행보다 두 칸 아래부터 고른다. 한 행짜리 직사각형을 빠뜨린다.",
+         """
+fun submatrixSumTarget(grid: Array<IntArray>, target: Int): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val prefix = Array(rows + 1) { LongArray(cols + 1) }
+    for (r in 0 until rows) for (c in 0 until cols) prefix[r + 1][c + 1] = grid[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c]
+    var count = 0L
+    for (top in 0 until rows) for (bottom in top + 2..rows) {
+        val seen = HashMap<Long, Int>(); seen[0L] = 1
+        for (c in 1..cols) { val running = prefix[bottom][c] - prefix[top][c]; count += seen[running - target] ?: 0; seen[running] = (seen[running] ?: 0) + 1 }
+    }
+    return count.toInt()
+}
+"""),
+        ("every-rectangle", "PERFORMANCE",
+         "모든 직사각형의 합을 누적합으로 하나씩 잰다. 직사각형 수가 행² × 열² 이다.",
+         """
+fun submatrixSumTarget(grid: Array<IntArray>, target: Int): Int {
+    val rows = grid.size; val cols = grid[0].size
+    val prefix = Array(rows + 1) { LongArray(cols + 1) }
+    for (r in 0 until rows) for (c in 0 until cols) prefix[r + 1][c + 1] = grid[r][c] + prefix[r][c + 1] + prefix[r + 1][c] - prefix[r][c]
+    var count = 0
+    for (top in 0 until rows) for (bottom in top + 1..rows) {
+        Drill.compare(top, bottom)
+        for (left in 0 until cols) for (right in left + 1..cols) {
+            val sum = prefix[bottom][right] - prefix[top][right] - prefix[bottom][left] + prefix[top][left]
+            if (sum == target.toLong()) count += 1
+        }
+    }
+    return count
+}
+"""),
+    ],
+))
