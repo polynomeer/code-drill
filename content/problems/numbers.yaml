@@ -215,3 +215,9 @@
 1205: reverse-pairs
 1206: visible-people
 1207: tree-max-path-sum
+1208: reverse-bits
+1209: distinct-palindromic-subsequences
+1210: even-digit-count
+1211: longest-increasing-path
+1212: max-unique-concat
+1213: validate-stack-sequences

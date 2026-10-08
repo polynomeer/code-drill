@@ -4,7 +4,7 @@
 두며, 그것을 읽는 것도 문제의 일부다 — 실무에서 스펙을 읽는 일과 다르지 않다.
 """
 
-from author import Problem, standard_groups, perf_groups, randoms, flat
+from author import Problem, standard_groups, perf_groups, randoms, flat, shuffled
 
 PROBLEMS = []
 
@@ -2843,6 +2843,138 @@ fun visiblePeople(heights: IntArray): IntArray {
         }
         seen
     }
+}
+"""),
+    ],
+))
+
+
+# --- 217. 스택 순서 검사 ------------------------------------------------------------------------
+
+def _validate_stack_sequences(pushed, popped):
+    stack = []
+    j = 0
+    for x in pushed:
+        stack.append(x)
+        while stack and j < len(popped) and stack[-1] == popped[j]:
+            stack.pop()
+            j += 1
+    return 1 if j == len(popped) else 0
+
+
+def _stack_order(n, salt):
+    """무작위로 넣고 꺼내 본 실제 순서 — 언제나 가능한 순서다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    stack, out, nxt = [], [], 0
+    while len(out) < n:
+        if nxt < n and (not stack or source.random() < 0.55):
+            stack.append(nxt)
+            nxt += 1
+        else:
+            out.append(stack.pop())
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="validate-stack-sequences",
+    title="스택 순서 검사",
+    summary="""
+빈 스택에 `pushed` 의 값을 차례로 넣으면서, 아무 때나 맨 위의 값을 꺼낼 수 있다. 꺼낸 값의 순서가 `popped` 와 같을
+수 있으면 `1`, 없으면 `0` 을 반환한다. 두 배열은 같은 값들을 다른 순서로 담고 있고, 값은 모두 다르다.
+""",
+    notes="""
+실제로 해 본다. 값을 하나 넣을 때마다, 맨 위가 지금 꺼내야 할 값(`popped` 의 다음 값)과 같은 **동안** 꺼낸다 —
+한 번 넣은 뒤 여러 개를 연달아 꺼낼 수 있다. 다 넣고 나서 `popped` 를 끝까지 꺼냈으면 가능한 순서다. 꺼낼 수
+있는데 미루는 것은 손해가 없다 — 값이 모두 달라 지금 맨 위의 값이 꺼낼 차례면 나중에도 그 값이 먼저다.
+""",
+    drill_doc="""
+Drill.push(x)   // 넣었다
+Drill.pop(x)    // 꺼냈다
+""",
+    constraints="""
+- `0 <= n <= 100_000`, 두 배열은 같은 서로 다른 값의 순열이다, `0 <= 값 < 1_000_000_000`
+""",
+    signature=dict(name="validateStackSequences", parameters=[("pushed", "INT_ARRAY"), ("popped", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_validate_stack_sequences,
+    cases={
+        "sample": [
+            ("01", [[1, 2, 3, 4, 5], [4, 5, 3, 2, 1]]),
+            ("02", [[1, 2, 3, 4, 5], [4, 3, 5, 1, 2]]),
+        ],
+        "boundary": [
+            ("01-empty", [[], []]),
+            ("02-single", [[7], [7]]),
+            ("03-same-order", [[1, 2, 3], [1, 2, 3]]),
+            ("04-reversed", [[1, 2, 3], [3, 2, 1]]),
+            # 한 번 넣은 뒤 여러 개를 연달아 꺼내야 한다.
+            ("05-burst-pop", [[1, 2, 3, 4], [2, 4, 3, 1]]),
+            ("06-impossible-swap", [[1, 2, 3], [3, 1, 2]]),
+            ("07-large-values", [[999_999_999, 0, 500], [0, 500, 999_999_999]]),
+        ],
+        "hidden": [
+            ("01-half-reversed-then-ordered", [list(range(1000)), [x for x in range(999, 499, -1)] + list(range(500))]),
+            ("06-random-possible", [list(range(5000)), _stack_order(5000, salt=10263)]),
+            ("07-random-possible-large", [list(range(100_000)), _stack_order(100_000, salt=10265)]),
+            ("02-random-shuffled", [list(range(200)), shuffled(range(200), salt=10253)]),
+            ("03-large-reverse", [list(range(100_000)), list(range(99_999, -1, -1))]),
+            ("04-large-same", [list(range(100_000)), list(range(100_000))]),
+            ("05-almost", [list(range(1000)), list(range(1, 1000)) + [0]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 실제로 넣고, 맨 위가 꺼낼 차례인 동안 꺼낸다.
+fun validateStackSequences(pushed: IntArray, popped: IntArray): Int {
+    val stack = IntArray(pushed.size)
+    var top = 0
+    var j = 0
+    for (x in pushed) {
+        stack[top] = x
+        top += 1
+        Drill.push(x)
+        while (top > 0 && j < popped.size && stack[top - 1] == popped[j]) {
+            top -= 1
+            Drill.pop(stack[top])
+            j += 1
+        }
+    }
+    return if (j == popped.size) 1 else 0
+}
+""",
+    mutants=[
+        ("pops-once", "WRONG_BRANCH",
+         "값을 하나 넣을 때마다 많아야 하나만 꺼낸다. 맨 위가 계속 꺼낼 차례면 연달아 꺼내야 한다.",
+         """
+fun validateStackSequences(pushed: IntArray, popped: IntArray): Int {
+    val stack = ArrayDeque<Int>()
+    var j = 0
+    for (x in pushed) {
+        stack.addLast(x)
+        if (stack.isNotEmpty() && j < popped.size && stack.last() == popped[j]) { stack.removeLast(); j += 1 }
+    }
+    while (stack.isNotEmpty() && j < popped.size && stack.last() == popped[j]) { stack.removeLast(); j += 1 }
+    return if (j == popped.size) 1 else 0
+}
+"""),
+        ("reverse-only", "WRONG_ALGORITHM",
+         "꺼낸 순서가 넣은 순서의 정반대일 때만 가능하다고 본다. 넣는 도중에도 꺼낼 수 있다.",
+         """
+fun validateStackSequences(pushed: IntArray, popped: IntArray): Int =
+    if (pushed.reversedArray().contentEquals(popped)) 1 else 0
+"""),
+        ("ignores-leftover", "MISSING_EDGE_CASE",
+         "다 넣은 뒤 꺼내지 못하고 남은 값이 있는지 보지 않는다. popped 를 끝까지 꺼냈어야 한다.",
+         """
+fun validateStackSequences(pushed: IntArray, popped: IntArray): Int {
+    val stack = ArrayDeque<Int>()
+    var j = 0
+    for (x in pushed) {
+        stack.addLast(x)
+        while (stack.isNotEmpty() && j < popped.size && stack.last() == popped[j]) { stack.removeLast(); j += 1 }
+    }
+    return 1
 }
 """),
     ],

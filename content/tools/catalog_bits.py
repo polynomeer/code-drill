@@ -1057,3 +1057,103 @@ fun shortestSuperstring(words: Array<String>): Int {
 """),
     ],
 ))
+
+
+# --- 215. 비트 뒤집기 ---------------------------------------------------------------------------
+
+def _reverse_bits(n):
+    x = n & 0xFFFFFFFF
+    r = int(format(x, "032b")[::-1], 2)
+    return r - (1 << 32) if r >= (1 << 31) else r
+
+
+PROBLEMS.append(Problem(
+    id="reverse-bits",
+    title="비트 뒤집기",
+    summary="""
+32 비트 정수 `n` 의 비트 순서를 뒤집은 값을 반환한다 — 0 번 비트가 31 번이 되고, 31 번 비트가 0 번이 된다. 입력과
+출력은 모두 32 비트 패턴으로 읽는다(맨 앞 비트가 1 이면 `Int` 로는 음수다).
+
+`43261596`(`00000010100101000001111010011100`) 을 뒤집으면 `964176192`(`00111001011110000010100101000000`) 다.
+""",
+    notes="""
+비트를 하나씩 빼서 결과의 오른쪽에 붙여 나간다 — 결과를 왼쪽으로 한 칸 밀고 `n` 의 맨 아래 비트를 넣은 뒤 `n` 을
+오른쪽으로 한 칸 민다. **반드시 32 번** 한다. `n` 의 위쪽이 0 이라고 일찍 멈추면 그 0 들이 결과의 아래쪽으로 가야
+하는데 밀지 못한다.
+""",
+    drill_doc="""
+Drill.write(i, bit)   // i 번째로 꺼낸 비트
+""",
+    constraints="""
+- `-2^31 <= n <= 2^31 - 1`
+""",
+    signature=dict(name="reverseBits", parameters=[("n", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_reverse_bits,
+    cases={
+        "sample": [("01", [43261596]), ("02", [-3])],
+        "boundary": [
+            ("01-zero", [0]),
+            ("02-one", [1]),
+            ("03-all-ones", [-1]),
+            ("04-min-int", [-2147483648]),
+            ("05-max-int", [2147483647]),
+            # 위쪽 절반이 0 이다 — 일찍 멈추면 덜 민다.
+            ("06-low-bits-only", [0b1011]),
+            ("07-palindrome-bits", [0x80000001 - (1 << 32)]),
+        ],
+        "hidden": [
+            ("01-random-a", [randoms(1, -2147483648, 2147483647, salt=10241)[0]]),
+            ("02-random-b", [randoms(1, -2147483648, 2147483647, salt=10243)[0]]),
+            ("03-byte-pattern", [0x12345678]),
+            ("04-single-high-bit", [1 << 30]),
+            ("05-alternating", [0x55555555]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 비트를 32 번 꺼내 결과의 오른쪽에 붙인다.
+fun reverseBits(n: Int): Int {
+    var x = n
+    var result = 0
+    for (i in 0 until 32) {
+        val bit = x and 1
+        Drill.write(i, bit)
+        result = (result shl 1) or bit
+        x = x ushr 1
+    }
+    return result
+}
+""",
+    mutants=[
+        ("stops-when-empty", "MISSING_EDGE_CASE",
+         "남은 비트가 0 이 되면 멈춘다. 그 0 들이 결과의 아래쪽으로 가도록 끝까지 밀어야 한다.",
+         """
+fun reverseBits(n: Int): Int {
+    var x = n
+    var result = 0
+    while (x != 0) { result = (result shl 1) or (x and 1); x = x ushr 1 }
+    return result
+}
+"""),
+        ("thirty-one-rounds", "OFF_BY_ONE",
+         "비트를 31 번만 꺼낸다. 32 비트를 모두 옮겨야 한다.",
+         """
+fun reverseBits(n: Int): Int {
+    var x = n
+    var result = 0
+    for (i in 0 until 31) { result = (result shl 1) or (x and 1); x = x ushr 1 }
+    return result
+}
+"""),
+        ("unpadded-string", "WRONG_ALGORITHM",
+         "이진 문자열을 앞자리 0 없이 뒤집는다. 32 자리로 채운 뒤 뒤집어야 한다.",
+         """
+fun reverseBits(n: Int): Int = Integer.toBinaryString(n).reversed().toLong(2).toInt()
+"""),
+        ("reverses-bytes", "WRONG_BRANCH",
+         "바이트 순서를 뒤집는다. 뒤집을 것은 비트 하나하나의 순서다.",
+         """
+fun reverseBits(n: Int): Int = Integer.reverseBytes(n)
+"""),
+    ],
+))

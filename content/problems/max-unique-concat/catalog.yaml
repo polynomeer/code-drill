@@ -1,0 +1,17 @@
+# max-unique-concat 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - string
+  - backtracking
+  - bit-manipulation
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - beautiful-arrangement-count
+complexity:
+  time: EXPONENTIAL
+  space: LINEAR
+  note: "낱말마다 넣는다·안 넣는다 — 많아야 2^16"

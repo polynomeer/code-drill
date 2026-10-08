@@ -2441,3 +2441,112 @@ fun trailingZerosInBase(n: Int, base: Int): Int {
 """),
     ],
 ))
+
+
+# --- 220. 자릿수가 짝수인 수 세기 ---------------------------------------------------------------
+
+def _even_digit_count(nums):
+    return sum(1 for x in nums if len(str(abs(x))) % 2 == 0)
+
+
+PROBLEMS.append(Problem(
+    id="even-digit-count",
+    title="자릿수가 짝수인 수 세기",
+    summary="""
+정수 배열 `nums` 에서 **자릿수가 짝수인** 수가 몇 개인지 반환한다. 부호는 자리가 아니다 — `-12` 는 두 자리다.
+`0` 은 한 자리다.
+""",
+    notes="""
+수마다 10 으로 나눠 가며 자릿수를 센다. `0` 은 나누기 전에 이미 한 자리이므로 "0 이 될 때까지 나눈 횟수"로 세면
+`0` 을 0 자리로 잘못 센다 — 적어도 한 번은 센다. 음수는 절댓값으로 본다(`Int` 의 가장 작은 값은 절댓값이 `Int`
+를 넘으니 나눗셈으로 센다).
+""",
+    drill_doc="""
+Drill.write(i, digits)   // nums[i] 의 자릿수
+""",
+    constraints="""
+- `0 <= nums.length <= 100_000`, `-2^31 <= nums[i] <= 2^31 - 1`
+""",
+    signature=dict(name="evenDigitCount", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_even_digit_count,
+    cases={
+        "sample": [("01", [[12, 345, 2, 6, 7896]]), ("02", [[555, 901, 482, 1771]])],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-zero", [[0]]),
+            # 부호는 자리가 아니다.
+            ("03-negatives", [[-12, -1, -100]]),
+            # 10 의 거듭제곱에서 자릿수가 바뀐다.
+            ("04-powers-of-ten", [[9, 10, 99, 100, 999, 1000]]),
+            ("05-min-int", [[-2147483648]]),
+            ("06-max-int", [[2147483647]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, -1000, 1000, salt=10275)]),
+            ("02-random-wide", [randoms(1000, -2147483648, 2147483647, salt=10277)]),
+            ("03-random-large", [randoms(100_000, -1_000_000, 1_000_000, salt=10279)]),
+            ("04-boundaries", [[10 ** k for k in range(10)] + [10 ** k - 1 for k in range(1, 10)] + [-(10 ** k) for k in range(10)]]),
+            ("05-zeros", [[0, 0, 10, -10, 0]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 수마다 10 으로 나눠 가며 센다 — 적어도 한 자리.
+fun evenDigitCount(nums: IntArray): Int {
+    var count = 0
+    for (i in nums.indices) {
+        var x = nums[i]
+        var digits = 1
+        while (x / 10 != 0) { x /= 10; digits += 1 }
+        Drill.write(i, digits)
+        if (digits % 2 == 0) count += 1
+    }
+    return count
+}
+""",
+    mutants=[
+        ("counts-the-sign", "MISSING_EDGE_CASE",
+         "문자열 길이로 센다. 음수의 부호까지 한 자리로 센다.",
+         """
+fun evenDigitCount(nums: IntArray): Int = nums.count { it.toString().length % 2 == 0 }
+"""),
+        ("zero-has-no-digits", "MISSING_EDGE_CASE",
+         "0 이 될 때까지 나눈 횟수로 센다. 0 은 한 자리인데 0 자리가 된다.",
+         """
+fun evenDigitCount(nums: IntArray): Int {
+    var count = 0
+    for (v in nums) {
+        var x = v
+        var digits = 0
+        while (x != 0) { x /= 10; digits += 1 }
+        if (digits % 2 == 0) count += 1
+    }
+    return count
+}
+"""),
+        ("off-at-powers-of-ten", "OFF_BY_ONE",
+         "자릿수를 경계와 견줄 때 등호를 잘못 둔다. 10, 100 같은 10 의 거듭제곱이 한 자리 적게 세어진다.",
+         """
+fun evenDigitCount(nums: IntArray): Int {
+    var count = 0
+    for (v in nums) {
+        val x = Math.abs(v.toLong())
+        var digits = 1
+        var bound = 10L
+        while (x > bound) { digits += 1; bound *= 10 }
+        if (digits % 2 == 0) count += 1
+    }
+    return count
+}
+"""),
+        ("counts-odd", "WRONG_BRANCH",
+         "자릿수가 홀수인 수를 센다. 짝수인 수다.",
+         """
+fun evenDigitCount(nums: IntArray): Int {
+    var count = 0
+    for (v in nums) { var x = v; var d = 1; while (x / 10 != 0) { x /= 10; d += 1 }; if (d % 2 == 1) count += 1 }
+    return count
+}
+"""),
+    ],
+))

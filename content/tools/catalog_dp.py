@@ -1421,3 +1421,214 @@ fun regexMatch(s: String, p: String): Int {
 """),
     ],
 ))
+
+
+# --- 219. 서로 다른 회문 부분 수열의 수 ---------------------------------------------------------
+
+def _distinct_palindromic_subsequences(s):
+    mod = 1_000_000_007
+    n = len(s)
+    nxt = [[n] * 4 for _ in range(n + 1)]
+    prv = [[-1] * 4 for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        nxt[i] = list(nxt[i + 1])
+        nxt[i][ord(s[i]) - 97] = i
+    for i in range(n):
+        prv[i + 1] = list(prv[i])
+        prv[i + 1][ord(s[i]) - 97] = i
+    dp = [[0] * (n + 1) for _ in range(n + 1)]   # dp[i][j] = s[i..j-1] 에서
+
+    for length in range(1, n + 1):
+        for i in range(0, n - length + 1):
+            j = i + length
+            if s[i] != s[j - 1]:
+                v = dp[i + 1][j] + dp[i][j - 1] - dp[i + 1][j - 1]
+            else:
+                c = ord(s[i]) - 97
+                lo = nxt[i + 1][c]
+                hi = prv[j - 1][c]
+                inner = dp[i + 1][j - 1]
+                if lo > hi:
+                    v = 2 * inner + (2 if length > 1 else 1)
+                elif lo == hi:
+                    v = 2 * inner + 1
+                else:
+                    v = 2 * inner - dp[lo + 1][hi]
+            dp[i][j] = v % mod
+    return dp[0][n] % mod
+
+
+def _abcd(n, salt, letters="abcd"):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return "".join(source.choice(letters) for _ in range(n))
+
+
+PROBLEMS.append(Problem(
+    id="distinct-palindromic-subsequences",
+    title="서로 다른 회문 부분 수열의 수",
+    summary="""
+`a`·`b`·`c`·`d` 로만 된 문자열 `s` 의 **비어 있지 않은 회문 부분 수열**이 서로 다른 것으로 몇 가지인지 반환한다.
+값이 크므로 `1000000007` 로 나눈 나머지다. 같은 문자열은 어느 자리에서 뽑았든 한 번만 센다.
+
+`bccb` 의 회문 부분 수열은 `b`, `c`, `bb`, `cc`, `bcb`, `bccb` — 여섯 가지다(`bcb` 는 두 가지 자리에서 뽑을 수 있지만 한 번이다).
+""",
+    notes="""
+구간 `s[i..j]` 의 답을 `dp[i][j]` 라 하자. 양 끝이 다르면 한쪽 끝을 뺀 두 구간을 더하고 겹친 가운데를 한 번 뺀다.
+양 끝이 같은 글자 `x` 면, 가운데 구간의 회문 각각을 `x…x` 로 감싼 것이 새로 생긴다 — 그래서 가운데의 두 배다. 다만
+가운데 안에 `x` 가 있으면 감싼 것 중 일부가 이미 세어져 있다.
+
+- 가운데에 `x` 가 없으면 `x` 와 `xx` 가 새로 생긴다: `2·가운데 + 2`.
+- 가운데에 `x` 가 하나 있으면 `x` 는 이미 있고 `xx` 만 새로 생긴다: `2·가운데 + 1`.
+- 둘 이상 있으면, 가운데의 첫 `x` 와 마지막 `x` 사이의 회문을 감싼 것이 이미 세어져 있다: `2·가운데 − dp[첫 x + 1][마지막 x − 1]`.
+
+다음·이전 `x` 의 자리를 미리 구해 두면 칸마다 상수 시간이다. 빼기가 있으니 나머지는 음수가 되지 않게 맞춘다.
+""",
+    drill_doc="""
+Drill.write(i * n + j, count)   // s[i..j] 의 서로 다른 회문 부분 수열 수
+""",
+    constraints="""
+- `1 <= s.length <= 1000`, 글자는 `a`·`b`·`c`·`d` 뿐
+""",
+    signature=dict(name="distinctPalindromicSubsequences", parameters=[("s", "STRING")], returns="INT"),
+    groups=standard_groups(),
+    reference=_distinct_palindromic_subsequences,
+    cases={
+        "sample": [("01", ["bccb"]), ("02", ["abcdabcdabcdabcdabcdabcdabcdabcddcbadcbadcbadcbadcbadcbadcbadcba"])],
+        "boundary": [
+            ("01-single", ["a"]),
+            ("02-two-same", ["aa"]),
+            ("03-two-different", ["ab"]),
+            ("04-one-inside", ["aba"]),
+            ("05-two-inside", ["aaaa"]),
+            ("06-many-inside", ["abacaba"]),
+            ("07-no-repeats", ["abcd"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_abcd(12, salt=10267)]),
+            ("02-random-medium", [_abcd(120, salt=10269)]),
+            ("03-random-large", [_abcd(1000, salt=10271)]),
+            ("04-one-letter-large", ["c" * 1000]),
+            ("05-two-letters-large", [_abcd(1000, salt=10273, letters="ab")]),
+            ("06-repeating-block", ["abcd" * 250]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 구간 DP — 양 끝이 같으면 가운데의 같은 글자가 몇 개인지로 나눈다.
+fun distinctPalindromicSubsequences(s: String): Int {
+    val mod = 1_000_000_007L
+    val n = s.length
+    val next = Array(n + 1) { IntArray(4) { n } }
+    val prev = Array(n + 1) { IntArray(4) { -1 } }
+    for (i in n - 1 downTo 0) { next[i] = next[i + 1].copyOf(); next[i][s[i] - 'a'] = i }
+    for (i in 0 until n) { prev[i + 1] = prev[i].copyOf(); prev[i + 1][s[i] - 'a'] = i }
+    val dp = Array(n + 1) { LongArray(n + 1) }
+    for (length in 1..n) {
+        for (i in 0..n - length) {
+            val j = i + length
+            val v: Long = if (s[i] != s[j - 1]) {
+                dp[i + 1][j] + dp[i][j - 1] - dp[i + 1][j - 1]
+            } else {
+                val c = s[i] - 'a'
+                val lo = next[i + 1][c]
+                val hi = prev[j - 1][c]
+                val inner = dp[i + 1][j - 1]
+                when {
+                    lo > hi -> 2 * inner + if (length > 1) 2 else 1
+                    lo == hi -> 2 * inner + 1
+                    else -> 2 * inner - dp[lo + 1][hi]
+                }
+            }
+            dp[i][j] = ((v % mod) + mod) % mod
+        }
+        if (length == n) Drill.write(0, dp[0][n].toInt())
+    }
+    return dp[0][n].toInt()
+}
+""",
+    mutants=[
+        ("counts-every-pick", "WRONG_ALGORITHM",
+         "뽑은 자리가 다르면 다른 것으로 센다. 같은 문자열은 한 번만 센다.",
+         """
+fun distinctPalindromicSubsequences(s: String): Int {
+    val mod = 1_000_000_007L
+    val n = s.length
+    val dp = Array(n + 1) { LongArray(n + 1) }
+    for (length in 1..n) for (i in 0..n - length) {
+        val j = i + length
+        val v = if (length == 1) 1L
+            else if (s[i] == s[j - 1]) dp[i + 1][j] + dp[i][j - 1] + 1
+            else dp[i + 1][j] + dp[i][j - 1] - dp[i + 1][j - 1]
+        dp[i][j] = ((v % mod) + mod) % mod
+    }
+    return dp[0][n].toInt()
+}
+"""),
+        ("negative-remainder", "MISSING_EDGE_CASE",
+         "빼기 뒤에 나머지를 그대로 둔다. 나머지를 취한 값끼리 빼면 음수가 되어 답이 음수로 나온다.",
+         """
+fun distinctPalindromicSubsequences(s: String): Int {
+    val mod = 1_000_000_007L
+    val n = s.length
+    val next = Array(n + 1) { IntArray(4) { n } }
+    val prev = Array(n + 1) { IntArray(4) { -1 } }
+    for (i in n - 1 downTo 0) { next[i] = next[i + 1].copyOf(); next[i][s[i] - 'a'] = i }
+    for (i in 0 until n) { prev[i + 1] = prev[i].copyOf(); prev[i + 1][s[i] - 'a'] = i }
+    val dp = Array(n + 1) { LongArray(n + 1) }
+    for (length in 1..n) for (i in 0..n - length) {
+        val j = i + length
+        val v: Long = if (s[i] != s[j - 1]) dp[i + 1][j] + dp[i][j - 1] - dp[i + 1][j - 1] else {
+            val c = s[i] - 'a'; val lo = next[i + 1][c]; val hi = prev[j - 1][c]; val inner = dp[i + 1][j - 1]
+            when { lo > hi -> 2 * inner + if (length > 1) 2 else 1; lo == hi -> 2 * inner + 1; else -> 2 * inner - dp[lo + 1][hi] }
+        }
+        dp[i][j] = v % mod
+    }
+    return dp[0][n].toInt()
+}
+"""),
+        ("one-inside-as-none", "OFF_BY_ONE",
+         "가운데에 같은 글자가 하나 있을 때도 그 글자 하나를 새로 센다. 그 글자는 가운데에서 이미 세어졌다.",
+         """
+fun distinctPalindromicSubsequences(s: String): Int {
+    val mod = 1_000_000_007L
+    val n = s.length
+    val next = Array(n + 1) { IntArray(4) { n } }
+    val prev = Array(n + 1) { IntArray(4) { -1 } }
+    for (i in n - 1 downTo 0) { next[i] = next[i + 1].copyOf(); next[i][s[i] - 'a'] = i }
+    for (i in 0 until n) { prev[i + 1] = prev[i].copyOf(); prev[i + 1][s[i] - 'a'] = i }
+    val dp = Array(n + 1) { LongArray(n + 1) }
+    for (length in 1..n) for (i in 0..n - length) {
+        val j = i + length
+        val v: Long = if (s[i] != s[j - 1]) dp[i + 1][j] + dp[i][j - 1] - dp[i + 1][j - 1] else {
+            val c = s[i] - 'a'; val lo = next[i + 1][c]; val hi = prev[j - 1][c]; val inner = dp[i + 1][j - 1]
+            when { lo >= hi -> 2 * inner + if (length > 1) 2 else 1; else -> 2 * inner - dp[lo + 1][hi] }
+        }
+        dp[i][j] = ((v % mod) + mod) % mod
+    }
+    return dp[0][n].toInt()
+}
+"""),
+        ("collects-strings", "PERFORMANCE",
+         "부분 수열을 모두 만들어 회문만 집합에 모은다. 부분 수열은 길이에 지수로 늘어난다.",
+         """
+fun distinctPalindromicSubsequences(s: String): Int {
+    val seen = HashSet<String>()
+    val picked = StringBuilder()
+    fun go(i: Int) {
+        if (i == s.length) {
+            if (picked.isNotEmpty()) { val t = picked.toString(); if (t == t.reversed()) seen.add(t) }
+            return
+        }
+        go(i + 1)
+        picked.append(s[i])
+        Drill.compare(i, picked.length)
+        go(i + 1)
+        picked.setLength(picked.length - 1)
+    }
+    go(0)
+    return seen.size % 1_000_000_007
+}
+"""),
+    ],
+))

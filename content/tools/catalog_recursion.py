@@ -2512,3 +2512,181 @@ fun tileSequences(tiles: String): Int {
 """),
     ],
 ))
+
+
+# --- 218. 글자가 겹치지 않는 가장 긴 이어 붙이기 ------------------------------------------------
+
+def _max_unique_concat(words):
+    masks = []
+    for w in words:
+        m = 0
+        ok = True
+        for ch in w:
+            bit = 1 << (ord(ch) - 97)
+            if m & bit:
+                ok = False
+                break
+            m |= bit
+        if ok:
+            masks.append((m, len(w)))
+    best = 0
+
+    def go(i, used, length):
+        nonlocal best
+        best = max(best, length)
+        for k in range(i, len(masks)):
+            m, l = masks[k]
+            if used & m == 0:
+                go(k + 1, used | m, length + l)
+
+    go(0, 0, 0)
+    return best
+
+
+def _short_words(count, salt, letters="abcdefghijklmnopqrstuvwxyz", low=1, high=5):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return ["".join(source.choice(letters) for _ in range(source.randint(low, high))) for _ in range(count)]
+
+
+PROBLEMS.append(Problem(
+    id="max-unique-concat",
+    title="글자가 겹치지 않는 가장 긴 이어 붙이기",
+    summary="""
+소문자 낱말 배열 `words` 에서 몇 개를(순서는 지킨 채, 0 개도 된다) 골라 이어 붙인 문자열이 **같은 글자를 두 번
+담지 않을 때**, 그 문자열의 가장 긴 길이를 반환한다. 낱말 안에 같은 글자가 이미 두 번 있으면 그 낱말은 쓸 수 없다.
+""",
+    notes="""
+낱말마다 쓰는 글자를 26 비트로 적어 두면 "겹치지 않는가"는 AND 한 번이다. 앞에서부터 낱말마다 **넣는 갈래와 넣지
+않는 갈래**를 모두 해 본다 — 지금 넣을 수 있다고 넣는 것이 늘 이득은 아니다(긴 낱말 둘을 막는 짧은 낱말). 낱말이
+16 개 이하라 갈래는 많아야 2^16 이다. 자기 안에서 글자가 겹치는 낱말은 처음부터 뺀다 — 비트로 적으면 그 겹침이
+보이지 않는다.
+""",
+    drill_doc="""
+Drill.push(i)   // i 번째 낱말을 넣었다
+Drill.pop(i)    // 그 낱말을 뺐다
+""",
+    constraints="""
+- `1 <= words.length <= 16`, `1 <= words[i].length <= 26`, 소문자만
+""",
+    signature=dict(name="maxUniqueConcat", parameters=[("words", "STRING_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_max_unique_concat,
+    cases={
+        "sample": [("01", [["un", "iq", "ue"]]), ("02", [["cha", "r", "act", "ers"]])],
+        "boundary": [
+            ("01-single", [["abcdefghijklmnopqrstuvwxyz"]]),
+            # 자기 안에서 겹치는 낱말은 쓸 수 없다.
+            ("02-self-duplicate", [["aa", "b"]]),
+            ("03-all-self-duplicate", [["aa", "bb"]]),
+            # 짧은 낱말을 넣으면 긴 낱말 둘이 막힌다.
+            ("04-skip-the-short", [["ab", "acdef", "bghij"]]),
+            ("05-all-overlap", [["ab", "bc", "ca"]]),
+            ("06-one-letter-each", [list("abcdefghijklmnop")]),
+        ],
+        "hidden": [
+            ("01-random-small", [_short_words(8, salt=10255)]),
+            ("02-random-sixteen", [_short_words(16, salt=10257, low=2, high=6)]),
+            ("03-few-letters", [_short_words(16, salt=10259, letters="abcdefgh", low=1, high=3)]),
+            ("04-long-words", [_short_words(16, salt=10261, low=5, high=12)]),
+            ("05-greedy-trap", [["abcdef", "ag", "bh", "ci", "dj", "ek", "fl"]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 낱말을 비트로 적고, 넣는 갈래와 넣지 않는 갈래를 모두 해 본다.
+fun maxUniqueConcat(words: Array<String>): Int {
+    val masks = ArrayList<Int>()
+    val lengths = ArrayList<Int>()
+    for (w in words) {
+        var m = 0
+        var ok = true
+        for (ch in w) {
+            val bit = 1 shl (ch - 'a')
+            if (m and bit != 0) { ok = false; break }
+            m = m or bit
+        }
+        if (ok) { masks.add(m); lengths.add(w.length) }
+    }
+    var best = 0
+    fun go(i: Int, used: Int, length: Int) {
+        if (length > best) best = length
+        for (k in i until masks.size) {
+            if (used and masks[k] == 0) {
+                Drill.push(k)
+                go(k + 1, used or masks[k], length + lengths[k])
+                Drill.pop(k)
+            }
+        }
+    }
+    go(0, 0, 0)
+    return best
+}
+""",
+    mutants=[
+        ("keeps-self-duplicates", "MISSING_EDGE_CASE",
+         "자기 안에서 글자가 겹치는 낱말도 쓴다. 비트로 적으면 그 겹침이 보이지 않는다.",
+         """
+fun maxUniqueConcat(words: Array<String>): Int {
+    val masks = words.map { w -> w.fold(0) { m, ch -> m or (1 shl (ch - 'a')) } }
+    var best = 0
+    fun go(i: Int, used: Int, length: Int) {
+        if (length > best) best = length
+        for (k in i until words.size) if (used and masks[k] == 0) go(k + 1, used or masks[k], length + words[k].length)
+    }
+    go(0, 0, 0)
+    return best
+}
+"""),
+        ("takes-whenever-fits", "WRONG_ALGORITHM",
+         "넣을 수 있는 낱말은 늘 넣는다. 짧은 낱말 하나가 긴 낱말 여럿을 막을 수 있다.",
+         """
+fun maxUniqueConcat(words: Array<String>): Int {
+    var used = 0
+    var length = 0
+    for (w in words) {
+        var m = 0; var ok = true
+        for (ch in w) { val bit = 1 shl (ch - 'a'); if (m and bit != 0) { ok = false; break }; m = m or bit }
+        if (ok && used and m == 0) { used = used or m; length += w.length }
+    }
+    return length
+}
+"""),
+        ("longest-first-greedy", "WRONG_ALGORITHM",
+         "긴 낱말부터 넣을 수 있으면 넣는다. 긴 낱말 하나보다 겹치지 않는 짧은 낱말 여럿이 길 수 있다.",
+         """
+fun maxUniqueConcat(words: Array<String>): Int {
+    var used = 0
+    var length = 0
+    for (w in words.sortedByDescending { it.length }) {
+        var m = 0; var ok = true
+        for (ch in w) { val bit = 1 shl (ch - 'a'); if (m and bit != 0) { ok = false; break }; m = m or bit }
+        if (ok && used and m == 0) { used = used or m; length += w.length }
+    }
+    return length
+}
+"""),
+        ("mask-not-restored", "WRONG_BRANCH",
+         "한 갈래에서 넣은 글자를 돌아올 때 빼지 않는다. 다음 갈래가 쓰지도 않은 글자에 막힌다.",
+         """
+fun maxUniqueConcat(words: Array<String>): Int {
+    val masks = ArrayList<Int>(); val lengths = ArrayList<Int>()
+    for (w in words) {
+        var m = 0; var ok = true
+        for (ch in w) { val bit = 1 shl (ch - 'a'); if (m and bit != 0) { ok = false; break }; m = m or bit }
+        if (ok) { masks.add(m); lengths.add(w.length) }
+    }
+    var best = 0
+    var used = 0
+    fun go(i: Int, length: Int) {
+        if (length > best) best = length
+        for (k in i until masks.size) {
+            if (used and masks[k] == 0) { used = used or masks[k]; go(k + 1, length + lengths[k]) }
+        }
+    }
+    go(0, 0)
+    return best
+}
+"""),
+    ],
+))

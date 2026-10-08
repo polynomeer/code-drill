@@ -1,0 +1,17 @@
+# distinct-palindromic-subsequences 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - string
+  - dynamic-programming
+  - counting
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - CONSTRAINTS
+prerequisites:
+  - longest-palindrome-substring
+complexity:
+  time: QUADRATIC
+  space: QUADRATIC
+  note: "구간 n² 칸, 칸마다 상수"

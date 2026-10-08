@@ -3579,3 +3579,266 @@ fun nearestOne(grid: Array<IntArray>): Array<IntArray> {
 """),
     ],
 ))
+
+
+# --- 216. 격자의 가장 긴 오르막 경로 ------------------------------------------------------------
+
+def _longest_increasing_path(grid):
+    rows = len(grid)
+    if rows == 0 or len(grid[0]) == 0:
+        return 0
+    cols = len(grid[0])
+    lower = [[0] * cols for _ in range(rows)]
+    steps = ((1, 0), (-1, 0), (0, 1), (0, -1))
+    for r in range(rows):
+        for c in range(cols):
+            v = grid[r][c]
+            for dr, dc in steps:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] < v:
+                    lower[r][c] += 1
+    layer = [(r, c) for r in range(rows) for c in range(cols) if lower[r][c] == 0]
+    length = 0
+    while layer:
+        length += 1
+        nxt = []
+        for r, c in layer:
+            v = grid[r][c]
+            for dr, dc in steps:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] > v:
+                    lower[nr][nc] -= 1
+                    if lower[nr][nc] == 0:
+                        nxt.append((nr, nc))
+        layer = nxt
+    return length
+
+
+def _snake(rows, cols):
+    """한 붓으로 지그재그로 1 씩 커지는 격자 — 가장 긴 오르막이 모든 칸을 지난다."""
+    grid = [[0] * cols for _ in range(rows)]
+    k = 0
+    for r in range(rows):
+        order = range(cols) if r % 2 == 0 else range(cols - 1, -1, -1)
+        for c in order:
+            grid[r][c] = k
+            k += 1
+    return grid
+
+
+PROBLEMS.append(Problem(
+    id="longest-increasing-path",
+    title="격자의 가장 긴 오르막 경로",
+    summary="""
+정수 격자 `grid` 에서 상하좌우로 이웃한 칸으로만 움직이며 값이 **엄격히 커지는** 경로 중 가장 긴 것의 **칸 수**를
+반환한다. 빈 격자는 `0` 이다.
+""",
+    notes="""
+"작은 칸 → 이웃한 큰 칸"을 간선으로 보면 순환이 없는 그래프다(값이 엄격히 커지므로). 가장 긴 경로는 위상 순서로
+층을 벗겨 내면 나온다 — 더 작은 이웃이 없는 칸들이 첫 층이고, 한 층을 지우면 작은 이웃이 모두 사라진 칸들이 다음
+층이다. 층의 수가 답이다. 메모를 붙인 깊이 우선 탐색도 같은 답을 내지만, 갈 곳이 하나뿐인 긴 줄(1 × 16 만)에서는
+깊이가 칸 수만큼이라 스택이 넘친다.
+""",
+    drill_doc="""
+Drill.visit(r * cols + c, layer)   // 이 칸이 몇 번째 층에서 벗겨졌다
+""",
+    constraints="""
+- `0 <= 행, 열`, 칸 `160_000` 개 이하, `0 <= grid[r][c] <= 1_000_000_000`
+""",
+    signature=dict(name="longestIncreasingPath", parameters=[("grid", "INT_MATRIX")], returns="INT"),
+    groups=perf_groups(),
+    reference=_longest_increasing_path,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
+    cases={
+        "sample": [
+            ("01", [[[9, 9, 4], [6, 6, 8], [2, 1, 1]]]),
+            ("02", [[[3, 4, 5], [3, 2, 6], [2, 2, 1]]]),
+        ],
+        "boundary": [
+            ("01-empty", [[]]),
+            ("02-single", [[[7]]]),
+            # 값이 모두 같으면 한 칸이다 — 같은 값으로는 갈 수 없다.
+            ("03-all-equal", [[[5, 5], [5, 5]]]),
+            ("04-one-row", [[[1, 2, 3, 2, 1]]]),
+            ("05-one-column", [[[1], [2], [3], [4]]]),
+            # 직사각형 — 행과 열을 맞바꾸면 틀린다.
+            ("06-rectangle", [[[1, 2, 3], [6, 5, 4]]]),
+            ("07-plateau-between", [[[1, 2, 2, 3]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_grid_of(5, 6, 0, 9, salt=10245)]),
+            ("02-random-medium", [_grid_of(60, 40, 0, 1000, salt=10247)]),
+            ("03-snake-small", [_snake(20, 30)]),
+            ("04-diagonal", [[[r + c for c in range(50)] for r in range(50)]]),
+            ("05-few-values", [_grid_of(100, 100, 0, 2, salt=10249)]),
+        ],
+        "performance": [
+            # 한 붓 지그재그 — 경로가 16 만 칸이다. 다만 메모 재귀는 세로 이웃으로 건너뛰어 깊이가 수백에 그친다.
+            ("01-snake", [_snake(400, 400)]),
+            # 값이 r+c 라 오르막 경로의 가짓수가 폭발한다 — 메모 없이 경로를 다 따라가면 끝나지 않는다.
+            ("02-diagonal-large", [[[r + c for c in range(400)] for r in range(400)]]),
+            ("03-random-large", [_grid_of(400, 400, 0, 1_000_000_000, salt=10251)]),
+            # 갈 곳이 하나뿐인 긴 줄 — 재귀의 깊이가 칸 수(16 만)와 같아 스택이 넘친다.
+            ("04-one-long-row", [[list(range(160_000))]]),
+            ("05-one-long-column", [[[v] for v in range(160_000, 0, -1)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 위상 순서로 층을 벗긴다 — 재귀 없이.
+fun longestIncreasingPath(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    if (rows == 0 || grid[0].isEmpty()) return 0
+    val cols = grid[0].size
+    val dr = intArrayOf(1, -1, 0, 0)
+    val dc = intArrayOf(0, 0, 1, -1)
+    val lower = IntArray(rows * cols)
+    for (r in 0 until rows) for (c in 0 until cols) for (k in 0 until 4) {
+        val nr = r + dr[k]; val nc = c + dc[k]
+        if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] < grid[r][c]) lower[r * cols + c] += 1
+    }
+    var layer = IntArray(rows * cols)
+    var size = 0
+    for (i in 0 until rows * cols) if (lower[i] == 0) { layer[size] = i; size += 1 }
+    var next = IntArray(rows * cols)
+    var length = 0
+    while (size > 0) {
+        length += 1
+        var nextSize = 0
+        for (t in 0 until size) {
+            val cell = layer[t]
+            val r = cell / cols; val c = cell % cols
+            Drill.visit(cell, length)
+            for (k in 0 until 4) {
+                val nr = r + dr[k]; val nc = c + dc[k]
+                if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] > grid[r][c]) {
+                    val id = nr * cols + nc
+                    lower[id] -= 1
+                    if (lower[id] == 0) { next[nextSize] = id; nextSize += 1 }
+                }
+            }
+        }
+        val swap = layer; layer = next; next = swap
+        size = nextSize
+    }
+    return length
+}
+""",
+    mutants=[
+        ("recursive-memo", "MISSING_EDGE_CASE",
+         "메모를 붙인 재귀로 따라간다. 갈 곳이 하나뿐인 긴 줄에서는 깊이가 칸 수만큼이라 스택이 넘친다.",
+         """
+fun longestIncreasingPath(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    if (rows == 0 || grid[0].isEmpty()) return 0
+    val cols = grid[0].size
+    val memo = Array(rows) { IntArray(cols) }
+    fun go(r: Int, c: Int): Int {
+        if (memo[r][c] != 0) return memo[r][c]
+        var best = 1
+        for ((dr, dc) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+            val nr = r + dr; val nc = c + dc
+            if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] > grid[r][c]) best = maxOf(best, 1 + go(nr, nc))
+        }
+        memo[r][c] = best
+        return best
+    }
+    var answer = 0
+    for (r in 0 until rows) for (c in 0 until cols) answer = maxOf(answer, go(r, c))
+    return answer
+}
+"""),
+        ("equal-steps-allowed", "WRONG_BRANCH",
+         "같은 값의 이웃으로도 간다고 센다. 같은 값끼리는 서로를 기다려 어느 쪽도 벗겨지지 않는다.",
+         """
+fun longestIncreasingPath(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    if (rows == 0 || grid[0].isEmpty()) return 0
+    val cols = grid[0].size
+    val dirs = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
+    val lower = IntArray(rows * cols)
+    for (r in 0 until rows) for (c in 0 until cols) for ((dr, dc) in dirs) {
+        val nr = r + dr; val nc = c + dc
+        if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] <= grid[r][c]) lower[r * cols + c] += 1
+    }
+    var layer = (0 until rows * cols).filter { lower[it] == 0 }
+    var length = 0
+    while (layer.isNotEmpty()) {
+        length += 1
+        val next = ArrayList<Int>()
+        for (cell in layer) {
+            val r = cell / cols; val c = cell % cols
+            for ((dr, dc) in dirs) {
+                val nr = r + dr; val nc = c + dc
+                if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] >= grid[r][c]) {
+                    val id = nr * cols + nc
+                    lower[id] -= 1
+                    if (lower[id] == 0) next.add(id)
+                }
+            }
+        }
+        layer = next
+    }
+    return length
+}
+"""),
+        ("counts-moves", "OFF_BY_ONE",
+         "움직인 횟수를 센다. 답은 경로의 칸 수다.",
+         """
+fun longestIncreasingPath(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    if (rows == 0 || grid[0].isEmpty()) return 0
+    val cols = grid[0].size
+    val dirs = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
+    val lower = IntArray(rows * cols)
+    for (r in 0 until rows) for (c in 0 until cols) for ((dr, dc) in dirs) {
+        val nr = r + dr; val nc = c + dc
+        if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] < grid[r][c]) lower[r * cols + c] += 1
+    }
+    var layer = (0 until rows * cols).filter { lower[it] == 0 }
+    var length = 0
+    while (layer.isNotEmpty()) {
+        length += 1
+        val next = ArrayList<Int>()
+        for (cell in layer) {
+            val r = cell / cols; val c = cell % cols
+            for ((dr, dc) in dirs) {
+                val nr = r + dr; val nc = c + dc
+                if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] > grid[r][c]) {
+                    val id = nr * cols + nc
+                    lower[id] -= 1
+                    if (lower[id] == 0) next.add(id)
+                }
+            }
+        }
+        layer = next
+    }
+    return length - 1
+}
+"""),
+        ("follows-every-path", "PERFORMANCE",
+         "칸마다 메모 없이 모든 오르막 경로를 따라간다. 경로의 가짓수가 폭발한다.",
+         """
+fun longestIncreasingPath(grid: Array<IntArray>): Int {
+    val rows = grid.size
+    if (rows == 0 || grid[0].isEmpty()) return 0
+    val cols = grid[0].size
+    val dirs = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
+    var best = 0
+    for (sr in 0 until rows) for (sc in 0 until cols) {
+        val stack = java.util.ArrayDeque<IntArray>()
+        stack.push(intArrayOf(sr, sc, 1))
+        while (stack.isNotEmpty()) {
+            val (r, c, len) = stack.pop()
+            Drill.compare(r * cols + c, len)
+            if (len > best) best = len
+            for ((dr, dc) in dirs) {
+                val nr = r + dr; val nc = c + dc
+                if (nr in 0 until rows && nc in 0 until cols && grid[nr][nc] > grid[r][c]) stack.push(intArrayOf(nr, nc, len + 1))
+            }
+        }
+    }
+    return best
+}
+"""),
+    ],
+))
