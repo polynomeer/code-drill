@@ -1,0 +1,8 @@
+difficulty: HARD
+tags:
+  - heap
+  - queue
+  - simulation
+summary: 지정가·시장가 주문을 가격 우선·시간 우선으로 체결하는 호가창을 만든다 — 부분 체결, 남은 수량의 처리, 취소, 한 번 쓴 주문 번호, 비어 버린 가격대까지.
+competencies:
+  - SPECIFICATION
