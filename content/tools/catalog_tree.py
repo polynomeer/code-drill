@@ -680,7 +680,10 @@ Drill.compare(l, r)            // 질의 구간을 봤다
                    returns="INT_ARRAY"),
     # 질의 수만큼 출력한다.
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.9배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.6),
     reference=_range_sums,
     cases={
         "sample": [

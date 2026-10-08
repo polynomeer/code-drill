@@ -822,7 +822,10 @@ Drill.write(0, best)          // 지금까지의 최장 길이
 """,
     signature=dict(name="longestOnes", parameters=[("bits", "INT_ARRAY"), ("k", "INT")],
                    returns="INT"),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.2배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.45),
     reference=_longest_ones,
     cases={
         "sample": [
@@ -2575,7 +2578,10 @@ Drill.write(i, total)         // 누적 합을 적었다
 - `-10^4 <= nums[i] <= 10^4` — 합은 `Int` 범위 안
 """,
     signature=dict(name="runningSum", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.9배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.6),
     reference=_running_sum,
     cases={
         "sample": [("01", [[1, 2, 3, 4]]), ("02", [[3, -1, 4]])],
@@ -3893,7 +3899,10 @@ Drill.write(0, total)         // 세었다
 """,
     signature=dict(name="subarrayProductLessThanK", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
     # n² 오답이 6 만에서 1.8배였다 — 답이 Int 안이어야 해서 n 을 못 키우니 한도를 조인다.
-    groups=perf_groups(time_multiplier=0.25),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.5배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.13),
     reference=_product_less_than_k,
     cases={
         "sample": [("01", [[10, 5, 2, 6], 100]), ("02", [[1, 2, 3], 0])],

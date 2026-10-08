@@ -262,7 +262,7 @@ PROBLEMS.append(Problem(
     id="count-inversions",
     # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
     # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
-    version=2,
+    version=3,
     title="역순 쌍의 개수",
     summary="""
 정수 배열 `nums` 에서 `i < j` 이면서 `nums[i] > nums[j]` 인 쌍의 개수를 반환한다.
@@ -283,7 +283,9 @@ Drill.call("sort")          // 재귀로 내려갔다
 - 정답은 `Int` 범위를 넘지 않는다
 """,
     signature=dict(name="countInversions", parameters=[("nums", "INT_ARRAY")], returns="INT"),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.0배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v3).
+    groups=perf_groups(time_multiplier=0.4),
     reference=_inversions,
     cases={
         "sample": [
@@ -1032,7 +1034,10 @@ Drill.write(index, value)     // 병합해 정렬된 누적합을 적었다
         returns="INT",
     ),
     # 모든 쌍을 보는 오답이 10 만에서 한도의 2.3 배로 겨우 넘겼다. 입력은 자료형 상한이라 한도를 조인다.
-    groups=perf_groups(time_multiplier=0.5),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.4배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.25),
     reference=_count_range_sums,
     cases={
         "sample": [
@@ -2245,7 +2250,10 @@ Drill.compare(i, j)   // 왼쪽 i 와 오른쪽 j 를 견줬다
 """,
     signature=dict(name="reversePairs", parameters=[("nums", "INT_ARRAY")], returns="INT"),
     # 모든 쌍을 보는 오답은 5 만에서 한도의 2.4배였다. 쌍의 수가 Int 에 드는 한(n²/2 < 2^31) 65 000 까지 늘린다.
-    groups=perf_groups(time_multiplier=0.25),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.7배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.15),
     reference=_reverse_pairs,
     cases={
         "sample": [("01", [[1, 3, 2, 3, 1]]), ("02", [[2, 4, 3, 5, 1]])],

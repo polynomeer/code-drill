@@ -2,7 +2,7 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: count-inversions
-version: 2
+version: 3
 title: 역순 쌍의 개수
 statement: statement.md
 
@@ -41,3 +41,5 @@ groups:
     visibility: HIDDEN
     aggregation: SUM
     stopPolicy: CONTINUE
+    limitMultiplier:
+      time: 0.4

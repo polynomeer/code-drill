@@ -163,7 +163,7 @@ PROBLEMS.append(Problem(
     id="next-greater-distance",
     # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
     # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
-    version=2,
+    version=3,
     title="다음 더 큰 값까지의 거리",
     summary="""
 정수 배열 `values` 가 주어진다. 각 위치마다 **자기보다 큰 값이 처음 나오는 곳까지의
@@ -187,7 +187,9 @@ Drill.write(index, dist)   // 거리를 적었다
                    returns="INT_ARRAY"),
     # 배열을 돌려주므로 기본 64KB 로는 성능 케이스의 정답조차 담지 못한다.
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 800000},
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.0배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v3).
+    groups=perf_groups(time_multiplier=0.4),
     reference=_next_greater,
     cases={
         "sample": [
@@ -316,7 +318,7 @@ PROBLEMS.append(Problem(
     id="histogram-rectangle",
     # v2: 성능 케이스를 키웠다. 두 겹 풀이가 한도를 배로만 넘겨, 한가한 머신에서는
     # 통과하고 바쁜 머신에서만 잡혔다 (§12.1 재현성).
-    version=2,
+    version=3,
     title="히스토그램에서 가장 큰 직사각형",
     summary="""
 너비가 1 인 막대의 높이 배열 `heights` 가 주어진다. 이 히스토그램 안에 들어가는 가장
@@ -338,7 +340,9 @@ Drill.write(0, area)  // 지금까지의 최대 넓이
 """,
     signature=dict(name="largestRectangle", parameters=[("heights", "INT_ARRAY")],
                    returns="INT"),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.2배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v3).
+    groups=perf_groups(time_multiplier=0.45),
     reference=_histogram,
     cases={
         "sample": [
@@ -1007,7 +1011,10 @@ Drill.write(0, best)          // 지금까지의 최대
 - `0 <= s.length <= 200_000`
 """,
     signature=dict(name="longestValidParentheses", parameters=[("s", "STRING")], returns="INT"),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 3.0배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.6),
     reference=_longest_valid_parentheses,
     cases={
         "sample": [("01", ["(()"]), ("02", [")()())"])],
@@ -1155,7 +1162,10 @@ Drill.compare(top, digit)     // 스택 꼭대기와 지금 자리를 비교했�
         parameters=[("num", "STRING"), ("k", "INT")],
         returns="STRING",
     ),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.1배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.45),
     reference=_remove_k_digits,
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 400000},
     cases={
@@ -1454,7 +1464,10 @@ Drill.pop(i)                  // 쓸모없어진 자리를 뒤에서 뺐다
 """,
     signature=dict(name="shortestSubarrayAtLeastK", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
     # 모든 쌍 오답이 10 만에서 1.8 배로 겨우 넘겼다. 입력은 상한이라 한도를 조인다.
-    groups=perf_groups(time_multiplier=0.4),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.9배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.25),
     reference=_shortest_at_least_k,
     cases={
         "sample": [("01", [[2, -1, 2], 3]), ("02", [[1, 2], 4])],

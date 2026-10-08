@@ -2050,7 +2050,7 @@ PROBLEMS.append(Problem(
 """,
     notes="""
 단어가 정점이고 "글자 하나 차이"가 간선인 그래프의 최단 경로 — BFS 다. 간선을 모든 쌍으로
-만들면 O(n²·L) — 5 만 단어면 12 억 번 — 이고, 단어마다 자리 하나를 26 글자로 바꿔 목록에 있는지 보면 O(n·L·26) 이다.
+만들면 O(n²·L) — 10 만 단어면 50 억 번 — 이고, 단어마다 자리 하나를 26 글자로 바꿔 목록에 있는지 보면 O(n·L·26) 이다.
 방문 표시가 없으면 같은 단어를 몇 번이고 다시 넣어 끝나지 않는다.
 """,
     drill_doc="""
@@ -2059,10 +2059,15 @@ Drill.dequeue(i)              // 꺼냈다
 Drill.match(i, steps)         // end 에 닿았다
 """,
     constraints="""
-- `1 <= 단어 길이 <= 10`, `0 <= words.size <= 50_000`, 소문자만
+- `1 <= 단어 길이 <= 10`, `0 <= words.size <= 100_000`, 소문자만
 - `begin != end`
 """,
     signature=dict(name="wordLadder", parameters=[("begin", "STRING"), ("end", "STRING"), ("words", "STRING_ARRAY")], returns="INT"),
+    # 빠른 CI 러너에서 모든 쌍을 견주는 오답이 한도의 2.9배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 정답이 한도의
+    # 2 할 가까이를 써서 시계를 조일 수 없고(0.3 에서 정답이 넘쳤다), 단어만 늘리면 정답도 같이 무거워진다. 그래서 정답은
+    # 일이 없고 오답만 모든 쌍을 견주는 입력 — 고립된 시작 단어와 10 만 단어 — 을 더한다(v4 — v2·v3 은 시계를 조이고
+    # 단어를 늘린 시도였고 개발 스택에만 등록됐다).
+    version=4,
     groups=perf_groups(time_multiplier=0.5),
     reference=_word_ladder,
     cases={
@@ -2092,6 +2097,8 @@ Drill.match(i, steps)         // end 에 닿았다
             ("02-medium", ["aaaaaa", "hhhhhh", _word_pool(20000, 6, salt=7604)]),
             # 5 만 단어. 모든 쌍을 견주면 12 억 번이다.
             ("03-large", ["aaaaaa", "hhhhhh", sorted(set(_word_pool(50000, 6, salt=7605)) | {"hhhhhh"})]),
+            # 시작 단어의 이웃이 없다 — 정답은 한 걸음에 끝나고, 간선부터 만드는 풀이는 10 만 단어의 모든 쌍(50 억)을 견준다.
+            ("04-isolated-begin", ["zzzzzzz", "hhhhhhh", sorted(set(_word_pool(100000, 7, salt=10239)) | {"hhhhhhh"})]),
         ],
     },
     kotlin="""
@@ -4951,7 +4958,10 @@ Drill.dequeue(v)              // 이번 학기에 들은 과목
 - 같은 쌍의 간선이 여럿 있을 수 있고, 자기 자신으로 가는 간선은 없다
 """,
     signature=dict(name="uniqueCourseOrder", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
-    groups=perf_groups(),
+    # 빠른 CI 러너에서 느린 오답이 한도의 2.7배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도 4.5배가
+    # 되도록 성능 그룹의 시계를 조인다(v2).
+    version=2,
+    groups=perf_groups(time_multiplier=0.6),
     reference=_unique_course_order,
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 65536},
     cases={

@@ -2,7 +2,7 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: histogram-rectangle
-version: 2
+version: 3
 title: 히스토그램에서 가장 큰 직사각형
 statement: statement.md
 
@@ -41,3 +41,5 @@ groups:
     visibility: HIDDEN
     aggregation: SUM
     stopPolicy: CONTINUE
+    limitMultiplier:
+      time: 0.45

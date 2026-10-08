@@ -1280,12 +1280,14 @@ Drill.write(size, count)      // 크기의 답을 정했다
 """,
     signature=dict(name="uniqueBstCount", parameters=[("n", "INT")], returns="INT"),
     # 공개 뒤 한도(케이스)를 고쳤다 — 판정이 바뀌므로 새 버전이다 (§6.1 공개 후 불변).
-    version=2,
+    # 빠른 CI 러너에서 메모 없는 오답이 한도의 2.7배에 그쳤다 — 러너의 CPU 는 실행마다 다르다. 그 러너에서도
+    # 4.5배가 되도록 한도를 150ms 에서 90ms 로 조인다(v3). 정답은 한도의 0% 를 쓴다.
+    version=3,
     groups=standard_groups(),
     reference=_unique_bst,
     # 기억 없는 재귀는 n = 19 에서 3^19 번쯤 부르고 1초 남짓이다. 기본 한도 2초 안에 들어와
     # 살아남았고, 400ms 에서 1.9배, 200ms 에서도 전체 검증에서 3.0배였다. 정답은 마이크로초라 150ms.
-    limits={"timeMillis": 150, "memoryMb": 256, "outputBytes": 65536},
+    limits={"timeMillis": 90, "memoryMb": 256, "outputBytes": 65536},
     cases={
         "sample": [("01", [3]), ("02", [1])],
         "boundary": [

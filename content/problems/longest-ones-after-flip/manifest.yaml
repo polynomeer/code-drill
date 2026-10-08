@@ -2,7 +2,7 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: longest-ones-after-flip
-version: 1
+version: 2
 title: 0을 k개까지 뒤집어 만든 최장 1 구간
 statement: statement.md
 
@@ -43,3 +43,5 @@ groups:
     visibility: HIDDEN
     aggregation: SUM
     stopPolicy: CONTINUE
+    limitMultiplier:
+      time: 0.45

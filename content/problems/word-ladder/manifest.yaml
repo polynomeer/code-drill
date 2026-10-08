@@ -2,7 +2,7 @@
 # 이 파일과 tests/ 의 내용이 problem_version_id 를 결정한다. 공개 후에는 불변이다.
 
 id: word-ladder
-version: 1
+version: 4
 title: 단어 사다리
 statement: statement.md
 
