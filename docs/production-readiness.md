@@ -395,7 +395,8 @@ push 를 한 적이 없어 images 워크플로가 돈 적이 없다. 첫 배포 
 **덮어쓰기로 안 되는 것이 와서 Boot 를 올렸다 (2026-10).** `spring-webmvc` 6.2.5 의
 CVE-2026-47884 는 고친 판이 Spring 7.0.9 뿐이었다 — 프로퍼티 한 줄로 덮을 수 없는 메이저다.
 게이트는 한시 면제로 열어 두고 Boot 3.4.4 → 4.1.1 (Spring 7.0.9, Kotlin 2.3, Tomcat 11, Netty 4.2)로
-올린 뒤 면제를 지웠다. Tomcat·Netty 덮어쓰기도 함께 지웠다 — Boot 4 가 고정한 판이 더 새것이다.
+올린 뒤 면제를 지웠다. Netty 덮어쓰기는 지웠다 — Boot 4 가 고정한 판이 더 새것이다. Tomcat 은 올리자마자
+게이트가 다시 잡아(Boot 4.1.1 의 11.0.24 에 CRITICAL 셋, CVE-2026-65182 등) 같은 방식으로 11.0.26 으로 덮었다.
 옮기며 정한 것: HTTP·브로커의 JSON 은 Boot 4 의 기본인 Jackson 3 이 쓰되
 `spring.jackson.use-jackson2-defaults` 로 응답 모양을 그대로 두고, 우리 코드의 직렬화(패키지
 다이제스트·YAML·JSONB)는 Jackson 2 에 남겼다 — 3 의 기본값(속성 이름순 등)으로 바뀌면 저장된

@@ -14,6 +14,10 @@ subprojects {
 
     repositories { mavenCentral() }
 
+    // Boot 가 고정한 Tomcat 의 패치 판에 고칠 수 있는 CRITICAL 이 있을 때 (§11.4 이미지 스캔) BOM 프로퍼티를
+    // 덮어 그 하나만 올린다 — 셋(core·el·websocket)이 이 한 값을 함께 쓴다. 이유는 libs.versions.toml 에.
+    extra["tomcat.version"] = rootProject.libs.versions.tomcat.get()
+
     the<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension>().apply {
         imports {
             mavenBom("org.springframework.boot:spring-boot-dependencies:${rootProject.libs.versions.springBoot.get()}")

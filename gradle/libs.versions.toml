@@ -1,6 +1,9 @@
 [versions]
 kotlin = "2.3.21"
 springBoot = "4.1.1"
+# Boot 4.1.1 이 고정하는 11.0.24 를 덮어쓴다. 고칠 수 있는 CRITICAL 이 셋 있다 (CVE-2026-65182 등, 11.0.25 에서 고침).
+# Boot 를 올릴 때 그 판이 이것보다 새것이면 이 줄을 지운다.
+tomcat = "11.0.26"
 springDependencyManagement = "1.1.7"
 awsSdk = "2.31.16"
 
