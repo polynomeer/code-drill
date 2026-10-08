@@ -76,6 +76,7 @@ scoops:
       owner: polynomeer
       name: scoop-bucket
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: bucket
     skip_upload: '{{ if isEnvSet "TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
     homepage: https://github.com/polynomeer/code-drill
     description: Solve CodeDrill project problems in your own IDE

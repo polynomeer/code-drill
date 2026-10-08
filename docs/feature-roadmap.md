@@ -977,8 +977,8 @@ WRONG_ANSWER(숨은 8/9, 6/9)·WRONG_ANSWER(0/1) 를 확인했다.
     푸는 사람도 Java 를 깔아야 한다. `test` 는 키트의 실행 명령을 그대로 부르고, `submit` 은 웹과 같은 규칙으로
     키트·빌드 파일을 빼고 한도를 미리 재서 `projectVersion` 과 함께 올린 뒤 판정을 기다린다. 배포는 `v*` 태그 →
     GoReleaser(Releases·Homebrew 탭·Scoop 버킷·install.sh), `checksums.txt` 는 cosign 키 없는 서명.
-  - **남긴 것 (2단계)**: Homebrew 탭·Scoop 버킷 저장소와 `TAP_GITHUB_TOKEN` 은 아직 없다 — 만들기 전까지는
-    Releases 와 install.sh 만. 공개 주소가 정해지면 CLI 의 기본 서버(`http://localhost:8080`)를 바꾼다. CLI 판이
+  - **남긴 것 (2단계)**: Homebrew 탭·Scoop 버킷 저장소는 만들었고(`polynomeer/homebrew-tap`·`scoop-bucket`),
+    거기 쓸 `TAP_GITHUB_TOKEN` 비밀이 아직 없다 — 넣기 전까지 릴리스는 Releases 와 install.sh 만. 공개 주소가 정해지면 CLI 의 기본 서버(`http://localhost:8080`)를 바꾼다. CLI 판이
     너무 낡았을 때 서버가 막는 장치(최소 판)는 아직 없다 — User-Agent 에 판을 싣고 있으니 필요해지면 거기서 건다.
 - **남긴 것 (1단계)**: 로컬 툴체인 판이 채점기와 다르면 결과가 갈릴 수 있다 — Kotlin 판은 빌드 파일에 고정했고
   JDK 는 17~21 을 권한다(Gradle 의 Kotlin 스크립트가 JDK 25 에서 읽히지 않았다). 받은 판보다 문제가 새 판이

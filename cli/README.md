@@ -40,5 +40,6 @@ go run . help
 ## 릴리스
 
 `v*` 태그를 밀면 `.github/workflows/cli.yml` 이 GoReleaser 로 여섯 판을 올린다. 앱은 커밋 해시로 배포하고
-태그를 쓰지 않으므로 `v*` 는 CLI 의 것이다. Homebrew 탭·Scoop 버킷은 `polynomeer/homebrew-tap`,
-`polynomeer/scoop-bucket` 저장소와 거기 쓸 수 있는 `TAP_GITHUB_TOKEN` 비밀이 있어야 올라간다 — 없으면 Releases 만.
+태그를 쓰지 않으므로 `v*` 는 CLI 의 것이다. Homebrew 탭·Scoop 버킷은 `polynomeer/homebrew-tap`(`Casks/`),
+`polynomeer/scoop-bucket`(`bucket/`)에 쓴다. 두 저장소에 Contents 쓰기 권한만 있는 fine-grained 토큰을
+이 저장소의 `TAP_GITHUB_TOKEN` 비밀로 넣어야 올라간다 — 없으면 Releases 만.
