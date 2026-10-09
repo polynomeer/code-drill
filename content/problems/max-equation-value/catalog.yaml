@@ -1,0 +1,17 @@
+# max-equation-value 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - queue
+  - sliding-window
+  - array
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - sliding-window-max
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "점마다 덱에 한 번 들어가고 한 번 나온다"

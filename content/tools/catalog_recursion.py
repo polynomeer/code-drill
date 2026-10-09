@@ -2932,3 +2932,142 @@ fun settleDebts(transactions: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 대소문자 바꾸기의 모든 경우 ---------------------------------------------------
+
+def _letter_case_permutations(s):
+    out = [""]
+    for ch in s:
+        if ch.isalpha():
+            out = [p + c for p in out for c in (ch.lower(), ch.upper())]
+        else:
+            out = [p + ch for p in out]
+    return sorted(out)
+
+
+PROBLEMS.append(Problem(
+    id="letter-case-permutations",
+    title="대소문자 바꾸기의 모든 경우",
+    summary="""
+영문자와 숫자로 된 문자열 `s` 에서 각 영문자를 소문자나 대문자로 바꿔 만들 수 있는 문자열을 모두 담은 배열을 반환한다.
+원래 문자열도 포함하고, 같은 문자열은 한 번만 넣는다. 배열은 **사전순(문자 코드 순 — 대문자가 소문자보다 앞)** 으로
+정렬한다.
+""",
+    notes="""
+글자를 하나씩 정하는 백트래킹이다. 영문자면 두 갈래(소문자, 대문자), 숫자면 한 갈래다 — 숫자를 두 번 넣으면 같은
+문자열이 둘 생긴다. 영문자가 `L` 개면 결과는 정확히 `2^L` 개다.
+
+문자 코드에서 대문자(`A`=65)가 소문자(`a`=97)보다 앞이므로, 갈래를 대문자부터 내려가면 결과가 처음부터 사전순으로
+나온다. 소문자부터 내려갔다면 마지막에 정렬한다.
+""",
+    drill_doc="""
+Drill.call(prefix)   // 이 접두사까지 정했다
+""",
+    constraints="""
+- `1 <= s.length <= 12`, `s` 는 영문자와 숫자로만 이뤄진다
+""",
+    signature=dict(name="letterCasePermutations", parameters=[("s", "STRING")], returns="STRING_ARRAY"),
+    groups=standard_groups(),
+    reference=_letter_case_permutations,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", ["a1b2"]), ("02", ["3z4"])],
+        "boundary": [
+            ("01-digits-only", ["12345"]),
+            ("02-single-letter", ["Q"]),
+            ("03-single-digit", ["7"]),
+            ("04-mixed-case-input", ["aB"]),
+            ("05-letters-only", ["abc"]),
+        ],
+        "hidden": [
+            ("01-twelve-letters", ["AbCdEfGhIjKl"]),
+            ("02-digits-between", ["0a1B2c3D4e5F"]),
+            ("03-digit-edges", ["9xyz9"]),
+            ("04-repeated-letter", ["aaaa"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 글자마다 갈래를 대문자부터 내려가는 백트래킹 — 결과가 그대로 사전순이다.
+fun letterCasePermutations(s: String): Array<String> {
+    val out = ArrayList<String>()
+    val chars = s.toCharArray()
+    fun go(i: Int) {
+        if (i == chars.size) { out.add(String(chars)); return }
+        val c = s[i]
+        if (c.isLetter()) {
+            chars[i] = c.uppercaseChar(); go(i + 1)
+            chars[i] = c.lowercaseChar(); go(i + 1)
+            chars[i] = c
+        } else {
+            go(i + 1)
+        }
+    }
+    go(0)
+    Drill.call(s)
+    return out.toTypedArray()
+}
+""",
+    mutants=[
+        ("lowercase-branch-first", "WRONG_BRANCH",
+         "소문자 갈래부터 내려가고 정렬하지 않는다. 대문자가 문자 코드에서 앞이라 순서가 거꾸로다.",
+         """
+fun letterCasePermutations(s: String): Array<String> {
+    val out = ArrayList<String>()
+    val chars = s.toCharArray()
+    fun go(i: Int) {
+        if (i == chars.size) { out.add(String(chars)); return }
+        val c = s[i]
+        if (c.isLetter()) { chars[i] = c.lowercaseChar(); go(i + 1); chars[i] = c.uppercaseChar(); go(i + 1); chars[i] = c } else go(i + 1)
+    }
+    go(0)
+    return out.toTypedArray()
+}
+"""),
+        ("digits-branch-too", "MISSING_EDGE_CASE",
+         "숫자도 두 갈래로 내려간다. 숫자의 대소문자는 같아 같은 문자열이 두 번 들어간다.",
+         """
+fun letterCasePermutations(s: String): Array<String> {
+    val out = ArrayList<String>()
+    val chars = s.toCharArray()
+    fun go(i: Int) {
+        if (i == chars.size) { out.add(String(chars)); return }
+        val c = s[i]
+        chars[i] = c.uppercaseChar(); go(i + 1)
+        chars[i] = c.lowercaseChar(); go(i + 1)
+        chars[i] = c
+    }
+    go(0)
+    return out.toTypedArray()
+}
+"""),
+        ("toggles-one-letter", "WRONG_ALGORITHM",
+         "원래 문자열에서 영문자 하나씩만 바꾼 것들을 낸다. 여러 글자를 함께 바꾼 경우가 빠진다.",
+         """
+fun letterCasePermutations(s: String): Array<String> {
+    val out = sortedSetOf(s)
+    for (i in s.indices) if (s[i].isLetter()) {
+        val c = s[i]
+        val flipped = if (c.isUpperCase()) c.lowercaseChar() else c.uppercaseChar()
+        out.add(s.substring(0, i) + flipped + s.substring(i + 1))
+    }
+    return out.toTypedArray()
+}
+"""),
+        ("original-left-out", "OFF_BY_ONE",
+         "원래 문자열을 결과에서 뺀다. 원래 문자열도 바꾸기의 한 경우다.",
+         """
+fun letterCasePermutations(s: String): Array<String> {
+    val out = ArrayList<String>()
+    val chars = s.toCharArray()
+    fun go(i: Int) {
+        if (i == chars.size) { val t = String(chars); if (t != s) out.add(t); return }
+        val c = s[i]
+        if (c.isLetter()) { chars[i] = c.uppercaseChar(); go(i + 1); chars[i] = c.lowercaseChar(); go(i + 1); chars[i] = c } else go(i + 1)
+    }
+    go(0)
+    return out.toTypedArray()
+}
+"""),
+    ],
+))

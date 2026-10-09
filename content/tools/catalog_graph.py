@@ -7625,3 +7625,460 @@ fun dagShortestPaths(n: Int, edges: IntArray, source: Int): IntArray {
 """),
     ],
 ))
+
+
+# --- 화살표를 고쳐 끝까지 가기 -------------------------------------------------
+
+_ARROWS = {1: (0, 1), 2: (0, -1), 3: (1, 0), 4: (-1, 0)}
+
+
+def _min_cost_valid_path(grid):
+    from collections import deque
+    m, n = len(grid), len(grid[0])
+    dist = [[None] * n for _ in range(m)]
+    dist[0][0] = 0
+    queue = deque([(0, 0)])
+    while queue:
+        r, c = queue.popleft()
+        d = dist[r][c]
+        for sign, (dr, dc) in _ARROWS.items():
+            a, b = r + dr, c + dc
+            if 0 <= a < m and 0 <= b < n:
+                w = 0 if grid[r][c] == sign else 1
+                if dist[a][b] is None or d + w < dist[a][b]:
+                    dist[a][b] = d + w
+                    if w == 0:
+                        queue.appendleft((a, b))
+                    else:
+                        queue.append((a, b))
+    return dist[m - 1][n - 1]
+
+
+def _arrow_grid(m, n, salt):
+    return [randoms(n, 1, 4, salt=salt + r) for r in range(m)]
+
+
+def _snake_arrows(m, n):
+    """줄마다 오른쪽·왼쪽을 번갈아 가는 뱀 — 화살표만 따라가면 칸을 모두 돌고 끝에 닿는다."""
+    rows = []
+    for r in range(m):
+        row = [1] * n if r % 2 == 0 else [2] * n
+        row[-1 if r % 2 == 0 else 0] = 3
+        rows.append(row)
+    return rows
+
+
+PROBLEMS.append(Problem(
+    id="min-cost-valid-path",
+    title="화살표를 고쳐 끝까지 가기",
+    summary="""
+`m × n` 격자의 칸마다 화살표가 하나 있다: `1` 오른쪽, `2` 왼쪽, `3` 아래, `4` 위. 왼쪽 위 칸에서 출발해 화살표를 따라
+움직인다(격자 밖을 가리키는 화살표도 있다). 칸의 화살표는 비용 `1` 을 내고 다른 방향으로 바꿀 수 있고, 한 칸은 한 번만
+바꿀 수 있다. 오른쪽 아래 칸에 닿는 데 드는 최소 비용을 반환한다.
+""",
+    notes="""
+칸에서 이웃으로 가는 간선은 넷이고, 화살표 방향이면 무게 `0`, 아니면 무게 `1` 이다(그 칸의 화살표를 바꾸는 값). 최단
+경로라 한 칸을 두 번 지날 일이 없으니 "한 칸은 한 번만"은 저절로 지켜진다.
+
+무게가 0 과 1 뿐이면 덱 하나로 다익스트라를 대신한다(0-1 BFS): 무게 0 으로 줄어든 칸은 덱 앞에, 무게 1 이면 뒤에 넣는다.
+덱 앞에서 꺼내는 칸은 언제나 거리가 가장 작다. 칸이 더 짧은 거리로 다시 줄어들 수 있으니 **거리가 줄었을 때만** 넣고,
+처음 넣을 때 방문을 확정하면 안 된다.
+""",
+    drill_doc="""
+Drill.visit(r * n + c, dist)   // 덱에서 꺼낸 칸과 그 거리
+""",
+    constraints="""
+- `1 <= m, n <= 400`
+- `grid[r][c]` 는 `1..4`
+""",
+    signature=dict(name="minCostValidPath", parameters=[("grid", "INT_MATRIX")], returns="INT"),
+    groups=standard_groups(),
+    reference=_min_cost_valid_path,
+    cases={
+        "sample": [
+            ("01", [[[1, 1, 1, 1], [2, 2, 2, 2], [1, 1, 1, 1], [2, 2, 2, 2]]]),
+            ("02", [[[1, 1, 3], [3, 2, 2], [1, 1, 4]]]),
+        ],
+        "boundary": [
+            ("01-single", [[[4]]]),
+            ("02-one-row-right", [[[1, 1, 1, 1]]]),
+            ("03-one-row-left", [[[2, 2, 2, 2]]]),
+            ("04-one-column-down", [[[3], [3], [3]]]),
+            ("05-one-column-up", [[[4], [4], [4]]]),
+            # 처음 닿은 길이 비싸고, 나중에 덱 앞으로 들어온 길이 더 싸다.
+            ("06-cheaper-later", [[[1, 1, 3], [4, 4, 3], [2, 2, 2]]]),
+            ("07-free-snake", [_snake_arrows(4, 3)]),
+        ],
+        "hidden": [
+            ("01-random-small", [_arrow_grid(5, 6, salt=10525)]),
+            ("02-random-large", [_arrow_grid(400, 400, salt=10527)]),
+            ("03-snake-large", [_snake_arrows(400, 400)]),
+            ("04-all-up", [[[4] * 300 for _ in range(300)]]),
+            ("05-tall-thin", [_arrow_grid(400, 3, salt=10529)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 0-1 BFS — 화살표 방향은 무게 0 이라 덱 앞에, 아니면 무게 1 이라 덱 뒤에 넣는다.
+fun minCostValidPath(grid: Array<IntArray>): Int {
+    val m = grid.size
+    val n = grid[0].size
+    val dr = intArrayOf(0, 0, 0, 1, -1)
+    val dc = intArrayOf(0, 1, -1, 0, 0)
+    val dist = IntArray(m * n) { Int.MAX_VALUE }
+    dist[0] = 0
+    val queue = ArrayDeque<Int>()
+    queue.addLast(0)
+    while (queue.isNotEmpty()) {
+        val cell = queue.removeFirst()
+        val r = cell / n; val c = cell % n
+        Drill.visit(cell, dist[cell])
+        for (sign in 1..4) {
+            val a = r + dr[sign]; val b = c + dc[sign]
+            if (a < 0 || a >= m || b < 0 || b >= n) continue
+            val w = if (grid[r][c] == sign) 0 else 1
+            val next = a * n + b
+            if (dist[cell] + w < dist[next]) {
+                dist[next] = dist[cell] + w
+                if (w == 0) queue.addFirst(next) else queue.addLast(next)
+            }
+        }
+    }
+    return dist[m * n - 1]
+}
+""",
+    mutants=[
+        ("counts-steps", "WRONG_ALGORITHM",
+         "칸 수를 센다(보통의 BFS). 화살표를 따라가는 걸음은 공짜다.",
+         """
+fun minCostValidPath(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val dist = IntArray(m * n) { -1 }
+    dist[0] = 0
+    val queue = ArrayDeque<Int>(); queue.addLast(0)
+    while (queue.isNotEmpty()) {
+        val cell = queue.removeFirst(); val r = cell / n; val c = cell % n
+        for ((a, b) in listOf(r to c + 1, r to c - 1, r + 1 to c, r - 1 to c)) {
+            if (a < 0 || a >= m || b < 0 || b >= n || dist[a * n + b] >= 0) continue
+            dist[a * n + b] = dist[cell] + 1; queue.addLast(a * n + b)
+        }
+    }
+    return dist[m * n - 1]
+}
+"""),
+        ("settled-when-pushed", "WRONG_BRANCH",
+         "칸을 처음 덱에 넣을 때 거리를 확정한다. 무게 1 로 먼저 닿은 칸에 나중에 무게 0 의 더 싼 길이 와도 고치지 않는다.",
+         """
+fun minCostValidPath(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val dr = intArrayOf(0, 0, 0, 1, -1); val dc = intArrayOf(0, 1, -1, 0, 0)
+    val dist = IntArray(m * n) { Int.MAX_VALUE }
+    val seen = BooleanArray(m * n)
+    dist[0] = 0; seen[0] = true
+    val queue = ArrayDeque<Int>(); queue.addLast(0)
+    while (queue.isNotEmpty()) {
+        val cell = queue.removeFirst(); val r = cell / n; val c = cell % n
+        for (sign in 1..4) {
+            val a = r + dr[sign]; val b = c + dc[sign]
+            if (a < 0 || a >= m || b < 0 || b >= n) continue
+            val next = a * n + b
+            if (seen[next]) continue
+            val w = if (grid[r][c] == sign) 0 else 1
+            seen[next] = true; dist[next] = dist[cell] + w
+            if (w == 0) queue.addFirst(next) else queue.addLast(next)
+        }
+    }
+    return dist[m * n - 1]
+}
+"""),
+        ("up-and-down-swapped", "WRONG_BRANCH",
+         "3 을 위, 4 를 아래로 읽는다. 3 이 아래, 4 가 위다.",
+         """
+fun minCostValidPath(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val dr = intArrayOf(0, 0, 0, -1, 1); val dc = intArrayOf(0, 1, -1, 0, 0)
+    val dist = IntArray(m * n) { Int.MAX_VALUE }
+    dist[0] = 0
+    val queue = ArrayDeque<Int>(); queue.addLast(0)
+    while (queue.isNotEmpty()) {
+        val cell = queue.removeFirst(); val r = cell / n; val c = cell % n
+        for (sign in 1..4) {
+            val a = r + dr[sign]; val b = c + dc[sign]
+            if (a < 0 || a >= m || b < 0 || b >= n) continue
+            val w = if (grid[r][c] == sign) 0 else 1
+            val next = a * n + b
+            if (dist[cell] + w < dist[next]) { dist[next] = dist[cell] + w; if (w == 0) queue.addFirst(next) else queue.addLast(next) }
+        }
+    }
+    return dist[m * n - 1]
+}
+"""),
+        ("follows-arrows-greedily", "WRONG_ALGORITHM",
+         "화살표를 따라가다 막히면 그 자리에서 끝 쪽으로 화살표를 바꾼다. 지금 바꾸는 것이 가장 싼 길이라는 보장이 없다.",
+         """
+fun minCostValidPath(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val dr = intArrayOf(0, 0, 0, 1, -1); val dc = intArrayOf(0, 1, -1, 0, 0)
+    val seen = BooleanArray(m * n)
+    var r = 0; var c = 0; var cost = 0
+    while (r != m - 1 || c != n - 1) {
+        seen[r * n + c] = true
+        val a = r + dr[grid[r][c]]; val b = c + dc[grid[r][c]]
+        if (a in 0 until m && b in 0 until n && !seen[a * n + b]) { r = a; c = b; continue }
+        cost += 1
+        if (c < n - 1 && !seen[r * n + c + 1]) c += 1 else if (r < m - 1) r += 1 else c += 1
+    }
+    return cost
+}
+"""),
+    ],
+))
+
+
+# --- 조건대로 놓은 행렬 --------------------------------------------------------
+
+def _smallest_topo(k, conditions):
+    import heapq
+    adj = [[] for _ in range(k + 1)]
+    indegree = [0] * (k + 1)
+    for i in range(0, len(conditions), 2):
+        adj[conditions[i]].append(conditions[i + 1])
+        indegree[conditions[i + 1]] += 1
+    ready = [v for v in range(1, k + 1) if indegree[v] == 0]
+    heapq.heapify(ready)
+    order = []
+    while ready:
+        v = heapq.heappop(ready)
+        order.append(v)
+        for u in adj[v]:
+            indegree[u] -= 1
+            if indegree[u] == 0:
+                heapq.heappush(ready, u)
+    return order if len(order) == k else None
+
+
+def _build_matrix(k, row_conditions, col_conditions):
+    rows = _smallest_topo(k, row_conditions)
+    cols = _smallest_topo(k, col_conditions)
+    if rows is None or cols is None:
+        return []
+    row_of = {v: i for i, v in enumerate(rows)}
+    col_of = {v: i for i, v in enumerate(cols)}
+    matrix = [[0] * k for _ in range(k)]
+    for v in range(1, k + 1):
+        matrix[row_of[v]][col_of[v]] = v
+    return matrix
+
+
+def _dag_conditions(k, m, salt):
+    """1..k 를 섞은 순서에서 앞 → 뒤로만 가는 조건 m 개. 순환이 없다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    order = list(range(1, k + 1))
+    source.shuffle(order)
+    out = []
+    for _ in range(m):
+        i, j = sorted(source.sample(range(k), 2))
+        out += [order[i], order[j]]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="matrix-from-conditions",
+    title="조건대로 놓은 행렬",
+    summary="""
+`1..k` 를 `k × k` 행렬에 하나씩 놓고 나머지 칸은 `0` 으로 둔다. `rowConditions = [a1, b1, a2, b2, ...]` 의 쌍마다 `a`
+가 `b` 보다 **위 행**에, `colConditions` 의 쌍마다 `a` 가 `b` 보다 **왼쪽 열**에 있어야 한다. 행의 순서와 열의 순서는 각각
+조건을 지키는 순서 가운데 **매번 놓을 수 있는 가장 작은 수를 먼저 놓는** 순서로 정한다. 그렇게 만든 행렬을 반환하고,
+조건을 지킬 수 없으면 빈 배열을 반환한다.
+""",
+    notes="""
+행과 열은 따로 논다. 행의 조건만 보면 "a 가 b 보다 위"는 방향 간선 `a → b` 이고, 행의 순서는 그 그래프의 위상 순서다.
+열도 같다. 수 `v` 는 행 순서에서의 자리와 열 순서에서의 자리가 만나는 칸에 놓인다.
+
+위상 순서는 여럿일 수 있어 답을 하나로 정하려고 "놓을 수 있는(진입 차수가 0 인) 수 가운데 가장 작은 것부터"로 정했다 —
+Kahn 알고리즘에서 큐 대신 최소 힙을 쓴다. 어느 한쪽에 순환이 있으면 모든 수를 꺼내지 못하므로 빈 배열이다.
+""",
+    drill_doc="""
+Drill.dequeue(v)   // 행(또는 열) 순서에 놓았다
+""",
+    constraints="""
+- `2 <= k <= 400`
+- 조건은 각각 `1..10_000` 쌍, `1 <= a, b <= k`, `a != b`, 같은 쌍이 되풀이될 수 있다
+""",
+    signature=dict(name="buildMatrix",
+                   parameters=[("k", "INT"), ("rowConditions", "INT_ARRAY"), ("colConditions", "INT_ARRAY")],
+                   returns="INT_MATRIX"),
+    groups=standard_groups(),
+    reference=_build_matrix,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [
+            ("01", [3, [1, 2, 3, 2], [2, 1, 3, 2]]),
+            ("02", [3, [1, 2, 2, 3, 3, 1, 2, 3], [2, 1]]),
+        ],
+        "boundary": [
+            ("01-one-condition", [2, [1, 2], [2, 1]]),
+            # 가장 작은 수부터 — 큐(들어온 순서)로 꺼내면 다른 행렬이 나온다.
+            ("02-smallest-first", [4, [4, 1, 3, 2], [4, 3]]),
+            ("03-row-cycle", [3, [1, 2, 2, 1], [1, 2]]),
+            ("04-column-cycle", [3, [1, 2], [1, 2, 2, 3, 3, 1]]),
+            ("05-repeated-pair", [3, [3, 1, 3, 1, 3, 1], [1, 3, 1, 3]]),
+            ("06-chain", [4, [4, 3, 3, 2, 2, 1], [1, 2, 2, 3, 3, 4]]),
+        ],
+        "hidden": [
+            ("01-random-small", [6, _dag_conditions(6, 5, salt=10547), _dag_conditions(6, 4, salt=10549)]),
+            ("02-random-large", [400, _dag_conditions(400, 10_000, salt=10551), _dag_conditions(400, 10_000, salt=10553)]),
+            ("03-sparse-large", [400, _dag_conditions(400, 50, salt=10555), _dag_conditions(400, 30, salt=10557)]),
+            ("04-cycle-deep-inside", [300, _dag_conditions(300, 2000, salt=10559) + [7, 8, 8, 9, 9, 7],
+                                      _dag_conditions(300, 2000, salt=10561)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 행과 열 각각 최소 힙 Kahn 으로 위상 순서를 얻고, 두 자리가 만나는 칸에 수를 놓는다.
+fun buildMatrix(k: Int, rowConditions: IntArray, colConditions: IntArray): Array<IntArray> {
+    fun order(conditions: IntArray): IntArray? {
+        val adj = Array(k + 1) { ArrayList<Int>() }
+        val indegree = IntArray(k + 1)
+        for (i in conditions.indices step 2) { adj[conditions[i]].add(conditions[i + 1]); indegree[conditions[i + 1]] += 1 }
+        val ready = java.util.PriorityQueue<Int>()
+        for (v in 1..k) if (indegree[v] == 0) ready.add(v)
+        val out = IntArray(k)
+        var size = 0
+        while (ready.isNotEmpty()) {
+            val v = ready.poll()
+            out[size++] = v
+            Drill.dequeue(v)
+            for (u in adj[v]) { indegree[u] -= 1; if (indegree[u] == 0) ready.add(u) }
+        }
+        return if (size == k) out else null
+    }
+    val rows = order(rowConditions) ?: return arrayOf()
+    val cols = order(colConditions) ?: return arrayOf()
+    val rowOf = IntArray(k + 1); val colOf = IntArray(k + 1)
+    for (i in 0 until k) { rowOf[rows[i]] = i; colOf[cols[i]] = i }
+    val matrix = Array(k) { IntArray(k) }
+    for (v in 1..k) matrix[rowOf[v]][colOf[v]] = v
+    return matrix
+}
+""",
+    mutants=[
+        ("fifo-order", "WRONG_ALGORITHM",
+         "Kahn 알고리즘을 보통의 큐로 돌린다. 위상 순서는 맞지만 가장 작은 수부터가 아니다.",
+         """
+fun buildMatrix(k: Int, rowConditions: IntArray, colConditions: IntArray): Array<IntArray> {
+    fun order(conditions: IntArray): IntArray? {
+        val adj = Array(k + 1) { ArrayList<Int>() }
+        val indegree = IntArray(k + 1)
+        for (i in conditions.indices step 2) { adj[conditions[i]].add(conditions[i + 1]); indegree[conditions[i + 1]] += 1 }
+        val ready = java.util.ArrayDeque<Int>()
+        for (v in 1..k) if (indegree[v] == 0) ready.add(v)
+        val out = IntArray(k)
+        var size = 0
+        while (ready.isNotEmpty()) {
+            val v = ready.poll()
+            out[size++] = v
+            Drill.dequeue(v)
+            for (u in adj[v]) { indegree[u] -= 1; if (indegree[u] == 0) ready.add(u) }
+        }
+        return if (size == k) out else null
+    }
+    val rows = order(rowConditions) ?: return arrayOf()
+    val cols = order(colConditions) ?: return arrayOf()
+    val rowOf = IntArray(k + 1); val colOf = IntArray(k + 1)
+    for (i in 0 until k) { rowOf[rows[i]] = i; colOf[cols[i]] = i }
+    val matrix = Array(k) { IntArray(k) }
+    for (v in 1..k) matrix[rowOf[v]][colOf[v]] = v
+    return matrix
+}
+"""),
+        ("rows-and-columns-swapped", "WRONG_BRANCH",
+         "행 조건으로 열을, 열 조건으로 행을 정한다.",
+         """
+fun buildMatrix(k: Int, rowConditions: IntArray, colConditions: IntArray): Array<IntArray> {
+    fun order(conditions: IntArray): IntArray? {
+        val adj = Array(k + 1) { ArrayList<Int>() }
+        val indegree = IntArray(k + 1)
+        for (i in conditions.indices step 2) { adj[conditions[i]].add(conditions[i + 1]); indegree[conditions[i + 1]] += 1 }
+        val ready = java.util.PriorityQueue<Int>()
+        for (v in 1..k) if (indegree[v] == 0) ready.add(v)
+        val out = IntArray(k)
+        var size = 0
+        while (ready.isNotEmpty()) {
+            val v = ready.poll()
+            out[size++] = v
+            Drill.dequeue(v)
+            for (u in adj[v]) { indegree[u] -= 1; if (indegree[u] == 0) ready.add(u) }
+        }
+        return if (size == k) out else null
+    }
+    val rows = order(colConditions) ?: return arrayOf()
+    val cols = order(rowConditions) ?: return arrayOf()
+    val rowOf = IntArray(k + 1); val colOf = IntArray(k + 1)
+    for (i in 0 until k) { rowOf[rows[i]] = i; colOf[cols[i]] = i }
+    val matrix = Array(k) { IntArray(k) }
+    for (v in 1..k) matrix[rowOf[v]][colOf[v]] = v
+    return matrix
+}
+"""),
+        ("cycle-ignored", "MISSING_EDGE_CASE",
+         "순환을 보지 않는다. 꺼내지 못한 수를 순서 끝에 붙여 행렬을 낸다 — 조건을 지킬 수 없으면 빈 배열이다.",
+         """
+fun buildMatrix(k: Int, rowConditions: IntArray, colConditions: IntArray): Array<IntArray> {
+    fun order(conditions: IntArray): IntArray? {
+        val adj = Array(k + 1) { ArrayList<Int>() }
+        val indegree = IntArray(k + 1)
+        for (i in conditions.indices step 2) { adj[conditions[i]].add(conditions[i + 1]); indegree[conditions[i + 1]] += 1 }
+        val ready = java.util.PriorityQueue<Int>()
+        for (v in 1..k) if (indegree[v] == 0) ready.add(v)
+        val out = IntArray(k)
+        var size = 0
+        while (ready.isNotEmpty()) {
+            val v = ready.poll()
+            out[size++] = v
+            Drill.dequeue(v)
+            for (u in adj[v]) { indegree[u] -= 1; if (indegree[u] == 0) ready.add(u) }
+        }
+        for (v in 1..k) if (v !in out) { out[size++] = v }
+        return out
+    }
+    val rows = order(rowConditions) ?: return arrayOf()
+    val cols = order(colConditions) ?: return arrayOf()
+    val rowOf = IntArray(k + 1); val colOf = IntArray(k + 1)
+    for (i in 0 until k) { rowOf[rows[i]] = i; colOf[cols[i]] = i }
+    val matrix = Array(k) { IntArray(k) }
+    for (v in 1..k) matrix[rowOf[v]][colOf[v]] = v
+    return matrix
+}
+"""),
+        ("largest-first", "WRONG_BRANCH",
+         "놓을 수 있는 수 가운데 가장 큰 것부터 꺼낸다.",
+         """
+fun buildMatrix(k: Int, rowConditions: IntArray, colConditions: IntArray): Array<IntArray> {
+    fun order(conditions: IntArray): IntArray? {
+        val adj = Array(k + 1) { ArrayList<Int>() }
+        val indegree = IntArray(k + 1)
+        for (i in conditions.indices step 2) { adj[conditions[i]].add(conditions[i + 1]); indegree[conditions[i + 1]] += 1 }
+        val ready = java.util.PriorityQueue<Int>(compareByDescending { it })
+        for (v in 1..k) if (indegree[v] == 0) ready.add(v)
+        val out = IntArray(k)
+        var size = 0
+        while (ready.isNotEmpty()) {
+            val v = ready.poll()
+            out[size++] = v
+            Drill.dequeue(v)
+            for (u in adj[v]) { indegree[u] -= 1; if (indegree[u] == 0) ready.add(u) }
+        }
+        return if (size == k) out else null
+    }
+    val rows = order(rowConditions) ?: return arrayOf()
+    val cols = order(colConditions) ?: return arrayOf()
+    val rowOf = IntArray(k + 1); val colOf = IntArray(k + 1)
+    for (i in 0 until k) { rowOf[rows[i]] = i; colOf[cols[i]] = i }
+    val matrix = Array(k) { IntArray(k) }
+    for (v in 1..k) matrix[rowOf[v]][colOf[v]] = v
+    return matrix
+}
+"""),
+    ],
+))

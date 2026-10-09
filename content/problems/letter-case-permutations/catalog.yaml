@@ -1,0 +1,16 @@
+# letter-case-permutations 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - backtracking
+  - string
+  - recursion
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - letter-tile-sequences
+complexity:
+  time: EXPONENTIAL
+  space: EXPONENTIAL
+  note: "영문자 L 개면 결과 2^L 개, 하나마다 길이 n"

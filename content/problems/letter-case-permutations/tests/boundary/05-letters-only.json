@@ -1,0 +1,1 @@
+{"args": ["abc"], "expected": ["ABC", "ABc", "AbC", "Abc", "aBC", "aBc", "abC", "abc"]}

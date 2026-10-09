@@ -1,0 +1,19 @@
+# min-cost-valid-path 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - shortest-path
+  - queue
+  - bfs
+  - matrix
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - READING
+prerequisites:
+  - shortest-clear-path
+  - cheapest-paths
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "0-1 BFS — 칸마다 덱에 넣는 횟수가 상수"

@@ -3228,3 +3228,335 @@ fun removeDuplicateLetters(s: String): String = s.toSortedSet().joinToString("")
 """),
     ],
 ))
+
+
+# --- 잎으로 만든 트리의 최소 비용 -----------------------------------------------
+
+def _min_cost_tree(arr):
+    stack = [float("inf")]
+    total = 0
+    for v in arr:
+        while stack[-1] <= v:
+            mid = stack.pop()
+            total += mid * min(stack[-1], v)
+        stack.append(v)
+    while len(stack) > 2:
+        total += stack.pop() * stack[-1]
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="min-cost-tree-from-leaves",
+    title="잎으로 만든 트리의 최소 비용",
+    summary="""
+양의 정수 배열 `arr` 가 주어진다. 잎이 왼쪽부터 차례로 `arr` 인 이진 트리를 만든다 — 잎이 아닌 정점은 자식이 정확히
+둘이고, 그 값은 왼쪽 서브트리의 가장 큰 잎과 오른쪽 서브트리의 가장 큰 잎의 곱이다. 가능한 트리 가운데 잎이 아닌
+정점 값의 합이 가장 작은 것의 합을 반환한다.
+""",
+    notes="""
+두 이웃 잎을 하나로 묶을 때마다 비용은 둘의 곱이고, 묶인 덩어리는 더 큰 잎의 값으로 남는다. 작은 잎은 한 번 묶이면
+사라지므로 **작은 잎을 그보다 큰 이웃 가운데 작은 쪽과 먼저 묶는 것**이 낫다 — 작은 잎이 큰 이웃과 묶이면 그만큼 비싸다.
+
+그 순서는 감소하는 스택으로 한 번 훑으며 정해진다. 새 잎 `v` 가 스택 맨 위 `mid` 보다 크거나 같으면, `mid` 의 왼쪽
+이웃(스택에서 그 아래)과 오른쪽 이웃 `v` 가 모두 확정됐다 — `mid × min(왼쪽, v)` 를 더하고 뺀다. 다 훑은 뒤 스택에 남은
+잎은 감소하므로 위에서부터 이웃끼리 묶는다.
+
+구간 DP(`O(n³)`)나 "가장 작은 잎을 찾아 묶기"를 되풀이하는 것(`O(n²)`)도 맞지만 10 만 개에서는 끝나지 않는다.
+""",
+    drill_doc="""
+Drill.push(v)   // 감소하는 스택에 넣었다
+Drill.pop(v)    // 이웃과 묶여 사라졌다
+""",
+    constraints="""
+- `2 <= arr.size <= 100_000`
+- `1 <= arr[i] <= 100`
+""",
+    signature=dict(name="minCostTreeFromLeaves", parameters=[("arr", "INT_ARRAY")], returns="INT"),
+    # 가장 작은 잎을 찾아 되풀이하는 오답은 2초 한도의 8배였다 — CI 러너는 단순 반복을 로컬보다 훨씬 빨리 돈다(n번째
+    # 배수에서 겪었다). 값이 100 이하라 입력을 더 키우면 합이 Int 를 넘으므로 시계를 절반으로 조인다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_min_cost_tree,
+    cases={
+        "sample": [("01", [[6, 2, 4]]), ("02", [[4, 11]])],
+        "boundary": [
+            ("01-two", [[1, 1]]),
+            ("02-increasing", [[1, 2, 3, 4, 5]]),
+            # 다 훑어도 스택에 모두 남는다 — 남은 것을 묶어야 한다.
+            ("03-decreasing", [[5, 4, 3, 2, 1]]),
+            ("04-all-equal", [[7, 7, 7, 7]]),
+            ("05-valley", [[9, 1, 9]]),
+            ("06-peak", [[1, 9, 1]]),
+            ("07-small-between-unequal", [[2, 1, 8]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(8, 1, 15, salt=10531)]),
+            ("02-random-medium", [randoms(3000, 1, 100, salt=10533)]),
+            ("03-mountain", [list(range(1, 101)) + list(range(99, 0, -1))]),
+            ("04-zigzag", [[100 if i % 2 else 1 for i in range(2000)]]),
+        ],
+        # 가장 작은 잎을 찾아 묶기를 되풀이하면 n² — 10 만이면 50 억 걸음이다.
+        "performance": [
+            ("01-random-large", [randoms(100_000, 1, 100, salt=10535)]),
+            ("02-decreasing-runs", [[100 - (i % 100) for i in range(100_000)]]),
+            ("03-all-ones", [[1] * 100_000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 감소하는 스택 — 이웃이 확정된 작은 잎을 두 이웃 중 작은 쪽과 묶는다.
+fun minCostTreeFromLeaves(arr: IntArray): Int {
+    val stack = IntArray(arr.size + 1)
+    var size = 0
+    stack[size++] = Int.MAX_VALUE
+    var total = 0L
+    for (v in arr) {
+        while (stack[size - 1] <= v) {
+            val mid = stack[--size]
+            total += mid.toLong() * minOf(stack[size - 1], v)
+            Drill.pop(mid)
+        }
+        stack[size++] = v
+        Drill.push(v)
+    }
+    while (size > 2) { val top = stack[--size]; total += top.toLong() * stack[size - 1] }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("pairs-with-the-larger-neighbour", "WRONG_BRANCH",
+         "작은 잎을 두 이웃 가운데 큰 쪽과 묶는다. 작은 쪽과 묶어야 싸다.",
+         """
+fun minCostTreeFromLeaves(arr: IntArray): Int {
+    val stack = ArrayList<Int>()
+    var total = 0L
+    for (v in arr) {
+        while (stack.isNotEmpty() && stack.last() <= v) {
+            val mid = stack.removeAt(stack.size - 1)
+            val left = if (stack.isEmpty()) v else stack.last()
+            total += mid.toLong() * maxOf(left, v)
+        }
+        stack.add(v)
+    }
+    while (stack.size > 1) { val top = stack.removeAt(stack.size - 1); total += top.toLong() * stack.last() }
+    return total.toInt()
+}
+"""),
+        ("leftovers-forgotten", "MISSING_EDGE_CASE",
+         "다 훑은 뒤 스택에 남은 잎을 묶지 않는다. 감소하는 구간은 끝까지 스택에 남는다.",
+         """
+fun minCostTreeFromLeaves(arr: IntArray): Int {
+    val stack = ArrayList<Int>(); stack.add(Int.MAX_VALUE)
+    var total = 0L
+    for (v in arr) {
+        while (stack.last() <= v) { val mid = stack.removeAt(stack.size - 1); total += mid.toLong() * minOf(stack.last(), v) }
+        stack.add(v)
+    }
+    return total.toInt()
+}
+"""),
+        ("adjacent-products", "WRONG_ALGORITHM",
+         "이웃한 잎 쌍의 곱을 모두 더한다. 묶인 덩어리는 큰 잎 하나로 남아 그다음 곱에 쓰인다.",
+         """
+fun minCostTreeFromLeaves(arr: IntArray): Int {
+    var total = 0L
+    for (i in 0 until arr.size - 1) total += arr[i].toLong() * arr[i + 1]
+    return total.toInt()
+}
+"""),
+        ("smallest-leaf-each-time", "PERFORMANCE",
+         "가장 작은 잎을 찾아 작은 이웃과 묶기를 되풀이한다. 맞지만, 한 번 묶을 때마다 배열을 다 훑어 n² 이다.",
+         """
+fun minCostTreeFromLeaves(arr: IntArray): Int {
+    val leaves = arr.toMutableList()
+    var total = 0L
+    while (leaves.size > 1) {
+        var smallest = 0
+        for (i in 1 until leaves.size) if (leaves[i] < leaves[smallest]) smallest = i
+        val left = if (smallest > 0) leaves[smallest - 1] else Int.MAX_VALUE
+        val right = if (smallest < leaves.size - 1) leaves[smallest + 1] else Int.MAX_VALUE
+        total += leaves[smallest].toLong() * minOf(left, right)
+        leaves.removeAt(smallest)
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 식의 최댓값 ---------------------------------------------------------------
+
+def _max_equation(xs, ys, k):
+    from collections import deque
+    window = deque()
+    best = None
+    for j in range(len(xs)):
+        while window and xs[j] - xs[window[0]] > k:
+            window.popleft()
+        if window:
+            i = window[0]
+            value = ys[i] - xs[i] + ys[j] + xs[j]
+            if best is None or value > best:
+                best = value
+        while window and ys[window[-1]] - xs[window[-1]] <= ys[j] - xs[j]:
+            window.pop()
+        window.append(j)
+    return best
+
+
+def _points(n, gap_high, y_low, y_high, salt):
+    gaps = randoms(n, 1, gap_high, salt=salt)
+    xs, x = [], -100_000_000
+    for g in gaps:
+        x += g
+        xs.append(x)
+    return xs, randoms(n, y_low, y_high, salt=salt + 1)
+
+
+_EQ_LARGE = _points(200_000, 900, -100_000_000, 100_000_000, salt=10537)
+_EQ_DOWN = (list(range(200_000)), [200_000 - i for i in range(200_000)])
+
+
+PROBLEMS.append(Problem(
+    id="max-equation-value",
+    title="식의 최댓값",
+    summary="""
+x 좌표가 순증가하는 점들이 `xs`, `ys` 로 주어지고 정수 `k` 가 주어진다. `i < j` 이고 `xs[j] - xs[i] <= k` 인 두 점에
+대해 `ys[i] + ys[j] + |xs[i] - xs[j]|` 의 최댓값을 반환한다. 그런 쌍이 적어도 하나는 있다.
+""",
+    notes="""
+`i < j` 면 `xs[i] < xs[j]` 라 식은 `(ys[j] + xs[j]) + (ys[i] - xs[i])` 다. `j` 를 왼쪽부터 옮기며, x 가 `xs[j] - k` 이상인
+앞선 점들 가운데 `ys[i] - xs[i]` 가 가장 큰 것을 알면 된다 — 창 안의 최댓값이다.
+
+덱에 점의 번호를 `ys - xs` 가 줄어드는 순서로 둔다. 앞에서는 창을 벗어난 점을 빼고, 뒤에서는 새 점보다 `ys - xs` 가
+작거나 같은 점을 뺀다 — 새 점이 더 늦게 벗어나면서 값도 크니 다시 쓰일 일이 없다. **새 점을 넣기 전에** 답을 갱신한다;
+넣은 뒤에 보면 점이 자기 자신과 짝지어진다.
+""",
+    drill_doc="""
+Drill.enqueue(j)   // 덱 뒤에 넣었다
+Drill.dequeue(i)   // 창을 벗어났다
+""",
+    constraints="""
+- `2 <= xs.size == ys.size <= 200_000`
+- `-10^8 <= xs[i], ys[i] <= 10^8`, `xs` 는 순증가
+- `0 <= k <= 2 * 10^8`, 조건을 만족하는 쌍이 적어도 하나 있다
+""",
+    signature=dict(name="maxEquationValue",
+                   parameters=[("xs", "INT_ARRAY"), ("ys", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_max_equation,
+    cases={
+        "sample": [("01", [[1, 2, 5, 6], [3, 0, 10, -10], 1]), ("02", [[0, 3, 9], [0, 0, 9], 3])],
+        "boundary": [
+            ("01-two-points", [[1, 2], [5, 5], 1]),
+            # 창 끝에 딱 걸친 점도 짝이 된다.
+            ("02-exactly-k-apart", [[0, 10], [100, 100], 10]),
+            ("03-just-outside", [[0, 10, 11], [100, 1, 1], 10]),
+            # 혼자서는 값이 커도 자기 자신과는 짝이 아니다.
+            ("04-lonely-giant", [[0, 1, 1000], [-5, -5, 100_000_000], 1]),
+            ("05-negatives", [[-100_000_000, -99_999_999], [-100_000_000, -100_000_000], 5]),
+            ("06-older-better", [[0, 1, 2, 3], [50, 0, 0, 0], 3]),
+            ("07-newer-better", [[0, 1, 2, 3], [0, 0, 50, 0], 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [*_points(12, 5, -20, 20, salt=10539), 6]),
+            ("02-random-medium", [*_points(5000, 100, -1000, 1000, salt=10541), 500]),
+            ("03-wide-window", [*_points(3000, 10, -1_000_000, 1_000_000, salt=10543), 200_000_000]),
+            ("04-narrow-window", [*_points(3000, 3, -100, 100, salt=10545), 2]),
+        ],
+        # 앞선 점을 창 안에서 모두 훑으면, 창이 넓을 때 n² — 20 만이면 200 억 쌍이다.
+        "performance": [
+            ("01-random-large", [*_EQ_LARGE, 200_000_000]),
+            ("02-falling", [*_EQ_DOWN, 200_000_000]),
+            ("03-half-window", [*_EQ_LARGE, 45_000_000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). ys - xs 가 줄어드는 덱. 창 밖은 앞에서 빼고, 답을 먼저 갱신한 뒤 새 점을 뒤에 넣는다.
+fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
+    val window = IntArray(xs.size)
+    var head = 0
+    var tail = 0
+    var best = Long.MIN_VALUE
+    for (j in xs.indices) {
+        while (head < tail && xs[j].toLong() - xs[window[head]] > k) { Drill.dequeue(window[head]); head += 1 }
+        if (head < tail) {
+            val i = window[head]
+            best = maxOf(best, ys[i].toLong() - xs[i] + ys[j] + xs[j])
+        }
+        while (head < tail && ys[window[tail - 1]] - xs[window[tail - 1]] <= ys[j] - xs[j]) tail -= 1
+        window[tail++] = j
+        Drill.enqueue(j)
+    }
+    return best.toInt()
+}
+""",
+    mutants=[
+        ("pairs-with-itself", "MISSING_EDGE_CASE",
+         "새 점을 덱에 넣은 뒤에 답을 갱신한다. 점이 자기 자신과 짝지어져 2·ys[j] 가 답이 된다.",
+         """
+fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
+    val window = IntArray(xs.size); var head = 0; var tail = 0
+    var best = Long.MIN_VALUE
+    for (j in xs.indices) {
+        while (head < tail && xs[j].toLong() - xs[window[head]] > k) head += 1
+        while (head < tail && ys[window[tail - 1]] - xs[window[tail - 1]] <= ys[j] - xs[j]) tail -= 1
+        window[tail++] = j
+        val i = window[head]
+        best = maxOf(best, ys[i].toLong() - xs[i] + ys[j] + xs[j])
+    }
+    return best.toInt()
+}
+"""),
+        ("window-excludes-k", "OFF_BY_ONE",
+         "x 의 차가 k 와 같은 점도 창에서 뺀다. 차가 정확히 k 인 쌍도 된다.",
+         """
+fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
+    val window = IntArray(xs.size); var head = 0; var tail = 0
+    var best = Long.MIN_VALUE
+    for (j in xs.indices) {
+        while (head < tail && xs[j].toLong() - xs[window[head]] >= k) head += 1
+        if (head < tail) { val i = window[head]; best = maxOf(best, ys[i].toLong() - xs[i] + ys[j] + xs[j]) }
+        while (head < tail && ys[window[tail - 1]] - xs[window[tail - 1]] <= ys[j] - xs[j]) tail -= 1
+        window[tail++] = j
+    }
+    return best.toInt()
+}
+"""),
+        ("keeps-largest-y", "WRONG_BRANCH",
+         "덱을 ys 로만 줄 세운다. 짝의 몫은 ys[i] - xs[i] 라 x 가 앞선 점이 그만큼 손해다.",
+         """
+fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
+    val window = IntArray(xs.size); var head = 0; var tail = 0
+    var best = Long.MIN_VALUE
+    for (j in xs.indices) {
+        while (head < tail && xs[j].toLong() - xs[window[head]] > k) head += 1
+        if (head < tail) { val i = window[head]; best = maxOf(best, ys[i].toLong() - xs[i] + ys[j] + xs[j]) }
+        while (head < tail && ys[window[tail - 1]] <= ys[j]) tail -= 1
+        window[tail++] = j
+    }
+    return best.toInt()
+}
+"""),
+        ("neighbours-only", "WRONG_ALGORITHM",
+         "바로 앞의 점과만 짝짓는다. 창 안의 더 먼 점이 나을 수 있다.",
+         """
+fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
+    var best = Long.MIN_VALUE
+    for (j in 1 until xs.size) if (xs[j].toLong() - xs[j - 1] <= k) best = maxOf(best, ys[j - 1].toLong() + ys[j] + xs[j] - xs[j - 1])
+    return best.toInt()
+}
+"""),
+        ("scans-the-window", "PERFORMANCE",
+         "점마다 창 안의 앞선 점을 모두 훑는다. 맞지만, 창이 넓으면 n² 이다.",
+         """
+fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
+    var best = Long.MIN_VALUE
+    for (j in xs.indices) {
+        var i = j - 1
+        while (i >= 0 && xs[j].toLong() - xs[i] <= k) { best = maxOf(best, ys[i].toLong() - xs[i] + ys[j] + xs[j]); i -= 1 }
+    }
+    return best.toInt()
+}
+"""),
+    ],
+))

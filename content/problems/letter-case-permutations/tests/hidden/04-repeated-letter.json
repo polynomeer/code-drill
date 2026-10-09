@@ -1,0 +1,1 @@
+{"args": ["aaaa"], "expected": ["AAAA", "AAAa", "AAaA", "AAaa", "AaAA", "AaAa", "AaaA", "Aaaa", "aAAA", "aAAa", "aAaA", "aAaa", "aaAA", "aaAa", "aaaA", "aaaa"]}

@@ -1,0 +1,18 @@
+# matrix-from-conditions 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - topological-sort
+  - heap
+  - graph
+  - matrix
+competencies:
+  - MODELING
+  - READING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - smallest-course-order
+complexity:
+  time: LINEARITHMIC
+  space: QUADRATIC
+  note: "위상 정렬 둘은 (k + 조건) log k, 행렬을 채우는 데 k²"

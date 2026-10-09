@@ -1623,3 +1623,181 @@ fun maxVowelsWindow(s: String, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 모든 글자가 k 번 이상인 가장 긴 구간 ---------------------------------------
+
+def _longest_k_repeating(s, k):
+    from collections import Counter
+    best = 0
+    stack = [(0, len(s))]
+    while stack:
+        low, high = stack.pop()
+        if high - low < k or high - low <= best:
+            continue
+        counts = Counter(s[low:high])
+        bad = [i for i in range(low, high) if counts[s[i]] < k]
+        if not bad:
+            best = high - low
+            continue
+        previous = low
+        for b in bad:
+            stack.append((previous, b))
+            previous = b + 1
+        stack.append((previous, high))
+    return best
+
+
+def _word(n, alphabet, salt):
+    return "".join(alphabet[v] for v in randoms(n, 0, len(alphabet) - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="longest-k-repeating",
+    title="모든 글자가 k 번 이상인 가장 긴 구간",
+    summary="""
+소문자 문자열 `s` 와 정수 `k` 가 주어진다. 구간 안에 나오는 **모든 글자가 그 구간 안에서 `k` 번 이상** 나오는 연속
+구간 가운데 가장 긴 것의 길이를 반환한다. 그런 구간이 없으면 `0` 이다.
+""",
+    notes="""
+구간 전체에서 `k` 번 미만 나오는 글자는 답 구간에 들 수 없다 — 그 글자를 포함하는 어떤 부분 구간에서도 그 글자는 더
+적게 나온다. 그러니 그런 글자가 있는 자리에서 구간을 자르고, 잘린 조각마다 같은 질문을 한다(분할 정복). 모자란 글자가
+없는 구간은 그 자체가 답 후보다.
+
+잘린 조각에는 원래 구간의 글자 종류 가운데 적어도 하나가 빠지므로 깊이는 알파벳 수(26)를 넘지 않는다. 한 층의 일은
+문자열 길이에 비례한다. 깊이가 그 정도라도 재귀 대신 스택으로 돌면 안전하다.
+""",
+    drill_doc="""
+Drill.call("lo..hi")          // 이 구간을 연다
+Drill.ret("lo..hi", length)   // 모자란 글자가 없는 구간
+""",
+    constraints="""
+- `1 <= s.length <= 300_000`, `s` 는 소문자로만 이뤄진다
+- `1 <= k <= 300_000`
+""",
+    signature=dict(name="longestKRepeating", parameters=[("s", "STRING"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_longest_k_repeating,
+    cases={
+        "sample": [("01", ["aaabb", 3]), ("02", ["ababbc", 2])],
+        "boundary": [
+            ("01-k-one", ["xyz", 1]),
+            ("02-k-larger-than-s", ["aaaa", 5]),
+            ("03-single", ["a", 1]),
+            ("04-none", ["abc", 2]),
+            # 모자란 글자가 둘 이상 — 조각이 셋으로 나뉜다.
+            ("05-many-cuts", ["aaxbbbybb", 2]),
+            # 자른 뒤 조각 안에서 다시 모자란 글자가 생긴다.
+            ("06-cut-again", ["aabcabb", 2]),
+            ("07-exactly-k", ["ababab", 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [_word(30, "abc", salt=10515), 3]),
+            ("02-random-medium", [_word(5000, "abcdefgh", salt=10517), 40]),
+            ("03-blocks", ["".join(ch * 5 for ch in "abcdefghij") + "z" + "ab" * 10, 5]),
+            ("04-whole-string", [_word(10_000, "ab", salt=10519), 2]),
+        ],
+        # 모든 구간을 늘려 가며 세면 n² — 30 만이면 450 억 쌍이다. 10 만(50 억)은 로컬에서 12초 안에 들었다.
+        "performance": [
+            ("01-random-large", [_word(300_000, "abcdefghijklmnopqrstuvwxyz", salt=10521), 9000]),
+            ("02-few-letters", [_word(300_000, "abcd", salt=10523), 10]),
+            ("03-one-bad-letter", ["a" * 150_000 + "b" + "a" * 149_999, 160_000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 구간 전체에서 k 번 미만인 글자 자리에서 자르고, 조각마다 같은 질문을 한다 — 스택으로.
+fun longestKRepeating(s: String, k: Int): Int {
+    var best = 0
+    val stack = ArrayDeque<IntArray>()
+    stack.addLast(intArrayOf(0, s.length))
+    while (stack.isNotEmpty()) {
+        val (low, high) = stack.removeLast().let { it[0] to it[1] }
+        if (high - low < k || high - low <= best) continue
+        val counts = IntArray(26)
+        for (i in low until high) counts[s[i] - 'a'] += 1
+        Drill.call("$low..$high")
+        var previous = low
+        var cut = false
+        for (i in low until high) {
+            if (counts[s[i] - 'a'] < k) {
+                stack.addLast(intArrayOf(previous, i))
+                previous = i + 1
+                cut = true
+            }
+        }
+        if (!cut) { best = high - low; Drill.ret("$low..$high", best) }
+        else stack.addLast(intArrayOf(previous, high))
+    }
+    return best
+}
+""",
+    mutants=[
+        ("no-split", "WRONG_ALGORITHM",
+         "문자열 전체만 보고, 모자란 글자가 있으면 0 을 낸다. 모자란 글자를 피한 조각 안에 답이 있을 수 있다.",
+         """
+fun longestKRepeating(s: String, k: Int): Int {
+    val counts = IntArray(26)
+    for (c in s) counts[c - 'a'] += 1
+    return if (s.all { counts[it - 'a'] >= k }) s.length else 0
+}
+"""),
+        ("checks-pieces-once", "WRONG_BRANCH",
+         "한 번 자른 조각을 다시 나누지 않고, 조각 안에서 모자란 글자가 없을 때만 답으로 본다. 자른 뒤 조각 안에서 새로 모자란 글자가 생긴다.",
+         """
+fun longestKRepeating(s: String, k: Int): Int {
+    val counts = IntArray(26)
+    for (c in s) counts[c - 'a'] += 1
+    var best = 0
+    var start = 0
+    for (i in 0..s.length) {
+        if (i == s.length || counts[s[i] - 'a'] < k) {
+            val piece = IntArray(26)
+            for (j in start until i) piece[s[j] - 'a'] += 1
+            if (i > start && (start until i).all { piece[s[it] - 'a'] >= k }) best = maxOf(best, i - start)
+            start = i + 1
+        }
+    }
+    return best
+}
+"""),
+        ("strictly-more-than-k", "OFF_BY_ONE",
+         "k 번보다 많아야 남긴다. 정확히 k 번도 된다.",
+         """
+fun longestKRepeating(s: String, k: Int): Int {
+    var best = 0
+    val stack = ArrayDeque<IntArray>()
+    stack.addLast(intArrayOf(0, s.length))
+    while (stack.isNotEmpty()) {
+        val (low, high) = stack.removeLast().let { it[0] to it[1] }
+        if (high - low <= best) continue
+        val counts = IntArray(26)
+        for (i in low until high) counts[s[i] - 'a'] += 1
+        var previous = low
+        var cut = false
+        for (i in low until high) if (counts[s[i] - 'a'] <= k) { stack.addLast(intArrayOf(previous, i)); previous = i + 1; cut = true }
+        if (!cut) best = high - low else stack.addLast(intArrayOf(previous, high))
+    }
+    return best
+}
+"""),
+        ("every-start-every-end", "PERFORMANCE",
+         "시작마다 끝을 늘려 가며 센다. 맞지만, 30 만 글자면 450 억 쌍이다.",
+         """
+fun longestKRepeating(s: String, k: Int): Int {
+    var best = 0
+    for (start in s.indices) {
+        val counts = IntArray(26)
+        var short = 0
+        for (end in start until s.length) {
+            val c = s[end] - 'a'
+            counts[c] += 1
+            if (counts[c] == 1) short += 1
+            if (counts[c] == k) short -= 1
+            if (short == 0 && end - start + 1 > best) best = end - start + 1
+        }
+    }
+    return best
+}
+"""),
+    ],
+))

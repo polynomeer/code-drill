@@ -1,0 +1,1 @@
+{"args": ["9xyz9"], "expected": ["9XYZ9", "9XYz9", "9XyZ9", "9Xyz9", "9xYZ9", "9xYz9", "9xyZ9", "9xyz9"]}
