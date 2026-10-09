@@ -4002,3 +4002,210 @@ fun submatrixSumTarget(grid: Array<IntArray>, target: Int): Int {
 """),
     ],
 ))
+
+
+# --- 빗금으로 나뉜 영역 --------------------------------------------------------
+
+def _regions_by_slashes(grid):
+    n = len(grid)
+    parent = list(range(4 * n * n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        parent[find(a)] = find(b)
+
+    for r in range(n):
+        for c in range(n):
+            # 칸 하나를 대각선 둘로 넷으로 나눈다: 0 위, 1 오른쪽, 2 아래, 3 왼쪽.
+            base = 4 * (r * n + c)
+            ch = grid[r][c]
+            if ch == "/":
+                union(base, base + 3)
+                union(base + 1, base + 2)
+            elif ch == "\\":
+                union(base, base + 1)
+                union(base + 2, base + 3)
+            else:
+                union(base, base + 1)
+                union(base + 1, base + 2)
+                union(base + 2, base + 3)
+            if c + 1 < n:
+                union(base + 1, 4 * (r * n + c + 1) + 3)
+            if r + 1 < n:
+                union(base + 2, 4 * ((r + 1) * n + c))
+    return sum(1 for i in range(4 * n * n) if find(i) == i)
+
+
+def _slash_grid(n, weights, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    return ["".join(source.choices([" ", "/", "\\"], weights=weights, k=n)) for _ in range(n)]
+
+
+def _diamonds(n):
+    """2×2 마다 마름모 하나 — 작은 닫힌 영역이 많다."""
+    rows = []
+    for r in range(n):
+        rows.append("".join(("/\\" if r % 2 == 0 else "\\/")[c % 2] for c in range(n)))
+    return rows
+
+
+PROBLEMS.append(Problem(
+    id="regions-by-slashes",
+    title="빗금으로 나뉜 영역",
+    summary="""
+`n × n` 격자의 각 칸에는 `'/'`, `'\\'`, `' '`(빈칸) 중 하나가 있다. 빗금은 칸의 한 대각선을 긋는 선분이다. 격자 전체가
+이 선분들로 몇 개의 영역으로 나뉘는지 반환한다. 격자의 테두리도 경계다.
+""",
+    notes="""
+칸 하나를 두 대각선으로 위·오른쪽·아래·왼쪽의 삼각형 넷으로 나눈다. `'/'` 는 위–왼쪽과 오른쪽–아래를 잇고,
+`'\\'` 는 위–오른쪽과 아래–왼쪽을 잇고, 빈칸은 넷을 모두 잇는다. 그리고 칸의 오른쪽 삼각형은 오른쪽 칸의 왼쪽
+삼각형과, 아래 삼각형은 아래 칸의 위 삼각형과 언제나 이어진다. 영역은 이렇게 이은 무리의 수다 — 유니온 파인드나
+DFS 로 센다.
+
+칸을 2×2 픽셀로 그려 DFS 하면 대각선 사이의 좁은 틈을 놓친다. 3×3 이어야 한다.
+""",
+    drill_doc="""
+Drill.edge("a", "b")   // 두 삼각형을 이었다
+""",
+    constraints="""
+- `1 <= n <= 300`, `grid[r].length == n`
+- `grid[r][c]` 는 `'/'`, `'\\'`, `' '` 중 하나
+""",
+    signature=dict(name="regionsBySlashes", parameters=[("grid", "STRING_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_regions_by_slashes,
+    cases={
+        "sample": [("01", [[" /", "/ "]]), ("02", [["/\\", "\\/"]])],
+        "boundary": [
+            ("01-single-blank", [[" "]]),
+            ("02-single-slash", [["/"]]),
+            ("03-single-backslash", [["\\"]]),
+            ("04-all-blank", [["   ", "   ", "   "]]),
+            # 두 빗금이 X 를 이루면 넷이다.
+            ("05-cross-in-one-row", [["/\\"]]),
+            ("06-long-diagonal", [["\\  ", " \\ ", "  \\"]]),
+            # 2×2 로 그리면 이 틈이 막혀 보인다.
+            ("07-narrow-gap", [["//", "/ "]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_slash_grid(6, [2, 1, 1], salt=10483)]),
+            ("02-random-large", [_slash_grid(300, [1, 1, 1], salt=10485)]),
+            ("03-diamonds", [_diamonds(300)]),
+            ("04-sparse", [_slash_grid(300, [20, 1, 1], salt=10487)]),
+            ("05-all-slash", [["/" * 200] * 200]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 칸마다 삼각형 넷(위·오른쪽·아래·왼쪽)을 두고 유니온 파인드로 잇는다.
+fun regionsBySlashes(grid: Array<String>): Int {
+    val n = grid.size
+    val parent = IntArray(4 * n * n) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    var regions = 4 * n * n
+    fun union(a: Int, b: Int) {
+        val ra = find(a); val rb = find(b)
+        if (ra != rb) { parent[ra] = rb; regions -= 1; Drill.edge(a.toString(), b.toString()) }
+    }
+    for (r in 0 until n) for (c in 0 until n) {
+        val base = 4 * (r * n + c)
+        when (grid[r][c]) {
+            '/' -> { union(base, base + 3); union(base + 1, base + 2) }
+            '\\\\' -> { union(base, base + 1); union(base + 2, base + 3) }
+            else -> { union(base, base + 1); union(base + 1, base + 2); union(base + 2, base + 3) }
+        }
+        if (c + 1 < n) union(base + 1, 4 * (r * n + c + 1) + 3)
+        if (r + 1 < n) union(base + 2, 4 * ((r + 1) * n + c))
+    }
+    return regions
+}
+""",
+    mutants=[
+        ("backslash-as-slash", "WRONG_BRANCH",
+         "역빗금을 빗금처럼 잇는다. 두 대각선이 잇는 삼각형 쌍은 서로 다르다.",
+         """
+fun regionsBySlashes(grid: Array<String>): Int {
+    val n = grid.size
+    val parent = IntArray(4 * n * n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    var regions = 4 * n * n
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) { parent[ra] = rb; regions -= 1 } }
+    for (r in 0 until n) for (c in 0 until n) {
+        val base = 4 * (r * n + c)
+        if (grid[r][c] != ' ') { union(base, base + 3); union(base + 1, base + 2) }
+        else { union(base, base + 1); union(base + 1, base + 2); union(base + 2, base + 3) }
+        if (c + 1 < n) union(base + 1, 4 * (r * n + c + 1) + 3)
+        if (r + 1 < n) union(base + 2, 4 * ((r + 1) * n + c))
+    }
+    return regions
+}
+"""),
+        ("forgets-the-cell-below", "WRONG_BRANCH",
+         "오른쪽 칸과만 잇고 아래 칸과는 잇지 않는다. 줄마다 영역이 따로 세어진다.",
+         """
+fun regionsBySlashes(grid: Array<String>): Int {
+    val n = grid.size
+    val parent = IntArray(4 * n * n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    var regions = 4 * n * n
+    fun union(a: Int, b: Int) { val ra = find(a); val rb = find(b); if (ra != rb) { parent[ra] = rb; regions -= 1 } }
+    for (r in 0 until n) for (c in 0 until n) {
+        val base = 4 * (r * n + c)
+        when (grid[r][c]) {
+            '/' -> { union(base, base + 3); union(base + 1, base + 2) }
+            '\\\\' -> { union(base, base + 1); union(base + 2, base + 3) }
+            else -> { union(base, base + 1); union(base + 1, base + 2); union(base + 2, base + 3) }
+        }
+        if (c + 1 < n) union(base + 1, 4 * (r * n + c + 1) + 3)
+    }
+    return regions
+}
+"""),
+        ("two-by-two-pixels", "WRONG_ALGORITHM",
+         "칸을 2×2 픽셀로 그려 빈 픽셀의 덩어리를 센다. 대각선 사이의 한 픽셀짜리 틈이 막혀 영역을 놓친다.",
+         """
+fun regionsBySlashes(grid: Array<String>): Int {
+    val n = grid.size
+    val size = 2 * n
+    val wall = Array(size) { BooleanArray(size) }
+    for (r in 0 until n) for (c in 0 until n) {
+        when (grid[r][c]) {
+            '/' -> { wall[2 * r][2 * c + 1] = true; wall[2 * r + 1][2 * c] = true }
+            '\\\\' -> { wall[2 * r][2 * c] = true; wall[2 * r + 1][2 * c + 1] = true }
+        }
+    }
+    var count = 0
+    val stack = ArrayDeque<Int>()
+    for (i in 0 until size) for (j in 0 until size) {
+        if (wall[i][j]) continue
+        count += 1
+        wall[i][j] = true
+        stack.addLast(i * size + j)
+        while (stack.isNotEmpty()) {
+            val cur = stack.removeLast(); val x = cur / size; val y = cur % size
+            for ((dx, dy) in listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)) {
+                val a = x + dx; val b = y + dy
+                if (a in 0 until size && b in 0 until size && !wall[a][b]) { wall[a][b] = true; stack.addLast(a * size + b) }
+            }
+        }
+    }
+    return count
+}
+"""),
+        ("lines-plus-one", "WRONG_ALGORITHM",
+         "빗금 수에 1 을 더한다. 선분이 테두리나 다른 선분과 만나 닫힐 때만 영역이 는다.",
+         """
+fun regionsBySlashes(grid: Array<String>): Int = 1 + grid.sumOf { row -> row.count { it != ' ' } }
+"""),
+    ],
+))

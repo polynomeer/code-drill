@@ -1,0 +1,17 @@
+# regions-by-slashes 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - union-find
+  - dfs
+  - matrix
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - island-count
+  - connected-components
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "칸마다 삼각형 넷 — 4n² 개를 거의 상수 시간의 유니온 파인드로 잇는다"

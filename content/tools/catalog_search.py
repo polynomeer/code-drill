@@ -2541,3 +2541,271 @@ fun searchRotated(nums: IntArray, queries: IntArray): IntArray = IntArray(querie
 """),
     ],
 ))
+
+
+# --- 예산 안의 가장 긴 부분 수열 ----------------------------------------------
+
+def _budget_subsequence(nums, queries):
+    import bisect
+    prefix = [0]
+    for v in sorted(nums):
+        prefix.append(prefix[-1] + v)
+    return [bisect.bisect_right(prefix, q) - 1 for q in queries]
+
+
+PROBLEMS.append(Problem(
+    id="budget-subsequence",
+    title="예산 안의 가장 긴 부분 수열",
+    summary="""
+양의 정수 배열 `nums` 와 예산 배열 `queries` 가 주어진다. 예산 `queries[j]` 마다, 합이 그 예산 **이하**인 `nums` 의
+부분 수열 가운데 가장 긴 것의 길이를 담은 배열을 반환한다. 부분 수열은 원소 몇 개를 고른 것이다(순서는 상관없다).
+""",
+    notes="""
+원소를 여럿 고르려면 작은 것부터 고르는 것이 언제나 낫다. 그러니 `nums` 를 정렬하고 누적합을 만들면, 예산 `q` 의 답은
+누적합이 `q` 이하인 가장 긴 앞부분의 길이다. 누적합은 늘기만 하므로 이분 탐색으로 찾는다 — 예산마다 다시 더하면
+예산 수 × 원소 수다.
+
+누적합은 `2 * 10^11` 까지 커진다. `Int` 로 더하면 넘친다.
+""",
+    drill_doc="""
+Drill.pointer("answer", k)   // 이 예산으로 고를 수 있는 원소 수
+""",
+    constraints="""
+- `1 <= nums.size, queries.size <= 200_000`
+- `1 <= nums[i] <= 1_000_000`, `0 <= queries[j] <= 2 * 10^9`
+""",
+    signature=dict(name="budgetSubsequence",
+                   parameters=[("nums", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_budget_subsequence,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [("01", [[4, 5, 2, 1], [3, 10, 21]]), ("02", [[2, 3, 4, 5], [1]])],
+        "boundary": [
+            ("01-zero-budget", [[1, 2], [0]]),
+            # 예산이 누적합과 딱 같으면 그 원소까지 고른다.
+            ("02-budget-equals-prefix", [[1, 2, 3], [1, 3, 6, 5]]),
+            ("03-everything", [[5, 5, 5], [15, 100]]),
+            ("04-single", [[7], [6, 7, 8]]),
+            # 정렬하지 않으면 앞의 큰 값이 예산을 다 쓴다.
+            ("05-big-first", [[100, 1, 1, 1], [3, 102]]),
+            # 누적합이 Int 를 넘는다.
+            ("06-prefix-past-int", [[1_000_000] * 3000, [2_000_000_000, 1_999_999_999, 2_147_000_000 // 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 20, salt=10439), randoms(10, 0, 120, salt=10441)]),
+            ("02-random-medium", [randoms(2000, 1, 1000, salt=10443), randoms(2000, 0, 1_000_000, salt=10445)]),
+            ("03-large-values", [randoms(5000, 900_000, 1_000_000, salt=10447), randoms(1000, 0, 2_000_000_000, salt=10449)]),
+        ],
+        # 예산마다 정렬된 배열을 처음부터 더하면, 예산이 크면 원소 전부를 훑는다 — 20 만 × 20 만.
+        "performance": [
+            ("01-large-budgets", [randoms(200_000, 1, 10_000, salt=10451), randoms(200_000, 1_000_000_000, 2_000_000_000, salt=10453)]),
+            ("02-mixed", [randoms(200_000, 1, 1_000_000, salt=10455), randoms(200_000, 0, 2_000_000_000, salt=10457)]),
+            ("03-all-ones", [[1] * 200_000, randoms(200_000, 200_000, 2_000_000_000, salt=10459)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 정렬해 Long 누적합을 만들고, 예산마다 누적합이 예산 이하인 마지막 자리를 이분 탐색한다.
+fun budgetSubsequence(nums: IntArray, queries: IntArray): IntArray {
+    val sorted = nums.sortedArray()
+    val prefix = LongArray(sorted.size + 1)
+    for (i in sorted.indices) prefix[i + 1] = prefix[i] + sorted[i]
+    return IntArray(queries.size) { j ->
+        var low = 0
+        var high = sorted.size
+        while (low < high) {
+            val mid = (low + high + 1) / 2
+            if (prefix[mid] <= queries[j]) low = mid else high = mid - 1
+        }
+        Drill.pointer("answer", low)
+        low
+    }
+}
+""",
+    mutants=[
+        ("strictly-under-budget", "OFF_BY_ONE",
+         "누적합이 예산보다 작아야 고른다. 예산과 딱 같아도 고를 수 있다.",
+         """
+fun budgetSubsequence(nums: IntArray, queries: IntArray): IntArray {
+    val sorted = nums.sortedArray()
+    val prefix = LongArray(sorted.size + 1)
+    for (i in sorted.indices) prefix[i + 1] = prefix[i] + sorted[i]
+    return IntArray(queries.size) { j ->
+        var low = 0; var high = sorted.size
+        while (low < high) { val mid = (low + high + 1) / 2; if (prefix[mid] < queries[j]) low = mid else high = mid - 1 }
+        low
+    }
+}
+"""),
+        ("keeps-the-given-order", "WRONG_ALGORITHM",
+         "정렬하지 않고 주어진 순서대로 앞에서부터 고른다. 작은 것부터 골라야 가장 많이 고른다.",
+         """
+fun budgetSubsequence(nums: IntArray, queries: IntArray): IntArray {
+    val prefix = LongArray(nums.size + 1)
+    for (i in nums.indices) prefix[i + 1] = prefix[i] + nums[i]
+    return IntArray(queries.size) { j ->
+        var low = 0; var high = nums.size
+        while (low < high) { val mid = (low + high + 1) / 2; if (prefix[mid] <= queries[j]) low = mid else high = mid - 1 }
+        low
+    }
+}
+"""),
+        ("int-prefix", "MISSING_EDGE_CASE",
+         "누적합을 Int 로 더한다. 20 억을 넘으면 음수로 감겨 누적합이 더는 늘기만 하지 않는다.",
+         """
+fun budgetSubsequence(nums: IntArray, queries: IntArray): IntArray {
+    val sorted = nums.sortedArray()
+    val prefix = IntArray(sorted.size + 1)
+    for (i in sorted.indices) prefix[i + 1] = prefix[i] + sorted[i]
+    return IntArray(queries.size) { j ->
+        var low = 0; var high = sorted.size
+        while (low < high) { val mid = (low + high + 1) / 2; if (prefix[mid] <= queries[j]) low = mid else high = mid - 1 }
+        low
+    }
+}
+"""),
+        ("adds-per-query", "PERFORMANCE",
+         "예산마다 정렬된 배열을 처음부터 더해 간다. 맞지만, 예산이 크면 예산 수 × 원소 수다.",
+         """
+fun budgetSubsequence(nums: IntArray, queries: IntArray): IntArray {
+    val sorted = nums.sortedArray()
+    return IntArray(queries.size) { j ->
+        var total = 0L
+        var count = 0
+        for (v in sorted) { if (total + v > queries[j]) break; total += v; count += 1 }
+        count
+    }
+}
+"""),
+    ],
+))
+
+
+# --- 정렬된 배열에서 개수 세기 -------------------------------------------------
+
+def _count_in_sorted(nums, targets):
+    import bisect
+    return [bisect.bisect_right(nums, t) - bisect.bisect_left(nums, t) for t in targets]
+
+
+def _sorted_with_runs(n, low, high, salt):
+    return sorted(randoms(n, low, high, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="count-in-sorted",
+    title="정렬된 배열에서 개수 세기",
+    summary="""
+오름차순(같은 값이 여럿일 수 있다) 배열 `nums` 와 `targets` 가 주어진다. `targets[j]` 마다 그 값이 `nums` 에 몇 번
+나오는지 담은 배열을 반환한다.
+""",
+    notes="""
+같은 값은 붙어 있다. 그 값이 처음 나오는 자리와, 그 값보다 큰 값이 처음 나오는 자리를 이분 탐색으로 찾으면 둘의 차가
+개수다. 값이 없으면 두 자리가 같아 0 이다. 하나 찾은 뒤 양옆으로 세어 나가면 같은 값이 많을 때 느리다.
+""",
+    drill_doc="""
+Drill.pointer("low", low)     // 탐색 구간
+Drill.pointer("high", high)
+""",
+    constraints="""
+- `1 <= nums.size, targets.size <= 200_000`
+- `-10^9 <= nums[i], targets[j] <= 10^9`, `nums` 는 오름차순
+""",
+    signature=dict(name="countInSorted",
+                   parameters=[("nums", "INT_ARRAY"), ("targets", "INT_ARRAY")], returns="INT_ARRAY"),
+    # 양옆으로 세는 오답은 2초 한도의 4.8배에 그쳤다(빠른 러너에서 모자란다). 정답은 한도의 8% 라 시계를 절반으로 조인다.
+    groups=perf_groups(time_multiplier=0.5),
+    reference=_count_in_sorted,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [("01", [[1, 2, 2, 2, 3, 5], [2, 4, 5]]), ("02", [[7], [7, 8]])],
+        "boundary": [
+            ("01-target-below-all", [[3, 4, 5], [1]]),
+            ("02-target-above-all", [[3, 4, 5], [9]]),
+            ("03-all-equal", [[6, 6, 6, 6], [6, 5, 7]]),
+            ("04-first-and-last", [[1, 1, 2, 3, 3], [1, 3]]),
+            ("05-negatives", [[-1_000_000_000, -5, -5, 0, 1_000_000_000], [-5, -1_000_000_000, 1_000_000_000, 0]]),
+            ("06-gap", [[1, 3, 5], [2, 4]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_sorted_with_runs(30, 0, 8, salt=10461), randoms(20, -1, 9, salt=10463)]),
+            ("02-random-medium", [_sorted_with_runs(5000, -100, 100, salt=10465), randoms(5000, -110, 110, salt=10467)]),
+            ("03-distinct", [list(range(-100_000, 100_000, 2)), randoms(1000, -100_001, 100_001, salt=10469)]),
+        ],
+        # 하나 찾고 양옆으로 세면 같은 값이 20 만 개일 때 질문마다 20 만 걸음이다.
+        "performance": [
+            ("01-one-value", [[42] * 200_000, [42] * 200_000]),
+            ("02-two-values", [[1] * 100_000 + [2] * 100_000, randoms(200_000, 1, 2, salt=10471)]),
+            ("03-random-large", [_sorted_with_runs(200_000, -1000, 1000, salt=10473), randoms(200_000, -1100, 1100, salt=10475)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 값이 처음 나오는 자리와 그보다 큰 값이 처음 나오는 자리의 차.
+fun countInSorted(nums: IntArray, targets: IntArray): IntArray {
+    // nums 에서 key 보다 작지 않은(strict 면 큰) 첫 자리
+    fun firstAtLeast(key: Int, strict: Boolean): Int {
+        var low = 0
+        var high = nums.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (nums[mid] < key || (strict && nums[mid] == key)) low = mid + 1 else high = mid
+            Drill.pointer("low", low); Drill.pointer("high", high)
+        }
+        return low
+    }
+    return IntArray(targets.size) { firstAtLeast(targets[it], true) - firstAtLeast(targets[it], false) }
+}
+""",
+    mutants=[
+        ("found-or-not", "WRONG_ALGORITHM",
+         "값이 있는지만 보고 1 이나 0 을 낸다. 같은 값이 여럿일 수 있다.",
+         """
+fun countInSorted(nums: IntArray, targets: IntArray): IntArray =
+    IntArray(targets.size) { if (java.util.Arrays.binarySearch(nums, targets[it]) >= 0) 1 else 0 }
+"""),
+        ("upper-bound-inclusive", "OFF_BY_ONE",
+         "개수를 마지막 자리에서 시작 자리를 뺀 값으로 센다. 양 끝을 다 넣으려면 1 을 더해야 한다.",
+         """
+fun countInSorted(nums: IntArray, targets: IntArray): IntArray {
+    fun firstAtLeast(key: Int, strict: Boolean): Int {
+        var low = 0; var high = nums.size
+        while (low < high) { val mid = (low + high) ushr 1; if (nums[mid] < key || (strict && nums[mid] == key)) low = mid + 1 else high = mid }
+        return low
+    }
+    return IntArray(targets.size) {
+        val start = firstAtLeast(targets[it], false)
+        if (start == nums.size || nums[start] != targets[it]) 0 else firstAtLeast(targets[it], true) - 1 - start
+    }
+}
+"""),
+        ("start-past-the-end", "MISSING_EDGE_CASE",
+         "시작 자리를 찾은 뒤 그 칸의 값을 바로 읽는다. 값이 모든 원소보다 크면 시작 자리가 배열 끝이라 범위를 벗어난다.",
+         """
+fun countInSorted(nums: IntArray, targets: IntArray): IntArray {
+    fun firstAtLeast(key: Int, strict: Boolean): Int {
+        var low = 0; var high = nums.size
+        while (low < high) { val mid = (low + high) ushr 1; if (nums[mid] < key || (strict && nums[mid] == key)) low = mid + 1 else high = mid }
+        return low
+    }
+    return IntArray(targets.size) {
+        val start = firstAtLeast(targets[it], false)
+        if (nums[start] != targets[it]) 0 else firstAtLeast(targets[it], true) - start
+    }
+}
+"""),
+        ("scans-outward", "PERFORMANCE",
+         "이분 탐색으로 하나를 찾고 양옆으로 센다. 같은 값이 많으면 질문마다 그 개수만큼 걷는다.",
+         """
+fun countInSorted(nums: IntArray, targets: IntArray): IntArray = IntArray(targets.size) {
+    val t = targets[it]
+    val at = java.util.Arrays.binarySearch(nums, t)
+    if (at < 0) 0 else {
+        var left = at; var right = at
+        while (left > 0 && nums[left - 1] == t) left -= 1
+        while (right < nums.size - 1 && nums[right + 1] == t) right += 1
+        right - left + 1
+    }
+}
+"""),
+    ],
+))

@@ -2670,3 +2670,322 @@ fun bstReorderWays(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 간선 둘을 끊어 나눈 XOR --------------------------------------------------
+
+def _tree_split_xor(vals, edges):
+    n = len(vals)
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 2):
+        adj[edges[i]].append(edges[i + 1])
+        adj[edges[i + 1]].append(edges[i])
+    tin, tout, sub = [0] * n, [0] * n, list(vals)
+    clock = 0
+    stack = [(0, -1, False)]
+    while stack:
+        v, p, done = stack.pop()
+        if not done:
+            tin[v] = clock
+            clock += 1
+            stack.append((v, p, True))
+            for u in adj[v]:
+                if u != p:
+                    stack.append((u, v, False))
+        else:
+            tout[v] = clock
+            if p >= 0:
+                sub[p] ^= sub[v]
+    total = sub[0]
+    best = None
+    for a in range(1, n):
+        for b in range(a + 1, n):
+            if tin[a] <= tin[b] < tout[a]:
+                x, y, z = sub[b], sub[a] ^ sub[b], total ^ sub[a]
+            elif tin[b] <= tin[a] < tout[b]:
+                x, y, z = sub[a], sub[b] ^ sub[a], total ^ sub[b]
+            else:
+                x, y, z = sub[a], sub[b], total ^ sub[a] ^ sub[b]
+            score = max(x, y, z) - min(x, y, z)
+            if best is None or score < best:
+                best = score
+    return best
+
+
+def _tree_edge_list(n, salt):
+    parent = _relabel_tree(_random_parents(n, salt=salt), salt=salt + 1)
+    return flat([p, v] for v, p in enumerate(parent) if p != -1)
+
+
+def _chain_edges(n, salt):
+    order = shuffled(range(n), salt=salt)
+    return flat([order[i], order[i + 1]] for i in range(n - 1))
+
+
+PROBLEMS.append(Problem(
+    id="tree-split-xor",
+    title="간선 둘을 끊어 나눈 XOR",
+    summary="""
+정점 `0..n-1` 의 트리가 간선 `edges = [a1, b1, a2, b2, ...]` 로 주어지고, 정점 `i` 의 값은 `vals[i]` 다. 서로 다른 간선
+둘을 끊으면 트리가 세 조각으로 나뉜다. 조각마다 그 안의 값을 모두 XOR 한 값을 구하고, 셋 중 가장 큰 것에서 가장 작은
+것을 뺀 값을 그 끊기의 점수라 한다. 가능한 모든 끊기 가운데 가장 작은 점수를 반환한다.
+""",
+    notes="""
+정점 0 을 루트로 잡으면 간선 하나는 그 아래쪽 정점(자식) 하나로 나타난다 — 끊으면 그 정점의 서브트리가 떨어진다. 서브트리
+XOR 을 한 번의 DFS 로 모두 구해 두면, 간선 둘(아래쪽 정점 `a`, `b`)을 끊은 세 조각의 XOR 은 두 경우로 나뉜다.
+
+- `b` 가 `a` 의 서브트리 안에 있으면: `sub[b]`, `sub[a] ^ sub[b]`, `total ^ sub[a]`.
+- 서로의 서브트리 밖이면: `sub[a]`, `sub[b]`, `total ^ sub[a] ^ sub[b]`.
+
+조상 관계는 DFS 의 진입·탈출 시각으로 상수 시간에 판단한다 — `a` 의 구간 `[tin[a], tout[a])` 에 `tin[b]` 가 들면 자손이다.
+**두 방향을 다 본다.** 쌍마다 세 조각을 다시 훑으면 정점 수의 세제곱이다.
+""",
+    drill_doc="""
+Drill.write(v, sub[v])   // 정점 v 의 서브트리 XOR
+""",
+    constraints="""
+- `3 <= n <= 2000`, 간선은 `n - 1` 개(트리)
+- `1 <= vals[i] <= 10^8`
+""",
+    signature=dict(name="treeSplitXor", parameters=[("vals", "INT_ARRAY"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_tree_split_xor,
+    cases={
+        "sample": [
+            ("01", [[1, 5, 5, 4, 11], [0, 1, 1, 2, 1, 3, 3, 4]]),
+            ("02", [[5, 5, 2, 4, 4, 2], [0, 1, 1, 2, 5, 2, 4, 3, 1, 3]]),
+        ],
+        "boundary": [
+            ("01-three-chain", [[1, 2, 3], [0, 1, 1, 2]]),
+            ("02-star", [[8, 1, 2, 4], [0, 1, 0, 2, 0, 3]]),
+            # 끊는 간선 둘이 조상–자손이다. 아래쪽 정점의 번호가 위쪽보다 작다.
+            ("03-nested-reversed-labels", [[6, 1, 9, 3], [3, 2, 2, 1, 1, 0]]),
+            ("04-all-equal", [[7, 7, 7, 7, 7], [0, 1, 1, 2, 2, 3, 3, 4]]),
+            # 진입·탈출 경계에 바로 붙은 형제.
+            ("05-siblings-after-subtree", [[1, 2, 4, 8, 16, 32], [0, 1, 1, 2, 0, 3, 3, 4, 0, 5]]),
+            ("06-big-values", [[100_000_000, 99_999_999, 1, 67_108_864], [0, 1, 0, 2, 2, 3]]),
+            # DFS 가 정점 1 의 서브트리를 다 돈 바로 다음에 정점 3 에 들어간다 — 탈출 시각을 구간에 넣으면 3 을 1 의 자손으로 본다.
+            ("07-entered-right-after-subtree", [[3, 3, 1, 14, 1, 4], [0, 2, 0, 3, 0, 4, 2, 5, 4, 1]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 50, salt=10489), _tree_edge_list(10, salt=10491)]),
+            ("02-random-medium", [randoms(300, 1, 100_000_000, salt=10493), _tree_edge_list(300, salt=10495)]),
+            ("03-chain", [randoms(200, 1, 1000, salt=10497), _chain_edges(200, salt=10499)]),
+            ("04-small-values", [randoms(400, 1, 3, salt=10501), _tree_edge_list(400, salt=10503)]),
+        ],
+        # 쌍마다 세 조각을 다시 훑으면 200 만 쌍 × 2000 정점이다.
+        "performance": [
+            ("01-random-large", [randoms(2000, 1, 100_000_000, salt=10505), _tree_edge_list(2000, salt=10507)]),
+            ("02-chain-large", [randoms(2000, 1, 100_000_000, salt=10509), _chain_edges(2000, salt=10511)]),
+            ("03-broom", [randoms(2000, 1, 1 << 20, salt=10513),
+                          flat([[i, i + 1] for i in range(999)] + [[999, i] for i in range(1000, 2000)])]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 서브트리 XOR 과 진입·탈출 시각을 한 번의 DFS 로 구하고, 아래쪽 정점의 쌍마다 세 조각을 상수 시간에 낸다.
+fun treeSplitXor(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val tin = IntArray(n); val tout = IntArray(n); val sub = vals.copyOf(); val parent = IntArray(n) { -1 }
+    var clock = 0
+    // 재귀 대신 스택: 음수는 "자식을 다 본 뒤"의 표시다.
+    val stack = ArrayDeque<Int>()
+    stack.addLast(0)
+    while (stack.isNotEmpty()) {
+        val top = stack.removeLast()
+        if (top >= 0) {
+            tin[top] = clock; clock += 1
+            stack.addLast(-top - 1)
+            for (u in adj[top]) if (u != parent[top]) { parent[u] = top; stack.addLast(u) }
+        } else {
+            val v = -top - 1
+            tout[v] = clock
+            if (parent[v] >= 0) sub[parent[v]] = sub[parent[v]] xor sub[v]
+            Drill.write(v, sub[v])
+        }
+    }
+    val total = sub[0]
+    var best = Int.MAX_VALUE
+    for (a in 1 until n) for (b in a + 1 until n) {
+        val x: Int; val y: Int; val z: Int
+        if (tin[b] >= tin[a] && tin[b] < tout[a]) { x = sub[b]; y = sub[a] xor sub[b]; z = total xor sub[a] }
+        else if (tin[a] >= tin[b] && tin[a] < tout[b]) { x = sub[a]; y = sub[b] xor sub[a]; z = total xor sub[b] }
+        else { x = sub[a]; y = sub[b]; z = total xor sub[a] xor sub[b] }
+        val score = maxOf(x, maxOf(y, z)) - minOf(x, minOf(y, z))
+        if (score < best) best = score
+    }
+    return best
+}
+""",
+    mutants=[
+        ("nested-as-disjoint", "WRONG_BRANCH",
+         "조상–자손 관계를 보지 않고 언제나 서로 떨어진 두 서브트리로 계산한다. 위쪽 서브트리의 XOR 에 아래쪽이 이미 들어 있다.",
+         """
+fun treeSplitXor(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val tin = IntArray(n); val tout = IntArray(n); val sub = vals.copyOf(); val parent = IntArray(n) { -1 }
+    var clock = 0
+    // 재귀 대신 스택: 음수는 "자식을 다 본 뒤"의 표시다.
+    val stack = ArrayDeque<Int>()
+    stack.addLast(0)
+    while (stack.isNotEmpty()) {
+        val top = stack.removeLast()
+        if (top >= 0) {
+            tin[top] = clock; clock += 1
+            stack.addLast(-top - 1)
+            for (u in adj[top]) if (u != parent[top]) { parent[u] = top; stack.addLast(u) }
+        } else {
+            val v = -top - 1
+            tout[v] = clock
+            if (parent[v] >= 0) sub[parent[v]] = sub[parent[v]] xor sub[v]
+            Drill.write(v, sub[v])
+        }
+    }
+    val total = sub[0]
+    var best = Int.MAX_VALUE
+    for (a in 1 until n) for (b in a + 1 until n) {
+        val x: Int; val y: Int; val z: Int
+        x = sub[a]; y = sub[b]; z = total xor sub[a] xor sub[b]
+        val score = maxOf(x, maxOf(y, z)) - minOf(x, minOf(y, z))
+        if (score < best) best = score
+    }
+    return best
+}
+"""),
+        ("one-way-ancestor", "WRONG_BRANCH",
+         "b 가 a 의 자손인지만 본다. 번호가 큰 쪽이 조상일 수도 있다.",
+         """
+fun treeSplitXor(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val tin = IntArray(n); val tout = IntArray(n); val sub = vals.copyOf(); val parent = IntArray(n) { -1 }
+    var clock = 0
+    // 재귀 대신 스택: 음수는 "자식을 다 본 뒤"의 표시다.
+    val stack = ArrayDeque<Int>()
+    stack.addLast(0)
+    while (stack.isNotEmpty()) {
+        val top = stack.removeLast()
+        if (top >= 0) {
+            tin[top] = clock; clock += 1
+            stack.addLast(-top - 1)
+            for (u in adj[top]) if (u != parent[top]) { parent[u] = top; stack.addLast(u) }
+        } else {
+            val v = -top - 1
+            tout[v] = clock
+            if (parent[v] >= 0) sub[parent[v]] = sub[parent[v]] xor sub[v]
+            Drill.write(v, sub[v])
+        }
+    }
+    val total = sub[0]
+    var best = Int.MAX_VALUE
+    for (a in 1 until n) for (b in a + 1 until n) {
+        val x: Int; val y: Int; val z: Int
+        if (tin[b] >= tin[a] && tin[b] < tout[a]) { x = sub[b]; y = sub[a] xor sub[b]; z = total xor sub[a] }
+        else { x = sub[a]; y = sub[b]; z = total xor sub[a] xor sub[b] }
+        val score = maxOf(x, maxOf(y, z)) - minOf(x, minOf(y, z))
+        if (score < best) best = score
+    }
+    return best
+}
+"""),
+        ("exit-time-inclusive", "OFF_BY_ONE",
+         "자손 판단에 탈출 시각까지 넣는다. 서브트리 바로 다음에 들어간 정점이 자손으로 잡힌다.",
+         """
+fun treeSplitXor(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val tin = IntArray(n); val tout = IntArray(n); val sub = vals.copyOf(); val parent = IntArray(n) { -1 }
+    var clock = 0
+    // 재귀 대신 스택: 음수는 "자식을 다 본 뒤"의 표시다.
+    val stack = ArrayDeque<Int>()
+    stack.addLast(0)
+    while (stack.isNotEmpty()) {
+        val top = stack.removeLast()
+        if (top >= 0) {
+            tin[top] = clock; clock += 1
+            stack.addLast(-top - 1)
+            for (u in adj[top]) if (u != parent[top]) { parent[u] = top; stack.addLast(u) }
+        } else {
+            val v = -top - 1
+            tout[v] = clock
+            if (parent[v] >= 0) sub[parent[v]] = sub[parent[v]] xor sub[v]
+            Drill.write(v, sub[v])
+        }
+    }
+    val total = sub[0]
+    var best = Int.MAX_VALUE
+    for (a in 1 until n) for (b in a + 1 until n) {
+        val x: Int; val y: Int; val z: Int
+        if (tin[b] >= tin[a] && tin[b] <= tout[a]) { x = sub[b]; y = sub[a] xor sub[b]; z = total xor sub[a] }
+        else if (tin[a] >= tin[b] && tin[a] < tout[b]) { x = sub[a]; y = sub[b] xor sub[a]; z = total xor sub[b] }
+        else { x = sub[a]; y = sub[b]; z = total xor sub[a] xor sub[b] }
+        val score = maxOf(x, maxOf(y, z)) - minOf(x, minOf(y, z))
+        if (score < best) best = score
+    }
+    return best
+}
+"""),
+        ("sums-instead-of-xor", "WRONG_ALGORITHM",
+         "조각의 값을 XOR 대신 합으로 낸다.",
+         """
+fun treeSplitXor(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val tin = IntArray(n); val tout = IntArray(n); val sub = LongArray(n) { vals[it].toLong() }; val parent = IntArray(n) { -1 }
+    var clock = 0
+    val stack = ArrayDeque<Int>(); stack.addLast(0)
+    while (stack.isNotEmpty()) {
+        val top = stack.removeLast()
+        if (top >= 0) { tin[top] = clock; clock += 1; stack.addLast(-top - 1); for (u in adj[top]) if (u != parent[top]) { parent[u] = top; stack.addLast(u) } }
+        else { val v = -top - 1; tout[v] = clock; if (parent[v] >= 0) sub[parent[v]] += sub[v] }
+    }
+    val total = sub[0]
+    var best = Long.MAX_VALUE
+    for (a in 1 until n) for (b in a + 1 until n) {
+        val x: Long; val y: Long; val z: Long
+        if (tin[b] >= tin[a] && tin[b] < tout[a]) { x = sub[b]; y = sub[a] - sub[b]; z = total - sub[a] }
+        else if (tin[a] >= tin[b] && tin[a] < tout[b]) { x = sub[a]; y = sub[b] - sub[a]; z = total - sub[b] }
+        else { x = sub[a]; y = sub[b]; z = total - sub[a] - sub[b] }
+        best = minOf(best, maxOf(x, maxOf(y, z)) - minOf(x, minOf(y, z)))
+    }
+    return best.toInt()
+}
+"""),
+        ("recounts-every-pair", "PERFORMANCE",
+         "간선 쌍마다 두 간선을 빼고 세 조각을 다시 훑는다. 맞지만, 간선 쌍 수 × 정점 수 — 2000 정점이면 수십억 걸음이다.",
+         """
+fun treeSplitXor(vals: IntArray, edges: IntArray): Int {
+    val n = vals.size
+    val m = edges.size / 2
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (e in 0 until m) { adj[edges[2 * e]].add(intArrayOf(edges[2 * e + 1], e)); adj[edges[2 * e + 1]].add(intArrayOf(edges[2 * e], e)) }
+    var best = Int.MAX_VALUE
+    val seen = IntArray(n) { -1 }
+    var stamp = 0
+    val stack = IntArray(n)
+    for (e1 in 0 until m) for (e2 in e1 + 1 until m) {
+        stamp += 1
+        val parts = ArrayList<Int>()
+        for (start in 0 until n) {
+            if (seen[start] == stamp) continue
+            var x = 0; var size = 0
+            stack[size++] = start; seen[start] = stamp
+            while (size > 0) {
+                val v = stack[--size]; x = x xor vals[v]
+                for (edge in adj[v]) if (edge[1] != e1 && edge[1] != e2 && seen[edge[0]] != stamp) { seen[edge[0]] = stamp; stack[size++] = edge[0] }
+            }
+            parts.add(x)
+        }
+        best = minOf(best, parts.maxOrNull()!! - parts.minOrNull()!!)
+    }
+    return best
+}
+"""),
+    ],
+))

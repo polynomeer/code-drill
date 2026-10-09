@@ -1,0 +1,17 @@
+# longest-nice-subarray 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - sliding-window
+  - bit-manipulation
+  - array
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - longest-unique-substring
+  - single-number
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "원소마다 창에 한 번 들어오고 한 번 나간다"

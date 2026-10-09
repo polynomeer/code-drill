@@ -1,0 +1,16 @@
+# apply-operations 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - in-place
+  - simulation
+  - array
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - move-zeros
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "한 번 훑으며 두 배로 만들고, 쓰기 포인터로 한 번 더 훑는다"

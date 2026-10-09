@@ -1,0 +1,18 @@
+# tree-split-xor 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - tree
+  - dfs
+  - bit-manipulation
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - subtree-sizes
+  - max-subtree-sum
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "DFS 한 번 뒤 아래쪽 정점의 쌍마다 상수 시간"

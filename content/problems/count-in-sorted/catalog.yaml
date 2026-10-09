@@ -1,0 +1,16 @@
+# count-in-sorted 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - binary-search
+  - array
+competencies:
+  - READING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - binary-search-insert
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT
+  note: "질문마다 이분 탐색 두 번 — 질문 수 × log n"

@@ -5392,3 +5392,127 @@ fun duplicateZeros(arr: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 두 배로 만들고 0 밀기 ----------------------------------------------------
+
+def _apply_operations(nums):
+    a = list(nums)
+    for i in range(len(a) - 1):
+        if a[i] == a[i + 1]:
+            a[i] *= 2
+            a[i + 1] = 0
+    kept = [v for v in a if v != 0]
+    return kept + [0] * (len(a) - len(kept))
+
+
+PROBLEMS.append(Problem(
+    id="apply-operations",
+    title="두 배로 만들고 0 밀기",
+    summary="""
+배열 `nums` 에 왼쪽부터 `i = 0, 1, ..., n-2` 차례로 다음을 한다: `nums[i] == nums[i+1]` 이면 `nums[i]` 를 두 배로 하고
+`nums[i+1]` 을 `0` 으로 만든다. 비교는 **그때까지 바뀐 값**으로 한다. 다 한 뒤 `0` 을 모두 뒤로 밀고(0 이 아닌 값의 순서는
+그대로) 그 배열을 반환한다.
+""",
+    notes="""
+`i` 번째 단계는 앞 단계가 바꿔 놓은 배열을 본다 — `[2, 2, 2]` 는 첫 단계에서 `[4, 0, 2]` 가 되고, 둘째 단계는 `0` 과
+`2` 를 비교한다. 원래 배열로 비교하면 틀린다.
+
+0 을 뒤로 미는 것은 쓰기 포인터 하나로 제자리에서 한다: 0 이 아닌 값을 만날 때마다 앞에서부터 채우고, 남은 칸을 0 으로
+채운다. 두 일을 한 번의 훑기로 합칠 수도 있다.
+""",
+    drill_doc="""
+Drill.write(i, nums[i])           // 두 배가 됐다
+Drill.pointer("write", write)     // 0 이 아닌 값을 놓을 자리
+""",
+    constraints="""
+- `2 <= nums.size <= 200_000`
+- `0 <= nums[i] <= 1000`
+""",
+    signature=dict(name="applyOperations", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_apply_operations,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [("01", [[1, 2, 2, 1, 1, 0]]), ("02", [[0, 1]])],
+        "boundary": [
+            ("01-two-equal", [[5, 5]]),
+            ("02-two-zeros", [[0, 0]]),
+            # 바뀐 값으로 비교한다 — 셋째 2 는 0 과 비교된다.
+            ("03-three-equal", [[2, 2, 2]]),
+            ("04-four-equal", [[3, 3, 3, 3]]),
+            # 마지막 쌍도 본다.
+            ("05-last-pair", [[1, 2, 3, 4, 4]]),
+            ("06-zeros-between", [[0, 4, 0, 4, 0]]),
+            ("07-doubles-then-equal", [[1, 1, 2, 4]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(20, 0, 3, salt=10433)]),
+            ("02-random-large", [randoms(200_000, 0, 5, salt=10435)]),
+            ("03-all-same", [[7] * 199_999]),
+            ("04-no-pairs", [[i % 1000 + 1 for i in range(200_000)]]),
+            ("05-many-zeros", [[0 if v < 8 else v for v in randoms(200_000, 0, 10, salt=10437)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 바뀐 값으로 차례로 비교하고, 쓰기 포인터로 0 이 아닌 값을 앞으로 모은다.
+fun applyOperations(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    for (i in 0 until a.size - 1) {
+        if (a[i] == a[i + 1]) { a[i] *= 2; a[i + 1] = 0; Drill.write(i, a[i]) }
+    }
+    var write = 0
+    for (v in a) if (v != 0) { a[write] = v; write += 1; Drill.pointer("write", write) }
+    while (write < a.size) { a[write] = 0; write += 1 }
+    return a
+}
+""",
+    mutants=[
+        ("compares-original-values", "WRONG_BRANCH",
+         "원래 배열로 비교한다. 앞 단계가 0 으로 만든 칸을 원래 값으로 보고 다시 두 배로 만든다.",
+         """
+fun applyOperations(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    for (i in 0 until a.size - 1) if (nums[i] == nums[i + 1]) { a[i] *= 2; a[i + 1] = 0 }
+    val kept = a.filter { it != 0 }
+    return IntArray(a.size) { if (it < kept.size) kept[it] else 0 }
+}
+"""),
+        ("last-pair-skipped", "OFF_BY_ONE",
+         "마지막 쌍(n-2, n-1)을 보지 않는다.",
+         """
+fun applyOperations(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    for (i in 0 until a.size - 2) if (a[i] == a[i + 1]) { a[i] *= 2; a[i + 1] = 0 }
+    val kept = a.filter { it != 0 }
+    return IntArray(a.size) { if (it < kept.size) kept[it] else 0 }
+}
+"""),
+        ("shifts-before-doubling", "WRONG_ALGORITHM",
+         "0 을 먼저 뒤로 밀고 두 배로 만든다. 그러면 0 을 사이에 둔 값이 이웃이 되고, 새로 생긴 0 은 밀리지 않는다.",
+         """
+fun applyOperations(nums: IntArray): IntArray {
+    val kept = nums.filter { it != 0 }
+    val a = IntArray(nums.size) { if (it < kept.size) kept[it] else 0 }
+    for (i in 0 until a.size - 1) if (a[i] == a[i + 1]) { a[i] *= 2; a[i + 1] = 0 }
+    return a
+}
+"""),
+        ("swaps-zeros-to-the-end", "WRONG_ALGORITHM",
+         "0 을 만나면 뒤쪽의 0 아닌 값과 맞바꾼다. 0 이 아닌 값의 순서가 흐트러진다.",
+         """
+fun applyOperations(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    for (i in 0 until a.size - 1) if (a[i] == a[i + 1]) { a[i] *= 2; a[i + 1] = 0 }
+    var left = 0
+    var right = a.size - 1
+    while (left < right) {
+        if (a[left] != 0) { left += 1; continue }
+        if (a[right] == 0) { right -= 1; continue }
+        a[left] = a[right]; a[right] = 0
+    }
+    return a
+}
+"""),
+    ],
+))

@@ -1157,3 +1157,148 @@ fun reverseBits(n: Int): Int = Integer.reverseBytes(n)
 """),
     ],
 ))
+
+
+# --- 비트가 겹치지 않는 가장 긴 구간 --------------------------------------------
+
+def _longest_nice_subarray(nums):
+    best = used = left = 0
+    for right, v in enumerate(nums):
+        while used & v:
+            used ^= nums[left]
+            left += 1
+        used |= v
+        best = max(best, right - left + 1)
+    return best
+
+
+def _sparse_bits(n, bits, salt):
+    """비트 하나나 둘만 켠 수들 — 겹치지 않는 구간이 길게 생긴다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    out = []
+    for _ in range(n):
+        v = 1 << source.randrange(bits)
+        if source.random() < 0.3:
+            v |= 1 << source.randrange(bits)
+        out.append(v)
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="longest-nice-subarray",
+    title="비트가 겹치지 않는 가장 긴 구간",
+    summary="""
+양의 정수 배열 `nums` 에서, 구간 안의 **어느 두 수를 골라도** 비트 AND 가 `0` 인 연속 구간 가운데 가장 긴 것의 길이를
+반환한다. 길이 1 인 구간은 언제나 조건을 만족한다.
+""",
+    notes="""
+구간 안의 수들이 켠 비트가 서로 하나도 겹치지 않는다는 뜻이다. 그러면 구간의 OR 은 각 수의 비트를 모은 것이고, 새 수
+`v` 를 넣을 수 있는지는 `OR & v == 0` 하나로 안다. 겹치면 왼쪽에서 수를 빼며 그 비트를 OR 에서 지운다 — 비트가 겹치지
+않으니 XOR 로 빼면 된다. 오른쪽 끝을 옮길 때마다 겹치지 않을 때까지 **여러 개**를 뺄 수 있다.
+
+이웃한 두 수만 보면 안 된다 — `1, 2, 1` 은 이웃끼리는 겹치지 않아도 양 끝이 겹친다.
+""",
+    drill_doc="""
+Drill.pointer("left", left)    // 창의 왼쪽 끝
+Drill.write(0, used)           // 창 안의 비트
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `1 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="longestNiceSubarray", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_longest_nice_subarray,
+    cases={
+        "sample": [("01", [[1, 3, 8, 48, 10]]), ("02", [[3, 1, 5, 11, 13]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-all-disjoint", [[1, 2, 4, 8, 16]]),
+            # 이웃끼리는 겹치지 않아도 양 끝이 겹친다.
+            ("03-ends-overlap", [[1, 2, 1]]),
+            # 새 수 하나가 왼쪽 여럿과 겹친다 — 한 번에 여럿을 빼야 한다.
+            ("04-drop-several", [[1, 2, 4, 7, 8]]),
+            ("05-all-equal", [[5, 5, 5, 5]]),
+            ("06-big-bits", [[1 << 29, 1 << 28, 1 << 29 | 1, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_sparse_bits(20, 6, salt=10477)]),
+            ("02-random-large", [_sparse_bits(200_000, 30, salt=10479)]),
+            ("03-dense", [randoms(200_000, 1, 1_000_000_000, salt=10481)]),
+            ("04-powers-cycle", [[1 << (i % 30) for i in range(200_000)]]),
+            ("05-late-long-run", [[3] * 1000 + [1 << i for i in range(30)] + [3] * 1000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 창의 OR 을 들고, 새 수와 겹치면 겹치지 않을 때까지 왼쪽을 XOR 로 뺀다.
+fun longestNiceSubarray(nums: IntArray): Int {
+    var best = 0
+    var used = 0
+    var left = 0
+    for (right in nums.indices) {
+        while (used and nums[right] != 0) { used = used xor nums[left]; left += 1; Drill.pointer("left", left) }
+        used = used or nums[right]
+        Drill.write(0, used)
+        best = maxOf(best, right - left + 1)
+    }
+    return best
+}
+""",
+    mutants=[
+        ("neighbours-only", "WRONG_ALGORITHM",
+         "이웃한 두 수만 겹치는지 본다. 구간 안의 모든 쌍이 겹치지 않아야 한다.",
+         """
+fun longestNiceSubarray(nums: IntArray): Int {
+    var best = 1
+    var run = 1
+    for (i in 1 until nums.size) {
+        run = if (nums[i] and nums[i - 1] == 0) run + 1 else 1
+        best = maxOf(best, run)
+    }
+    return best
+}
+"""),
+        ("drops-one-per-step", "WRONG_BRANCH",
+         "겹칠 때 왼쪽에서 하나만 뺀다. 새 수가 창 안의 여럿과 겹치면 겹친 채로 창을 넓힌다.",
+         """
+fun longestNiceSubarray(nums: IntArray): Int {
+    var best = 0; var used = 0; var left = 0
+    for (right in nums.indices) {
+        if (used and nums[right] != 0) { used = used xor nums[left]; left += 1 }
+        used = used or nums[right]
+        best = maxOf(best, right - left + 1)
+    }
+    return best
+}
+"""),
+        ("restarts-at-conflict", "WRONG_ALGORITHM",
+         "겹치면 창을 새 수 하나로 새로 시작한다. 겹친 수 뒤의 수들은 새 수와 함께 남을 수 있다.",
+         """
+fun longestNiceSubarray(nums: IntArray): Int {
+    var best = 0; var used = 0; var length = 0
+    for (v in nums) {
+        if (used and v != 0) { used = 0; length = 0 }
+        used = used or v; length += 1
+        best = maxOf(best, length)
+    }
+    return best
+}
+"""),
+        ("removes-with-or", "WRONG_BRANCH",
+         "왼쪽 수를 뺄 때 OR 을 다시 한다. OR 은 비트를 지우지 못해 창이 다시 겹치지 않는 때를 알아채지 못한다.",
+         """
+fun longestNiceSubarray(nums: IntArray): Int {
+    var best = 0; var used = 0; var left = 0
+    for (right in nums.indices) {
+        while (left < right && used and nums[right] != 0) { used = used or nums[left]; left += 1 }
+        if (left == right) used = 0
+        used = used or nums[right]
+        best = maxOf(best, right - left + 1)
+    }
+    return best
+}
+"""),
+    ],
+))
