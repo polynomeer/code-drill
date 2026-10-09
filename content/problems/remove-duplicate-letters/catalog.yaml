@@ -1,0 +1,17 @@
+# remove-duplicate-letters 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - stack
+  - monotonic-stack
+  - greedy
+  - string
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - remove-k-digits
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "글자마다 많아야 한 번 넣고 한 번 뺀다. 스택은 26 글자를 넘지 않는다"

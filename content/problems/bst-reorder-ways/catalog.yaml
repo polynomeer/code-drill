@@ -1,0 +1,19 @@
+# bst-reorder-ways 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: HARD
+tags:
+  - divide-conquer
+  - tree
+  - number-theory
+  - math
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - unique-bst-count
+  - binomial-mod-prime
+complexity:
+  time: QUADRATIC
+  space: LINEAR
+  note: "서브트리마다 원소를 둘로 나눈다 — 깊은 트리에서 n²"

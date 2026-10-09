@@ -2690,3 +2690,245 @@ fun maxUniqueConcat(words: Array<String>): Int {
 """),
     ],
 ))
+
+
+# --- 빚 정리 -----------------------------------------------------------------
+
+def _settle_debts(transactions):
+    balance = {}
+    for i in range(0, len(transactions), 3):
+        giver, taker, amount = transactions[i], transactions[i + 1], transactions[i + 2]
+        balance[giver] = balance.get(giver, 0) - amount
+        balance[taker] = balance.get(taker, 0) + amount
+    values = [v for v in balance.values() if v != 0]
+    k = len(values)
+    sums = [0] * (1 << k)
+    groups = [0] * (1 << k)
+    for mask in range(1, 1 << k):
+        low = (mask & -mask).bit_length() - 1
+        sums[mask] = sums[mask & (mask - 1)] + values[low]
+        best = 0
+        for i in range(k):
+            if mask >> i & 1:
+                best = max(best, groups[mask ^ (1 << i)])
+        groups[mask] = best + (1 if sums[mask] == 0 else 0)
+    return k - groups[(1 << k) - 1]
+
+
+def _debts_from_balances(balances, noise, salt):
+    """잔액을 그대로 만드는 거래 목록. 앞사람이 다음 사람에게 누적액을 넘기고, 서로 상쇄되는 거래를 섞는다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    people = list(range(len(balances)))
+    source.shuffle(people)
+    out = []
+    carry = 0
+    for i in range(len(balances) - 1):
+        # 사람 people[i] 의 잔액이 balances[i] 가 되도록 다음 사람과 주고받는다.
+        carry += balances[i]
+        if carry > 0:
+            out.append((people[i + 1], people[i], carry))
+        elif carry < 0:
+            out.append((people[i], people[i + 1], -carry))
+    for _ in range(noise):
+        a, b = source.sample(people, 2)
+        x = source.randint(1, 100)
+        out.append((a, b, x))
+        out.append((b, a, x))
+    source.shuffle(out)
+    return [v for t in out for v in t]
+
+
+def _balances(k, low, high, salt):
+    """합이 0 인 0 아닌 잔액 k 개. 마지막 값으로 맞추되 0 이 되면 다시 뽑는다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    while True:
+        values = [source.choice([-1, 1]) * source.randint(low, high) for _ in range(k - 1)]
+        last = -sum(values)
+        if last != 0 and abs(last) <= 10_000:
+            return values + [last]
+
+
+PROBLEMS.append(Problem(
+    id="settle-debts",
+    title="빚 정리",
+    summary="""
+친구들 사이의 거래가 `transactions = [from1, to1, amount1, from2, to2, amount2, ...]` 로 주어진다 — `from` 이 `to` 에게
+`amount` 를 줬다. 모든 사람이 받은 만큼 돌려주고 준 만큼 돌려받아 셈이 끝나도록, 새로 해야 할 **송금의 최소 횟수**를
+반환한다. 송금 한 번은 한 사람이 다른 한 사람에게 아무 금액이나 보내는 것이다.
+""",
+    notes="""
+누가 누구에게 얼마를 줬는지는 중요하지 않다 — 사람마다의 잔액만 남는다. 잔액이 0 이 아닌 사람이 `k` 명이면 `k - 1` 번의
+송금으로 늘 끝낼 수 있다(한 줄로 세워 앞사람이 다음 사람에게 넘긴다). 그런데 잔액의 합이 0 인 무리로 쪼갤 수 있으면
+무리마다 따로 정리해 한 번씩 아낀다. 그러니 답은 `k - (합이 0 인 무리로 가장 많이 쪼갠 수)` 다.
+
+`k` 가 작으니 사람들의 부분집합을 비트로 나타낸다. 부분집합 `mask` 를 가장 많이 쪼갠 수는, 한 사람을 뺀 부분집합들의
+최댓값에 `mask` 의 합이 0 이면 1 을 더한 것이다 — 합이 0 인 부분집합에 이르는 순간이 무리 하나가 닫히는 순간이다.
+
+빚 진 사람과 받을 사람을 하나씩 짝지어 보는 백트래킹도 맞지만, 쪼갤 수 없는 잔액이 스무 명이면 끝나지 않는다.
+""",
+    drill_doc="""
+Drill.write(mask, groups)   // 이 부분집합을 합이 0 인 무리로 가장 많이 쪼갠 수
+""",
+    constraints="""
+- 사람 번호는 `0..19`, `from != to`, `1 <= amount <= 100_000`
+- 거래는 `0..1000` 건
+""",
+    signature=dict(name="settleDebts", parameters=[("transactions", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_settle_debts,
+    cases={
+        "sample": [
+            ("01", [[0, 1, 10, 2, 0, 5]]),
+            ("02", [[0, 1, 10, 1, 0, 1, 1, 2, 5, 2, 0, 5]]),
+        ],
+        "boundary": [
+            ("01-no-transactions", [[]]),
+            ("02-one-transaction", [[3, 7, 50]]),
+            # 주고받아 이미 셈이 끝났다.
+            ("03-already-settled", [[0, 1, 20, 1, 0, 20]]),
+            ("04-cycle-settles", [[0, 1, 5, 1, 2, 5, 2, 0, 5]]),
+            # 두 무리로 쪼개진다 — 한 줄로 세우면 한 번 더 든다.
+            ("05-two-groups", [_debts_from_balances([1, 2, -3, 4, 5, -9], 0, salt=10397)]),
+            # 짝이 딱 맞는 둘씩.
+            ("06-opposite-pairs", [_debts_from_balances([7, -7, 3, -3, 9, -9], 2, salt=10399)]),
+            ("07-one-pays-many", [[0, 1, 1, 0, 2, 2, 0, 3, 3, 0, 4, 4]]),
+            # 스무 명 모두 잔액이 있다 — 열아홉이 1 씩 빚지고 한 사람이 19 를 받는다.
+            ("08-all-twenty", [[v for i in range(19) for v in (i, i + 1, i + 1)]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_debts_from_balances(_balances(6, 1, 20, salt=10401), 5, salt=10403)]),
+            ("02-hidden-groups", [_debts_from_balances([2, 3, -5, 1, 1, -2, 4, -1, -3, 6, -6], 20, salt=10405)]),
+            ("03-random-ten", [_debts_from_balances(_balances(10, 1, 50, salt=10407), 50, salt=10409)]),
+            ("04-many-noise", [_debts_from_balances([5, -5, 8, -3, -5], 400, salt=10411)]),
+        ],
+        # 짝지어 보는 백트래킹은 쪼갤 수 없는 잔액 스무 명에서 가지가 폭발한다.
+        "performance": [
+            ("01-twenty-random", [_debts_from_balances(_balances(20, 1, 1000, salt=10413), 100, salt=10415)]),
+            ("02-twenty-distinct", [_debts_from_balances(_balances(20, 500, 999, salt=10417), 0, salt=10419)]),
+            ("03-twenty-small", [_debts_from_balances(_balances(20, 1, 9, salt=10421), 50, salt=10423)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 잔액만 남기고, 부분집합마다 합이 0 인 무리로 가장 많이 쪼갠 수를 센다.
+fun settleDebts(transactions: IntArray): Int {
+    val balance = IntArray(20)
+    for (i in transactions.indices step 3) {
+        balance[transactions[i]] -= transactions[i + 2]
+        balance[transactions[i + 1]] += transactions[i + 2]
+    }
+    val values = balance.filter { it != 0 }
+    val k = values.size
+    val full = 1 shl k
+    val sums = IntArray(full)
+    val groups = IntArray(full)
+    for (mask in 1 until full) {
+        val low = Integer.numberOfTrailingZeros(mask)
+        sums[mask] = sums[mask and (mask - 1)] + values[low]
+        var best = 0
+        var rest = mask
+        while (rest != 0) {
+            val bit = rest and -rest
+            if (groups[mask xor bit] > best) best = groups[mask xor bit]
+            rest = rest xor bit
+        }
+        groups[mask] = best + if (sums[mask] == 0) 1 else 0
+        if (sums[mask] == 0) Drill.write(mask, groups[mask])
+    }
+    return k - groups[full - 1]
+}
+""",
+    mutants=[
+        ("one-line-of-everyone", "WRONG_ALGORITHM",
+         "잔액이 0 아닌 사람을 한 줄로 세워 k − 1 번이라고 한다. 합이 0 인 무리로 쪼개지면 무리마다 한 번씩 아낀다.",
+         """
+fun settleDebts(transactions: IntArray): Int {
+    val balance = IntArray(20)
+    for (i in transactions.indices step 3) { balance[transactions[i]] -= transactions[i + 2]; balance[transactions[i + 1]] += transactions[i + 2] }
+    val k = balance.count { it != 0 }
+    return if (k == 0) 0 else k - 1
+}
+"""),
+        ("exact-pairs-then-line", "WRONG_BRANCH",
+         "금액이 딱 맞는 둘을 먼저 짝짓고, 나머지는 한 줄로 세운다. 나머지가 다시 여러 무리로 쪼개질 수 있다.",
+         """
+fun settleDebts(transactions: IntArray): Int {
+    val balance = IntArray(20)
+    for (i in transactions.indices step 3) { balance[transactions[i]] -= transactions[i + 2]; balance[transactions[i + 1]] += transactions[i + 2] }
+    val rest = balance.filter { it != 0 }.toMutableList()
+    var count = 0
+    var i = 0
+    while (i < rest.size) {
+        val j = (i + 1 until rest.size).firstOrNull { rest[it] == -rest[i] }
+        if (j != null) { rest.removeAt(j); rest.removeAt(i); count += 1 } else i += 1
+    }
+    return count + if (rest.isEmpty()) 0 else rest.size - 1
+}
+"""),
+        ("largest-meets-largest", "WRONG_ALGORITHM",
+         "가장 많이 빚진 사람이 가장 많이 받을 사람에게 갚는 것을 되풀이한다. 탐욕으로는 무리를 찾지 못한다.",
+         """
+fun settleDebts(transactions: IntArray): Int {
+    val balance = IntArray(20)
+    for (i in transactions.indices step 3) { balance[transactions[i]] -= transactions[i + 2]; balance[transactions[i + 1]] += transactions[i + 2] }
+    var count = 0
+    while (true) {
+        val hi = balance.indices.maxByOrNull { balance[it] }!!
+        val lo = balance.indices.minByOrNull { balance[it] }!!
+        if (balance[hi] == 0) return count
+        val x = minOf(balance[hi], -balance[lo])
+        balance[hi] -= x; balance[lo] += x
+        count += 1
+    }
+}
+"""),
+        ("empty-set-is-a-group", "OFF_BY_ONE",
+         "빈 부분집합의 합도 0 이라 무리 하나로 센다. 빈 무리는 송금을 아끼지 않는다 — 답이 하나 적게 나온다.",
+         """
+fun settleDebts(transactions: IntArray): Int {
+    val balance = IntArray(20)
+    for (i in transactions.indices step 3) { balance[transactions[i]] -= transactions[i + 2]; balance[transactions[i + 1]] += transactions[i + 2] }
+    val values = balance.filter { it != 0 }
+    val k = values.size
+    val full = 1 shl k
+    val sums = IntArray(full)
+    val groups = IntArray(full)
+    groups[0] = 1
+    for (mask in 1 until full) {
+        sums[mask] = sums[mask and (mask - 1)] + values[Integer.numberOfTrailingZeros(mask)]
+        var best = 0
+        for (i in 0 until k) if (mask shr i and 1 == 1) best = maxOf(best, groups[mask xor (1 shl i)])
+        groups[mask] = best + if (sums[mask] == 0) 1 else 0
+    }
+    return maxOf(0, k - groups[full - 1])
+}
+"""),
+        ("pairwise-backtracking", "PERFORMANCE",
+         "앞사람의 잔액을 부호가 반대인 뒷사람에게 넘겨 보는 백트래킹. 맞지만, 쪼갤 수 없는 잔액 스무 명이면 가지가 폭발한다.",
+         """
+fun settleDebts(transactions: IntArray): Int {
+    val balance = IntArray(20)
+    for (i in transactions.indices step 3) { balance[transactions[i]] -= transactions[i + 2]; balance[transactions[i + 1]] += transactions[i + 2] }
+    val values = balance.filter { it != 0 }.toIntArray()
+    fun go(start: Int): Int {
+        var i = start
+        while (i < values.size && values[i] == 0) i += 1
+        if (i == values.size) return 0
+        var best = Int.MAX_VALUE
+        for (j in i + 1 until values.size) {
+            if (values[j].toLong() * values[i] < 0) {
+                values[j] += values[i]
+                best = minOf(best, 1 + go(i + 1))
+                values[j] -= values[i]
+            }
+        }
+        return best
+    }
+    return go(0)
+}
+"""),
+    ],
+))

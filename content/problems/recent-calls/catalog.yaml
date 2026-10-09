@@ -1,0 +1,16 @@
+# recent-calls 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - queue
+  - sliding-window
+  - array
+competencies:
+  - READING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - moving-average
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "호출마다 한 번 넣고 많아야 한 번 뺀다"

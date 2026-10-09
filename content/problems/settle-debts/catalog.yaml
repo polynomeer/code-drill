@@ -1,0 +1,18 @@
+# settle-debts 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - backtracking
+  - bit-manipulation
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - COMPLEXITY
+  - CORRECTNESS
+prerequisites:
+  - partition-k-equal-sums
+  - subset-sum-count
+complexity:
+  time: EXPONENTIAL
+  space: EXPONENTIAL
+  note: "잔액이 있는 사람 k ≤ 20 명의 부분집합 2^k 개, 하나마다 k 번"

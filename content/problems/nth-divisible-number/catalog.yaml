@@ -1,0 +1,18 @@
+# nth-divisible-number 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - number-theory
+  - binary-search
+  - math
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - min-ship-capacity
+  - gcd-of-array
+complexity:
+  time: LOGARITHMIC
+  space: CONSTANT
+  note: "개수 세기는 상수, 이분 탐색은 답의 상한의 로그"

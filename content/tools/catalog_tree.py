@@ -2420,3 +2420,253 @@ fun countLeaves(parent: IntArray): Int = parent.size - parent.count { it != -1 }
 """),
     ],
 ))
+
+
+# --- 같은 BST 를 만드는 순서 --------------------------------------------------
+
+def _bst_reorder_ways(nums):
+    mod = 1_000_000_007
+    n = len(nums)
+    fact = [1] * (n + 1)
+    for i in range(1, n + 1):
+        fact[i] = fact[i - 1] * i % mod
+    inverse = [pow(f, mod - 2, mod) for f in fact]
+
+    def choose(a, b):
+        return fact[a] * inverse[b] % mod * inverse[a - b] % mod
+
+    # 정렬된 입력이면 깊이가 n 이라 재귀 대신 스택으로 돈다.
+    total = 1
+    stack = [nums]
+    while stack:
+        xs = stack.pop()
+        if len(xs) <= 2:
+            continue
+        root = xs[0]
+        left = [x for x in xs if x < root]
+        right = [x for x in xs if x > root]
+        total = total * choose(len(xs) - 1, len(left)) % mod
+        stack.append(left)
+        stack.append(right)
+    return (total - 1) % mod
+
+
+def _bst_shape_order(n, salt):
+    """무작위 순서. 그대로 넣으면 깊이가 log n 쯤인 BST 가 된다."""
+    return shuffled(range(1, n + 1), salt=salt)
+
+
+def _complete_order(n):
+    """완전 이진 트리를 너비 우선으로 넣는 순서. n = 2^k - 1."""
+    out, queue = [], [(1, n)]
+    for low, high in queue:
+        if low > high:
+            continue
+        mid = (low + high) // 2
+        out.append(mid)
+        queue.append((low, mid - 1))
+        queue.append((mid + 1, high))
+    return out
+
+
+def _zigzag(n):
+    """양 끝에서 번갈아 꺼낸다 — 깊이 n 인 지그재그 사슬."""
+    low, high, out = 1, n, []
+    while low <= high:
+        out.append(low)
+        low += 1
+        if low <= high:
+            out.append(high)
+            high -= 1
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="bst-reorder-ways",
+    title="같은 BST 를 만드는 순서",
+    summary="""
+`1..n` 의 순열 `nums` 를 앞에서부터 빈 이진 탐색 트리(BST)에 차례로 넣는다. `nums` 를 다시 배열해 넣어도 **모양이
+같은** BST 가 나오는 순서가 몇 가지인지, 원래 순서를 빼고 센 수를 `1_000_000_007` 로 나눈 나머지로 반환한다.
+""",
+    notes="""
+첫 원소가 루트다. 나머지 가운데 루트보다 작은 것은 왼쪽 서브트리, 큰 것은 오른쪽 서브트리로 간다. 모양을 지키려면
+루트가 맨 앞이어야 하고, 왼쪽 원소들끼리의 순서와 오른쪽 원소들끼리의 순서만 지키면 둘을 어떻게 섞어도 된다 —
+`m` 개 중 왼쪽이 들어갈 자리를 고르는 `C(m, |왼쪽|)` 가지다. 그래서
+
+`ways(xs) = C(|xs| - 1, |왼쪽|) × ways(왼쪽) × ways(오른쪽)`
+
+이고, 답은 `ways(nums) - 1` 이다(원래 순서를 뺀다). 이항 계수는 팩토리얼과 그 역원으로 미리 구해 두고, 곱할 때마다
+나머지를 취한다.
+""",
+    drill_doc="""
+Drill.call("ways(root)")            // 이 서브트리를 연다
+Drill.ret("ways(root)", ways)       // 이 서브트리의 순서 수
+""",
+    constraints="""
+- `1 <= nums.size <= 5000`, `nums` 는 `1..n` 의 순열
+""",
+    signature=dict(name="bstReorderWays", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_bst_reorder_ways,
+    cases={
+        "sample": [("01", [[2, 1, 3]]), ("02", [[3, 4, 5, 1, 2]])],
+        "boundary": [
+            ("01-single", [[1]]),
+            # 순서가 하나뿐이면 원래 순서를 빼서 0 이다.
+            ("02-sorted-small", [[1, 2, 3]]),
+            ("03-two", [[2, 1]]),
+            ("04-balanced-seven", [[4, 2, 6, 1, 3, 5, 7]]),
+            ("05-left-only", [[5, 4, 3, 2, 1]]),
+            ("06-root-with-chains", [[4, 3, 2, 1, 5, 6, 7]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_bst_shape_order(12, salt=10425)]),
+            ("02-random-medium", [_bst_shape_order(200, salt=10427)]),
+            # 곱이 나머지를 여러 번 감는다.
+            ("03-random-large", [_bst_shape_order(5000, salt=10429)]),
+            # 완전 이진 트리 모양 — 서브트리 크기가 모두 2^k - 1 이다.
+            ("04-complete", [_complete_order(1023)]),
+        ],
+        # 이항 계수를 노드마다 파스칼 삼각형으로 다시 쌓으면 깊은 트리에서 크기의 세제곱이다.
+        "performance": [
+            ("01-sorted", [list(range(1, 5001))]),
+            ("02-zigzag", [_zigzag(5000)]),
+            ("03-descending", [list(range(5000, 0, -1))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 루트를 떼고 작은 쪽·큰 쪽으로 나눈 뒤, 둘을 섞는 자리의 수 C(m, |왼쪽|) 를 곱한다.
+fun bstReorderWays(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    val fact = LongArray(n + 1)
+    fact[0] = 1
+    for (i in 1..n) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exp: Long): Long {
+        var result = 1L; var b = base % mod; var e = exp
+        while (e > 0) { if (e and 1L == 1L) result = result * b % mod; b = b * b % mod; e = e shr 1 }
+        return result
+    }
+    val inverse = LongArray(n + 1) { power(fact[it], mod - 2) }
+    fun choose(a: Int, b: Int): Long = fact[a] * inverse[b] % mod * inverse[a - b] % mod
+    // 정렬된 입력이면 깊이가 n 이다 — 재귀 대신 스택으로 돈다.
+    var total = 1L
+    val stack = ArrayDeque<IntArray>()
+    stack.addLast(nums)
+    while (stack.isNotEmpty()) {
+        val xs = stack.removeLast()
+        if (xs.size <= 2) continue
+        val root = xs[0]
+        val left = xs.filter { it < root }.toIntArray()
+        val right = xs.filter { it > root }.toIntArray()
+        val here = choose(xs.size - 1, left.size)
+        Drill.ret("ways($root)", here.toInt())
+        total = total * here % mod
+        stack.addLast(left); stack.addLast(right)
+    }
+    return ((total - 1 + mod) % mod).toInt()
+}
+""",
+    mutants=[
+        ("keeps-the-original", "OFF_BY_ONE",
+         "원래 순서를 빼지 않는다. 문제는 다시 배열한 다른 순서의 수를 묻는다.",
+         """
+fun bstReorderWays(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    val fact = LongArray(n + 1); fact[0] = 1
+    for (i in 1..n) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exp: Long): Long { var r = 1L; var b = base % mod; var e = exp; while (e > 0) { if (e and 1L == 1L) r = r * b % mod; b = b * b % mod; e = e shr 1 }; return r }
+    fun choose(a: Int, b: Int): Long = fact[a] * power(fact[b], mod - 2) % mod * power(fact[a - b], mod - 2) % mod
+    fun ways(xs: List<Int>): Long {
+        if (xs.size <= 2) return 1
+        val left = xs.filter { it < xs[0] }; val right = xs.filter { it > xs[0] }
+        return choose(xs.size - 1, left.size) * ways(left) % mod * ways(right) % mod
+    }
+    return ways(nums.toList()).toInt()
+}
+"""),
+        ("counts-the-root-slot", "OFF_BY_ONE",
+         "섞을 자리를 루트까지 넣어 C(m + 1, |왼쪽|) 로 고른다. 루트는 맨 앞에 고정이라 남은 m 자리만 섞인다.",
+         """
+fun bstReorderWays(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    val fact = LongArray(n + 1); fact[0] = 1
+    for (i in 1..n) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exp: Long): Long { var r = 1L; var b = base % mod; var e = exp; while (e > 0) { if (e and 1L == 1L) r = r * b % mod; b = b * b % mod; e = e shr 1 }; return r }
+    fun choose(a: Int, b: Int): Long = fact[a] * power(fact[b], mod - 2) % mod * power(fact[a - b], mod - 2) % mod
+    fun ways(xs: List<Int>): Long {
+        if (xs.size <= 2) return 1
+        val left = xs.filter { it < xs[0] }; val right = xs.filter { it > xs[0] }
+        return choose(xs.size, left.size) * ways(left) % mod * ways(right) % mod
+    }
+    return ((ways(nums.toList()) - 1 + mod) % mod).toInt()
+}
+"""),
+        ("adds-the-subtrees", "WRONG_ALGORITHM",
+         "두 서브트리의 순서 수를 더한다. 왼쪽 순서마다 오른쪽 순서를 모두 고를 수 있으니 곱해야 한다.",
+         """
+fun bstReorderWays(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    val fact = LongArray(n + 1); fact[0] = 1
+    for (i in 1..n) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exp: Long): Long { var r = 1L; var b = base % mod; var e = exp; while (e > 0) { if (e and 1L == 1L) r = r * b % mod; b = b * b % mod; e = e shr 1 }; return r }
+    fun choose(a: Int, b: Int): Long = fact[a] * power(fact[b], mod - 2) % mod * power(fact[a - b], mod - 2) % mod
+    fun ways(xs: List<Int>): Long {
+        if (xs.size <= 2) return 1
+        val left = xs.filter { it < xs[0] }; val right = xs.filter { it > xs[0] }
+        return choose(xs.size - 1, left.size) * ((ways(left) + ways(right)) % mod) % mod
+    }
+    return ((ways(nums.toList()) - 1 + mod) % mod).toInt()
+}
+"""),
+        ("product-overflows", "MISSING_EDGE_CASE",
+         "세 값을 한 번에 곱하고 마지막에만 나머지를 취한다. 나머지 셋을 곱하면 Long 을 넘친다.",
+         """
+fun bstReorderWays(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    val fact = LongArray(n + 1); fact[0] = 1
+    for (i in 1..n) fact[i] = fact[i - 1] * i % mod
+    fun power(base: Long, exp: Long): Long { var r = 1L; var b = base % mod; var e = exp; while (e > 0) { if (e and 1L == 1L) r = r * b % mod; b = b * b % mod; e = e shr 1 }; return r }
+    fun choose(a: Int, b: Int): Long = fact[a] * power(fact[b], mod - 2) % mod * power(fact[a - b], mod - 2) % mod
+    fun ways(xs: List<Int>): Long {
+        if (xs.size <= 2) return 1
+        val left = xs.filter { it < xs[0] }; val right = xs.filter { it > xs[0] }
+        return choose(xs.size - 1, left.size) * ways(left) * ways(right) % mod
+    }
+    return ((ways(nums.toList()) - 1 + mod) % mod).toInt()
+}
+"""),
+        ("pascal-per-node", "PERFORMANCE",
+         "노드마다 파스칼 삼각형을 처음부터 쌓아 이항 계수를 구한다. 맞지만, 깊은 트리에서는 크기의 세제곱이다.",
+         """
+fun bstReorderWays(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    fun choose(a: Int, b: Int): Long {
+        var row = LongArray(1) { 1L }
+        for (r in 1..a) {
+            val next = LongArray(r + 1)
+            next[0] = 1; next[r] = 1
+            for (j in 1 until r) next[j] = (row[j - 1] + row[j]) % mod
+            row = next
+        }
+        return row[b]
+    }
+    var total = 1L
+    val stack = ArrayDeque<IntArray>()
+    stack.addLast(nums)
+    while (stack.isNotEmpty()) {
+        val xs = stack.removeLast()
+        if (xs.size <= 2) continue
+        val left = xs.filter { it < xs[0] }.toIntArray(); val right = xs.filter { it > xs[0] }.toIntArray()
+        total = total * choose(xs.size - 1, left.size) % mod
+        stack.addLast(left); stack.addLast(right)
+    }
+    return ((total - 1 + mod) % mod).toInt()
+}
+"""),
+    ],
+))

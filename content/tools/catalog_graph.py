@@ -7369,3 +7369,259 @@ fun goodPaths(vals: IntArray, edges: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- DAG 의 최단 거리 ---------------------------------------------------------
+
+_UNREACHABLE = 2_147_483_647
+
+
+def _dag_shortest_paths(n, edges, source):
+    from collections import deque
+    adj = [[] for _ in range(n)]
+    indegree = [0] * n
+    for i in range(0, len(edges), 3):
+        u, v, w = edges[i], edges[i + 1], edges[i + 2]
+        adj[u].append((v, w))
+        indegree[v] += 1
+    queue = deque(v for v in range(n) if indegree[v] == 0)
+    order = []
+    while queue:
+        u = queue.popleft()
+        order.append(u)
+        for v, _ in adj[u]:
+            indegree[v] -= 1
+            if indegree[v] == 0:
+                queue.append(v)
+    dist = [None] * n
+    dist[source] = 0
+    for u in order:
+        if dist[u] is None:
+            continue
+        for v, w in adj[u]:
+            if dist[v] is None or dist[u] + w < dist[v]:
+                dist[v] = dist[u] + w
+    return [_UNREACHABLE if d is None else d for d in dist]
+
+
+def _random_dag(n, m, low, high, salt):
+    """정점 번호를 섞은 무작위 DAG. 간선은 섞인 순서에서 앞 → 뒤로만 가고, 목록도 섞는다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    order = list(range(n))
+    source.shuffle(order)
+    edges = []
+    for _ in range(m):
+        i = source.randrange(n - 1)
+        j = min(n - 1, i + 1 + int(source.expovariate(1 / 20)))
+        edges.append((order[i], order[j], source.randint(low, high)))
+    source.shuffle(edges)
+    return flat(list(e) for e in edges), order[0]
+
+
+def _shuffled_chain(n, low, high, extra, salt):
+    """길게 이어진 사슬 + 지름길. 간선 목록이 섞여 있어, 목록 순서대로 완화하면 한 바퀴에 한 칸씩만 나아간다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    order = list(range(n))
+    source.shuffle(order)
+    edges = [(order[i], order[i + 1], source.randint(low, high)) for i in range(n - 1)]
+    for _ in range(extra):
+        i = source.randrange(n - 2)
+        j = source.randint(i + 2, min(n - 1, i + 50))
+        edges.append((order[i], order[j], source.randint(low, high)))
+    source.shuffle(edges)
+    return flat(list(e) for e in edges), order[0]
+
+
+_DAG_LARGE = _random_dag(200_000, 400_000, -1000, 1000, salt=10383)
+_CHAIN_LARGE = _shuffled_chain(200_000, -1000, 1000, 100_000, salt=10385)
+_CHAIN_NEG = _shuffled_chain(200_000, -1000, -1, 0, salt=10387)
+
+
+PROBLEMS.append(Problem(
+    id="dag-shortest-paths",
+    title="DAG 의 최단 거리",
+    summary="""
+정점 `0..n-1` 의 방향 비순환 그래프(DAG)가 간선 `edges = [u1, v1, w1, u2, v2, w2, ...]` 로 주어진다 — `u` 에서 `v` 로
+가는 무게 `w` 의 간선이다. **무게는 음수일 수 있다.** 정점 `source` 에서 각 정점까지의 최단 거리를 담은 배열을
+반환한다. 갈 수 없는 정점은 `2147483647` 이다.
+""",
+    notes="""
+순환이 없으니 위상 순서가 있다. 위상 순서대로 정점을 꺼내 그 정점에서 나가는 간선을 완화하면, 어떤 정점을 꺼낼 때는
+그리로 들어오는 간선이 모두 이미 완화됐다 — 거리가 확정된다. 음수 간선이 있어도 상관없다.
+
+다익스트라는 음수 간선에서 틀린다. 한 번 확정한 정점이 나중에 음수 간선으로 더 짧아질 수 있다. 벨만–포드는 맞지만
+간선 목록을 정점 수만큼 훑는다.
+
+`source` 에서 갈 수 없는 정점에서 나가는 간선은 완화하지 않는다 — "무한대 + 음수"를 거리로 삼으면 안 된다.
+""",
+    drill_doc="""
+Drill.visit(u, dist)          // 위상 순서로 꺼낸 정점과 그 거리
+Drill.edge("u", "v")          // 이 간선으로 거리가 줄었다
+""",
+    constraints="""
+- `1 <= n <= 200_000`, 간선은 `0..400_000` 개, `0 <= u, v < n`, `u != v`, 같은 쌍의 간선이 여럿일 수 있다
+- `-1000 <= w <= 1000`, 그래프에 순환이 없다
+- `0 <= source < n`
+""",
+    signature=dict(name="dagShortestPaths",
+                   parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("source", "INT")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_dag_shortest_paths,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 5, 0, 2, 3, 2, 1, -4, 1, 3, 2], 0]),
+            ("02", [3, [1, 2, 7], 0]),
+        ],
+        "boundary": [
+            ("01-single", [1, [], 0]),
+            ("02-no-edges", [3, [], 1]),
+            # 먼저 확정한 정점이 음수 간선으로 다시 짧아진다 — 다익스트라가 틀린다.
+            ("03-negative-shortcut", [4, [0, 1, 1, 0, 2, 5, 2, 1, -10, 1, 3, 1], 0]),
+            # 갈 수 없는 정점에서 나가는 음수 간선은 무시해야 한다.
+            ("04-unreachable-negative", [4, [1, 2, -5, 0, 3, 4, 2, 3, -100], 0]),
+            ("05-source-in-middle", [5, [0, 1, 1, 1, 2, 1, 2, 3, 1, 3, 4, 1, 0, 4, 1], 2]),
+            ("06-parallel-edges", [2, [0, 1, 5, 0, 1, -3, 0, 1, 2], 0]),
+            ("07-zero-and-negative-sum", [3, [0, 1, -1000, 1, 2, 1000], 0]),
+            # 간선 목록이 위상 순서의 반대로 놓였다.
+            ("08-edges-reversed", [5, [3, 4, -1, 2, 3, -1, 1, 2, -1, 0, 1, -1], 0]),
+        ],
+        "hidden": [
+            ("01-random-small", [12, *_random_dag(12, 25, -5, 5, salt=10389)]),
+            ("02-random-medium", [2000, *_random_dag(2000, 6000, -100, 100, salt=10391)]),
+            ("03-positive-only", [5000, *_random_dag(5000, 15000, 0, 50, salt=10393)]),
+            ("04-chain-medium", [3000, *_shuffled_chain(3000, -50, 50, 3000, salt=10395)]),
+        ],
+        # 벨만–포드는 섞인 사슬에서 한 바퀴에 두 칸쯤 나아간다 — 10 만 바퀴 × 20 만 간선.
+        "performance": [
+            ("01-random-large", [200_000, *_DAG_LARGE]),
+            ("02-chain-large", [200_000, *_CHAIN_LARGE]),
+            ("03-negative-chain", [200_000, *_CHAIN_NEG]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). Kahn 의 위상 정렬로 순서를 얻고, 그 순서대로 나가는 간선을 완화한다.
+fun dagShortestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }
+    val next = IntArray(m)
+    val indegree = IntArray(n)
+    for (e in 0 until m) { val u = edges[3 * e]; next[e] = head[u]; head[u] = e; indegree[edges[3 * e + 1]] += 1 }
+    val order = IntArray(n)
+    var size = 0
+    for (v in 0 until n) if (indegree[v] == 0) { order[size] = v; size += 1 }
+    var read = 0
+    while (read < size) {
+        val u = order[read]; read += 1
+        var e = head[u]
+        while (e != -1) {
+            val v = edges[3 * e + 1]
+            indegree[v] -= 1
+            if (indegree[v] == 0) { order[size] = v; size += 1 }
+            e = next[e]
+        }
+    }
+    val unreachable = Long.MAX_VALUE
+    val dist = LongArray(n) { unreachable }
+    dist[source] = 0
+    for (u in order) {
+        if (dist[u] == unreachable) continue
+        Drill.visit(u, dist[u].toInt())
+        var e = head[u]
+        while (e != -1) {
+            val v = edges[3 * e + 1]
+            val candidate = dist[u] + edges[3 * e + 2]
+            if (candidate < dist[v]) { dist[v] = candidate; Drill.edge(u.toString(), v.toString()) }
+            e = next[e]
+        }
+    }
+    return IntArray(n) { if (dist[it] == unreachable) Int.MAX_VALUE else dist[it].toInt() }
+}
+""",
+    mutants=[
+        ("dijkstra", "WRONG_ALGORITHM",
+         "다익스트라로 푼다. 한 번 확정한 정점이 나중에 음수 간선으로 더 짧아질 수 있다.",
+         """
+fun dagShortestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (e in 0 until edges.size / 3) adj[edges[3 * e]].add(intArrayOf(edges[3 * e + 1], edges[3 * e + 2]))
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    val done = BooleanArray(n)
+    dist[source] = 0
+    val queue = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    queue.add(longArrayOf(0, source.toLong()))
+    while (queue.isNotEmpty()) {
+        val top = queue.poll(); val u = top[1].toInt()
+        if (done[u]) continue
+        done[u] = true
+        for (edge in adj[u]) {
+            val v = edge[0]
+            if (!done[v] && dist[u] + edge[1] < dist[v]) { dist[v] = dist[u] + edge[1]; queue.add(longArrayOf(dist[v], v.toLong())) }
+        }
+    }
+    return IntArray(n) { if (dist[it] == Long.MAX_VALUE) Int.MAX_VALUE else dist[it].toInt() }
+}
+"""),
+        ("relaxes-from-unreachable", "MISSING_EDGE_CASE",
+         "갈 수 없는 정점에서 나가는 간선도 완화한다. 무한대에 음수를 더한 값이 거리로 들어간다.",
+         """
+fun dagShortestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val m = edges.size / 3
+    val adj = Array(n) { ArrayList<Int>() }
+    val indegree = IntArray(n)
+    for (e in 0 until m) { adj[edges[3 * e]].add(e); indegree[edges[3 * e + 1]] += 1 }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) queue.addLast(v)
+    val order = ArrayList<Int>()
+    while (queue.isNotEmpty()) {
+        val u = queue.removeFirst(); order.add(u)
+        for (e in adj[u]) { val v = edges[3 * e + 1]; indegree[v] -= 1; if (indegree[v] == 0) queue.addLast(v) }
+    }
+    val inf = Int.MAX_VALUE.toLong()
+    val dist = LongArray(n) { inf }
+    dist[source] = 0
+    for (u in order) for (e in adj[u]) {
+        val v = edges[3 * e + 1]
+        dist[v] = minOf(dist[v], dist[u] + edges[3 * e + 2])
+    }
+    return IntArray(n) { dist[it].toInt() }
+}
+"""),
+        ("one-pass-in-list-order", "WRONG_BRANCH",
+         "간선 목록을 주어진 순서대로 한 번만 완화한다. 목록이 위상 순서로 놓여 있지 않으면 거리가 덜 줄어든다.",
+         """
+fun dagShortestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[source] = 0
+    for (e in 0 until edges.size / 3) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]
+        if (dist[u] != Long.MAX_VALUE && dist[u] + edges[3 * e + 2] < dist[v]) dist[v] = dist[u] + edges[3 * e + 2]
+    }
+    return IntArray(n) { if (dist[it] == Long.MAX_VALUE) Int.MAX_VALUE else dist[it].toInt() }
+}
+"""),
+        ("bellman-ford", "PERFORMANCE",
+         "벨만–포드로 간선 목록을 바뀌지 않을 때까지 훑는다. 맞지만, 섞인 긴 사슬에서는 정점 수만큼 바퀴를 돈다.",
+         """
+fun dagShortestPaths(n: Int, edges: IntArray, source: Int): IntArray {
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[source] = 0
+    var changed = true
+    var rounds = 0
+    while (changed && rounds < n) {
+        changed = false
+        rounds += 1
+        for (e in 0 until edges.size / 3) {
+            val u = edges[3 * e]; val v = edges[3 * e + 1]
+            if (dist[u] != Long.MAX_VALUE && dist[u] + edges[3 * e + 2] < dist[v]) { dist[v] = dist[u] + edges[3 * e + 2]; changed = true }
+        }
+    }
+    return IntArray(n) { if (dist[it] == Long.MAX_VALUE) Int.MAX_VALUE else dist[it].toInt() }
+}
+"""),
+    ],
+))

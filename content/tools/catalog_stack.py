@@ -2979,3 +2979,252 @@ fun validateStackSequences(pushed: IntArray, popped: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 최근 호출 수 -------------------------------------------------------------
+
+def _recent_calls(times):
+    window = []
+    head = 0
+    out = []
+    for t in times:
+        window.append(t)
+        while window[head] < t - 3000:
+            head += 1
+        out.append(len(window) - head)
+    return out
+
+
+def _call_times(n, low_gap, high_gap, salt):
+    gaps = randoms(n, low_gap, high_gap, salt=salt)
+    out, t = [], 0
+    for g in gaps:
+        t += g
+        out.append(t)
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="recent-calls",
+    title="최근 호출 수",
+    summary="""
+호출이 들어온 시각(밀리초)이 오름차순 배열 `times` 로 주어진다. 각 호출에 대해, 그 시각 `t` 를 포함해 `[t - 3000, t]`
+안에 들어온 호출이 몇 개인지 담은 배열을 반환한다. 양 끝 시각도 창에 든다.
+""",
+    notes="""
+창은 오른쪽으로만 움직인다. 새 호출을 큐 뒤에 넣고, 앞에서 `t - 3000` 보다 이른 호출을 **모두** 빼면 큐에 남은 수가
+답이다. 한 번에 여러 개가 빠질 수 있다 — 호출 사이가 길게 비면 그렇다.
+""",
+    drill_doc="""
+Drill.enqueue(t)   // 새 호출
+Drill.dequeue(t)   // 창 밖으로 나간 호출
+""",
+    constraints="""
+- `1 <= times.size <= 200_000`
+- `1 <= times[i] <= 10^9`, `times` 는 순증가
+""",
+    signature=dict(name="recentCalls", parameters=[("times", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_recent_calls,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [("01", [[1, 100, 3001, 3002]]), ("02", [[5, 4000, 8000]])],
+        "boundary": [
+            ("01-single", [[1]]),
+            # 정확히 3000 앞의 호출은 창에 든다.
+            ("02-exactly-3000-apart", [[1000, 4000]]),
+            ("03-3001-apart", [[1000, 4001]]),
+            # 긴 공백 뒤에는 한 번에 여럿이 빠진다.
+            ("04-many-leave-at-once", [[1, 2, 3, 4, 5, 10000, 10001]]),
+            ("05-all-in-window", [[1, 2, 3, 2999, 3000, 3001]]),
+            ("06-large-times", [[999_990_000, 999_993_000, 999_996_001, 1_000_000_000]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_call_times(30, 1, 1500, salt=10371)]),
+            ("02-random-large", [_call_times(200_000, 1, 1500, salt=10373)]),
+            ("03-dense", [list(range(1, 200_001))]),
+            ("04-bursts", [flat([1_000_000 * b + i for i in range(50)] for b in range(1, 1001))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 큐 뒤에 넣고, 앞에서 창 밖의 호출을 모두 뺀다.
+fun recentCalls(times: IntArray): IntArray {
+    val out = IntArray(times.size)
+    var head = 0
+    for (i in times.indices) {
+        Drill.enqueue(times[i])
+        while (times[head] < times[i] - 3000) { Drill.dequeue(times[head]); head += 1 }
+        out[i] = i - head + 1
+    }
+    return out
+}
+""",
+    mutants=[
+        ("boundary-call-dropped", "OFF_BY_ONE",
+         "정확히 3000 앞의 호출까지 뺀다. 창은 양 끝을 포함한다.",
+         """
+fun recentCalls(times: IntArray): IntArray {
+    val out = IntArray(times.size)
+    var head = 0
+    for (i in times.indices) {
+        while (times[head] <= times[i] - 3000) head += 1
+        out[i] = i - head + 1
+    }
+    return out
+}
+"""),
+        ("one-leaves-per-call", "WRONG_BRANCH",
+         "호출마다 많아야 하나만 뺀다. 긴 공백 뒤에는 여러 호출이 한꺼번에 창을 벗어난다.",
+         """
+fun recentCalls(times: IntArray): IntArray {
+    val out = IntArray(times.size)
+    var head = 0
+    for (i in times.indices) {
+        if (times[head] < times[i] - 3000) head += 1
+        out[i] = i - head + 1
+    }
+    return out
+}
+"""),
+        ("counts-every-call", "WRONG_ALGORITHM",
+         "지금까지 들어온 호출을 모두 센다. 3000 밀리초 창 안의 호출만 센다.",
+         """
+fun recentCalls(times: IntArray): IntArray = IntArray(times.size) { it + 1 }
+"""),
+    ],
+))
+
+
+# --- 중복 글자 지우기 ---------------------------------------------------------
+
+def _remove_duplicate_letters(s):
+    last = {ch: i for i, ch in enumerate(s)}
+    stack, inside = [], set()
+    for i, ch in enumerate(s):
+        if ch in inside:
+            continue
+        while stack and stack[-1] > ch and last[stack[-1]] > i:
+            inside.discard(stack.pop())
+        stack.append(ch)
+        inside.add(ch)
+    return "".join(stack)
+
+
+def _letters(n, alphabet, salt):
+    return "".join(alphabet[v] for v in randoms(n, 0, len(alphabet) - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="remove-duplicate-letters",
+    title="중복 글자 지우기",
+    summary="""
+소문자 문자열 `s` 에서 글자를 지워, 나오는 글자마다 **정확히 한 번씩** 남긴다. 남은 글자의 순서는 원래 순서를 따른다.
+그렇게 만들 수 있는 문자열 가운데 사전순으로 가장 앞서는 것을 반환한다.
+""",
+    notes="""
+왼쪽부터 답을 스택에 쌓는다. 새 글자 `c` 가 스택 맨 위 글자보다 작고, 맨 위 글자가 **뒤에 또 나온다면** 맨 위를 빼도
+된다 — 나중에 다시 넣을 수 있고, 그편이 사전순으로 앞선다. 뒤에 다시 나오지 않는 글자는 뺄 수 없다. 이미 스택에 있는
+글자는 건너뛴다.
+""",
+    drill_doc="""
+Drill.push(c - 'a')   // 글자를 답에 넣었다
+Drill.pop(c - 'a')    // 뒤에 또 나오는 더 큰 글자를 뺐다
+""",
+    constraints="""
+- `1 <= s.length <= 200_000`, `s` 는 소문자로만 이뤄진다
+""",
+    signature=dict(name="removeDuplicateLetters", parameters=[("s", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_remove_duplicate_letters,
+    cases={
+        "sample": [("01", ["bcabc"]), ("02", ["cbacdcbc"])],
+        "boundary": [
+            ("01-single", ["z"]),
+            ("02-all-same", ["aaaa"]),
+            ("03-already-distinct", ["dcba"]),
+            # 뒤에 다시 나오지 않는 글자는 더 커도 남겨야 한다.
+            ("04-last-of-its-kind", ["cbac"]),
+            ("05-sorted-repeats", ["abcabc"]),
+            # 빼낸 글자가 뒤에서 다시 들어온다.
+            ("06-pop-then-return", ["bcabcb"]),
+            ("07-ab-repeated", ["ba" * 10]),
+        ],
+        "hidden": [
+            ("01-random-small", [_letters(20, "abcde", salt=10375)]),
+            ("02-random-large", [_letters(200_000, "abcdefghijklmnopqrstuvwxyz", salt=10377)]),
+            ("03-few-letters", [_letters(200_000, "xyz", salt=10379)]),
+            ("04-descending-blocks", ["".join("zyxwvutsrqponmlkjihgfedcba" for _ in range(7000))]),
+            ("05-rare-letters", ["m" * 1000 + _letters(5000, "abc", salt=10381) + "q" + "a" * 1000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 뒤에 또 나오는 더 큰 글자는 스택에서 빼고, 이미 있는 글자는 건너뛴다.
+fun removeDuplicateLetters(s: String): String {
+    val last = IntArray(26)
+    for (i in s.indices) last[s[i] - 'a'] = i
+    val inside = BooleanArray(26)
+    val stack = StringBuilder()
+    for (i in s.indices) {
+        val c = s[i]
+        if (inside[c - 'a']) continue
+        while (stack.isNotEmpty() && stack.last() > c && last[stack.last() - 'a'] > i) {
+            val top = stack.last()
+            inside[top - 'a'] = false
+            stack.setLength(stack.length - 1)
+            Drill.pop(top - 'a')
+        }
+        stack.append(c)
+        inside[c - 'a'] = true
+        Drill.push(c - 'a')
+    }
+    return stack.toString()
+}
+""",
+    mutants=[
+        ("pops-the-last-of-its-kind", "WRONG_BRANCH",
+         "맨 위 글자가 뒤에 또 나오는지 보지 않고 뺀다. 마지막으로 나온 글자를 빼면 그 글자가 답에서 사라진다.",
+         """
+fun removeDuplicateLetters(s: String): String {
+    val inside = BooleanArray(26)
+    val stack = StringBuilder()
+    for (c in s) {
+        if (inside[c - 'a']) continue
+        while (stack.isNotEmpty() && stack.last() > c) { inside[stack.last() - 'a'] = false; stack.setLength(stack.length - 1) }
+        stack.append(c); inside[c - 'a'] = true
+    }
+    return stack.toString()
+}
+"""),
+        ("first-occurrences", "WRONG_ALGORITHM",
+         "글자마다 처음 나온 것을 남긴다. 사전순으로 가장 앞서는 선택이 아니다.",
+         """
+fun removeDuplicateLetters(s: String): String {
+    val seen = BooleanArray(26)
+    val out = StringBuilder()
+    for (c in s) if (!seen[c - 'a']) { seen[c - 'a'] = true; out.append(c) }
+    return out.toString()
+}
+"""),
+        ("readds-letters-already-kept", "MISSING_EDGE_CASE",
+         "이미 스택에 있는 글자도 다시 넣는다. 같은 글자가 두 번 남는다.",
+         """
+fun removeDuplicateLetters(s: String): String {
+    val last = IntArray(26)
+    for (i in s.indices) last[s[i] - 'a'] = i
+    val stack = StringBuilder()
+    for (i in s.indices) {
+        val c = s[i]
+        if (stack.isNotEmpty() && stack.last() == c) continue
+        while (stack.isNotEmpty() && stack.last() > c && last[stack.last() - 'a'] > i) stack.setLength(stack.length - 1)
+        stack.append(c)
+    }
+    return stack.toString()
+}
+"""),
+        ("sorted-distinct", "WRONG_ALGORITHM",
+         "나온 글자를 정렬해 이어 붙인다. 원래 순서를 지켜야 한다.",
+         """
+fun removeDuplicateLetters(s: String): String = s.toSortedSet().joinToString("")
+"""),
+    ],
+))

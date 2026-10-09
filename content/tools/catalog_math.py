@@ -2550,3 +2550,182 @@ fun evenDigitCount(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- n번째 배수 --------------------------------------------------------------
+
+def _nth_divisible(n, a, b, c):
+    import math
+    cap = 2_000_000_000
+
+    def lcm(x, y):
+        return min(x // math.gcd(x, y) * y, cap + 1)
+
+    ab, bc, ac = lcm(a, b), lcm(b, c), lcm(a, c)
+    abc = lcm(ab, c)
+
+    def count(x):
+        return x // a + x // b + x // c - x // ab - x // bc - x // ac + x // abc
+
+    low, high = 1, cap
+    while low < high:
+        mid = (low + high) // 2
+        if count(mid) >= n:
+            high = mid
+        else:
+            low = mid + 1
+    return low
+
+
+PROBLEMS.append(Problem(
+    id="nth-divisible-number",
+    title="n번째 배수",
+    summary="""
+양의 정수 `a`, `b`, `c` 가운데 하나 이상으로 나누어떨어지는 양의 정수를 작은 것부터 나열할 때, `n` 번째 수를 반환한다.
+""",
+    notes="""
+`x` 이하에서 조건을 만족하는 수의 개수는 포함·배제로 바로 센다 — `x/a + x/b + x/c` 에서 두 수의 최소공배수로 나눈 몫을
+빼고, 셋의 최소공배수로 나눈 몫을 더한다. 개수는 `x` 에 대해 늘기만 하므로, 개수가 처음 `n` 이상이 되는 `x` 를 이분
+탐색으로 찾는다.
+
+최소공배수는 금방 커진다. 두 수의 최소공배수는 `Long` 에 들지만 셋의 최소공배수는 `Long` 도 넘을 수 있다 — 답의 상한을
+넘으면 그 이상은 의미가 없으니 상한에서 자른다.
+""",
+    drill_doc="""
+Drill.pointer("low", low)     // 탐색 구간
+Drill.pointer("high", high)
+""",
+    constraints="""
+- `1 <= n, a, b, c <= 10^9`
+- 답은 `2 * 10^9` 이하다
+""",
+    signature=dict(name="nthDivisible",
+                   parameters=[("n", "INT"), ("a", "INT"), ("b", "INT"), ("c", "INT")], returns="INT"),
+    groups=perf_groups(time_multiplier=0.1),
+    reference=_nth_divisible,
+    cases={
+        "sample": [("01", [3, 2, 3, 5]), ("02", [4, 2, 3, 4])],
+        "boundary": [
+            ("01-first", [1, 7, 9, 11]),
+            ("02-all-one", [1_000_000_000, 1, 1, 1]),
+            ("03-same-three", [5, 4, 4, 4]),
+            # 하나가 다른 수의 배수면 겹침을 빼야 한다.
+            ("04-nested-multiples", [10, 2, 4, 8]),
+            # 셋의 최소공배수가 Long 을 넘는다.
+            ("05-huge-lcm", [3, 999_999_937, 999_999_929, 999_999_893]),
+            ("06-answer-at-cap", [2, 1_000_000_000, 1_000_000_000, 1_000_000_000]),
+            # 두 수의 최소공배수가 상한 근처다.
+            ("07-pair-lcm-near-cap", [4, 44_721, 44_729, 999_999_999]),
+            # 65536 × 65537 = 2^32 + 65536 — Int 로 곱하면 65536 으로 감긴다.
+            ("08-lcm-past-int", [1000, 65_536, 65_537, 999_999_999]),
+        ],
+        "hidden": [
+            ("01-small-mix", [100, 6, 10, 15]),
+            ("02-coprime", [1_000_000, 7, 11, 13]),
+            ("03-shared-factors", [123_456_789, 12, 18, 30]),
+            ("04-large-divisors", [7, 300_000_007, 500_000_003, 700_000_001]),
+            ("05-max-n", [1_000_000_000, 2, 3, 5]),
+        ],
+        # 하나씩 세어 올라가는 풀이는 답만큼 걷는다.
+        "performance": [
+            ("01-two-billion", [1_000_000_000, 2, 2, 2]),
+            ("02-sparse", [600_000_000, 3, 5, 7]),
+            ("03-large-n", [999_999_999, 2, 4, 1_000_000_000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). x 이하의 개수를 포함·배제로 세고, 처음 n 이상이 되는 x 를 이분 탐색한다.
+fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
+    val cap = 2_000_000_000L
+    fun gcd(x: Long, y: Long): Long = if (y == 0L) x else gcd(y, x % y)
+    // 상한을 넘는 최소공배수는 상한 + 1 로 자른다 — 그 몫은 언제나 0 이고 Long 도 넘치지 않는다.
+    fun lcm(x: Long, y: Long): Long = minOf(x / gcd(x, y) * y, cap + 1)
+    val ab = lcm(a.toLong(), b.toLong()); val bc = lcm(b.toLong(), c.toLong()); val ac = lcm(a.toLong(), c.toLong())
+    val abc = lcm(ab, c.toLong())
+    fun count(x: Long): Long = x / a + x / b + x / c - x / ab - x / bc - x / ac + x / abc
+    var low = 1L
+    var high = cap
+    while (low < high) {
+        val mid = (low + high) / 2
+        if (count(mid) >= n) high = mid else low = mid + 1
+        Drill.pointer("low", low.toInt()); Drill.pointer("high", high.toInt())
+    }
+    return low.toInt()
+}
+""",
+    mutants=[
+        ("forgets-the-triple", "WRONG_ALGORITHM",
+         "셋의 최소공배수로 나눈 몫을 다시 더하지 않는다. 셋 모두의 배수가 한 번도 세어지지 않는다.",
+         """
+fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
+    val cap = 2_000_000_000L
+    fun gcd(x: Long, y: Long): Long = if (y == 0L) x else gcd(y, x % y)
+    fun lcm(x: Long, y: Long): Long = minOf(x / gcd(x, y) * y, cap + 1)
+    val ab = lcm(a.toLong(), b.toLong()); val bc = lcm(b.toLong(), c.toLong()); val ac = lcm(a.toLong(), c.toLong())
+    fun count(x: Long): Long = x / a + x / b + x / c - x / ab - x / bc - x / ac
+    var low = 1L; var high = cap
+    while (low < high) { val mid = (low + high) / 2; if (count(mid) >= n) high = mid else low = mid + 1 }
+    return low.toInt()
+}
+"""),
+        ("int-lcm", "MISSING_EDGE_CASE",
+         "최소공배수를 Int 로 계산한다. 두 수의 최소공배수가 2^31 을 넘으면 감겨 엉뚱한 작은 수가 되고, 그 몫이 빠진다.",
+         """
+fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
+    fun gcd(x: Int, y: Int): Int = if (y == 0) x else gcd(y, x % y)
+    fun lcm(x: Int, y: Int): Int = x / gcd(x, y) * y
+    val ab = lcm(a, b); val bc = lcm(b, c); val ac = lcm(a, c)
+    val abc = lcm(ab, c)
+    fun count(x: Long): Long = x / a + x / b + x / c - x / ab - x / bc - x / ac + x / abc
+    var low = 1L; var high = 2_000_000_000L
+    while (low < high) { val mid = (low + high) / 2; if (count(mid) >= n) high = mid else low = mid + 1 }
+    return low.toInt()
+}
+"""),
+        ("first-exact-count", "OFF_BY_ONE",
+         "개수가 정확히 n 인 x 를 하나 찾으면 바로 돌려준다. 그런 x 는 여럿이고, 가장 작은 것이 답이다.",
+         """
+fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
+    val cap = 2_000_000_000L
+    fun gcd(x: Long, y: Long): Long = if (y == 0L) x else gcd(y, x % y)
+    fun lcm(x: Long, y: Long): Long = minOf(x / gcd(x, y) * y, cap + 1)
+    val ab = lcm(a.toLong(), b.toLong()); val bc = lcm(b.toLong(), c.toLong()); val ac = lcm(a.toLong(), c.toLong())
+    val abc = lcm(ab, c.toLong())
+    fun count(x: Long): Long = x / a + x / b + x / c - x / ab - x / bc - x / ac + x / abc
+    var low = 1L; var high = cap
+    while (low < high) {
+        val mid = (low + high) / 2
+        val k = count(mid)
+        if (k == n.toLong()) return mid.toInt()
+        if (k > n) high = mid else low = mid + 1
+    }
+    return low.toInt()
+}
+"""),
+        ("walks-one-by-one", "PERFORMANCE",
+         "1 부터 하나씩 올라가며 센다. 답이 20 억이면 20 억 걸음이다.",
+         """
+fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
+    var x = 0
+    var k = 0
+    while (k < n) { x += 1; if (x % a == 0 || x % b == 0 || x % c == 0) k += 1 }
+    return x
+}
+"""),
+        ("merges-the-sequences", "PERFORMANCE",
+         "세 배수열을 병합하듯 n 번 앞으로 간다. 걸음은 n 번이라 n 이 10 억이면 끝나지 않는다.",
+         """
+fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
+    var x = a.toLong(); var y = b.toLong(); var z = c.toLong()
+    var current = 0L
+    repeat(n) {
+        current = minOf(x, minOf(y, z))
+        if (x == current) x += a
+        if (y == current) y += b
+        if (z == current) z += c
+    }
+    return current.toInt()
+}
+"""),
+    ],
+))

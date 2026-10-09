@@ -227,3 +227,9 @@
 1217: search-rotated
 1218: max-vowels-window
 1219: count-leaves
+1220: dag-shortest-paths
+1221: nth-divisible-number
+1222: settle-debts
+1223: recent-calls
+1224: remove-duplicate-letters
+1225: bst-reorder-ways
