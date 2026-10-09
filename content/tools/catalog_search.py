@@ -2416,6 +2416,9 @@ def _probe_queries(nums, count, salt):
 
 PROBLEMS.append(Problem(
     id="search-rotated",
+    # v2: 질문마다 훑는 오답이 CI 러너에서 2초 한도의 2.6배였다 — 4×10^10 번의 비교가 벡터화돼 5초에 든다. 입력은
+    # 이미 상한이라 성능 그룹의 시계를 절반으로 조인다.
+    version=2,
     title="회전된 정렬 배열에서 찾기",
     summary="""
 서로 다른 정수를 오름차순으로 정렬한 배열을 어느 자리에서 잘라 앞뒤를 바꿔 붙인 `nums` 가 있다(`[0,1,2,4,5,6,7]` →
@@ -2434,7 +2437,7 @@ Drill.pointer("hi", hi)    // 오른쪽
 - `1 <= nums.length <= 200_000`, 값은 서로 다르고 `-10^9..10^9`, `1 <= queries.length <= 200_000`
 """,
     signature=dict(name="searchRotated", parameters=[("nums", "INT_ARRAY"), ("queries", "INT_ARRAY")], returns="INT_ARRAY"),
-    groups=perf_groups(),
+    groups=perf_groups(time_multiplier=0.5),
     reference=_search_rotated,
     limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8_000_000},
     cases={

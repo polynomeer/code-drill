@@ -2579,6 +2579,9 @@ def _nth_divisible(n, a, b, c):
 
 PROBLEMS.append(Problem(
     id="nth-divisible-number",
+    # v2: 세 배수열을 병합하는 오답이 CI 러너에서 200ms 한도의 2.4배였다 — 10 억 걸음이 0.5초에 든다. n 은 Int 상한이라
+    # 시계를 40ms 로 조인다. 정답은 이분 탐색 31 번이다.
+    version=2,
     title="n번째 배수",
     summary="""
 양의 정수 `a`, `b`, `c` 가운데 하나 이상으로 나누어떨어지는 양의 정수를 작은 것부터 나열할 때, `n` 번째 수를 반환한다.
@@ -2601,7 +2604,7 @@ Drill.pointer("high", high)
 """,
     signature=dict(name="nthDivisible",
                    parameters=[("n", "INT"), ("a", "INT"), ("b", "INT"), ("c", "INT")], returns="INT"),
-    groups=perf_groups(time_multiplier=0.1),
+    groups=perf_groups(time_multiplier=0.02),
     reference=_nth_divisible,
     cases={
         "sample": [("01", [3, 2, 3, 5]), ("02", [4, 2, 3, 4])],
