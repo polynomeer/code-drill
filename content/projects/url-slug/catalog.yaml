@@ -1,0 +1,8 @@
+# url-slug 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - simulation
+summary: 글 제목에서 URL 슬러그를 만든다 — 악센트 떼기, 아포스트로피, 앞뒤 대시, 낱말 경계에서 자르기, 남는 것이 없을 때, 겹치는 슬러그에 번호 붙이기.
+competencies:
+  - SPECIFICATION
