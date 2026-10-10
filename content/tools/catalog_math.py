@@ -2732,3 +2732,108 @@ fun nthDivisible(n: Int, a: Int, b: Int, c: Int): Int {
 """),
     ],
 ))
+
+
+# --- 서로소인 쌍 세기 ---------------------------------------------------------
+
+def _coprime_pairs(nums):
+    import math
+    count = 0
+    for i in range(len(nums)):
+        for j in range(i + 1, len(nums)):
+            if math.gcd(nums[i], nums[j]) == 1:
+                count += 1
+    return count
+
+
+PROBLEMS.append(Problem(
+    id="coprime-pairs",
+    title="서로소인 쌍 세기",
+    summary="""
+양의 정수 배열 `nums` 에서 `i < j` 이고 `gcd(nums[i], nums[j]) == 1` 인 쌍 `(i, j)` 가 몇 개인지 반환한다.
+""",
+    notes="""
+두 수가 서로소라는 것은 최대공약수가 1 이라는 것이다. 유클리드 호제법 `gcd(a, b) = gcd(b, a mod b)` 로 구한다. 쌍은 많아야
+200 만 개라 모두 보면 된다. `1` 은 모든 수와 서로소이고, 같은 수 둘은 둘 다 `1` 일 때만 서로소다.
+""",
+    drill_doc="""
+Drill.compare(i, j)   // 이 쌍의 최대공약수를 구했다
+""",
+    constraints="""
+- `1 <= nums.size <= 2000`
+- `1 <= nums[i] <= 10^6`
+""",
+    signature=dict(name="coprimePairs", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_coprime_pairs,
+    cases={
+        "sample": [("01", [[2, 3, 4, 9]]), ("02", [[6, 10, 15]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            ("02-ones", [[1, 1, 1]]),
+            ("03-one-and-others", [[1, 4, 6]]),
+            ("04-equal-primes", [[5, 5]]),
+            ("05-divides", [[3, 9, 27]]),
+            ("06-consecutive", [[14, 15]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 1, 30, salt=10573)]),
+            ("02-random-large", [randoms(2000, 1, 1_000_000, salt=10575)]),
+            ("03-evens", [[2 * (i + 1) for i in range(2000)]]),
+            ("04-small-values", [randoms(2000, 1, 12, salt=10577)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 쌍마다 유클리드 호제법으로 최대공약수를 구한다.
+fun coprimePairs(nums: IntArray): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    var count = 0
+    for (i in nums.indices) for (j in i + 1 until nums.size) {
+        if (gcd(nums[i], nums[j]) == 1) count += 1
+    }
+    Drill.compare(0, nums.size - 1)
+    return count
+}
+""",
+    mutants=[
+        ("pairs-with-itself", "OFF_BY_ONE",
+         "i <= j 로 원소를 자기 자신과도 짝짓는다. 1 은 자기 자신과 서로소라 1 하나마다 하나 더 세어진다.",
+         """
+fun coprimePairs(nums: IntArray): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    var count = 0
+    for (i in nums.indices) for (j in i until nums.size) if (gcd(nums[i], nums[j]) == 1) count += 1
+    return count
+}
+"""),
+        ("neither-divides", "WRONG_ALGORITHM",
+         "어느 쪽도 다른 쪽을 나누지 않으면 서로소로 본다. 6 과 10 은 서로를 나누지 않지만 2 를 함께 가진다.",
+         """
+fun coprimePairs(nums: IntArray): Int {
+    var count = 0
+    for (i in nums.indices) for (j in i + 1 until nums.size) if (nums[i] % nums[j] != 0 && nums[j] % nums[i] != 0) count += 1
+    return count
+}
+"""),
+        ("one-is-not-coprime", "MISSING_EDGE_CASE",
+         "1 이 든 쌍을 세지 않는다. 1 은 모든 수와 서로소다.",
+         """
+fun coprimePairs(nums: IntArray): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    var count = 0
+    for (i in nums.indices) for (j in i + 1 until nums.size) if (nums[i] > 1 && nums[j] > 1 && gcd(nums[i], nums[j]) == 1) count += 1
+    return count
+}
+"""),
+        ("neighbours-only", "WRONG_BRANCH",
+         "이웃한 원소끼리만 본다. 쌍은 어느 두 자리든 된다.",
+         """
+fun coprimePairs(nums: IntArray): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    var count = 0
+    for (i in 0 until nums.size - 1) if (gcd(nums[i], nums[i + 1]) == 1) count += 1
+    return count
+}
+"""),
+    ],
+))

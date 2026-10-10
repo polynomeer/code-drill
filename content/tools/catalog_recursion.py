@@ -3071,3 +3071,169 @@ fun letterCasePermutations(s: String): Array<String> {
 """),
     ],
 ))
+
+
+# --- 쿠키 나누기 --------------------------------------------------------------
+
+def _distribute_cookies(bags, k):
+    n = len(bags)
+    full = 1 << n
+    sums = [0] * full
+    for mask in range(1, full):
+        low = (mask & -mask).bit_length() - 1
+        sums[mask] = sums[mask & (mask - 1)] + bags[low]
+    best = sums[:]
+    for _ in range(k - 1):
+        nxt = [0] * full
+        for mask in range(full):
+            value = best[mask]
+            sub = mask
+            while sub:
+                candidate = max(best[mask ^ sub], sums[sub])
+                if candidate < value:
+                    value = candidate
+                sub = (sub - 1) & mask
+            nxt[mask] = value
+        best = nxt
+    return best[full - 1]
+
+
+PROBLEMS.append(Problem(
+    id="distribute-cookies",
+    title="쿠키 나누기",
+    summary="""
+쿠키 봉지 `bags` 를 아이 `k` 명에게 나눠 준다. 봉지는 나누지 못하고 통째로 한 아이에게 가며, 모든 봉지를 나눠 준다(봉지를
+받지 못하는 아이가 있어도 된다). 가장 많이 받은 아이의 쿠키 수를 될 수 있는 한 작게 할 때 그 값을 반환한다.
+""",
+    notes="""
+봉지마다 아이를 고르는 백트래킹은 `k^n` 갈래다 — 봉지 12 개, 아이 12 명이면 8조다. 봉지의 집합을 비트로 나타내 "봉지 집합
+`mask` 를 아이 `j` 명에게 나눌 때의 가장 작은 최댓값" `best[j][mask]` 를 채운다. 아이 한 명이면 `mask` 의 합이고, 한 명을
+더할 때는 그 아이가 받을 부분집합 `sub ⊆ mask` 를 모두 보아 `max(best[j-1][mask - sub], sum[sub])` 의 최솟값을 취한다.
+부분집합의 부분집합을 모두 도는 것은 `3^n` 이라 봉지 12 개면 53 만이다.
+
+받지 않는 아이가 있어도 되므로 `sub` 는 빈 집합이어도 된다(그때는 이전 값이 그대로다).
+""",
+    drill_doc="""
+Drill.write(mask, value)   // 이 봉지 집합을 지금까지의 아이들에게 나눈 가장 작은 최댓값
+""",
+    constraints="""
+- `2 <= bags.size <= 12`, `1 <= bags[i] <= 100_000`
+- `2 <= k <= bags.size`
+""",
+    signature=dict(name="distributeCookies", parameters=[("bags", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_distribute_cookies,
+    cases={
+        "sample": [("01", [[8, 15, 10, 20, 8], 2]), ("02", [[6, 1, 3, 2, 2, 4, 1, 2], 3])],
+        "boundary": [
+            ("01-two-bags-two-kids", [[5, 9], 2]),
+            ("02-one-bag-each", [[4, 7, 1], 3]),
+            # 한 봉지가 나머지 전부보다 크다 — 답은 그 봉지다.
+            ("03-giant-bag", [[100, 1, 1, 1], 2]),
+            ("04-all-equal", [[3, 3, 3, 3, 3, 3], 4]),
+            # 큰 것부터 가장 덜 받은 아이에게 주는 탐욕이 틀린다.
+            ("05-greedy-trap", [[3, 3, 2, 2, 2], 2]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(6, 1, 30, salt=10579), 3]),
+            ("02-random-medium", [randoms(9, 1, 1000, salt=10581), 4]),
+            ("03-ten-two", [randoms(10, 1, 100_000, salt=10583), 2]),
+            ("04-many-kids", [randoms(8, 1, 50, salt=10585), 7]),
+        ],
+        # 봉지마다 아이를 고르는 백트래킹은 k^n — 12 개와 12 명이면 끝나지 않는다.
+        "performance": [
+            ("01-twelve-twelve", [randoms(12, 1, 100_000, salt=10587), 12]),
+            ("02-twelve-six", [randoms(12, 1, 100_000, salt=10589), 6]),
+            ("03-twelve-nine-equal", [[50_000] * 12, 9]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 봉지 집합 비트마스크 DP — 아이를 한 명씩 더하며 그 아이가 받을 부분집합을 모두 본다.
+fun distributeCookies(bags: IntArray, k: Int): Int {
+    val n = bags.size
+    val full = 1 shl n
+    val sums = IntArray(full)
+    for (mask in 1 until full) sums[mask] = sums[mask and (mask - 1)] + bags[Integer.numberOfTrailingZeros(mask)]
+    var best = sums.copyOf()
+    repeat(k - 1) {
+        val next = IntArray(full)
+        for (mask in 0 until full) {
+            var value = best[mask]
+            var sub = mask
+            while (sub != 0) {
+                val candidate = maxOf(best[mask xor sub], sums[sub])
+                if (candidate < value) value = candidate
+                sub = (sub - 1) and mask
+            }
+            next[mask] = value
+        }
+        best = next
+    }
+    Drill.write(full - 1, best[full - 1])
+    return best[full - 1]
+}
+""",
+    mutants=[
+        ("largest-to-the-poorest", "WRONG_ALGORITHM",
+         "큰 봉지부터 지금 가장 적게 받은 아이에게 준다. 탐욕은 최적을 보장하지 않는다.",
+         """
+fun distributeCookies(bags: IntArray, k: Int): Int {
+    val kids = IntArray(k)
+    for (b in bags.sortedDescending()) { val i = kids.indices.minByOrNull { kids[it] }!!; kids[i] += b }
+    return kids.maxOrNull()!!
+}
+"""),
+        ("one-kid-short", "OFF_BY_ONE",
+         "아이를 k - 1 명으로 나눈다. 반복을 한 번 덜 돈다.",
+         """
+fun distributeCookies(bags: IntArray, k: Int): Int {
+    val n = bags.size; val full = 1 shl n
+    val sums = IntArray(full)
+    for (mask in 1 until full) sums[mask] = sums[mask and (mask - 1)] + bags[Integer.numberOfTrailingZeros(mask)]
+    var best = sums.copyOf()
+    repeat(k - 2) {
+        val next = IntArray(full)
+        for (mask in 0 until full) {
+            var value = best[mask]; var sub = mask
+            while (sub != 0) { val c = maxOf(best[mask xor sub], sums[sub]); if (c < value) value = c; sub = (sub - 1) and mask }
+            next[mask] = value
+        }
+        best = next
+    }
+    return best[full - 1]
+}
+"""),
+        ("contiguous-split", "WRONG_BRANCH",
+         "봉지를 정렬해 연속한 덩어리로만 나눈다. 아이가 받는 봉지는 연속할 필요가 없다.",
+         """
+fun distributeCookies(bags: IntArray, k: Int): Int {
+    val sorted = bags.sorted()
+    val n = sorted.size
+    val prefix = IntArray(n + 1); for (i in 0 until n) prefix[i + 1] = prefix[i] + sorted[i]
+    // best[j][i]: 앞 i 개를 j 명에게 연속으로 나눈 가장 작은 최댓값
+    val inf = Int.MAX_VALUE
+    var best = IntArray(n + 1) { prefix[it] }
+    repeat(k - 1) {
+        val next = IntArray(n + 1) { inf }
+        for (i in 0..n) for (cut in 0..i) next[i] = minOf(next[i], maxOf(best[cut], prefix[i] - prefix[cut]))
+        best = next
+    }
+    return best[n]
+}
+"""),
+        ("every-assignment", "PERFORMANCE",
+         "봉지마다 아이를 고르는 모든 경우를 본다. 맞지만, k^n 이다.",
+         """
+fun distributeCookies(bags: IntArray, k: Int): Int {
+    val kids = IntArray(k)
+    var best = Int.MAX_VALUE
+    fun go(i: Int) {
+        if (i == bags.size) { best = minOf(best, kids.maxOrNull()!!); return }
+        for (c in 0 until k) { kids[c] += bags[i]; go(i + 1); kids[c] -= bags[i] }
+    }
+    go(0)
+    return best
+}
+"""),
+    ],
+))

@@ -2812,3 +2812,202 @@ fun countInSorted(nums: IntArray, targets: IntArray): IntArray = IntArray(target
 """),
     ],
 ))
+
+
+# --- 부등식을 만족하는 쌍 -------------------------------------------------------
+
+def _inequality_pairs(nums1, nums2, diff):
+    """앞선 d 값들을 펜윅 트리에 넣어 두고, d[j] + diff 이하인 것의 수를 센다 — 코틀린 정답(병합 정렬)과 다른 길이다."""
+    d = [a - b for a, b in zip(nums1, nums2)]
+    values = sorted(set(d))
+    import bisect
+    tree = [0] * (len(values) + 1)
+    count = 0
+    for v in d:
+        # v + diff 이하인 앞선 값의 수
+        k = bisect.bisect_right(values, v + diff)
+        i = k
+        while i > 0:
+            count += tree[i]
+            i -= i & -i
+        i = bisect.bisect_left(values, v) + 1
+        while i <= len(values):
+            tree[i] += 1
+            i += i & -i
+    return count % 1_000_000_007
+
+
+PROBLEMS.append(Problem(
+    id="inequality-pairs",
+    # v2: 성능 그룹의 시계를 절반으로 조였던 v1 은 개발 스택에서 정답이 넘쳤다 — 시계를 되돌렸다.
+    version=2,
+    title="부등식을 만족하는 쌍",
+    summary="""
+길이가 같은 정수 배열 `nums1`, `nums2` 와 정수 `diff` 가 주어진다. `i < j` 이고
+`nums1[i] - nums1[j] <= nums2[i] - nums2[j] + diff` 인 쌍 `(i, j)` 의 수를 `1_000_000_007` 로 나눈 나머지로 반환한다.
+""",
+    notes="""
+`d[i] = nums1[i] - nums2[i]` 로 두면 조건은 `d[i] <= d[j] + diff` 다 — 한 배열 안에서 "앞의 값이 뒤의 값 + diff 이하"인 쌍을
+세는 문제가 된다. 뒤집힌 쌍 세기와 같은 모양이라 병합 정렬로 센다: 왼쪽 반과 오른쪽 반을 각각 정렬해 두면, 오른쪽의 각
+`d[j]` 에 대해 `d[j] + diff` 이하인 왼쪽 원소의 수는 포인터 하나가 앞으로만 움직이며 센다. 그다음 두 반을 합친다.
+
+쌍의 수는 1 250 억까지 간다. 세는 동안은 `Long` 으로 들고 마지막에 나머지를 취한다.
+""",
+    drill_doc="""
+Drill.call("lo..hi")          // 이 구간을 정렬하며 센다
+Drill.ret("lo..hi", count)    // 두 반을 가로지르는 쌍의 수
+""",
+    constraints="""
+- `1 <= nums1.size == nums2.size <= 500_000`
+- `-10^4 <= nums1[i], nums2[i], diff <= 10^4`
+""",
+    signature=dict(name="inequalityPairs",
+                   parameters=[("nums1", "INT_ARRAY"), ("nums2", "INT_ARRAY"), ("diff", "INT")], returns="INT"),
+    # 쌍을 모두 보는 오답은 비교 한 번이 전부라 JIT 이 벡터화한다(CI 러너에서 회전 배열이 그랬다). 시계를 조이는 대신
+    # 입력을 50 만으로 키워 1 250 억 번의 비교로 만든다 — 50 만 개를 읽고 정렬하는 정답에 1초는 빠듯했다.
+    groups=perf_groups(),
+    reference=_inequality_pairs,
+    cases={
+        "sample": [("01", [[3, 2, 5], [2, 2, 1], 1]), ("02", [[3, -1], [-2, 2], -1])],
+        "boundary": [
+            ("01-single", [[5], [5], 0]),
+            # 등호도 된다.
+            ("02-exactly-equal", [[1, 1], [1, 1], 0]),
+            ("03-negative-diff", [[0, 0, 0], [0, 0, 0], -1]),
+            ("04-order-matters", [[5, 1], [0, 0], 0]),
+            ("05-extremes", [[10_000, -10_000, 10_000], [-10_000, 10_000, -10_000], 10_000]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -5, 5, salt=10599), randoms(12, -5, 5, salt=10601), 2]),
+            ("02-random-medium", [randoms(3000, -10_000, 10_000, salt=10603), randoms(3000, -10_000, 10_000, salt=10605), 37]),
+            # 쌍이 거의 다 — 수가 Int 를 넘는다(나머지 전).
+            ("03-all-pairs", [[0] * 100_000, [0] * 100_000, 0]),
+        ],
+        # 쌍을 모두 보면 50 만 × 50 만 / 2 = 1 250 억 번의 비교다.
+        "performance": [
+            ("01-random-large", [randoms(500_000, -10_000, 10_000, salt=10607), randoms(500_000, -10_000, 10_000, salt=10609), 100]),
+            ("02-all-pairs-large", [[0] * 500_000, [0] * 500_000, 0]),
+            ("03-descending", [list(range(10_000, -10_000, -1)) * 25, [0] * 500_000, -3]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). d = nums1 - nums2 를 병합 정렬하며, 오른쪽의 d[j] + diff 이하인 왼쪽 원소를 포인터로 센다.
+fun inequalityPairs(nums1: IntArray, nums2: IntArray, diff: Int): Int {
+    val n = nums1.size
+    val d = IntArray(n) { nums1[it] - nums2[it] }
+    val buffer = IntArray(n)
+    var count = 0L
+    var width = 1
+    // 재귀 없이 아래에서부터 — 폭 1, 2, 4, … 의 이웃한 두 덩어리를 센 뒤 합친다
+    while (width < n) {
+        var low = 0
+        while (low < n - width) {
+            val mid = low + width
+            val high = minOf(low + 2 * width, n)
+            var i = low
+            for (j in mid until high) {
+                while (i < mid && d[i] <= d[j] + diff) i += 1
+                count += i - low
+            }
+            Drill.ret("$low..$high", (count % 1_000_000_007).toInt())
+            var a = low; var b = mid; var k = low
+            while (a < mid && b < high) buffer[k++] = if (d[a] <= d[b]) d[a++] else d[b++]
+            while (a < mid) buffer[k++] = d[a++]
+            while (b < high) buffer[k++] = d[b++]
+            for (t in low until high) d[t] = buffer[t]
+            low += 2 * width
+        }
+        width *= 2
+    }
+    return (count % 1_000_000_007).toInt()
+}
+""",
+    mutants=[
+        ("strictly-less", "OFF_BY_ONE",
+         "d[i] < d[j] + diff 인 쌍만 센다. 같아도 조건을 만족한다.",
+         """
+fun inequalityPairs(nums1: IntArray, nums2: IntArray, diff: Int): Int {
+    val n = nums1.size
+    val d = IntArray(n) { nums1[it] - nums2[it] }
+    val buffer = IntArray(n); var count = 0L; var width = 1
+    while (width < n) {
+        var low = 0
+        while (low < n - width) {
+            val mid = low + width; val high = minOf(low + 2 * width, n)
+            var i = low
+            for (j in mid until high) { while (i < mid && d[i] < d[j] + diff) i += 1; count += i - low }
+            var a = low; var b = mid; var k = low
+            while (a < mid && b < high) buffer[k++] = if (d[a] <= d[b]) d[a++] else d[b++]
+            while (a < mid) buffer[k++] = d[a++]
+            while (b < high) buffer[k++] = d[b++]
+            for (t in low until high) d[t] = buffer[t]
+            low += 2 * width
+        }
+        width *= 2
+    }
+    return (count % 1_000_000_007).toInt()
+}
+"""),
+        ("diff-on-the-wrong-side", "WRONG_BRANCH",
+         "d[i] + diff <= d[j] 로 센다. diff 는 뒤쪽 값에 더한다.",
+         """
+fun inequalityPairs(nums1: IntArray, nums2: IntArray, diff: Int): Int {
+    val n = nums1.size
+    val d = IntArray(n) { nums1[it] - nums2[it] }
+    val buffer = IntArray(n); var count = 0L; var width = 1
+    while (width < n) {
+        var low = 0
+        while (low < n - width) {
+            val mid = low + width; val high = minOf(low + 2 * width, n)
+            var i = low
+            for (j in mid until high) { while (i < mid && d[i] + diff <= d[j]) i += 1; count += i - low }
+            var a = low; var b = mid; var k = low
+            while (a < mid && b < high) buffer[k++] = if (d[a] <= d[b]) d[a++] else d[b++]
+            while (a < mid) buffer[k++] = d[a++]
+            while (b < high) buffer[k++] = d[b++]
+            for (t in low until high) d[t] = buffer[t]
+            low += 2 * width
+        }
+        width *= 2
+    }
+    return (count % 1_000_000_007).toInt()
+}
+"""),
+        ("int-count", "MISSING_EDGE_CASE",
+         "쌍의 수를 Int 로 센다. 쌍은 1 250 억까지 가서 나머지를 취하기 전에 넘친다.",
+         """
+fun inequalityPairs(nums1: IntArray, nums2: IntArray, diff: Int): Int {
+    val n = nums1.size
+    val d = IntArray(n) { nums1[it] - nums2[it] }
+    val buffer = IntArray(n); var count = 0; var width = 1
+    while (width < n) {
+        var low = 0
+        while (low < n - width) {
+            val mid = low + width; val high = minOf(low + 2 * width, n)
+            var i = low
+            for (j in mid until high) { while (i < mid && d[i] <= d[j] + diff) i += 1; count += i - low }
+            var a = low; var b = mid; var k = low
+            while (a < mid && b < high) buffer[k++] = if (d[a] <= d[b]) d[a++] else d[b++]
+            while (a < mid) buffer[k++] = d[a++]
+            while (b < high) buffer[k++] = d[b++]
+            for (t in low until high) d[t] = buffer[t]
+            low += 2 * width
+        }
+        width *= 2
+    }
+    return count % 1_000_000_007
+}
+"""),
+        ("every-pair", "PERFORMANCE",
+         "모든 쌍을 본다. 맞지만, 50 만이면 1 250 억 번의 비교다.",
+         """
+fun inequalityPairs(nums1: IntArray, nums2: IntArray, diff: Int): Int {
+    val n = nums1.size
+    val d = IntArray(n) { nums1[it] - nums2[it] }
+    var count = 0L
+    for (i in 0 until n) for (j in i + 1 until n) if (d[i] <= d[j] + diff) count += 1
+    return (count % 1_000_000_007).toInt()
+}
+"""),
+    ],
+))

@@ -1,0 +1,15 @@
+# swap-pairs 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - in-place
+  - array
+competencies:
+  - READING
+  - EDGE_CASES
+  - IMPLEMENTATION
+prerequisites:
+  - rotate-array
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "둘씩 한 번 맞바꾼다"

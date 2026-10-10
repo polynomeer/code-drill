@@ -1,0 +1,15 @@
+# coprime-pairs 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - number-theory
+  - math
+competencies:
+  - READING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - gcd-of-array
+complexity:
+  time: QUADRATIC
+  space: CONSTANT
+  note: "쌍 200 만 개, 하나마다 유클리드 호제법 로그 걸음"

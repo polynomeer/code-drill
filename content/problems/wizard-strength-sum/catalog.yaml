@@ -1,0 +1,19 @@
+# wizard-strength-sum 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - monotonic-stack
+  - stack
+  - prefix-sum
+  - number-theory
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - sum-of-subarray-minimums
+  - range-sum-queries
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "단조 스택 한 번, 누적합의 누적합 한 번"

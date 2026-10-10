@@ -3560,3 +3560,213 @@ fun maxEquationValue(xs: IntArray, ys: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 마법사 세기의 합 ----------------------------------------------------------
+
+def _wizard_strength(strength):
+    mod = 1_000_000_007
+    n = len(strength)
+    left = [-1] * n
+    right = [n] * n
+    stack = []
+    for i in range(n):
+        while stack and strength[stack[-1]] >= strength[i]:
+            right[stack.pop()] = i
+        left[i] = stack[-1] if stack else -1
+        stack.append(i)
+    prefix = [0] * (n + 1)
+    for i in range(n):
+        prefix[i + 1] = (prefix[i] + strength[i]) % mod
+    prefix2 = [0] * (n + 2)
+    for i in range(n + 1):
+        prefix2[i + 1] = (prefix2[i] + prefix[i]) % mod
+    total = 0
+    for i in range(n):
+        l, r = left[i], right[i]
+        right_sum = (prefix2[r + 1] - prefix2[i + 1]) % mod
+        left_sum = (prefix2[i + 1] - prefix2[l + 1]) % mod
+        total = (total + strength[i] * (((i - l) * right_sum - (r - i) * left_sum) % mod)) % mod
+    return total
+
+
+PROBLEMS.append(Problem(
+    id="wizard-strength-sum",
+    title="마법사 세기의 합",
+    summary="""
+마법사들이 한 줄로 서 있고 `strength[i]` 는 `i` 번째 마법사의 힘이다. 이어 선 마법사 무리(연속 구간) 하나의 세기는
+**무리에서 가장 약한 힘 × 무리의 힘의 합**이다. 모든 연속 구간의 세기를 더한 값을 `1_000_000_007` 로 나눈 나머지를
+반환한다.
+""",
+    notes="""
+구간마다 최솟값을 맡는 원소를 정하면 구간을 원소별로 나눌 수 있다. 원소 `i` 가 최솟값인 구간은 `(left[i], right[i])` 안에서
+`i` 를 포함하는 구간이다 — `left[i]` 는 왼쪽에서 처음 만나는 **더 작은** 원소, `right[i]` 는 오른쪽에서 처음 만나는 **작거나
+같은** 원소다(같은 값이 여럿이면 한쪽에만 등호를 두어야 두 번 세지 않는다). 둘 다 단조 스택 한 번으로 구한다.
+
+원소 `i` 의 몫은 `strength[i] × (그 구간들의 합의 합)` 이다. 구간 `[x, y]` 의 합은 누적합 `P[y+1] - P[x]` 이고, `x` 와 `y` 가
+각각 범위를 돌 때의 합은 누적합의 누적합 `PP` 로 상수 시간에 나온다:
+`(i - l) × (PP[r+1] - PP[i+1]) - (r - i) × (PP[i+1] - PP[l+1])`.
+
+나머지 연산 중에 뺄셈이 있어 음수가 될 수 있다 — 나머지를 양수로 되돌려야 한다.
+""",
+    drill_doc="""
+Drill.push(i)   // 단조 스택에 넣었다
+Drill.pop(i)    // 오른쪽 경계가 정해졌다
+""",
+    constraints="""
+- `1 <= strength.size <= 100_000`
+- `1 <= strength[i] <= 10^9`
+""",
+    signature=dict(name="wizardStrengthSum", parameters=[("strength", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_wizard_strength,
+    cases={
+        "sample": [("01", [[1, 3, 1, 2]]), ("02", [[5, 4, 6]])],
+        "boundary": [
+            ("01-single", [[7]]),
+            # 같은 값이 여럿 — 최솟값을 맡는 원소를 하나로 정해야 두 번 세지 않는다.
+            ("02-all-equal", [[2, 2, 2, 2]]),
+            ("03-increasing", [[1, 2, 3, 4, 5]]),
+            ("04-decreasing", [[5, 4, 3, 2, 1]]),
+            ("05-big-values", [[1_000_000_000, 1_000_000_000, 1_000_000_000]]),
+            ("06-valley", [[9, 1, 9]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 10, salt=10591)]),
+            ("02-random-medium", [randoms(2000, 1, 1_000_000_000, salt=10593)]),
+            ("03-few-values", [randoms(3000, 1, 3, salt=10595)]),
+            ("04-mountain", [list(range(1, 1001)) + list(range(1000, 0, -1))]),
+        ],
+        # 시작마다 끝을 늘려 가며 최솟값과 합을 갱신하면 n² — 10 만이면 50 억 쌍이다.
+        "performance": [
+            ("01-random-large", [randoms(100_000, 1, 1_000_000_000, salt=10597)]),
+            ("02-equal-large", [[123_456_789] * 100_000]),
+            ("03-sawtooth", [[(i % 1000) + 1 for i in range(100_000)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 단조 스택으로 최솟값을 맡는 범위를 구하고, 누적합의 누적합으로 구간 합의 합을 상수 시간에 낸다.
+fun wizardStrengthSum(strength: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = strength.size
+    val left = IntArray(n) { -1 }
+    val right = IntArray(n) { n }
+    val stack = IntArray(n)
+    var size = 0
+    for (i in 0 until n) {
+        // 왼쪽은 더 작은 것, 오른쪽은 작거나 같은 것 — 같은 값은 왼쪽 원소가 맡는다
+        while (size > 0 && strength[stack[size - 1]] >= strength[i]) { right[stack[size - 1]] = i; Drill.pop(stack[size - 1]); size -= 1 }
+        left[i] = if (size > 0) stack[size - 1] else -1
+        stack[size++] = i
+        Drill.push(i)
+    }
+    val prefix = LongArray(n + 1)
+    for (i in 0 until n) prefix[i + 1] = (prefix[i] + strength[i]) % mod
+    val prefix2 = LongArray(n + 2)
+    for (i in 0..n) prefix2[i + 1] = (prefix2[i] + prefix[i]) % mod
+    var total = 0L
+    for (i in 0 until n) {
+        val l = left[i]; val r = right[i]
+        val rightSum = (prefix2[r + 1] - prefix2[i + 1] + mod) % mod
+        val leftSum = (prefix2[i + 1] - prefix2[l + 1] + mod) % mod
+        val span = ((i - l).toLong() * rightSum % mod - (r - i).toLong() * leftSum % mod + mod) % mod
+        total = (total + strength[i] % mod * span) % mod
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("ties-counted-twice", "MISSING_EDGE_CASE",
+         "왼쪽과 오른쪽 모두 '더 작은' 원소에서 멈춘다. 같은 값이 여럿인 구간은 최솟값을 맡는 원소가 둘이 되어 두 번 세어진다.",
+         """
+fun wizardStrengthSum(strength: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = strength.size
+    val left = IntArray(n) { -1 }; val right = IntArray(n) { n }
+    val stack = ArrayList<Int>()
+    for (i in 0 until n) {
+        while (stack.isNotEmpty() && strength[stack.last()] > strength[i]) right[stack.removeAt(stack.size - 1)] = i
+        stack.add(i)
+    }
+    stack.clear()
+    for (i in n - 1 downTo 0) {
+        while (stack.isNotEmpty() && strength[stack.last()] > strength[i]) left[stack.removeAt(stack.size - 1)] = i
+        stack.add(i)
+    }
+    val prefix = LongArray(n + 1); for (i in 0 until n) prefix[i + 1] = (prefix[i] + strength[i]) % mod
+    val prefix2 = LongArray(n + 2); for (i in 0..n) prefix2[i + 1] = (prefix2[i] + prefix[i]) % mod
+    var total = 0L
+    for (i in 0 until n) {
+        val l = left[i]; val r = right[i]
+        val rs = (prefix2[r + 1] - prefix2[i + 1] + mod) % mod; val ls = (prefix2[i + 1] - prefix2[l + 1] + mod) % mod
+        val span = ((i - l).toLong() * rs % mod - (r - i).toLong() * ls % mod + mod) % mod
+        total = (total + strength[i] % mod * span) % mod
+    }
+    return total.toInt()
+}
+"""),
+        ("negative-remainder", "MISSING_EDGE_CASE",
+         "뺄셈 뒤의 나머지를 양수로 되돌리지 않는다. 음수 나머지가 그대로 더해져 답이 음수나 엉뚱한 수가 된다.",
+         """
+fun wizardStrengthSum(strength: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = strength.size
+    val left = IntArray(n) { -1 }; val right = IntArray(n) { n }
+    val stack = IntArray(n); var size = 0
+    for (i in 0 until n) {
+        while (size > 0 && strength[stack[size - 1]] >= strength[i]) { right[stack[size - 1]] = i; size -= 1 }
+        left[i] = if (size > 0) stack[size - 1] else -1
+        stack[size++] = i
+    }
+    val prefix = LongArray(n + 1); for (i in 0 until n) prefix[i + 1] = (prefix[i] + strength[i]) % mod
+    val prefix2 = LongArray(n + 2); for (i in 0..n) prefix2[i + 1] = (prefix2[i] + prefix[i]) % mod
+    var total = 0L
+    for (i in 0 until n) {
+        val l = left[i]; val r = right[i]
+        val rs = (prefix2[r + 1] - prefix2[i + 1]) % mod; val ls = (prefix2[i + 1] - prefix2[l + 1]) % mod
+        val span = ((i - l).toLong() * rs % mod - (r - i).toLong() * ls % mod) % mod
+        total = (total + strength[i] % mod * span) % mod
+    }
+    return total.toInt()
+}
+"""),
+        ("sum-of-mins-times-sum", "WRONG_ALGORITHM",
+         "최솟값의 합에 전체 합을 곱한다. 세기는 구간마다 그 구간의 최솟값 × 그 구간의 합이다.",
+         """
+fun wizardStrengthSum(strength: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = strength.size
+    val left = IntArray(n) { -1 }; val right = IntArray(n) { n }
+    val stack = IntArray(n); var size = 0
+    for (i in 0 until n) {
+        while (size > 0 && strength[stack[size - 1]] >= strength[i]) { right[stack[size - 1]] = i; size -= 1 }
+        left[i] = if (size > 0) stack[size - 1] else -1
+        stack[size++] = i
+    }
+    var mins = 0L
+    for (i in 0 until n) mins = (mins + strength[i] % mod * ((i - left[i]).toLong() * (right[i] - i) % mod)) % mod
+    var sum = 0L
+    for (v in strength) sum = (sum + v) % mod
+    return (mins * sum % mod).toInt()
+}
+"""),
+        ("every-start-every-end", "PERFORMANCE",
+         "시작마다 끝을 늘려 가며 최솟값과 합을 갱신한다. 맞지만, 10 만 명이면 50 억 구간이다.",
+         """
+fun wizardStrengthSum(strength: IntArray): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    for (start in strength.indices) {
+        var low = Int.MAX_VALUE
+        var sum = 0L
+        for (end in start until strength.size) {
+            low = minOf(low, strength[end])
+            sum = (sum + strength[end]) % mod
+            total = (total + low % mod * sum) % mod
+        }
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))

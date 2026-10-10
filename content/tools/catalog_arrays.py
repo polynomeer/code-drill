@@ -5516,3 +5516,221 @@ fun applyOperations(nums: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 이웃끼리 자리 바꾸기 -------------------------------------------------------
+
+def _swap_pairs(nums):
+    out = list(nums)
+    for i in range(0, len(out) - 1, 2):
+        out[i], out[i + 1] = out[i + 1], out[i]
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="swap-pairs",
+    title="이웃끼리 자리 바꾸기",
+    summary="""
+배열 `nums` 의 원소를 앞에서부터 둘씩 묶어(`0`과 `1`, `2`와 `3`, …) 묶음 안의 두 원소의 자리를 바꾼 배열을 반환한다.
+길이가 홀수면 마지막 원소는 짝이 없어 그대로 둔다.
+""",
+    notes="""
+`i = 0, 2, 4, …` 에서 `i + 1` 이 배열 안이면 `nums[i]` 와 `nums[i + 1]` 을 맞바꾼다. 새 배열 없이 제자리에서 할 수 있다.
+마지막 원소는 `i + 1` 이 배열 밖이라 건드리지 않는다.
+""",
+    drill_doc="""
+Drill.swap(i, i + 1)   // 이 두 자리를 맞바꿨다
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="swapPairs", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_swap_pairs,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [("01", [[1, 2, 3, 4]]), ("02", [[5, 6, 7]])],
+        "boundary": [
+            ("01-single", [[9]]),
+            ("02-two", [[1, 2]]),
+            # 홀수 길이 — 마지막은 그대로다.
+            ("03-odd", [[1, 2, 3, 4, 5]]),
+            ("04-equal-values", [[3, 3, 3, 3]]),
+            ("05-extremes", [[-1_000_000_000, 1_000_000_000, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(11, -9, 9, salt=10563)]),
+            ("02-random-large-even", [randoms(200_000, -1_000_000_000, 1_000_000_000, salt=10565)]),
+            ("03-random-large-odd", [randoms(199_999, -1000, 1000, salt=10567)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 둘씩 묶어 제자리에서 맞바꾼다. 짝이 없는 마지막 원소는 그대로다.
+fun swapPairs(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = 0
+    while (i + 1 < a.size) {
+        val t = a[i]; a[i] = a[i + 1]; a[i + 1] = t
+        Drill.swap(i, i + 1)
+        i += 2
+    }
+    return a
+}
+""",
+    mutants=[
+        ("odd-tail-dropped", "MISSING_EDGE_CASE",
+         "짝이 없는 마지막 원소를 버린다. 그대로 두어야 한다.",
+         """
+fun swapPairs(nums: IntArray): IntArray {
+    val out = IntArray(nums.size / 2 * 2)
+    for (i in out.indices step 2) { out[i] = nums[i + 1]; out[i + 1] = nums[i] }
+    return out
+}
+"""),
+        ("pairs-start-at-one", "OFF_BY_ONE",
+         "1과 2, 3과 4 로 묶는다. 묶음은 0과 1 부터다.",
+         """
+fun swapPairs(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = 1
+    while (i + 1 < a.size) { val t = a[i]; a[i] = a[i + 1]; a[i + 1] = t; i += 2 }
+    return a
+}
+"""),
+        ("tail-swaps-with-head", "WRONG_BRANCH",
+         "길이가 홀수면 마지막 원소를 맨 앞과 바꾼다. 짝이 없으면 그대로다.",
+         """
+fun swapPairs(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var i = 0
+    while (i + 1 < a.size) { val t = a[i]; a[i] = a[i + 1]; a[i + 1] = t; i += 2 }
+    if (a.size % 2 == 1 && a.size > 1) { val t = a[0]; a[0] = a[a.size - 1]; a[a.size - 1] = t }
+    return a
+}
+"""),
+        ("reverses", "WRONG_ALGORITHM",
+         "배열을 뒤집는다. 길이 2 에서만 같다.",
+         """
+fun swapPairs(nums: IntArray): IntArray = nums.reversedArray()
+"""),
+    ],
+))
+
+
+# --- 합이 같아지는 자르기 -------------------------------------------------------
+
+def _balanced_splits(nums):
+    total = sum(nums)
+    left = 0
+    count = 0
+    for i in range(len(nums) - 1):
+        left += nums[i]
+        if 2 * left == total:
+            count += 1
+    return count
+
+
+PROBLEMS.append(Problem(
+    id="balanced-splits",
+    title="합이 같아지는 자르기",
+    summary="""
+정수 배열 `nums` 를 두 덩어리 `nums[0..i]` 와 `nums[i+1..n-1]` 로 자른다(양쪽 모두 비어 있지 않다). 두 덩어리의 합이
+같아지는 자르기가 몇 가지인지 반환한다.
+""",
+    notes="""
+전체 합 `total` 을 한 번 구하고, 왼쪽 덩어리의 합(누적합)을 늘려 가며 `왼쪽 == total - 왼쪽`, 곧 `2 × 왼쪽 == total`
+인지 본다. `total / 2` 와 비교하면 `total` 이 홀수일 때 내림 때문에 틀린다. 자르는 자리는 `i = 0 .. n-2` 다 — 오른쪽도 비면
+안 된다.
+
+합은 `2 × 10^14` 까지 커진다. `Long` 으로 더한다.
+""",
+    drill_doc="""
+Drill.pointer("cut", i)   // 여기서 자르면 두 합이 같다
+""",
+    constraints="""
+- `2 <= nums.size <= 200_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="balancedSplits", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_balanced_splits,
+    cases={
+        "sample": [("01", [[1, 2, 3, 3]]), ("02", [[1, -1, 1, -1]])],
+        "boundary": [
+            ("01-two-equal", [[5, 5]]),
+            ("02-two-unequal", [[5, 6]]),
+            # 전체 합이 0 이면 오른쪽이 빈 자르기(왼쪽 = 전체)도 2 × 왼쪽 == 전체다 — 세면 안 된다.
+            ("03-total-zero", [[3, -3, 0]]),
+            # 전체 합이 홀수 — 내림한 절반과 같아도 두 합은 다르다.
+            ("04-odd-total", [[1, 2, 0]]),
+            ("05-all-zeros", [[0, 0, 0, 0]]),
+            ("06-large-values", [[1_000_000_000] * 4]),
+            # 왼쪽과 오른쪽이 정확히 2^32 차이 — Int 로 더하면 감겨서 같아 보인다.
+            ("07-differ-by-two-to-the-32", [[1_000_000_000] * 4 + [294_967_296, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, -2, 2, salt=10569)]),
+            ("02-random-large", [randoms(200_000, -1, 1, salt=10571)]),
+            ("03-big-sums", [[1_000_000_000] * 100_000 + [-1_000_000_000] * 100_000]),
+            ("04-alternating", [[7, -7] * 100_000]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 전체 합을 구하고, 왼쪽 누적합의 두 배가 전체와 같은 자르기를 센다. Long 으로.
+fun balancedSplits(nums: IntArray): Int {
+    var total = 0L
+    for (v in nums) total += v
+    var left = 0L
+    var count = 0
+    for (i in 0 until nums.size - 1) {
+        left += nums[i]
+        if (2 * left == total) { count += 1; Drill.pointer("cut", i) }
+    }
+    return count
+}
+""",
+    mutants=[
+        ("empty-right-counted", "OFF_BY_ONE",
+         "마지막 원소 뒤에서도 자른다. 그러면 오른쪽이 비고, 전체 합이 0 이면 그것도 세어진다.",
+         """
+fun balancedSplits(nums: IntArray): Int {
+    val total = nums.sumOf { it.toLong() }
+    var left = 0L; var count = 0
+    for (i in nums.indices) { left += nums[i]; if (2 * left == total) count += 1 }
+    return count
+}
+"""),
+        ("half-rounded-down", "WRONG_BRANCH",
+         "왼쪽 합을 total / 2 와 비교한다. 전체 합이 홀수면 내림한 절반과 같아도 두 합은 다르다.",
+         """
+fun balancedSplits(nums: IntArray): Int {
+    val total = nums.sumOf { it.toLong() }
+    var left = 0L; var count = 0
+    for (i in 0 until nums.size - 1) { left += nums[i]; if (left == total / 2) count += 1 }
+    return count
+}
+"""),
+        ("int-sums", "MISSING_EDGE_CASE",
+         "합을 Int 로 더한다. 원소 하나가 10^9 라 셋만 더해도 넘친다.",
+         """
+fun balancedSplits(nums: IntArray): Int {
+    var total = 0
+    for (v in nums) total += v
+    var left = 0; var count = 0
+    for (i in 0 until nums.size - 1) { left += nums[i]; if (2 * left == total) count += 1 }
+    return count
+}
+"""),
+        ("first-split-only", "WRONG_ALGORITHM",
+         "같아지는 자리를 하나 찾으면 1 을 낸다. 0 이 이어지면 여러 자리에서 같아진다.",
+         """
+fun balancedSplits(nums: IntArray): Int {
+    val total = nums.sumOf { it.toLong() }
+    var left = 0L
+    for (i in 0 until nums.size - 1) { left += nums[i]; if (2 * left == total) return 1 }
+    return 0
+}
+"""),
+    ],
+))
