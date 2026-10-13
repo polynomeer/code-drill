@@ -4575,3 +4575,217 @@ fun countOnesSubmatrices(grid: Array<IntArray>): Int {
 """),
     ],
 ))
+
+
+# --- 안에 든 섬 ----------------------------------------------------------------
+
+def _count_sub_islands(grid1, grid2):
+    m, n = len(grid1), len(grid1[0])
+    seen = [[False] * n for _ in range(m)]
+    count = 0
+    for i in range(m):
+        for j in range(n):
+            if grid2[i][j] == 1 and not seen[i][j]:
+                inside = True
+                stack = [(i, j)]
+                seen[i][j] = True
+                while stack:
+                    x, y = stack.pop()
+                    if grid1[x][y] == 0:
+                        inside = False
+                    for a, b in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                        if 0 <= a < m and 0 <= b < n and grid2[a][b] == 1 and not seen[a][b]:
+                            seen[a][b] = True
+                            stack.append((a, b))
+                if inside:
+                    count += 1
+    return count
+
+
+def _island_pair(m, n, land_percent, keep_percent, salt):
+    """grid1 은 무작위 땅, grid2 는 grid1 의 땅 대부분과 바다 조금 — 안에 든 섬과 삐져나온 섬이 섞인다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    g1 = [[1 if source.randrange(100) < land_percent else 0 for _ in range(n)] for _ in range(m)]
+    g2 = [[(1 if source.randrange(100) < keep_percent else 0) if g1[i][j] else (1 if source.randrange(100) < 3 else 0)
+           for j in range(n)] for i in range(m)]
+    return [g1, g2]
+
+
+def _snake_pair(m, n):
+    """grid2 는 칸 하나 폭의 뱀, grid1 은 뱀의 끝 한 칸만 바다 — 섬 하나가 끝에서야 안에 들지 않는다."""
+    g2 = [[0] * n for _ in range(m)]
+    for r in range(0, m, 2):
+        for c in range(n):
+            g2[r][c] = 1
+        if r + 1 < m:
+            g2[r + 1][n - 1 if (r // 2) % 2 == 0 else 0] = 1
+    g1 = [[1] * n for _ in range(m)]
+    last = m - 1 if (m - 1) % 2 == 0 else m - 2
+    g1[last][n - 1 if (last // 2) % 2 == 1 else 0] = 0
+    return [g1, g2]
+
+
+PROBLEMS.append(Problem(
+    id="count-sub-islands",
+    title="안에 든 섬",
+    summary="""
+같은 크기의 `0`(바다)·`1`(땅) 격자 `grid1`, `grid2` 가 주어진다. 섬은 상하좌우로 이어진 땅의 덩어리다. `grid2` 의 섬 가운데,
+그 섬의 **모든 칸이 `grid1` 에서도 땅**인 섬의 수를 반환한다.
+""",
+    notes="""
+`grid2` 의 섬을 하나씩 칠해 가며(DFS), 칠한 칸 가운데 `grid1` 에서 바다인 칸이 있었는지 표시한다. **바다 칸을 만나도 섬을 끝까지
+칠한다** — 거기서 멈추면 남은 칸이 나중에 다른 섬처럼 세어진다. 다 칠하고 표시가 없으면 센다.
+
+칸이 25 만 개라 이어진 길이 길면 재귀가 깊어진다. 스택을 직접 들고 돈다.
+""",
+    drill_doc="""
+Drill.visit(x * n + y, 1)   // 칠했다
+""",
+    constraints="""
+- `1 <= m, n <= 500`, 두 격자의 크기가 같다
+- 칸은 `0` 이나 `1`
+""",
+    signature=dict(name="countSubIslands", parameters=[("grid1", "INT_MATRIX"), ("grid2", "INT_MATRIX")], returns="INT"),
+    groups=standard_groups(),
+    reference=_count_sub_islands,
+    cases={
+        "sample": [
+            ("01", [[[1, 1, 1, 0, 0], [0, 1, 1, 1, 1], [0, 0, 0, 0, 0], [1, 0, 0, 0, 0], [1, 1, 0, 1, 1]],
+                    [[1, 1, 1, 0, 0], [0, 0, 1, 1, 1], [0, 1, 0, 0, 0], [1, 0, 1, 1, 0], [0, 1, 0, 1, 0]]]),
+            ("02", [[[1, 0, 1, 0, 1], [1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [1, 1, 1, 1, 1], [1, 0, 1, 0, 1]],
+                    [[0, 0, 0, 0, 0], [1, 1, 1, 1, 1], [0, 1, 0, 1, 0], [0, 1, 0, 1, 0], [1, 0, 0, 0, 1]]]),
+        ],
+        "boundary": [
+            ("01-single-land", [[[1]], [[1]]]),
+            ("02-single-sea-under", [[[0]], [[1]]]),
+            ("03-no-islands", [[[1, 1], [1, 1]], [[0, 0], [0, 0]]]),
+            # 바다 칸을 만난 뒤에도 끝까지 칠해야 한다 — 멈추면 남은 칸이 따로 세어진다.
+            ("04-sea-in-the-middle", [[[1, 0, 1]], [[1, 1, 1]]]),
+            # 대각선은 이어진 것이 아니다.
+            ("05-diagonal-separate", [[[1, 0], [0, 1]], [[1, 0], [0, 1]]]),
+        ],
+        "hidden": [
+            ("01-random-small", _island_pair(6, 7, 70, 80, salt=10737)),
+            ("02-random-large", _island_pair(500, 500, 65, 85, salt=10739)),
+            # 칸 하나 폭의 긴 뱀 — 재귀로 칠하면 깊이가 12 만이다.
+            ("03-snake", _snake_pair(499, 500)),
+            ("04-all-land", [[[1] * 300 for _ in range(300)], [[1] * 300 for _ in range(300)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). grid2 의 섬을 스택으로 끝까지 칠하며, grid1 에서 바다인 칸이 있었는지 표시한다.
+fun countSubIslands(grid1: Array<IntArray>, grid2: Array<IntArray>): Int {
+    val m = grid1.size; val n = grid1[0].size
+    val seen = Array(m) { BooleanArray(n) }
+    val stack = IntArray(m * n)
+    var count = 0
+    for (i in 0 until m) for (j in 0 until n) {
+        if (grid2[i][j] != 1 || seen[i][j]) continue
+        var inside = true
+        var size = 0
+        stack[size++] = i * n + j; seen[i][j] = true
+        while (size > 0) {
+            val cell = stack[--size]; val x = cell / n; val y = cell % n
+            Drill.visit(cell, 1)
+            if (grid1[x][y] == 0) inside = false
+            if (x + 1 < m && grid2[x + 1][y] == 1 && !seen[x + 1][y]) { seen[x + 1][y] = true; stack[size++] = (x + 1) * n + y }
+            if (x > 0 && grid2[x - 1][y] == 1 && !seen[x - 1][y]) { seen[x - 1][y] = true; stack[size++] = (x - 1) * n + y }
+            if (y + 1 < n && grid2[x][y + 1] == 1 && !seen[x][y + 1]) { seen[x][y + 1] = true; stack[size++] = x * n + y + 1 }
+            if (y > 0 && grid2[x][y - 1] == 1 && !seen[x][y - 1]) { seen[x][y - 1] = true; stack[size++] = x * n + y - 1 }
+        }
+        if (inside) count += 1
+    }
+    return count
+}
+""",
+    mutants=[
+        ("stops-at-the-sea", "WRONG_BRANCH",
+         "grid1 의 바다 칸을 만나면 그 섬 칠하기를 멈춘다. 남은 칸이 나중에 다른 섬으로 세어진다.",
+         """
+fun countSubIslands(grid1: Array<IntArray>, grid2: Array<IntArray>): Int {
+    val m = grid1.size; val n = grid1[0].size
+    val seen = Array(m) { BooleanArray(n) }
+    var count = 0
+    for (i in 0 until m) for (j in 0 until n) {
+        if (grid2[i][j] != 1 || seen[i][j]) continue
+        var inside = true
+        val stack = ArrayDeque<Int>(); stack.addLast(i * n + j); seen[i][j] = true
+        while (stack.isNotEmpty()) {
+            val cell = stack.removeLast(); val x = cell / n; val y = cell % n
+            if (grid1[x][y] == 0) { inside = false; break }
+            for ((a, b) in listOf(x + 1 to y, x - 1 to y, x to y + 1, x to y - 1)) {
+                if (a in 0 until m && b in 0 until n && grid2[a][b] == 1 && !seen[a][b]) { seen[a][b] = true; stack.addLast(a * n + b) }
+            }
+        }
+        if (inside) count += 1
+    }
+    return count
+}
+"""),
+        ("ignores-grid1", "WRONG_ALGORITHM",
+         "grid2 의 섬을 모두 센다. grid1 에서도 모두 땅인 섬만 센다.",
+         """
+fun countSubIslands(grid1: Array<IntArray>, grid2: Array<IntArray>): Int {
+    val m = grid2.size; val n = grid2[0].size
+    val seen = Array(m) { BooleanArray(n) }
+    var count = 0
+    for (i in 0 until m) for (j in 0 until n) {
+        if (grid2[i][j] != 1 || seen[i][j]) continue
+        count += 1
+        val stack = ArrayDeque<Int>(); stack.addLast(i * n + j); seen[i][j] = true
+        while (stack.isNotEmpty()) {
+            val cell = stack.removeLast(); val x = cell / n; val y = cell % n
+            for ((a, b) in listOf(x + 1 to y, x - 1 to y, x to y + 1, x to y - 1)) {
+                if (a in 0 until m && b in 0 until n && grid2[a][b] == 1 && !seen[a][b]) { seen[a][b] = true; stack.addLast(a * n + b) }
+            }
+        }
+    }
+    return count
+}
+"""),
+        ("diagonal-neighbours", "WRONG_BRANCH",
+         "대각선 이웃도 같은 섬으로 본다. 섬은 상하좌우로만 이어진다.",
+         """
+fun countSubIslands(grid1: Array<IntArray>, grid2: Array<IntArray>): Int {
+    val m = grid1.size; val n = grid1[0].size
+    val seen = Array(m) { BooleanArray(n) }
+    var count = 0
+    for (i in 0 until m) for (j in 0 until n) {
+        if (grid2[i][j] != 1 || seen[i][j]) continue
+        var inside = true
+        val stack = ArrayDeque<Int>(); stack.addLast(i * n + j); seen[i][j] = true
+        while (stack.isNotEmpty()) {
+            val cell = stack.removeLast(); val x = cell / n; val y = cell % n
+            if (grid1[x][y] == 0) inside = false
+            for (dx in -1..1) for (dy in -1..1) {
+                val a = x + dx; val b = y + dy
+                if (a in 0 until m && b in 0 until n && grid2[a][b] == 1 && !seen[a][b]) { seen[a][b] = true; stack.addLast(a * n + b) }
+            }
+        }
+        if (inside) count += 1
+    }
+    return count
+}
+"""),
+        ("recursive-dfs", "MISSING_EDGE_CASE",
+         "재귀로 칠한다. 칸 하나 폭의 긴 섬은 깊이가 12 만이라 스택이 넘친다.",
+         """
+fun countSubIslands(grid1: Array<IntArray>, grid2: Array<IntArray>): Int {
+    val m = grid1.size; val n = grid1[0].size
+    val seen = Array(m) { BooleanArray(n) }
+    var inside = true
+    fun fill(x: Int, y: Int) {
+        if (x !in 0 until m || y !in 0 until n || grid2[x][y] != 1 || seen[x][y]) return
+        seen[x][y] = true
+        if (grid1[x][y] == 0) inside = false
+        fill(x + 1, y); fill(x - 1, y); fill(x, y + 1); fill(x, y - 1)
+    }
+    var count = 0
+    for (i in 0 until m) for (j in 0 until n) if (grid2[i][j] == 1 && !seen[i][j]) { inside = true; fill(i, j); if (inside) count += 1 }
+    return count
+}
+"""),
+    ],
+))

@@ -3979,3 +3979,184 @@ fun lunchQueue(students: IntArray, sandwiches: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 구간 폭의 합 --------------------------------------------------------------
+
+def _subarray_ranges_sum(nums):
+    n = len(nums)
+
+    def total(is_max):
+        # 원소 i 가 최댓값(최솟값)인 구간의 수 = 왼쪽 거리 × 오른쪽 거리 — 같은 값은 한쪽에만 등호를 둔다
+        left, right, stack = [0] * n, [0] * n, []
+        for i in range(n):
+            while stack and (nums[stack[-1]] < nums[i] if is_max else nums[stack[-1]] > nums[i]):
+                stack.pop()
+            left[i] = i - (stack[-1] if stack else -1)
+            stack.append(i)
+        stack = []
+        for i in range(n - 1, -1, -1):
+            while stack and (nums[stack[-1]] <= nums[i] if is_max else nums[stack[-1]] >= nums[i]):
+                stack.pop()
+            right[i] = (stack[-1] if stack else n) - i
+            stack.append(i)
+        return sum(nums[i] * left[i] * right[i] for i in range(n))
+
+    return (total(True) - total(False)) % 1_000_000_007
+
+
+PROBLEMS.append(Problem(
+    id="subarray-ranges-sum",
+    title="구간 폭의 합",
+    summary="""
+정수 배열 `nums` 의 모든 연속 구간에 대해 (구간의 최댓값 − 최솟값)을 더한 값을 `1_000_000_007` 로 나눈 나머지로 반환한다.
+""",
+    notes="""
+합은 (모든 구간의 최댓값의 합) − (모든 구간의 최솟값의 합)이다. 최댓값의 합은 원소별로 나눈다: 원소 `i` 가 최댓값인 구간의 수는
+(왼쪽으로 `nums[i]` 보다 작은 원소가 이어지는 거리) × (오른쪽 거리)이고, 둘 다 단조 스택으로 구한다. **같은 값이 여럿이면 한쪽에만
+등호를 두어** 한 구간의 최댓값을 한 원소만 맡게 한다. 최솟값의 합도 같다.
+
+값이 음수일 수 있어 나머지가 음수가 될 수 있다 — 양수로 되돌린다. 원소 × 구간 수는 `Long` 도 넘을 수 있으니 곱하기 전에 나머지를
+취한다.
+""",
+    drill_doc="""
+Drill.push(i)   // 단조 스택에 넣었다
+""",
+    constraints="""
+- `1 <= nums.size <= 100_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="subarrayRangesSum", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_subarray_ranges_sum,
+    cases={
+        "sample": [("01", [[1, 2, 3]]), ("02", [[4, -2, -3, 4, 1]])],
+        "boundary": [
+            ("01-single", [[5]]),
+            # 같은 값이 여럿 — 한 구간의 최댓값을 두 원소가 맡으면 두 번 센다.
+            ("02-all-equal", [[3, 3, 3, 3]]),
+            ("03-negatives", [[-5, -1, -9]]),
+            ("04-extremes", [[1_000_000_000, -1_000_000_000, 1_000_000_000]]),
+            ("05-ties-mixed", [[2, 1, 2, 1, 2]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, -5, 5, salt=10729)]),
+            ("02-random-medium", [randoms(3000, -1_000_000_000, 1_000_000_000, salt=10731)]),
+            ("03-few-values", [randoms(5000, 0, 2, salt=10733)]),
+        ],
+        # 시작마다 끝을 늘려 가며 최댓값과 최솟값을 갱신하면 n² — 10 만이면 50 억 구간이다.
+        "performance": [
+            ("01-random-large", [randoms(100_000, -1_000_000_000, 1_000_000_000, salt=10735)]),
+            ("02-increasing", [list(range(-50_000, 50_000))]),
+            ("03-sawtooth", [[(i % 100) * 1000 for i in range(100_000)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 최댓값의 합 − 최솟값의 합. 원소마다 그 원소가 맡는 구간 수를 단조 스택으로 구한다.
+fun subarrayRangesSum(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    fun total(isMax: Boolean): Long {
+        val left = IntArray(n); val right = IntArray(n)
+        val stack = IntArray(n); var size = 0
+        for (i in 0 until n) {
+            // 왼쪽은 엄격하게, 오른쪽은 등호를 두어 같은 값을 한 원소만 맡게 한다
+            while (size > 0 && (if (isMax) nums[stack[size - 1]] < nums[i] else nums[stack[size - 1]] > nums[i])) size -= 1
+            left[i] = i - (if (size > 0) stack[size - 1] else -1)
+            stack[size++] = i
+            Drill.push(i)
+        }
+        size = 0
+        for (i in n - 1 downTo 0) {
+            while (size > 0 && (if (isMax) nums[stack[size - 1]] <= nums[i] else nums[stack[size - 1]] >= nums[i])) size -= 1
+            right[i] = (if (size > 0) stack[size - 1] else n) - i
+            stack[size++] = i
+        }
+        var sum = 0L
+        for (i in 0 until n) {
+            val value = ((nums[i] % mod) + mod) % mod
+            sum = (sum + value * (left[i].toLong() * right[i] % mod)) % mod
+        }
+        return sum
+    }
+    return (((total(true) - total(false)) % mod + mod) % mod).toInt()
+}
+""",
+    mutants=[
+        ("ties-counted-twice", "MISSING_EDGE_CASE",
+         "양쪽 모두 엄격하게 비교한다. 같은 값이 여럿인 구간은 최댓값(최솟값)을 두 원소가 맡아 두 번 세어진다.",
+         """
+fun subarrayRangesSum(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    fun total(isMax: Boolean): Long {
+        val left = IntArray(n); val right = IntArray(n); val stack = IntArray(n); var size = 0
+        for (i in 0 until n) {
+            while (size > 0 && (if (isMax) nums[stack[size - 1]] < nums[i] else nums[stack[size - 1]] > nums[i])) size -= 1
+            left[i] = i - (if (size > 0) stack[size - 1] else -1); stack[size++] = i
+        }
+        size = 0
+        for (i in n - 1 downTo 0) {
+            while (size > 0 && (if (isMax) nums[stack[size - 1]] < nums[i] else nums[stack[size - 1]] > nums[i])) size -= 1
+            right[i] = (if (size > 0) stack[size - 1] else n) - i; stack[size++] = i
+        }
+        var sum = 0L
+        for (i in 0 until n) sum = (sum + ((nums[i] % mod) + mod) % mod * (left[i].toLong() * right[i] % mod)) % mod
+        return sum
+    }
+    return (((total(true) - total(false)) % mod + mod) % mod).toInt()
+}
+"""),
+        ("negative-remainder", "MISSING_EDGE_CASE",
+         "음수 값과 뺄셈 뒤의 나머지를 양수로 되돌리지 않는다. 음수 나머지가 그대로 나온다.",
+         """
+fun subarrayRangesSum(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val n = nums.size
+    fun total(isMax: Boolean): Long {
+        val left = IntArray(n); val right = IntArray(n); val stack = IntArray(n); var size = 0
+        for (i in 0 until n) {
+            while (size > 0 && (if (isMax) nums[stack[size - 1]] < nums[i] else nums[stack[size - 1]] > nums[i])) size -= 1
+            left[i] = i - (if (size > 0) stack[size - 1] else -1); stack[size++] = i
+        }
+        size = 0
+        for (i in n - 1 downTo 0) {
+            while (size > 0 && (if (isMax) nums[stack[size - 1]] <= nums[i] else nums[stack[size - 1]] >= nums[i])) size -= 1
+            right[i] = (if (size > 0) stack[size - 1] else n) - i; stack[size++] = i
+        }
+        var sum = 0L
+        for (i in 0 until n) sum = (sum + nums[i] % mod * (left[i].toLong() * right[i] % mod)) % mod
+        return sum
+    }
+    return ((total(true) - total(false)) % mod).toInt()
+}
+"""),
+        ("global-range-times-count", "WRONG_ALGORITHM",
+         "배열 전체의 (최댓값 − 최솟값)에 구간 수를 곱한다. 구간마다 폭이 다르다.",
+         """
+fun subarrayRangesSum(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    val range = (nums.maxOrNull()!!.toLong() - nums.minOrNull()!!) % mod
+    val count = nums.size.toLong() * (nums.size + 1) / 2 % mod
+    return (range * count % mod).toInt()
+}
+"""),
+        ("every-start", "PERFORMANCE",
+         "시작마다 끝을 늘려 가며 최댓값과 최솟값을 갱신한다. 맞지만, 10 만이면 50 억 구간이다.",
+         """
+fun subarrayRangesSum(nums: IntArray): Int {
+    val mod = 1_000_000_007L
+    var total = 0L
+    for (start in nums.indices) {
+        var high = nums[start]; var low = nums[start]
+        for (end in start until nums.size) {
+            if (nums[end] > high) high = nums[end]
+            if (nums[end] < low) low = nums[end]
+            total = (total + (high.toLong() - low)) % mod
+        }
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))

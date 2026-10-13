@@ -2837,3 +2837,142 @@ fun coprimePairs(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 곱이 k 의 배수인 쌍 -------------------------------------------------------
+
+def _divisible_product_pairs(nums, k):
+    import math
+    from collections import Counter
+    counts = Counter(math.gcd(v, k) for v in nums)
+    keys = list(counts)
+    total = 0
+    for i, g in enumerate(keys):
+        for h in keys[i:]:
+            if g * h % k == 0:
+                total += counts[g] * (counts[g] - 1) // 2 if g == h else counts[g] * counts[h]
+    return total % 1_000_000_007
+
+
+PROBLEMS.append(Problem(
+    id="divisible-product-pairs",
+    title="곱이 k 의 배수인 쌍",
+    summary="""
+양의 정수 배열 `nums` 와 `k` 가 주어진다. `i < j` 이고 `nums[i] × nums[j]` 가 `k` 의 배수인 쌍의 수를 `1_000_000_007` 로 나눈
+나머지로 반환한다.
+""",
+    notes="""
+`a × b` 가 `k` 의 배수인지는 `a`, `b` 의 전부가 아니라 **`k` 와 함께 가진 부분**에만 달려 있다: `gcd(a, k) × gcd(b, k)` 가 `k` 의
+배수인 것과 같다. 그래서 원소마다 `gcd(v, k)` 로 바꿔 무리 지어 센다. `gcd(v, k)` 는 `k` 의 약수라 종류가 많아야 128 개 남짓이고,
+무리의 쌍마다 확인하면 된다 — 같은 무리 안의 쌍은 `c(c−1)/2`, 다른 두 무리 사이는 `c₁ × c₂` 다.
+
+약수 둘의 곱은 `k²` 까지라 `Int` 를 넘을 수 있다. 쌍의 수는 50 억까지 간다.
+""",
+    drill_doc="""
+Drill.write(g, count)   // gcd 가 g 인 원소의 수
+""",
+    constraints="""
+- `1 <= nums.size <= 100_000`
+- `1 <= nums[i], k <= 100_000`
+""",
+    signature=dict(name="divisibleProductPairs", parameters=[("nums", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_divisible_product_pairs,
+    cases={
+        "sample": [("01", [[1, 2, 3, 4, 5], 2]), ("02", [[1, 2, 3, 4], 5])],
+        "boundary": [
+            ("01-two", [[3, 4], 12]),
+            ("02-k-one", [[5, 7, 9], 1]),
+            # 둘 다 k 의 배수가 아니어도 곱은 배수일 수 있다.
+            ("03-neither-divisible", [[4, 6, 9], 12]),
+            # 같은 무리 안의 쌍 — 자기 자신과는 짝짓지 않는다.
+            ("04-same-group", [[6, 6, 6], 36]),
+            # 약수 둘의 곱이 Int 를 넘는다.
+            ("05-big-k", [[99_991, 99_991, 1], 99_991]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(15, 1, 30, salt=10717), 12]),
+            ("02-random-medium", [randoms(5000, 1, 100_000, salt=10719), 360]),
+            ("03-prime-k", [randoms(5000, 1, 100_000, salt=10721), 99_991]),
+            ("04-all-multiples", [[100_000] * 100_000, 100_000]),
+        ],
+        # 쌍을 모두 보면 10 만 × 10 만 / 2 = 50 억 번의 곱셈과 나머지다.
+        "performance": [
+            ("01-random-large", [randoms(100_000, 1, 100_000, salt=10723), 720]),
+            ("02-highly-composite", [randoms(100_000, 1, 100_000, salt=10725), 83_160]),
+            ("03-prime-large", [randoms(100_000, 1, 100_000, salt=10727), 99_991]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 원소를 gcd(v, k) 로 무리 짓고, gcd 곱이 k 의 배수인 무리 쌍마다 센다.
+fun divisibleProductPairs(nums: IntArray, k: Int): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    val counts = HashMap<Int, Long>()
+    for (v in nums) { val g = gcd(v, k); counts[g] = (counts[g] ?: 0L) + 1 }
+    val keys = counts.keys.toIntArray()
+    var total = 0L
+    for (i in keys.indices) {
+        val g = keys[i]; val cg = counts[g]!!
+        Drill.write(g, cg.toInt())
+        for (j in i until keys.size) {
+            val h = keys[j]
+            if (g.toLong() * h % k != 0L) continue
+            total += if (i == j) cg * (cg - 1) / 2 else cg * counts[h]!!
+        }
+    }
+    return (total % 1_000_000_007).toInt()
+}
+""",
+    mutants=[
+        ("counts-self-pairs", "OFF_BY_ONE",
+         "같은 무리 안의 쌍을 c × c 로 센다. 자기 자신과 짝짓고 순서까지 두 번 센다 — c(c−1)/2 다.",
+         """
+fun divisibleProductPairs(nums: IntArray, k: Int): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    val counts = HashMap<Int, Long>()
+    for (v in nums) { val g = gcd(v, k); counts[g] = (counts[g] ?: 0L) + 1 }
+    val keys = counts.keys.toIntArray(); var total = 0L
+    for (i in keys.indices) for (j in i until keys.size) {
+        if (keys[i].toLong() * keys[j] % k != 0L) continue
+        total += counts[keys[i]]!! * counts[keys[j]]!!
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("int-gcd-product", "MISSING_EDGE_CASE",
+         "약수 둘의 곱을 Int 로 한다. k 가 10 만에 가까우면 k² 이 Int 를 넘어 엉뚱한 나머지가 나온다.",
+         """
+fun divisibleProductPairs(nums: IntArray, k: Int): Int {
+    fun gcd(a: Int, b: Int): Int { var x = a; var y = b; while (y != 0) { val t = x % y; x = y; y = t }; return x }
+    val counts = HashMap<Int, Long>()
+    for (v in nums) { val g = gcd(v, k); counts[g] = (counts[g] ?: 0L) + 1 }
+    val keys = counts.keys.toIntArray(); var total = 0L
+    for (i in keys.indices) for (j in i until keys.size) {
+        if (keys[i] * keys[j] % k != 0) continue
+        val c = counts[keys[i]]!!
+        total += if (i == j) c * (c - 1) / 2 else c * counts[keys[j]]!!
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("one-must-be-a-multiple", "WRONG_ALGORITHM",
+         "둘 중 하나가 k 의 배수인 쌍만 센다. 4 × 6 = 24 처럼 둘 다 아니어도 곱은 배수일 수 있다.",
+         """
+fun divisibleProductPairs(nums: IntArray, k: Int): Int {
+    val multiples = nums.count { it % k == 0 }.toLong()
+    val others = nums.size - multiples
+    val total = multiples * (multiples - 1) / 2 + multiples * others
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("every-pair", "PERFORMANCE",
+         "쌍을 모두 보며 곱의 나머지를 구한다. 맞지만, 10 만이면 50 억 쌍이다.",
+         """
+fun divisibleProductPairs(nums: IntArray, k: Int): Int {
+    var total = 0L
+    for (i in nums.indices) for (j in i + 1 until nums.size) if (nums[i].toLong() * nums[j] % k == 0L) total += 1
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+    ],
+))

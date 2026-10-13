@@ -1,0 +1,16 @@
+# count-sub-islands 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - dfs
+  - matrix
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+prerequisites:
+  - island-count
+  - flood-fill
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "칸마다 많아야 한 번 칠한다"

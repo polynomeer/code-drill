@@ -5734,3 +5734,259 @@ fun balancedSplits(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 왼쪽 합과 오른쪽 합의 차 ---------------------------------------------------
+
+def _left_right_difference(nums):
+    total = sum(nums)
+    left = 0
+    out = []
+    for v in nums:
+        right = total - left - v
+        out.append(abs(left - right))
+        left += v
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="left-right-difference",
+    title="왼쪽 합과 오른쪽 합의 차",
+    summary="""
+배열 `nums` 의 자리 `i` 마다, `i` **왼쪽** 원소들의 합과 **오른쪽** 원소들의 합의 차의 절댓값을 담은 배열을 반환한다. `i` 자신은
+어느 쪽에도 들지 않는다. 원소가 없는 쪽의 합은 `0` 이다.
+""",
+    notes="""
+전체 합을 한 번 구하고, 왼쪽 합을 누적하며 지나간다. 자리 `i` 에서 오른쪽 합은 `전체 − 왼쪽 − nums[i]` 다. 차는 음수일 수 있으니
+절댓값을 취하고, `nums[i]` 는 답을 낸 **뒤에** 왼쪽 합에 더한다.
+""",
+    drill_doc="""
+Drill.write(i, answer[i])   // 이 자리의 차
+""",
+    constraints="""
+- `1 <= nums.size <= 100_000`
+- `1 <= nums[i] <= 10_000`
+""",
+    signature=dict(name="leftRightDifference", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_left_right_difference,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [("01", [[10, 4, 8, 3]]), ("02", [[1]])],
+        "boundary": [
+            ("01-two", [[5, 9]]),
+            ("02-symmetric", [[2, 7, 2]]),
+            # 왼쪽이 더 커지는 자리부터 차가 음수가 된다.
+            ("03-heavy-left", [[100, 1, 1, 1]]),
+            ("04-big-values", [[10_000] * 5]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 1, 20, salt=10707)]),
+            ("02-random-large", [randoms(100_000, 1, 10_000, salt=10709)]),
+            ("03-increasing", [list(range(1, 10_001))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 전체 합에서 왼쪽 합과 자기 자신을 빼면 오른쪽 합이다.
+fun leftRightDifference(nums: IntArray): IntArray {
+    var total = 0
+    for (v in nums) total += v
+    var left = 0
+    val out = IntArray(nums.size)
+    for (i in nums.indices) {
+        val right = total - left - nums[i]
+        out[i] = Math.abs(left - right)
+        Drill.write(i, out[i])
+        left += nums[i]
+    }
+    return out
+}
+""",
+    mutants=[
+        ("left-includes-self", "OFF_BY_ONE",
+         "자기 자신을 왼쪽 합에 먼저 더한다. i 자신은 어느 쪽에도 들지 않는다.",
+         """
+fun leftRightDifference(nums: IntArray): IntArray {
+    val total = nums.sum()
+    var left = 0
+    return IntArray(nums.size) { i -> left += nums[i]; Math.abs(left - (total - left)) }
+}
+"""),
+        ("signed-difference", "MISSING_EDGE_CASE",
+         "절댓값을 취하지 않는다. 왼쪽이 더 무거우면 차가 음수가 된다.",
+         """
+fun leftRightDifference(nums: IntArray): IntArray {
+    val total = nums.sum()
+    var left = 0
+    return IntArray(nums.size) { i -> val right = total - left - nums[i]; val d = right - left; left += nums[i]; d }
+}
+"""),
+        ("left-sum-only", "WRONG_ALGORITHM",
+         "왼쪽 합만 낸다. 오른쪽 합과의 차다.",
+         """
+fun leftRightDifference(nums: IntArray): IntArray {
+    var left = 0
+    return IntArray(nums.size) { i -> val v = left; left += nums[i]; v }
+}
+"""),
+    ],
+))
+
+
+# --- 최솟값과 최댓값이 정해진 구간 ----------------------------------------------
+
+def _fixed_bound_subarrays(nums, min_k, max_k):
+    bad = last_min = last_max = -1
+    count = 0
+    for i, v in enumerate(nums):
+        if v < min_k or v > max_k:
+            bad = i
+        if v == min_k:
+            last_min = i
+        if v == max_k:
+            last_max = i
+        count += max(0, min(last_min, last_max) - bad)
+    return count % 1_000_000_007
+
+
+def _bounded_values(n, low, high, outside_percent, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    out = []
+    for _ in range(n):
+        if source.randrange(100) < outside_percent:
+            out.append(source.choice([max(1, low - 1), high + 1]))
+        else:
+            out.append(source.randint(low, high))
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="fixed-bound-subarrays",
+    title="최솟값과 최댓값이 정해진 구간",
+    summary="""
+정수 배열 `nums` 와 `minK <= maxK` 가 주어진다. **최솟값이 정확히 `minK` 이고 최댓값이 정확히 `maxK`** 인 연속 구간의 수를
+`1_000_000_007` 로 나눈 나머지로 반환한다.
+""",
+    notes="""
+구간의 오른쪽 끝 `i` 를 옮기며, 그 끝을 갖는 좋은 구간의 수를 더한다. 세 자리를 기억한다: 범위 `[minK, maxK]` 를 벗어난 마지막
+자리 `bad`, `minK` 가 마지막으로 나온 자리, `maxK` 가 마지막으로 나온 자리. 왼쪽 끝은 `bad` 보다 오른쪽이고, `minK` 와 `maxK`
+가 모두 들어오려면 두 마지막 자리 가운데 앞선 것 이하여야 한다. 그러니 `max(0, min(마지막 minK, 마지막 maxK) − bad)` 개다 —
+`bad` 뒤에 둘 중 하나가 아직 없으면 0 이다.
+
+`minK == maxK` 면 그 값만으로 된 구간이다. 수는 200 억까지 가므로 `Long` 으로 센다.
+""",
+    drill_doc="""
+Drill.pointer("bad", bad)   // 범위를 벗어난 마지막 자리
+""",
+    constraints="""
+- `2 <= nums.size <= 200_000`
+- `1 <= nums[i], minK, maxK <= 10^6`, `minK <= maxK`
+""",
+    signature=dict(name="fixedBoundSubarrays",
+                   parameters=[("nums", "INT_ARRAY"), ("minK", "INT"), ("maxK", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_fixed_bound_subarrays,
+    cases={
+        "sample": [("01", [[1, 3, 5, 2, 7, 5], 1, 5]), ("02", [[1, 1, 1, 1], 1, 1])],
+        "boundary": [
+            ("01-two-elements", [[2, 4], 2, 4]),
+            # 둘 중 하나가 없다.
+            ("02-max-missing", [[2, 3, 3], 2, 4]),
+            # 범위를 벗어난 값이 구간을 끊는다.
+            ("03-cut-by-outsider", [[2, 4, 9, 2, 4], 2, 4]),
+            # 끊긴 뒤 아직 minK 가 나오지 않았으면 0 이다 — 옛 minK 는 쓸 수 없다.
+            ("04-old-min-before-cut", [[2, 9, 4, 4], 2, 4]),
+            ("05-equal-bounds", [[3, 3, 5, 3], 3, 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 1, 5, salt=10711), 2, 4]),
+            ("02-random-medium", [_bounded_values(5000, 10, 20, 3, salt=10713), 10, 20]),
+            # 수가 Int 를 넘는다.
+            ("03-all-in-range", [[1, 2] * 50_000, 1, 2]),
+        ],
+        # 시작마다 끝을 늘려 가며 최솟값과 최댓값을 보면, 범위 안의 값만 있을 때 n² 이다.
+        "performance": [
+            ("01-all-in-range-large", [[1, 2] * 100_000, 1, 2]),
+            ("02-rare-outsiders", [_bounded_values(200_000, 100, 200, 0, salt=10715), 100, 200]),
+            ("03-equal-bounds-large", [[7] * 200_000, 7, 7]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오른쪽 끝마다 max(0, min(마지막 minK, 마지막 maxK) − 범위를 벗어난 마지막 자리) 를 더한다.
+fun fixedBoundSubarrays(nums: IntArray, minK: Int, maxK: Int): Int {
+    var bad = -1
+    var lastMin = -1
+    var lastMax = -1
+    var count = 0L
+    for (i in nums.indices) {
+        val v = nums[i]
+        if (v < minK || v > maxK) { bad = i; Drill.pointer("bad", bad) }
+        if (v == minK) lastMin = i
+        if (v == maxK) lastMax = i
+        count += maxOf(0, minOf(lastMin, lastMax) - bad)
+    }
+    return (count % 1_000_000_007).toInt()
+}
+""",
+    mutants=[
+        ("negative-counts", "WRONG_BRANCH",
+         "min(마지막 minK, 마지막 maxK) − bad 가 음수여도 더한다. 끊긴 뒤 아직 둘 중 하나가 없으면 0 이다.",
+         """
+fun fixedBoundSubarrays(nums: IntArray, minK: Int, maxK: Int): Int {
+    var bad = -1; var lastMin = -1; var lastMax = -1; var count = 0L
+    for (i in nums.indices) {
+        val v = nums[i]
+        if (v < minK || v > maxK) bad = i
+        if (v == minK) lastMin = i
+        if (v == maxK) lastMax = i
+        count += minOf(lastMin, lastMax) - bad
+    }
+    return (((count % 1_000_000_007) + 1_000_000_007) % 1_000_000_007).toInt()
+}
+"""),
+        ("within-bounds-only", "WRONG_ALGORITHM",
+         "모든 값이 [minK, maxK] 안에 있는 구간을 센다. 최솟값과 최댓값이 정확히 minK, maxK 여야 한다.",
+         """
+fun fixedBoundSubarrays(nums: IntArray, minK: Int, maxK: Int): Int {
+    var bad = -1; var count = 0L
+    for (i in nums.indices) { if (nums[i] < minK || nums[i] > maxK) bad = i; count += i - bad }
+    return (count % 1_000_000_007).toInt()
+}
+"""),
+        ("int-count", "MISSING_EDGE_CASE",
+         "구간 수를 Int 로 센다. 범위 안의 값만 10 만 개면 50 억 개라 넘친다.",
+         """
+fun fixedBoundSubarrays(nums: IntArray, minK: Int, maxK: Int): Int {
+    var bad = -1; var lastMin = -1; var lastMax = -1; var count = 0
+    for (i in nums.indices) {
+        val v = nums[i]
+        if (v < minK || v > maxK) bad = i
+        if (v == minK) lastMin = i
+        if (v == maxK) lastMax = i
+        count += maxOf(0, minOf(lastMin, lastMax) - bad)
+    }
+    return count % 1_000_000_007
+}
+"""),
+        ("every-start", "PERFORMANCE",
+         "시작마다 끝을 늘려 가며 최솟값과 최댓값을 갱신한다. 맞지만, 범위 안의 값만 있으면 n² 이다.",
+         """
+fun fixedBoundSubarrays(nums: IntArray, minK: Int, maxK: Int): Int {
+    var count = 0L
+    for (start in nums.indices) {
+        var low = Int.MAX_VALUE; var high = Int.MIN_VALUE
+        for (end in start until nums.size) {
+            val v = nums[end]
+            if (v < minK || v > maxK) break
+            if (v < low) low = v
+            if (v > high) high = v
+            if (low == minK && high == maxK) count += 1
+        }
+    }
+    return (count % 1_000_000_007).toInt()
+}
+"""),
+    ],
+))

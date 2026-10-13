@@ -3290,3 +3290,101 @@ fun increasingTripletsCount(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 산의 꼭대기 ---------------------------------------------------------------
+
+def _mountain_peak(nums):
+    low, high = 0, len(nums) - 1
+    while low < high:
+        mid = (low + high) // 2
+        if nums[mid] < nums[mid + 1]:
+            low = mid + 1
+        else:
+            high = mid
+    return low
+
+
+def _mountain(n, peak_at, salt):
+    up = sorted(set(randoms(n * 2, 0, 1_000_000_000, salt=salt)))[:peak_at]
+    top = 1_000_000_001
+    down = sorted(set(randoms(n * 2, 0, 1_000_000_000, salt=salt + 1)), reverse=True)[:n - peak_at - 1]
+    return up + [top] + down
+
+
+PROBLEMS.append(Problem(
+    id="mountain-peak",
+    title="산의 꼭대기",
+    summary="""
+배열 `nums` 는 산 모양이다 — 어느 자리 `p`(양 끝이 아님)까지 **순증가**하고 그 뒤로 **순감소**한다. 꼭대기 자리 `p` 를 반환한다.
+""",
+    notes="""
+가운데 `mid` 에서 오른쪽 이웃과 견준다. `nums[mid] < nums[mid + 1]` 이면 아직 오르막이라 꼭대기는 `mid` 보다 오른쪽이고, 아니면
+내리막이거나 꼭대기라 꼭대기는 `mid` 이하다 — `mid` 를 버리면 안 된다. 구간이 한 칸이 될 때까지 줄이면 그 칸이 꼭대기다.
+한 번 훑어 가장 큰 값을 찾아도 답은 같지만, 이 문제는 로그 걸음으로 찾는 것을 연습한다.
+""",
+    drill_doc="""
+Drill.pointer("low", low)
+Drill.pointer("high", high)
+""",
+    constraints="""
+- `3 <= nums.size <= 200_000`, 산 모양이다
+- `0 <= nums[i] <= 1_000_000_001`
+""",
+    signature=dict(name="mountainPeak", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_mountain_peak,
+    cases={
+        "sample": [("01", [[0, 1, 0]]), ("02", [[0, 2, 5, 3, 1]])],
+        "boundary": [
+            ("01-peak-second", [[1, 9, 8, 7, 6]]),
+            ("02-peak-second-last", [[1, 2, 3, 4, 0]]),
+            ("03-shortest", [[3, 7, 2]]),
+            ("04-even-length", [[1, 3, 5, 4]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_mountain(9, 4, salt=10699)]),
+            ("02-random-large", [_mountain(200_000, 123_456, salt=10701)]),
+            ("03-peak-near-left", [_mountain(200_000, 1, salt=10703)]),
+            ("04-peak-near-right", [_mountain(200_000, 199_998, salt=10705)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오른쪽 이웃이 더 크면 꼭대기는 오른쪽, 아니면 mid 이하 — mid 를 버리지 않는다.
+fun mountainPeak(nums: IntArray): Int {
+    var low = 0
+    var high = nums.size - 1
+    while (low < high) {
+        val mid = (low + high) ushr 1
+        if (nums[mid] < nums[mid + 1]) low = mid + 1 else high = mid
+        Drill.pointer("low", low); Drill.pointer("high", high)
+    }
+    return low
+}
+""",
+    mutants=[
+        ("drops-mid", "OFF_BY_ONE",
+         "내리막이면 high 를 mid - 1 로 옮긴다. mid 가 꼭대기일 수 있다.",
+         """
+fun mountainPeak(nums: IntArray): Int {
+    var low = 0; var high = nums.size - 1
+    while (low < high) { val mid = (low + high) ushr 1; if (nums[mid] < nums[mid + 1]) low = mid + 1 else high = mid - 1 }
+    return low
+}
+"""),
+        ("returns-the-height", "WRONG_BRANCH",
+         "꼭대기의 값을 낸다. 자리(인덱스)를 낸다.",
+         """
+fun mountainPeak(nums: IntArray): Int {
+    var low = 0; var high = nums.size - 1
+    while (low < high) { val mid = (low + high) ushr 1; if (nums[mid] < nums[mid + 1]) low = mid + 1 else high = mid }
+    return nums[low]
+}
+"""),
+        ("middle-of-the-array", "WRONG_ALGORITHM",
+         "배열의 가운데 자리를 낸다. 꼭대기는 어디에나 있을 수 있다.",
+         """
+fun mountainPeak(nums: IntArray): Int = nums.size / 2
+"""),
+    ],
+))

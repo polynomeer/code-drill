@@ -1,0 +1,18 @@
+# subarray-ranges-sum 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: MEDIUM
+tags:
+  - monotonic-stack
+  - stack
+  - math
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - sum-of-subarray-minimums
+  - wizard-strength-sum
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "최댓값 쪽, 최솟값 쪽 단조 스택 두 번씩"

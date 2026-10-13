@@ -1,0 +1,18 @@
+# fixed-bound-subarrays 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - sliding-window
+  - two-pointers
+  - counting
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - subarrays-with-k-distinct
+  - subarray-product-less-than-k
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "오른쪽 끝마다 자리 셋을 갱신한다"

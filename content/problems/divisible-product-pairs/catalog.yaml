@@ -1,0 +1,19 @@
+# divisible-product-pairs 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - number-theory
+  - math
+  - counting
+  - hash-map
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - gcd-of-array
+  - divisor-count
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "원소마다 gcd 한 번, 그다음 k 의 약수 쌍"
