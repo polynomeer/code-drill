@@ -97,6 +97,32 @@ class ProjectEngineTest {
     }
 
     @Test
+    fun `subTest 안에서 떨어진 테스트는 실패 한 줄로 남는다`() {
+        // unittest 는 subTest 실패를 addSubTest 로만 알린다. 받지 않으면 그 테스트는 줄이 없어 통과처럼 보인다.
+        val subTests = """
+            import unittest
+
+            class SubTests(unittest.TestCase):
+                def test_some_fail(self):
+                    for i in range(3):
+                        with self.subTest(i=i):
+                            self.assertEqual(0, i)
+
+                def test_all_pass(self):
+                    for i in range(3):
+                        with self.subTest(i=i):
+                            self.assertEqual(i, i)
+        """.trimIndent()
+        val result = engine.execute(request("subtest", reference + ("tests/test_sub.py" to subTests)))
+
+        assertEquals(Verdict.WRONG_ANSWER, result.verdict, result.log)
+        val failing = result.tests.filter { it.name == "SubTests.test_some_fail" }
+        assertEquals(1, failing.size, "떨어진 subTest 가 여럿이어도 줄은 하나다: ${result.tests}")
+        assertTrue(!failing.single().passed && failing.single().message.orEmpty().contains("i=1"), failing.single().message)
+        assertEquals(listOf(true), result.tests.filter { it.name == "SubTests.test_all_pass" }.map { it.passed })
+    }
+
+    @Test
     fun `워크스페이스의 digest 가 다르면 채점하지 않는다`() {
         val files = pkg.starter
         val bytes = Workspaces.encode(files)

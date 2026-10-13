@@ -40,6 +40,7 @@ _ORIGINAL_METHODS = {
     if name.startswith("assert") or name in ("run", "fail", "__call__", "subTest")
 }
 _ORIGINAL_MODULE = sys.modules["unittest"]
+_SUBTEST = _case._SubTest
 
 
 def _tampering() -> str | None:
@@ -62,24 +63,44 @@ def _limit_memory(megabytes: int) -> None:
 
 
 class _Result(unittest.TestResult):
-    """테스트마다 한 줄. 사유는 마지막 줄만 — 트레이스백은 사용자 화면에 쓸모가 없고 길다."""
+    """테스트마다 한 줄. 사유는 마지막 줄만 — 트레이스백은 사용자 화면에 쓸모가 없고 길다.
+
+    subTest 는 부모 테스트의 한 줄로 접는다. unittest 는 subTest 가 떨어지면 addSubTest 만 부르고
+    부모의 addSuccess/addFailure 는 부르지 않는다 — 받지 않으면 그 테스트는 줄이 **없다**. 여럿이
+    떨어져도 줄은 하나, 처음 떨어진 것의 사유로 남는다.
+    """
 
     def __init__(self) -> None:
         super().__init__()
         self.rows: list[dict] = []
+        self._index: dict[tuple[str, str], int] = {}
 
     def _row(self, test, passed: bool, message: str | None) -> None:
+        if isinstance(test, _SUBTEST):
+            test = test.test_case
         if isinstance(test, unittest.loader._FailedTest):
             # 모듈을 import 하지 못했다. unittest 는 그것을 자기 모듈의 테스트로 꾸미는데,
             # 그러면 어느 모듈이 깨졌는지 — 숨은 것인지 — 를 채점기가 알 수 없다.
-            self.rows.append({"module": test._testMethodName, "name": "<import>", "passed": False, "message": message})
-            return
-        self.rows.append({
-            "module": test.__class__.__module__,
-            "name": f"{test.__class__.__name__}.{test._testMethodName}",
-            "passed": passed,
-            "message": message,
-        })
+            row = {"module": test._testMethodName, "name": "<import>", "passed": False, "message": message}
+        else:
+            row = {
+                "module": test.__class__.__module__,
+                "name": f"{test.__class__.__name__}.{test._testMethodName}",
+                "passed": passed,
+                "message": message,
+            }
+        key = (row["module"], row["name"])
+        at = self._index.get(key)
+        if at is None:
+            self._index[key] = len(self.rows)
+            self.rows.append(row)
+        elif self.rows[at]["passed"] and not passed:
+            self.rows[at] = row  # 먼저 떨어진 것이 이긴다. 통과는 실패를 덮지 못한다.
+
+    def addSubTest(self, test, subtest, err):
+        super().addSubTest(test, subtest, err)
+        if err is not None:
+            self._row(test, False, f"{_describe(subtest)}{_reason(err)}"[:500])
 
     def addSuccess(self, test):
         super().addSuccess(test)
@@ -111,6 +132,14 @@ def _reason(err) -> str:
     lines = traceback.format_exception_only(kind, value)
     text = "".join(lines).strip().splitlines()
     return (text[-1] if text else kind.__name__)[:500]
+
+
+def _describe(subtest) -> str:
+    try:
+        description = subtest._subDescription()
+    except Exception:
+        return ""
+    return f"{description} " if description and description != "(<subtest>)" else ""
 
 
 def _canary_name() -> str:
