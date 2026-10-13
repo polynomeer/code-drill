@@ -87,6 +87,12 @@ server:
   port: ${PORT:8080}
 
 management:
+  # 메트릭은 Prometheus 가 긁어 간다 (/actuator/prometheus). Boot 4 의 OpenTelemetry starter 는 OTLP 로 밀어
+  # 보내기를 기본으로 켜서, 수집기가 없으면 몇 초마다 연결 실패를 로그에 쏟는다. 수집기를 둘 때만 켠다.
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTLP_METRICS_ENABLED:false}
   endpoints:
     web:
       exposure:
