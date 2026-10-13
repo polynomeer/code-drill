@@ -1,0 +1,16 @@
+# smallest-equivalent-string 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - union-find
+  - string
+competencies:
+  - MODELING
+  - CORRECTNESS
+  - READING
+prerequisites:
+  - merged-accounts-count
+  - equations-possible
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "알파벳 26 개의 유니온 파인드"

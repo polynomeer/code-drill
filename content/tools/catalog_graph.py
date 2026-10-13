@@ -8082,3 +8082,687 @@ fun buildMatrix(k: Int, rowConditions: IntArray, colConditions: IntArray): Array
 """),
     ],
 ))
+
+
+# --- 두 출발점이 함께 쓰는 길 ---------------------------------------------------
+
+def _required_paths_weight(n, edges, a, b, dest):
+    import heapq
+
+    def dijkstra(adj, start):
+        dist = [None] * n
+        dist[start] = 0
+        heap = [(0, start)]
+        while heap:
+            d, u = heapq.heappop(heap)
+            if d != dist[u]:
+                continue
+            for v, w in adj[u]:
+                if dist[v] is None or d + w < dist[v]:
+                    dist[v] = d + w
+                    heapq.heappush(heap, (dist[v], v))
+        return dist
+
+    forward = [[] for _ in range(n)]
+    backward = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        u, v, w = edges[i], edges[i + 1], edges[i + 2]
+        forward[u].append((v, w))
+        backward[v].append((u, w))
+    from_a, from_b, to_dest = dijkstra(forward, a), dijkstra(forward, b), dijkstra(backward, dest)
+    best = None
+    for v in range(n):
+        if from_a[v] is None or from_b[v] is None or to_dest[v] is None:
+            continue
+        total = from_a[v] + from_b[v] + to_dest[v]
+        if best is None or total < best:
+            best = total
+    return -1 if best is None else best
+
+
+def _three_way_graph(n, m, salt):
+    """무작위 간선 + 출발점 둘에서 도착점까지 가는 사슬 — 답이 늘 있다."""
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    edges = []
+    for _ in range(m):
+        u, v = source.sample(range(n), 2)
+        edges.append((u, v, source.randint(1, 5000)))
+    order = list(range(n))
+    source.shuffle(order)
+    for i in range(n - 1):
+        edges.append((order[i], order[i + 1], source.randint(1, 5000)))
+    source.shuffle(edges)
+    a, b, dest = order[0], order[n // 3], order[-1]
+    return [n, flat(list(e) for e in edges), a, b, dest]
+
+
+PROBLEMS.append(Problem(
+    id="required-paths-weight",
+    title="두 출발점이 함께 쓰는 길",
+    summary="""
+정점 `0..n-1` 의 방향 그래프가 간선 `edges = [u1, v1, w1, u2, v2, w2, ...]` 로 주어진다(`u` 에서 `v` 로, 무게 `w`). 서로 다른
+세 정점 `a`, `b`, `dest` 가 주어진다. 간선 일부를 골라 **`a` 에서 `dest` 로 가는 길과 `b` 에서 `dest` 로 가는 길이 둘 다 있게**
+할 때, 고른 간선 무게 합의 최솟값을 반환한다. 그렇게 할 수 없으면 `-1` 이다.
+""",
+    notes="""
+가장 싼 선택에서 두 길은 어느 정점 `v` 에서 만나 그 뒤로는 같은 길을 쓴다 — 만난 뒤에 갈라질 이유가 없다. 그러면 비용은
+`a → v` 의 최단 거리 + `b → v` 의 최단 거리 + `v → dest` 의 최단 거리이고, 답은 모든 `v` 에 대한 그 합의 최솟값이다(`v` 가
+`a`, `b`, `dest` 자신이어도 된다).
+
+`a`, `b` 에서의 거리는 다익스트라 두 번이고, `v → dest` 의 거리는 **간선을 뒤집은 그래프**에서 `dest` 로부터의 다익스트라 한
+번이다. 두 거리를 따로 더하면(`a → dest` + `b → dest`) 함께 쓰는 길을 두 번 센다.
+""",
+    drill_doc="""
+Drill.visit(v, total)   // v 에서 만나면 드는 비용
+""",
+    constraints="""
+- `3 <= n <= 100_000`, 간선은 `1..200_000` 개, `u != v`, 같은 쌍의 간선이 여럿일 수 있다
+- `1 <= w <= 5000`
+- `a`, `b`, `dest` 는 서로 다르다
+""",
+    signature=dict(name="requiredPathsWeight",
+                   parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("a", "INT"), ("b", "INT"), ("dest", "INT")],
+                   returns="INT"),
+    groups=perf_groups(),
+    reference=_required_paths_weight,
+    cases={
+        "sample": [
+            ("01", [6, [0, 2, 2, 0, 5, 6, 1, 0, 3, 1, 4, 5, 2, 1, 1, 2, 3, 3, 2, 3, 4, 3, 4, 2, 4, 5, 1], 0, 1, 5]),
+            ("02", [3, [0, 1, 1, 2, 1, 1], 0, 1, 2]),
+        ],
+        "boundary": [
+            # 만나는 곳이 도착점 — 두 길이 따로 간다.
+            ("01-meet-at-dest", [3, [0, 2, 4, 1, 2, 6], 0, 1, 2]),
+            # b 가 a 의 길 위에 있다 — a 의 길만 사면 된다.
+            ("02-b-on-the-way", [3, [0, 1, 3, 1, 2, 5], 0, 1, 2]),
+            # 함께 쓰는 긴 꼬리 — 따로 더하면 두 번 센다.
+            ("03-shared-tail", [5, [0, 2, 1, 1, 2, 1, 2, 3, 100, 3, 4, 100], 0, 1, 4]),
+            # 간선 방향을 거꾸로 가면 안 된다.
+            ("04-wrong-direction", [3, [2, 0, 1, 1, 2, 1], 0, 1, 2]),
+            ("05-unreachable", [4, [0, 3, 1, 2, 3, 1], 0, 1, 3]),
+            ("06-parallel-edges", [3, [0, 2, 9, 0, 2, 2, 1, 2, 7, 1, 2, 3], 0, 1, 2]),
+        ],
+        "hidden": [
+            ("01-random-small", _three_way_graph(8, 12, salt=10611)),
+            ("02-random-medium", _three_way_graph(2000, 6000, salt=10613)),
+            ("03-sparse", _three_way_graph(5000, 100, salt=10615)),
+        ],
+        # 거리 표를 배열로 훑어 다음 정점을 고르는 다익스트라는 n² — 10 만이면 세 번에 300 억이다.
+        "performance": [
+            ("01-random-large", _three_way_graph(100_000, 100_000, salt=10617)),
+            ("02-chain-only", _three_way_graph(100_000, 1, salt=10619)),
+            ("03-dense-ish", _three_way_graph(60_000, 140_000, salt=10621)),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). a, b 에서의 다익스트라 둘과, 간선을 뒤집어 dest 로부터의 다익스트라 하나. 만나는 정점마다 합의 최솟값.
+fun requiredPathsWeight(n: Int, edges: IntArray, a: Int, b: Int, dest: Int): Int {
+    val m = edges.size / 3
+    fun build(reverse: Boolean): Array<IntArray> {
+        val head = IntArray(n) { -1 }; val next = IntArray(m); val to = IntArray(m); val weight = IntArray(m)
+        for (e in 0 until m) {
+            val u = if (reverse) edges[3 * e + 1] else edges[3 * e]
+            val v = if (reverse) edges[3 * e] else edges[3 * e + 1]
+            to[e] = v; weight[e] = edges[3 * e + 2]; next[e] = head[u]; head[u] = e
+        }
+        return arrayOf(head, next, to, weight)
+    }
+    fun dijkstra(graph: Array<IntArray>, start: Int): LongArray {
+        val (head, next, to, weight) = graph
+        val dist = LongArray(n) { Long.MAX_VALUE }
+        dist[start] = 0
+        val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+        heap.add(longArrayOf(0, start.toLong()))
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val u = top[1].toInt()
+            if (top[0] != dist[u]) continue
+            var e = head[u]
+            while (e != -1) {
+                val v = to[e]; val d = dist[u] + weight[e]
+                if (d < dist[v]) { dist[v] = d; heap.add(longArrayOf(d, v.toLong())) }
+                e = next[e]
+            }
+        }
+        return dist
+    }
+    val forward = build(false)
+    val fromA = dijkstra(forward, a); val fromB = dijkstra(forward, b); val toDest = dijkstra(build(true), dest)
+    var best = Long.MAX_VALUE
+    for (v in 0 until n) {
+        if (fromA[v] == Long.MAX_VALUE || fromB[v] == Long.MAX_VALUE || toDest[v] == Long.MAX_VALUE) continue
+        val total = fromA[v] + fromB[v] + toDest[v]
+        if (total < best) { best = total; Drill.visit(v, total.toInt()) }
+    }
+    return if (best == Long.MAX_VALUE) -1 else best.toInt()
+}
+""",
+    mutants=[
+        ("two-separate-paths", "WRONG_ALGORITHM",
+         "a → dest 와 b → dest 의 최단 거리를 따로 더한다. 두 길이 함께 쓰는 부분을 두 번 센다.",
+         """
+fun requiredPathsWeight(n: Int, edges: IntArray, a: Int, b: Int, dest: Int): Int {
+    val m = edges.size / 3
+    fun build(reverse: Boolean): Array<IntArray> {
+        val head = IntArray(n) { -1 }; val next = IntArray(m); val to = IntArray(m); val weight = IntArray(m)
+        for (e in 0 until m) {
+            val u = if (reverse) edges[3 * e + 1] else edges[3 * e]
+            val v = if (reverse) edges[3 * e] else edges[3 * e + 1]
+            to[e] = v; weight[e] = edges[3 * e + 2]; next[e] = head[u]; head[u] = e
+        }
+        return arrayOf(head, next, to, weight)
+    }
+    fun dijkstra(graph: Array<IntArray>, start: Int): LongArray {
+        val (head, next, to, weight) = graph
+        val dist = LongArray(n) { Long.MAX_VALUE }
+        dist[start] = 0
+        val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+        heap.add(longArrayOf(0, start.toLong()))
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val u = top[1].toInt()
+            if (top[0] != dist[u]) continue
+            var e = head[u]
+            while (e != -1) {
+                val v = to[e]; val d = dist[u] + weight[e]
+                if (d < dist[v]) { dist[v] = d; heap.add(longArrayOf(d, v.toLong())) }
+                e = next[e]
+            }
+        }
+        return dist
+    }
+    val forward = build(false)
+    val fromA = dijkstra(forward, a); val fromB = dijkstra(forward, b); val toDest = dijkstra(build(true), dest)
+    var best = Long.MAX_VALUE
+    if (fromA[dest] != Long.MAX_VALUE && fromB[dest] != Long.MAX_VALUE) best = fromA[dest] + fromB[dest]
+    return if (best == Long.MAX_VALUE) -1 else best.toInt()
+}
+"""),
+        ("dest-not-reversed", "WRONG_BRANCH",
+         "dest 로부터의 거리를 뒤집지 않은 그래프에서 구한다. 필요한 것은 v 에서 dest 로 가는 거리다.",
+         """
+fun requiredPathsWeight(n: Int, edges: IntArray, a: Int, b: Int, dest: Int): Int {
+    val m = edges.size / 3
+    fun build(reverse: Boolean): Array<IntArray> {
+        val head = IntArray(n) { -1 }; val next = IntArray(m); val to = IntArray(m); val weight = IntArray(m)
+        for (e in 0 until m) {
+            val u = if (reverse) edges[3 * e + 1] else edges[3 * e]
+            val v = if (reverse) edges[3 * e] else edges[3 * e + 1]
+            to[e] = v; weight[e] = edges[3 * e + 2]; next[e] = head[u]; head[u] = e
+        }
+        return arrayOf(head, next, to, weight)
+    }
+    fun dijkstra(graph: Array<IntArray>, start: Int): LongArray {
+        val (head, next, to, weight) = graph
+        val dist = LongArray(n) { Long.MAX_VALUE }
+        dist[start] = 0
+        val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+        heap.add(longArrayOf(0, start.toLong()))
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val u = top[1].toInt()
+            if (top[0] != dist[u]) continue
+            var e = head[u]
+            while (e != -1) {
+                val v = to[e]; val d = dist[u] + weight[e]
+                if (d < dist[v]) { dist[v] = d; heap.add(longArrayOf(d, v.toLong())) }
+                e = next[e]
+            }
+        }
+        return dist
+    }
+    val forward = build(false)
+    val fromA = dijkstra(forward, a); val fromB = dijkstra(forward, b); val toDest = dijkstra(forward, dest)
+    var best = Long.MAX_VALUE
+    for (v in 0 until n) {
+        if (fromA[v] == Long.MAX_VALUE || fromB[v] == Long.MAX_VALUE || toDest[v] == Long.MAX_VALUE) continue
+        val total = fromA[v] + fromB[v] + toDest[v]
+        if (total < best) { best = total; Drill.visit(v, total.toInt()) }
+    }
+    return if (best == Long.MAX_VALUE) -1 else best.toInt()
+}
+"""),
+        ("meets-only-at-endpoints", "WRONG_BRANCH",
+         "만나는 곳을 a, b, dest 가운데서만 고른다. 두 길은 어느 정점에서든 만날 수 있다.",
+         """
+fun requiredPathsWeight(n: Int, edges: IntArray, a: Int, b: Int, dest: Int): Int {
+    val m = edges.size / 3
+    fun build(reverse: Boolean): Array<IntArray> {
+        val head = IntArray(n) { -1 }; val next = IntArray(m); val to = IntArray(m); val weight = IntArray(m)
+        for (e in 0 until m) {
+            val u = if (reverse) edges[3 * e + 1] else edges[3 * e]
+            val v = if (reverse) edges[3 * e] else edges[3 * e + 1]
+            to[e] = v; weight[e] = edges[3 * e + 2]; next[e] = head[u]; head[u] = e
+        }
+        return arrayOf(head, next, to, weight)
+    }
+    fun dijkstra(graph: Array<IntArray>, start: Int): LongArray {
+        val (head, next, to, weight) = graph
+        val dist = LongArray(n) { Long.MAX_VALUE }
+        dist[start] = 0
+        val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+        heap.add(longArrayOf(0, start.toLong()))
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val u = top[1].toInt()
+            if (top[0] != dist[u]) continue
+            var e = head[u]
+            while (e != -1) {
+                val v = to[e]; val d = dist[u] + weight[e]
+                if (d < dist[v]) { dist[v] = d; heap.add(longArrayOf(d, v.toLong())) }
+                e = next[e]
+            }
+        }
+        return dist
+    }
+    val forward = build(false)
+    val fromA = dijkstra(forward, a); val fromB = dijkstra(forward, b); val toDest = dijkstra(build(true), dest)
+    var best = Long.MAX_VALUE
+    for (v in intArrayOf(a, b, dest)) {
+        if (fromA[v] == Long.MAX_VALUE || fromB[v] == Long.MAX_VALUE || toDest[v] == Long.MAX_VALUE) continue
+        val total = fromA[v] + fromB[v] + toDest[v]
+        if (total < best) { best = total; Drill.visit(v, total.toInt()) }
+    }
+    return if (best == Long.MAX_VALUE) -1 else best.toInt()
+}
+"""),
+        ("sums-unreachable-distances", "MISSING_EDGE_CASE",
+         "갈 수 없는 정점(거리 무한대)도 건너뛰지 않고 더한다. 무한대끼리 더하면 넘쳐 음수가 되고, 그것이 가장 작은 값으로 뽑힌다.",
+         """
+fun requiredPathsWeight(n: Int, edges: IntArray, a: Int, b: Int, dest: Int): Int {
+    val m = edges.size / 3
+    fun build(reverse: Boolean): Array<IntArray> {
+        val head = IntArray(n) { -1 }; val next = IntArray(m); val to = IntArray(m); val weight = IntArray(m)
+        for (e in 0 until m) {
+            val u = if (reverse) edges[3 * e + 1] else edges[3 * e]
+            val v = if (reverse) edges[3 * e] else edges[3 * e + 1]
+            to[e] = v; weight[e] = edges[3 * e + 2]; next[e] = head[u]; head[u] = e
+        }
+        return arrayOf(head, next, to, weight)
+    }
+    fun dijkstra(graph: Array<IntArray>, start: Int): LongArray {
+        val (head, next, to, weight) = graph
+        val dist = LongArray(n) { Long.MAX_VALUE }
+        dist[start] = 0
+        val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+        heap.add(longArrayOf(0, start.toLong()))
+        while (heap.isNotEmpty()) {
+            val top = heap.poll(); val u = top[1].toInt()
+            if (top[0] != dist[u]) continue
+            var e = head[u]
+            while (e != -1) {
+                val v = to[e]; val d = dist[u] + weight[e]
+                if (d < dist[v]) { dist[v] = d; heap.add(longArrayOf(d, v.toLong())) }
+                e = next[e]
+            }
+        }
+        return dist
+    }
+    val forward = build(false)
+    val fromA = dijkstra(forward, a); val fromB = dijkstra(forward, b); val toDest = dijkstra(build(true), dest)
+    var best = Long.MAX_VALUE
+    for (v in 0 until n) {
+        val total = fromA[v] + fromB[v] + toDest[v]
+        if (total < best) { best = total; Drill.visit(v, total.toInt()) }
+    }
+    return if (best == Long.MAX_VALUE) -1 else best.toInt()
+}
+"""),
+        ("array-scan-dijkstra", "PERFORMANCE",
+         "다익스트라에서 다음 정점을 거리 표를 다 훑어 고른다. 맞지만, 정점 10 만이면 한 번에 100 억 걸음이다.",
+         """
+fun requiredPathsWeight(n: Int, edges: IntArray, a: Int, b: Int, dest: Int): Int {
+    val m = edges.size / 3
+    fun dijkstra(reverse: Boolean, start: Int): LongArray {
+        val adj = Array(n) { ArrayList<IntArray>() }
+        for (e in 0 until m) {
+            val u = if (reverse) edges[3 * e + 1] else edges[3 * e]
+            val v = if (reverse) edges[3 * e] else edges[3 * e + 1]
+            adj[u].add(intArrayOf(v, edges[3 * e + 2]))
+        }
+        val dist = LongArray(n) { Long.MAX_VALUE }
+        val done = BooleanArray(n)
+        dist[start] = 0
+        repeat(n) {
+            var u = -1
+            for (v in 0 until n) if (!done[v] && dist[v] != Long.MAX_VALUE && (u == -1 || dist[v] < dist[u])) u = v
+            if (u == -1) return dist
+            done[u] = true
+            for (edge in adj[u]) if (dist[u] + edge[1] < dist[edge[0]]) dist[edge[0]] = dist[u] + edge[1]
+        }
+        return dist
+    }
+    val fromA = dijkstra(false, a); val fromB = dijkstra(false, b); val toDest = dijkstra(true, dest)
+    var best = Long.MAX_VALUE
+    for (v in 0 until n) {
+        if (fromA[v] == Long.MAX_VALUE || fromB[v] == Long.MAX_VALUE || toDest[v] == Long.MAX_VALUE) continue
+        best = minOf(best, fromA[v] + fromB[v] + toDest[v])
+    }
+    return if (best == Long.MAX_VALUE) -1 else best.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 같다고 정한 글자로 가장 앞선 문자열 ------------------------------------------
+
+def _smallest_equivalent(s1, s2, base):
+    parent = list(range(26))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for a, b in zip(s1, s2):
+        ra, rb = find(ord(a) - 97), find(ord(b) - 97)
+        # 무리의 대표를 언제나 가장 작은 글자로 둔다
+        if ra < rb:
+            parent[rb] = ra
+        elif rb < ra:
+            parent[ra] = rb
+    return "".join(chr(find(ord(c) - 97) + 97) for c in base)
+
+
+def _letters_word(n, alphabet, salt):
+    return "".join(alphabet[v] for v in randoms(n, 0, len(alphabet) - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="smallest-equivalent-string",
+    title="같다고 정한 글자로 가장 앞선 문자열",
+    summary="""
+길이가 같은 소문자 문자열 `s1`, `s2` 가 있고, 각 `i` 에 대해 글자 `s1[i]` 와 `s2[i]` 는 **같은 글자**로 친다. 같다는 관계는
+반사적이고 대칭적이고 추이적이다(`a = b`, `b = c` 면 `a = c`). 문자열 `base` 의 각 글자를 그와 같은 글자 가운데 가장 앞선
+(알파벳 순으로 가장 작은) 글자로 바꾼 문자열을 반환한다.
+""",
+    notes="""
+같은 글자들은 무리를 이룬다 — 유니온 파인드로 묶는다. 묶을 때 두 무리의 대표 가운데 **더 작은 글자를 대표로** 남기면, 대표가
+곧 그 무리에서 가장 작은 글자다. 그러면 `base` 의 글자마다 대표를 찾으면 된다.
+
+추이성 때문에 직접 짝지어진 글자만 보면 안 된다: `a = c`, `c = b` 면 `b` 는 `a` 가 된다.
+""",
+    drill_doc="""
+Drill.edge("a", "b")   // 두 무리를 묶었다
+""",
+    constraints="""
+- `1 <= s1.length == s2.length <= 1000`
+- `1 <= base.length <= 100_000`, 모두 소문자
+""",
+    signature=dict(name="smallestEquivalentString",
+                   parameters=[("s1", "STRING"), ("s2", "STRING"), ("base", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_smallest_equivalent,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 1000000},
+    cases={
+        "sample": [("01", ["parker", "morris", "parser"]), ("02", ["hello", "world", "hold"])],
+        "boundary": [
+            ("01-nothing-equal", ["a", "a", "xyz"]),
+            # 직접 짝지어지지 않아도 이어지면 같다.
+            ("02-transitive", ["cb", "ac", "b"]),
+            ("03-larger-first", ["z", "a", "zzz"]),
+            ("04-whole-alphabet", ["abcdefghijklmnopqrstuvwxy", "bcdefghijklmnopqrstuvwxyz", "zebra"]),
+            ("05-self-pairs", ["aaa", "aaa", "b"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_letters_word(6, "abcdefgh", salt=10623), _letters_word(6, "abcdefgh", salt=10625), _letters_word(20, "abcdefgh", salt=10627)]),
+            ("02-random-large", [_letters_word(1000, "abcdefghijklmnopqrstuvwxyz", salt=10629), _letters_word(1000, "abcdefghijklmnopqrstuvwxyz", salt=10631), _letters_word(100_000, "abcdefghijklmnopqrstuvwxyz", salt=10633)]),
+            ("03-chain-down", ["yxwvu", "zyxwv", "zzzz"]),
+            ("04-two-groups", ["mnop", "nopq", "qponmlk"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 유니온 파인드 — 묶을 때 더 작은 글자를 대표로 남기면 대표가 그 무리의 가장 앞선 글자다.
+fun smallestEquivalentString(s1: String, s2: String, base: String): String {
+    val parent = IntArray(26) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    for (i in s1.indices) {
+        val ra = find(s1[i] - 'a'); val rb = find(s2[i] - 'a')
+        if (ra != rb) {
+            if (ra < rb) parent[rb] = ra else parent[ra] = rb
+            Drill.edge(('a' + ra).toString(), ('a' + rb).toString())
+        }
+    }
+    val out = StringBuilder()
+    for (c in base) out.append('a' + find(c - 'a'))
+    return out.toString()
+}
+""",
+    mutants=[
+        ("any-root", "WRONG_ALGORITHM",
+         "묶을 때 대표를 아무 쪽으로나 둔다. 대표가 그 무리의 가장 앞선 글자라는 보장이 없다.",
+         """
+fun smallestEquivalentString(s1: String, s2: String, base: String): String {
+    val parent = IntArray(26) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; return r }
+    for (i in s1.indices) { val ra = find(s1[i] - 'a'); val rb = find(s2[i] - 'a'); if (ra != rb) parent[ra] = rb }
+    return base.map { 'a' + find(it - 'a') }.joinToString("")
+}
+"""),
+        ("direct-pairs-only", "WRONG_BRANCH",
+         "직접 짝지어진 글자 가운데 가장 작은 것으로만 바꾼다. 같다는 관계는 이어진다 — a = c, c = b 면 b 는 a 다.",
+         """
+fun smallestEquivalentString(s1: String, s2: String, base: String): String {
+    val best = CharArray(26) { 'a' + it }
+    for (i in s1.indices) {
+        val x = s1[i] - 'a'; val y = s2[i] - 'a'
+        best[x] = minOf(best[x], s2[i]); best[y] = minOf(best[y], s1[i])
+    }
+    return base.map { best[it - 'a'] }.joinToString("")
+}
+"""),
+        ("largest-letter", "WRONG_BRANCH",
+         "무리에서 가장 큰 글자로 바꾼다. 가장 앞선 글자다.",
+         """
+fun smallestEquivalentString(s1: String, s2: String, base: String): String {
+    val parent = IntArray(26) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; return r }
+    for (i in s1.indices) { val ra = find(s1[i] - 'a'); val rb = find(s2[i] - 'a'); if (ra != rb) { if (ra > rb) parent[rb] = ra else parent[ra] = rb } }
+    return base.map { 'a' + find(it - 'a') }.joinToString("")
+}
+"""),
+    ],
+))
+
+
+# --- 가장 낮은 트리의 뿌리 -----------------------------------------------------
+
+def _min_height_roots(n, edges):
+    if n == 1:
+        return [0]
+    adj = [set() for _ in range(n)]
+    for i in range(0, len(edges), 2):
+        adj[edges[i]].add(edges[i + 1])
+        adj[edges[i + 1]].add(edges[i])
+    leaves = [v for v in range(n) if len(adj[v]) == 1]
+    remaining = n
+    while remaining > 2:
+        remaining -= len(leaves)
+        nxt = []
+        for v in leaves:
+            u = adj[v].pop()
+            adj[u].discard(v)
+            if len(adj[u]) == 1:
+                nxt.append(u)
+        leaves = nxt
+    return sorted(leaves)
+
+
+def _shuffled_tree(n, salt):
+    parent = [-1] + [p % i for i, p in enumerate(randoms(n, 0, 10 ** 9, salt=salt)) if i > 0]
+    order = shuffled(range(n), salt=salt + 1)
+    return flat([order[parent[v]], order[v]] for v in range(1, n))
+
+
+def _path_tree(n, salt):
+    order = shuffled(range(n), salt=salt)
+    return flat([order[i], order[i + 1]] for i in range(n - 1))
+
+
+PROBLEMS.append(Problem(
+    id="min-height-roots",
+    title="가장 낮은 트리의 뿌리",
+    summary="""
+정점 `0..n-1` 의 트리가 간선 `edges = [a1, b1, a2, b2, ...]` 로 주어진다. 어느 정점을 뿌리로 잡느냐에 따라 트리의 높이(뿌리에서
+가장 먼 정점까지의 간선 수)가 달라진다. 높이가 가장 낮아지는 뿌리를 **모두** 오름차순으로 담은 배열을 반환한다.
+""",
+    notes="""
+트리의 잎을 한 겹씩 동시에 벗겨 낸다고 하자. 벗길 때마다 모든 정점에서 가장 먼 잎까지의 거리가 똑같이 하나씩 줄고, 마지막에
+남는 정점이 가운데다 — 위상 정렬처럼 진입 차수 대신 **차수가 1 인 정점**을 큐에 넣고 꺼내 간다. 남은 정점이 둘 이하가 되면
+멈춘다. 지름의 길이가 짝수면 가운데가 하나, 홀수면 둘이다.
+
+한 겹을 다 벗기기 전에 멈추면 안 된다 — 같은 겹의 잎은 동시에 떨어진다. 정점이 하나뿐이면 그 정점이 답이다.
+""",
+    drill_doc="""
+Drill.dequeue(v)   // 잎을 벗겼다
+""",
+    constraints="""
+- `1 <= n <= 200_000`, 간선은 `n - 1` 개(트리)
+""",
+    signature=dict(name="minHeightRoots", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=perf_groups(),
+    reference=_min_height_roots,
+    cases={
+        "sample": [("01", [4, [1, 0, 1, 2, 1, 3]]), ("02", [6, [3, 0, 3, 1, 3, 2, 3, 4, 5, 4]])],
+        "boundary": [
+            ("01-single", [1, []]),
+            ("02-two", [2, [0, 1]]),
+            ("03-path-odd", [5, [0, 1, 1, 2, 2, 3, 3, 4]]),
+            # 정점 수가 짝수인 길 — 가운데가 둘이다.
+            ("04-path-even", [6, [0, 1, 1, 2, 2, 3, 3, 4, 4, 5]]),
+            ("05-star", [5, [2, 0, 2, 1, 2, 3, 2, 4]]),
+            # 차수가 큰 정점이 가운데가 아니다.
+            ("06-busy-but-off-center", [8, [0, 1, 0, 2, 0, 3, 0, 4, 4, 5, 5, 6, 6, 7]]),
+        ],
+        "hidden": [
+            ("01-random-small", [12, _shuffled_tree(12, salt=10635)]),
+            ("02-random-medium", [3000, _shuffled_tree(3000, salt=10637)]),
+            ("03-path-medium", [2001, _path_tree(2001, salt=10639)]),
+        ],
+        # 정점마다 BFS 로 높이를 재면 n² — 20 만이면 400 억 걸음이다.
+        "performance": [
+            ("01-random-large", [200_000, _shuffled_tree(200_000, salt=10641)]),
+            ("02-path-large", [200_000, _path_tree(200_000, salt=10643)]),
+            ("03-caterpillar", [200_000, flat([[i, i + 1] for i in range(99_999)] + [[i - 100_000, i] for i in range(100_000, 200_000)])]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 차수가 1 인 정점(잎)을 한 겹씩 동시에 벗기고, 둘 이하가 남으면 그것이 가운데다.
+fun minHeightRoots(n: Int, edges: IntArray): IntArray {
+    if (n == 1) return intArrayOf(0)
+    val degree = IntArray(n)
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) {
+        adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i])
+        degree[edges[i]] += 1; degree[edges[i + 1]] += 1
+    }
+    var layer = ArrayList<Int>()
+    for (v in 0 until n) if (degree[v] == 1) layer.add(v)
+    var remaining = n
+    while (remaining > 2) {
+        remaining -= layer.size
+        val next = ArrayList<Int>()
+        for (v in layer) {
+            Drill.dequeue(v)
+            for (u in adj[v]) { degree[u] -= 1; if (degree[u] == 1) next.add(u) }
+        }
+        layer = next
+    }
+    return layer.sorted().toIntArray()
+}
+""",
+    mutants=[
+        ("one-leaf-at-a-time", "WRONG_BRANCH",
+         "잎을 하나씩 벗기다 둘 이하가 남으면 멈춘다. 같은 겹의 잎은 동시에 떨어져야 한다 — 겹 가운데서 멈추면 가운데가 아닌 정점이 남는다.",
+         """
+fun minHeightRoots(n: Int, edges: IntArray): IntArray {
+    if (n == 1) return intArrayOf(0)
+    val degree = IntArray(n); val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]); degree[edges[i]] += 1; degree[edges[i + 1]] += 1 }
+    val queue = ArrayDeque<Int>()
+    for (v in 0 until n) if (degree[v] == 1) queue.addLast(v)
+    val removed = BooleanArray(n)
+    var remaining = n
+    while (remaining > 2) {
+        val v = queue.removeFirst(); removed[v] = true; remaining -= 1
+        for (u in adj[v]) if (!removed[u]) { degree[u] -= 1; if (degree[u] == 1) queue.addLast(u) }
+    }
+    return (0 until n).filter { !removed[it] }.toIntArray()
+}
+"""),
+        ("single-vertex-forgotten", "MISSING_EDGE_CASE",
+         "정점이 하나뿐인 트리를 따로 보지 않는다. 잎이 없어 빈 배열이 나온다.",
+         """
+fun minHeightRoots(n: Int, edges: IntArray): IntArray {
+    val degree = IntArray(n); val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]); degree[edges[i]] += 1; degree[edges[i + 1]] += 1 }
+    var layer = ArrayList<Int>()
+    for (v in 0 until n) if (degree[v] == 1) layer.add(v)
+    var remaining = n
+    while (remaining > 2) {
+        remaining -= layer.size
+        val next = ArrayList<Int>()
+        for (v in layer) for (u in adj[v]) { degree[u] -= 1; if (degree[u] == 1) next.add(u) }
+        layer = next
+    }
+    return layer.sorted().toIntArray()
+}
+"""),
+        ("highest-degree", "WRONG_ALGORITHM",
+         "차수가 가장 큰 정점을 고른다. 이웃이 많다고 가운데인 것은 아니다.",
+         """
+fun minHeightRoots(n: Int, edges: IntArray): IntArray {
+    val degree = IntArray(n)
+    for (v in edges) degree[v] += 1
+    val top = degree.maxOrNull() ?: 0
+    return (0 until n).filter { degree[it] == top }.toIntArray()
+}
+"""),
+        ("one-center-always", "OFF_BY_ONE",
+         "지름의 가운데 정점을 하나만 낸다. 지름의 길이가 홀수면 가운데는 둘이다.",
+         """
+fun minHeightRoots(n: Int, edges: IntArray): IntArray {
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    fun bfs(start: Int): IntArray {
+        val parent = IntArray(n) { -2 }; parent[start] = -1
+        val queue = ArrayDeque<Int>(); queue.addLast(start); var last = start
+        while (queue.isNotEmpty()) { val v = queue.removeFirst(); last = v; for (u in adj[v]) if (parent[u] == -2) { parent[u] = v; queue.addLast(u) } }
+        parent[start] = last
+        return parent
+    }
+    val far = bfs(0)[0]
+    val parents = bfs(far)
+    val end = parents[far]
+    val path = ArrayList<Int>()
+    var v = end
+    while (v != far) { path.add(v); v = parents[v] }
+    path.add(far)
+    return intArrayOf(path[path.size / 2])
+}
+"""),
+        ("bfs-from-every-vertex", "PERFORMANCE",
+         "정점마다 BFS 로 높이를 잰다. 맞지만, 20 만 정점이면 400 억 걸음이다.",
+         """
+fun minHeightRoots(n: Int, edges: IntArray): IntArray {
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val height = IntArray(n)
+    val dist = IntArray(n)
+    val queue = IntArray(n)
+    for (s in 0 until n) {
+        java.util.Arrays.fill(dist, -1)
+        dist[s] = 0; var head = 0; var tail = 0; queue[tail++] = s; var best = 0
+        while (head < tail) { val v = queue[head++]; best = dist[v]; for (u in adj[v]) if (dist[u] < 0) { dist[u] = dist[v] + 1; queue[tail++] = u } }
+        height[s] = best
+    }
+    val low = height.minOrNull()!!
+    return (0 until n).filter { height[it] == low }.toIntArray()
+}
+"""),
+    ],
+))

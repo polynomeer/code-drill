@@ -4209,3 +4209,369 @@ fun regionsBySlashes(grid: Array<String>): Int = 1 + grid.sumOf { row -> row.cou
 """),
     ],
 ))
+
+
+# --- 같은 색 칠하기 ------------------------------------------------------------
+
+def _flood_fill(grid, r, c, color):
+    g = [row[:] for row in grid]
+    old = g[r][c]
+    if old == color:
+        return g
+    g[r][c] = color
+    stack = [(r, c)]
+    while stack:
+        x, y = stack.pop()
+        for a, b in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if 0 <= a < len(g) and 0 <= b < len(g[0]) and g[a][b] == old:
+                g[a][b] = color
+                stack.append((a, b))
+    return g
+
+
+def _color_grid(m, n, colors, salt):
+    return [randoms(n, 0, colors - 1, salt=salt + r) for r in range(m)]
+
+
+def _snake_grid(m, n):
+    """0 으로 된 뱀 길과 1 의 벽 — 칠하는 길이 칸 하나 폭으로 끝까지 이어진다."""
+    g = [[1] * n for _ in range(m)]
+    for r in range(0, m, 2):
+        for c in range(n):
+            g[r][c] = 0
+        if r + 1 < m:
+            g[r + 1][n - 1 if (r // 2) % 2 == 0 else 0] = 0
+    return g
+
+
+PROBLEMS.append(Problem(
+    id="flood-fill",
+    title="같은 색 칠하기",
+    summary="""
+`m × n` 격자의 칸마다 색(정수)이 있다. 칸 `(r, c)` 에서 시작해, 그 칸과 **상하좌우로 이어진 같은 색의 칸**을 모두 `color` 로
+바꾼 격자를 반환한다(그림판의 페인트 통).
+""",
+    notes="""
+시작 칸의 원래 색을 기억하고, 그 색인 이웃으로 퍼져 나간다(DFS 나 BFS). 칠한 칸은 색이 바뀌어 다시 들어가지 않는다 — 그런데
+`color` 가 원래 색과 같으면 칠해도 색이 그대로라 같은 칸을 끝없이 다시 찾는다. 그때는 아무것도 바꿀 필요가 없으니 바로 돌려준다.
+
+칸이 25 만 개라 이어진 길이 길면 재귀가 깊어진다. 스택을 직접 들고 돈다.
+""",
+    drill_doc="""
+Drill.visit(x * n + y, color)   // 칠했다
+""",
+    constraints="""
+- `1 <= m, n <= 500`
+- `0 <= grid[i][j], color <= 65_535`, `0 <= r < m`, `0 <= c < n`
+""",
+    signature=dict(name="floodFill",
+                   parameters=[("grid", "INT_MATRIX"), ("r", "INT"), ("c", "INT"), ("color", "INT")],
+                   returns="INT_MATRIX"),
+    groups=standard_groups(),
+    reference=_flood_fill,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 8000000},
+    cases={
+        "sample": [
+            ("01", [[[1, 1, 1], [1, 1, 0], [1, 0, 1]], 1, 1, 2]),
+            ("02", [[[0, 0, 0], [0, 0, 0]], 0, 0, 0]),
+        ],
+        "boundary": [
+            ("01-single-cell", [[[5]], 0, 0, 9]),
+            # 대각선은 이어진 것이 아니다.
+            ("02-diagonal-not-connected", [[[1, 0], [0, 1]], 0, 0, 7]),
+            ("03-same-color", [[[3, 3], [3, 3]], 1, 1, 3]),
+            ("04-other-regions-untouched", [[[1, 1, 2, 1], [2, 2, 2, 1], [1, 1, 2, 1]], 0, 0, 4]),
+            ("05-start-in-corner", [[[0, 0, 0], [0, 1, 0], [0, 0, 0]], 2, 2, 5]),
+        ],
+        "hidden": [
+            ("01-random-small", [_color_grid(6, 7, 2, salt=10649), 3, 3, 9]),
+            ("02-random-large", [_color_grid(500, 500, 2, salt=10651), 250, 250, 7]),
+            # 칸 하나 폭의 긴 뱀 — 재귀로 따라가면 깊이가 12 만이다.
+            ("03-snake", [_snake_grid(499, 500), 0, 0, 2]),
+            ("04-single-row", [[[0] * 500], 0, 499, 1]),
+            ("05-whole-grid", [[[4] * 500 for _ in range(500)], 499, 0, 8]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 원래 색과 같은 이웃으로 스택을 들고 퍼진다. 색이 같으면 바꿀 것이 없다.
+fun floodFill(grid: Array<IntArray>, r: Int, c: Int, color: Int): Array<IntArray> {
+    val g = Array(grid.size) { grid[it].copyOf() }
+    val old = g[r][c]
+    if (old == color) return g
+    val m = g.size; val n = g[0].size
+    val stack = ArrayDeque<Int>()
+    g[r][c] = color
+    stack.addLast(r * n + c)
+    while (stack.isNotEmpty()) {
+        val cell = stack.removeLast(); val x = cell / n; val y = cell % n
+        Drill.visit(cell, color)
+        if (x + 1 < m && g[x + 1][y] == old) { g[x + 1][y] = color; stack.addLast((x + 1) * n + y) }
+        if (x > 0 && g[x - 1][y] == old) { g[x - 1][y] = color; stack.addLast((x - 1) * n + y) }
+        if (y + 1 < n && g[x][y + 1] == old) { g[x][y + 1] = color; stack.addLast(x * n + y + 1) }
+        if (y > 0 && g[x][y - 1] == old) { g[x][y - 1] = color; stack.addLast(x * n + y - 1) }
+    }
+    return g
+}
+""",
+    mutants=[
+        ("same-color-loops", "MISSING_EDGE_CASE",
+         "새 색이 원래 색과 같은 경우를 보지 않고 방문 표시도 없다. 칠해도 색이 그대로라 같은 칸을 끝없이 다시 넣는다.",
+         """
+fun floodFill(grid: Array<IntArray>, r: Int, c: Int, color: Int): Array<IntArray> {
+    val g = Array(grid.size) { grid[it].copyOf() }
+    val old = g[r][c]; val m = g.size; val n = g[0].size
+    val stack = ArrayDeque<Int>(); g[r][c] = color; stack.addLast(r * n + c)
+    while (stack.isNotEmpty()) {
+        val cell = stack.removeLast(); val x = cell / n; val y = cell % n
+        for ((a, b) in listOf(x + 1 to y, x - 1 to y, x to y + 1, x to y - 1)) {
+            if (a in 0 until m && b in 0 until n && g[a][b] == old) { g[a][b] = color; stack.addLast(a * n + b) }
+        }
+    }
+    return g
+}
+"""),
+        ("diagonals-too", "WRONG_BRANCH",
+         "대각선 이웃으로도 퍼진다. 이어진 것은 상하좌우뿐이다.",
+         """
+fun floodFill(grid: Array<IntArray>, r: Int, c: Int, color: Int): Array<IntArray> {
+    val g = Array(grid.size) { grid[it].copyOf() }
+    val old = g[r][c]; if (old == color) return g
+    val m = g.size; val n = g[0].size
+    val stack = ArrayDeque<Int>(); g[r][c] = color; stack.addLast(r * n + c)
+    while (stack.isNotEmpty()) {
+        val cell = stack.removeLast(); val x = cell / n; val y = cell % n
+        for (dx in -1..1) for (dy in -1..1) {
+            val a = x + dx; val b = y + dy
+            if (a in 0 until m && b in 0 until n && g[a][b] == old) { g[a][b] = color; stack.addLast(a * n + b) }
+        }
+    }
+    return g
+}
+"""),
+        ("every-cell-of-that-color", "WRONG_ALGORITHM",
+         "원래 색인 칸을 격자에서 모두 바꾼다. 시작 칸과 이어진 칸만 바꾼다.",
+         """
+fun floodFill(grid: Array<IntArray>, r: Int, c: Int, color: Int): Array<IntArray> {
+    val old = grid[r][c]
+    return Array(grid.size) { i -> IntArray(grid[i].size) { j -> if (grid[i][j] == old) color else grid[i][j] } }
+}
+"""),
+        ("recursive-dfs", "MISSING_EDGE_CASE",
+         "재귀로 퍼진다. 칸 하나 폭의 긴 길은 깊이가 12 만이라 스택이 넘친다.",
+         """
+fun floodFill(grid: Array<IntArray>, r: Int, c: Int, color: Int): Array<IntArray> {
+    val g = Array(grid.size) { grid[it].copyOf() }
+    val old = g[r][c]; if (old == color) return g
+    fun fill(x: Int, y: Int) {
+        if (x !in g.indices || y !in g[0].indices || g[x][y] != old) return
+        g[x][y] = color
+        fill(x + 1, y); fill(x - 1, y); fill(x, y + 1); fill(x, y - 1)
+    }
+    fill(r, c)
+    return g
+}
+"""),
+    ],
+))
+
+
+# --- 모두 1 인 부분 행렬의 수 ---------------------------------------------------
+
+def _count_ones_submatrices(grid):
+    m, n = len(grid), len(grid[0])
+    height = [0] * n
+    total = 0
+    for i in range(m):
+        for j in range(n):
+            height[j] = height[j] + 1 if grid[i][j] else 0
+        sums = [0] * n
+        stack = []
+        for j in range(n):
+            while stack and height[stack[-1]] >= height[j]:
+                stack.pop()
+            if stack:
+                p = stack[-1]
+                sums[j] = sums[p] + height[j] * (j - p)
+            else:
+                sums[j] = height[j] * (j + 1)
+            stack.append(j)
+            total += sums[j]
+    return total % 1_000_000_007
+
+
+def _bits_grid(m, n, ones_percent, salt):
+    return [[1 if v < ones_percent else 0 for v in randoms(n, 0, 99, salt=salt + r)] for r in range(m)]
+
+
+PROBLEMS.append(Problem(
+    id="count-ones-submatrices",
+    # v2: v1 의 숨은 케이스 150 × 400 의 1 은 9 억 개라 Int 에 들었다 — 넘친다던 주석이 틀렸다. 200 × 600(36 억)으로.
+    version=2,
+    title="모두 1 인 부분 행렬의 수",
+    summary="""
+`0` 과 `1` 로 된 `m × n` 격자에서, 칸이 **모두 `1` 인** 직사각형 부분 행렬이 몇 개인지 `1_000_000_007` 로 나눈 나머지로
+반환한다. 크기와 위치가 다르면 다른 부분 행렬이다.
+""",
+    notes="""
+부분 행렬을 오른쪽 아래 모서리로 센다. 행 `i` 까지 내려왔을 때 열마다 위로 이어진 1 의 높이 `h[j]` 를 들면, 오른쪽 아래가
+`(i, j)` 인 부분 행렬의 수는 `j` 에서 왼쪽으로 가며 지나온 높이의 최솟값들의 합이다.
+
+그 합 `sum[j]` 는 단조 스택으로 이어 붙인다: 왼쪽에서 처음 만나는 `h[j]` 보다 낮은 열 `p` 까지는 높이가 `h[j]` 로 막히니
+`h[j] × (j − p)` 이고, 그 너머는 `sum[p]` 그대로다. 행마다 한 번 훑으면 된다.
+
+왼쪽으로 하나씩 늘려 가며 최솟값을 갱신하면 행마다 `n²` 이라 열이 2 만이면 끝나지 않는다. 수는 10^12 까지 가므로 `Long`
+으로 세고 마지막에 나머지를 취한다.
+""",
+    drill_doc="""
+Drill.push(j)   // 단조 스택에 넣었다
+""",
+    constraints="""
+- `1 <= m <= 300`, `1 <= n <= 20_000`, `m × n <= 2_000_000`
+- `grid[i][j]` 는 `0` 이나 `1`
+""",
+    signature=dict(name="countOnesSubmatrices", parameters=[("grid", "INT_MATRIX")], returns="INT"),
+    groups=perf_groups(),
+    reference=_count_ones_submatrices,
+    cases={
+        "sample": [("01", [[[1, 0, 1], [1, 1, 0], [1, 1, 0]]]), ("02", [[[0, 1, 1, 0], [0, 1, 1, 1], [1, 1, 1, 0]]])],
+        "boundary": [
+            ("01-single-one", [[[1]]]),
+            ("02-single-zero", [[[0]]]),
+            ("03-all-ones-2x2", [[[1, 1], [1, 1]]]),
+            # 0 이 높이를 끊는다.
+            ("04-zero-breaks-height", [[[1, 1], [0, 1], [1, 1]]]),
+            ("05-one-row", [[[1, 1, 1, 0, 1, 1]]]),
+            ("06-one-column", [[[1], [1], [0], [1]]]),
+        ],
+        "hidden": [
+            ("01-random-small", [_bits_grid(5, 6, 70, salt=10653)]),
+            ("02-random-medium", [_bits_grid(60, 80, 85, salt=10655)]),
+            # 수가 Int 를 넘는다 — 20 100 × 180 300 = 36 억.
+            ("03-all-ones", [[[1] * 600 for _ in range(200)]]),
+        ],
+        # 왼쪽으로 하나씩 늘려 가면 행마다 n² / 2 — 100 × 20 000² / 2 = 200 억 걸음이다. 300 × 5000 은 1.3배뿐이었다.
+        "performance": [
+            ("01-all-ones-large", [[[1] * 20_000 for _ in range(100)]]),
+            ("02-one-zero-column", [[[0 if j == 10_000 else 1 for j in range(20_000)] for _ in range(100)]]),
+            ("03-staircase", [[[1 if j >= i * 100 else 0 for j in range(20_000)] for i in range(100)]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 열마다 위로 이어진 1 의 높이를 들고, 행마다 단조 스택으로 오른쪽 아래 모서리별 개수를 잇는다.
+fun countOnesSubmatrices(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val height = IntArray(n)
+    val sums = LongArray(n)
+    val stack = IntArray(n)
+    var total = 0L
+    for (i in 0 until m) {
+        for (j in 0 until n) height[j] = if (grid[i][j] == 1) height[j] + 1 else 0
+        var size = 0
+        for (j in 0 until n) {
+            while (size > 0 && height[stack[size - 1]] >= height[j]) size -= 1
+            sums[j] = if (size > 0) {
+                val p = stack[size - 1]
+                sums[p] + height[j].toLong() * (j - p)
+            } else {
+                height[j].toLong() * (j + 1)
+            }
+            stack[size++] = j
+            total += sums[j]
+        }
+        Drill.push(i)
+    }
+    return (total % 1_000_000_007).toInt()
+}
+""",
+    mutants=[
+        ("height-not-reset", "WRONG_BRANCH",
+         "0 을 만나도 높이를 0 으로 되돌리지 않는다. 0 위의 1 이 아래로 이어진 것처럼 세어진다.",
+         """
+fun countOnesSubmatrices(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val height = IntArray(n); val sums = LongArray(n); val stack = IntArray(n)
+    var total = 0L
+    for (i in 0 until m) {
+        for (j in 0 until n) height[j] = if (grid[i][j] == 1) height[j] + 1 else height[j]
+        var size = 0
+        for (j in 0 until n) {
+            while (size > 0 && height[stack[size - 1]] >= height[j]) size -= 1
+            sums[j] = if (size > 0) { val p = stack[size - 1]; sums[p] + height[j].toLong() * (j - p) } else height[j].toLong() * (j + 1)
+            stack[size++] = j; total += sums[j]
+        }
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("forgets-the-first-column", "OFF_BY_ONE",
+         "왼쪽에 더 낮은 열이 없을 때 h × j 로 센다. 0 번 열까지 j + 1 개의 열이 있다.",
+         """
+fun countOnesSubmatrices(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val height = IntArray(n); val sums = LongArray(n); val stack = IntArray(n)
+    var total = 0L
+    for (i in 0 until m) {
+        for (j in 0 until n) height[j] = if (grid[i][j] == 1) height[j] + 1 else 0
+        var size = 0
+        for (j in 0 until n) {
+            while (size > 0 && height[stack[size - 1]] >= height[j]) size -= 1
+            sums[j] = if (size > 0) { val p = stack[size - 1]; sums[p] + height[j].toLong() * (j - p) } else height[j].toLong() * j
+            stack[size++] = j; total += sums[j]
+        }
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("int-total", "MISSING_EDGE_CASE",
+         "개수를 Int 로 센다. 200 × 600 의 1 만 해도 수가 36 억이라 Int 를 넘는다.",
+         """
+fun countOnesSubmatrices(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val height = IntArray(n); val sums = IntArray(n); val stack = IntArray(n)
+    var total = 0
+    for (i in 0 until m) {
+        for (j in 0 until n) height[j] = if (grid[i][j] == 1) height[j] + 1 else 0
+        var size = 0
+        for (j in 0 until n) {
+            while (size > 0 && height[stack[size - 1]] >= height[j]) size -= 1
+            sums[j] = if (size > 0) { val p = stack[size - 1]; sums[p] + height[j] * (j - p) } else height[j] * (j + 1)
+            stack[size++] = j; total += sums[j]
+        }
+    }
+    return total % 1_000_000_007
+}
+"""),
+        ("squares-only", "WRONG_ALGORITHM",
+         "모두 1 인 정사각형만 센다. 직사각형도 센다.",
+         """
+fun countOnesSubmatrices(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val side = Array(m) { IntArray(n) }
+    var total = 0L
+    for (i in 0 until m) for (j in 0 until n) if (grid[i][j] == 1) {
+        side[i][j] = if (i == 0 || j == 0) 1 else 1 + minOf(side[i - 1][j], minOf(side[i][j - 1], side[i - 1][j - 1]))
+        total += side[i][j]
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("extends-left-one-by-one", "PERFORMANCE",
+         "오른쪽 아래 모서리마다 왼쪽으로 하나씩 늘려 가며 높이의 최솟값을 더한다. 맞지만, 행마다 n² 이다.",
+         """
+fun countOnesSubmatrices(grid: Array<IntArray>): Int {
+    val m = grid.size; val n = grid[0].size
+    val height = IntArray(n)
+    var total = 0L
+    for (i in 0 until m) {
+        for (j in 0 until n) height[j] = if (grid[i][j] == 1) height[j] + 1 else 0
+        for (j in 0 until n) {
+            var low = Int.MAX_VALUE
+            var k = j
+            while (k >= 0 && height[k] > 0) { low = minOf(low, height[k]); total += low; k -= 1 }
+        }
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+    ],
+))

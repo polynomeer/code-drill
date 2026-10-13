@@ -1,0 +1,1 @@
+{"args": ["mnop", "nopq", "qponmlk"], "expected": "mmmmmlk"}

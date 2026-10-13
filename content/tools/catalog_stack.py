@@ -3770,3 +3770,119 @@ fun wizardStrengthSum(strength: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 붙은 같은 글자 지우기 -----------------------------------------------------
+
+def _remove_adjacent_duplicates(s):
+    stack = []
+    for ch in s:
+        if stack and stack[-1] == ch:
+            stack.pop()
+        else:
+            stack.append(ch)
+    return "".join(stack)
+
+
+def _pairs_word(n, alphabet, salt):
+    return "".join(alphabet[v] for v in randoms(n, 0, len(alphabet) - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="remove-adjacent-duplicates",
+    title="붙은 같은 글자 지우기",
+    summary="""
+소문자 문자열 `s` 에서 **붙어 있는 같은 글자 둘**을 지우는 일을 더 지울 것이 없을 때까지 되풀이한다. 남은 문자열을 반환한다
+(빈 문자열일 수 있다). 지우는 순서와 상관없이 결과는 하나로 정해진다.
+""",
+    notes="""
+지우고 나면 그 양옆이 새로 붙어 또 지워질 수 있다 — `abba` 는 `bb` 를 지우면 `aa` 가 되어 모두 사라진다. 왼쪽부터 글자를
+스택에 쌓으며, 새 글자가 맨 위 글자와 같으면 넣지 않고 맨 위를 뺀다. 스택에 남은 것이 답이다.
+
+같은 글자가 셋이면 둘만 지워지고 하나가 남는다(`aaa` → `a`).
+""",
+    drill_doc="""
+Drill.push(c - 'a')   // 쌓았다
+Drill.pop(c - 'a')    // 맨 위와 같아 함께 지웠다
+""",
+    constraints="""
+- `1 <= s.length <= 200_000`, `s` 는 소문자로만 이뤄진다
+""",
+    signature=dict(name="removeAdjacentDuplicates", parameters=[("s", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    reference=_remove_adjacent_duplicates,
+    cases={
+        "sample": [("01", ["abbaca"]), ("02", ["azxxzy"])],
+        "boundary": [
+            ("01-single", ["q"]),
+            ("02-pair", ["ee"]),
+            # 지우고 나면 양옆이 새로 붙는다.
+            ("03-cascade", ["abccba"]),
+            # 셋이면 하나가 남는다.
+            ("04-triple", ["aaa"]),
+            ("05-no-pairs", ["abcabc"]),
+            ("06-four", ["bbbb"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_pairs_word(30, "ab", salt=10645)]),
+            ("02-random-large", [_pairs_word(200_000, "abc", salt=10647)]),
+            ("03-palindrome-collapse", ["abcdefghij" * 1 + "jihgfedcba" + "x"]),
+            ("04-deep-nesting", ["".join("abcdefghijklmnopqrstuvwxyz"[i % 26] for i in range(100_000)) + "".join("abcdefghijklmnopqrstuvwxyz"[i % 26] for i in range(99_999, -1, -1))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 왼쪽부터 쌓으며 맨 위와 같은 글자가 오면 함께 지운다 — 지운 뒤 새로 붙는 쌍도 이어서 지워진다.
+fun removeAdjacentDuplicates(s: String): String {
+    val stack = StringBuilder()
+    for (c in s) {
+        if (stack.isNotEmpty() && stack[stack.length - 1] == c) {
+            stack.setLength(stack.length - 1)
+            Drill.pop(c - 'a')
+        } else {
+            stack.append(c)
+            Drill.push(c - 'a')
+        }
+    }
+    return stack.toString()
+}
+""",
+    mutants=[
+        ("one-pass-no-cascade", "WRONG_ALGORITHM",
+         "한 번 훑으며 붙은 쌍만 지운다. 지우고 나서 새로 붙는 쌍은 남는다.",
+         """
+fun removeAdjacentDuplicates(s: String): String {
+    val out = StringBuilder()
+    var i = 0
+    while (i < s.length) {
+        if (i + 1 < s.length && s[i] == s[i + 1]) i += 2 else { out.append(s[i]); i += 1 }
+    }
+    return out.toString()
+}
+"""),
+        ("whole-run-removed", "WRONG_BRANCH",
+         "같은 글자가 이어진 덩어리를 통째로 지운다. 둘씩 지우므로 셋이면 하나가 남는다.",
+         """
+fun removeAdjacentDuplicates(s: String): String {
+    val stack = StringBuilder()
+    var i = 0
+    while (i < s.length) {
+        var j = i
+        while (j < s.length && s[j] == s[i]) j += 1
+        if (j - i >= 2) { i = j; continue }
+        if (stack.isNotEmpty() && stack[stack.length - 1] == s[i]) stack.setLength(stack.length - 1) else stack.append(s[i])
+        i = j
+    }
+    return stack.toString()
+}
+"""),
+        ("stops-after-one-removal", "WRONG_BRANCH",
+         "쌍 하나를 지우면 멈춘다. 더 지울 것이 없을 때까지 되풀이한다.",
+         """
+fun removeAdjacentDuplicates(s: String): String {
+    for (i in 0 until s.length - 1) if (s[i] == s[i + 1]) return s.substring(0, i) + s.substring(i + 2)
+    return s
+}
+"""),
+    ],
+))
