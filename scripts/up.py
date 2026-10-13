@@ -13,6 +13,7 @@
     python3 scripts/up.py --status   # 지금 무엇이 어디에 떠 있나
     python3 scripts/up.py --no-web   # 웹 없이
     python3 scripts/up.py --seed     # 문제 검증·공개까지 (몇 분 걸린다)
+    python3 scripts/up.py --down --all --reset   # 로컬 데이터(DB·브로커·스토어)까지 지운다
 """
 
 from __future__ import annotations
@@ -322,7 +323,7 @@ def release(ports: dict, timeout: int = 20) -> None:
         time.sleep(0.5)
 
 
-def stop(state: dict, everything: bool) -> None:
+def stop(state: dict, everything: bool, reset: bool = False) -> None:
     for name, pid in (state.get("pids") or {}).items():
         if alive(pid):
             # 프로세스 그룹째 보낸다. pnpm 은 vite 를 자식으로 띄우므로 부모만
@@ -347,7 +348,12 @@ def stop(state: dict, everything: bool) -> None:
             f"{name}:{ports[name]}" for name in stray))
         print("  lsof -ti :<포트> 로 확인하고 직접 정리한다")
 
-    if everything:
+    if reset:
+        # 로컬 데이터를 비운다 — 스모크는 돌 때마다 제출을 남기고, 프로젝트 단위 재채점은 쌓인 제출을 전부
+        # 다시 채점하므로 실행이 갈수록 길어진다. CI 는 매번 빈 DB 라 상관없다. 손으로 고를 때만 지운다.
+        print("플랫폼 의존성 정지, 데이터 볼륨 삭제")
+        subprocess.run([*COMPOSE, "down", "-v"], cwd=ROOT, check=False)
+    elif everything:
         print("플랫폼 의존성 정지")
         subprocess.run([*COMPOSE, "stop"], cwd=ROOT, check=False)
     state["pids"] = {}
@@ -412,6 +418,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--down", action="store_true", help="앱을 내린다")
     parser.add_argument("--all", action="store_true", help="--down 과 함께: 컨테이너도 정지")
+    parser.add_argument("--reset", action="store_true", help="--down --all 과 함께: 로컬 데이터 볼륨까지 지운다")
     parser.add_argument("--status", action="store_true", help="지금 상태")
     parser.add_argument("--no-web", action="store_true", help="웹 개발 서버 없이")
     parser.add_argument("--seed", action="store_true", help="문제 검증·공개까지")
@@ -429,8 +436,10 @@ def main() -> int:
     if args.status:
         status(state)
         return 0
+    if args.reset and not (args.down and args.all):
+        parser.error("--reset 은 --down --all 과 함께 쓴다 — 데이터를 지우는 일이라 뜻을 분명히 한다")
     if args.down:
-        stop(state, everything=args.all)
+        stop(state, everything=args.all, reset=args.reset)
         return 0
 
     check_tools(with_web=not args.no_web)

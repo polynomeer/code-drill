@@ -89,7 +89,12 @@ KOTLIN_IMAGE=gradle:8.10.2-jdk21 JAVA_IMAGE=gradle:8.10.2-jdk21 PYTHON_IMAGE=pyt
 python3 scripts/up.py            # 의존성 + 앱 셋 + 웹
 python3 scripts/up.py --status   # 지금 무엇이 어디에
 python3 scripts/up.py --down     # 앱을 내린다 (--all 이면 컨테이너까지)
+python3 scripts/up.py --down --all --reset   # 로컬 데이터(DB·브로커·스토어)까지 지운다
 ```
+
+**스모크는 돌 때마다 제출을 남긴다.** 프로젝트 단위 재채점은 쌓인 제출을 전부 다시 채점하므로 로컬에서는
+실행이 갈수록 길어진다(CI 는 매번 빈 DB 다). 그 구간이 수십 분이 되면 `--reset` 으로 비우고 다시 띄운다 —
+스모크가 대상 수를 보고 알려 준다.
 
 **포트가 차 있으면 비켜 간다.** 개발 머신에는 5432·6379·8080 을 쓰는 스택이 이미 떠
 있는 경우가 흔하다. 고른 포트는 `.codedrill-stack.json` 에 적어 다음 실행에서도 같은

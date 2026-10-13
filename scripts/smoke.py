@@ -1577,6 +1577,10 @@ def main() -> int:
     raw_request("POST", f"/admin/rejudges/{preal['id']}/approve", None, approver)
     status, dispatched = raw_request("POST", f"/admin/rejudges/{preal['id']}/dispatch", None, operator)
     results.append(check("프로젝트 단위 재채점 실행", (status, dispatched["targets"] >= 3), (202, True)))
+    if dispatched["targets"] > 60:
+        # 대상은 지난 스모크들이 남긴 제출까지다 — 로컬 DB 에서는 실행마다 늘어 이 구간만 수십 분이 된다
+        print(f"  (참고) 재채점 대상이 {dispatched['targets']} 개다. 로컬이면 "
+              "python3 scripts/up.py --down --all --reset 으로 데이터를 비우고 다시 띄우면 짧아진다")
     # 대상은 이 프로젝트의 종료된 제출 전부다 — 스모크가 돌 때마다 늘고, 더 쓴 테스트가 있는 제출은
     # 시험판까지 다시 돈다. 기다리는 시간은 대상 수에 비례해야 한다; 고정 한도는 세 번째 완주에서 넘쳤다.
     report = await_rejudge(preal["id"], operator, timeout=TIMEOUT * 3 + dispatched["targets"] * 10)
