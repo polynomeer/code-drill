@@ -1,0 +1,9 @@
+# roman-numerals 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - greedy
+  - math
+summary: 정수와 로마 숫자를 서로 바꾼다 — 빼는 꼴(IV, XC, CM), 1..3999 의 범위, 그리고 표준이 아닌 꼴(IIII, IC, VV, 소문자, 빈 문자열)의 거부.
+competencies:
+  - SPECIFICATION
