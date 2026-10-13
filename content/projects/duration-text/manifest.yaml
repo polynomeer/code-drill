@@ -1,0 +1,11 @@
+# 프로젝트형 문제 manifest (content/projects/README.md 에 모양이 있다). 아홉째 Python 프로젝트.
+id: duration-text
+version: 1
+title: 기간 표기
+language: PYTHON
+statement: statement.md
+
+limits:
+  buildSeconds: 60
+  testSeconds: 120
+  memoryMb: 256

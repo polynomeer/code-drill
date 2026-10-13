@@ -1,0 +1,8 @@
+# duration-text 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - string
+  - simulation
+summary: 설정 파일의 timeout = "1h30m" 같은 기간 표기를 초로 읽고 다시 쓴다 — 단위의 순서와 중복, 단위 없는 수, 부분 사이의 공백, 0 과 음수.
+competencies:
+  - SPECIFICATION
