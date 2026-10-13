@@ -1,7 +1,7 @@
-import { ChevronLeft, FilePlus, FolderOpen, MoreHorizontal, Send, Terminal, Trash2, Upload } from 'lucide-react'
+import { ChevronLeft, FilePlus, FolderOpen, MoreHorizontal, Send, Terminal, Trash2, Upload, X } from 'lucide-react'
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { Link } from 'wouter'
-import { Badge, Button, Dialog, EmptyState, IconButton, Skeleton, Tabs, VerdictBadge } from '../../design'
+import { Badge, Button, Dialog, EmptyState, IconButton, InlineAlert, Skeleton, Tabs, VerdictBadge } from '../../design'
 import { DIFFICULTY_LABEL, LANGUAGE_LABEL } from '../../shared/types'
 import type { ProjectProbeOutcome, ProjectSubmission, ProjectView } from '../../shared/types'
 import { fullTime } from '../../shared/format'
@@ -56,6 +56,7 @@ function Workspace({ project, workspace }: { project: ProjectView; workspace: Wo
   const settings = useEditorSettings()
   const [kitOpen, setKitOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [changesOpen, setChangesOpen] = useState(false)
   const [left, setLeft] = useState<'statement' | 'history'>('statement')
   const { files, current, result, judging, submitting } = workspace
   const fileCount = Object.keys(files).length
@@ -143,6 +144,20 @@ function Workspace({ project, workspace }: { project: ProjectView; workspace: Wo
         <p className={styles.error} role="alert">
           {workspace.error}
         </p>
+      )}
+
+      {workspace.cli && (
+        <CliBanner
+          cli={workspace.cli}
+          changesOpen={changesOpen}
+          onShowChanges={() => setChangesOpen(true)}
+          onCloseChanges={() => setChangesOpen(false)}
+          onAdopt={() => {
+            workspace.adoptCliSubmission()
+            setChangesOpen(false)
+          }}
+          onDismiss={workspace.dismissCli}
+        />
       )}
 
       <div className={styles.split}>
@@ -446,4 +461,74 @@ function Probe({ probe }: { probe: ProjectProbeOutcome }) {
 function Source({ submission }: { submission: ProjectSubmission }) {
   if (submission.source !== 'CLI') return <span className={styles.source}>웹</span>
   return <span className={`${styles.source} ${styles.sourceCli}`}>CLI{submission.device ? ` · ${submission.device}` : ''}</span>
+}
+
+const CHANGE_LABEL = { added: '제출에만 있음', modified: '내용이 다름', removed: '제출에 없음' } as const
+
+/**
+ * CLI 로 낸 파일이 웹 초안과 다르다 (디자인 시안 24). IDE 에서 풀고 낸 뒤 웹에서 이어 쓰려는 사람에게, 그 제출의
+ * 파일로 초안을 바꾸는 길을 준다. 바꾸지 않으면 웹 초안은 그대로다 — 어느 쪽이 맞는지는 사람이 안다.
+ */
+function CliBanner({
+  cli,
+  changesOpen,
+  onShowChanges,
+  onCloseChanges,
+  onAdopt,
+  onDismiss,
+}: {
+  cli: NonNullable<WorkspaceState['cli']>
+  changesOpen: boolean
+  onShowChanges: () => void
+  onCloseChanges: () => void
+  onAdopt: () => void
+  onDismiss: () => void
+}) {
+  const device = cli.submission.device ?? '다른 기기'
+  return (
+    <div className={styles.cliBanner}>
+      <InlineAlert
+        tone="info"
+        title={`${device} 에서 CLI 로 낸 파일이 웹 초안과 ${cli.changes.length}곳 다릅니다`}
+        action={
+          <div className={styles.cliActions}>
+            <Button variant="secondary" size="dense" onClick={onShowChanges}>
+              달라진 것 보기
+            </Button>
+            <Button variant="primary" size="dense" onClick={onAdopt}>
+              이 제출로 초안 바꾸기
+            </Button>
+            <IconButton label="이 알림 닫기" icon={<X size={16} />} onClick={onDismiss} />
+          </div>
+        }
+      >
+        웹에서 이어 쓰려면 그 제출의 파일로 초안을 바꾸세요. {fullTime(cli.submission.createdAt)} 제출.
+      </InlineAlert>
+      <Dialog
+        open={changesOpen}
+        onClose={onCloseChanges}
+        title="CLI 제출과 웹 초안의 차이"
+        description="초안을 바꾸면 아래 파일이 제출의 것이 됩니다. 제출에 없는 파일은 초안에서 빠집니다."
+        footer={
+          <>
+            <Button variant="tertiary" onClick={onCloseChanges}>
+              닫기
+            </Button>
+            <Button variant="primary" onClick={onAdopt}>
+              이 제출로 초안 바꾸기
+            </Button>
+          </>
+        }
+      >
+        <ul className={styles.changes}>
+          {cli.changes.map((change) => (
+            <li key={change.path}>
+              <code>{change.path}</code>
+              <span className={`${styles.change} ${styles[`change_${change.change}`]}`}>{CHANGE_LABEL[change.change]}</span>
+            </li>
+          ))}
+        </ul>
+      </Dialog>
+    </div>
+  )
 }

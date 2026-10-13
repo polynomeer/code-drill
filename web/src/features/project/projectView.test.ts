@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fileTree, firstFile, hiddenCells, judgingStep, statementBody } from './projectView'
+import { fileChanges, fileTree, firstFile, hiddenCells, judgingStep, statementBody } from './projectView'
 
 describe('fileTree', () => {
   it('폴더 줄을 만들고, 같은 폴더에서는 하위 폴더가 파일보다 먼저다', () => {
@@ -46,5 +46,24 @@ describe('statementBody', () => {
   it('첫 줄의 제목만 뗀다', () => {
     expect(statementBody('# 작업 큐\n\n본문', '작업 큐')).toBe('본문')
     expect(statementBody('# 다른 제목\n본문', '작업 큐')).toBe('# 다른 제목\n본문')
+  })
+})
+
+describe('fileChanges', () => {
+  it('제출에만 있는 것, 다른 것, 초안에만 있는 것을 가른다', () => {
+    expect(
+      fileChanges(
+        { 'src/a.kt': 'a', 'src/b.kt': 'b', 'notes.md': 'n' },
+        { 'src/a.kt': 'a', 'src/b.kt': 'B', 'tests/MyTest.kt': 't' },
+      ),
+    ).toEqual([
+      { path: 'notes.md', change: 'removed' },
+      { path: 'src/b.kt', change: 'modified' },
+      { path: 'tests/MyTest.kt', change: 'added' },
+    ])
+  })
+
+  it('줄 끝만 다르면 같은 파일이다', () => {
+    expect(fileChanges({ 'a.py': 'x\ny\n' }, { 'a.py': 'x\r\ny\r\n' })).toEqual([])
   })
 })

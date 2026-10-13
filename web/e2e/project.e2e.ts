@@ -43,7 +43,16 @@ const DONE = {
   probe: { referencePassed: true, killed: ['off-by-one', 'stale-token', 'no-reclaim'], survived: ['token-reuse--a'], log: null, alreadyCaught: ['x', 'y'] },
 }
 
-async function mockApi(page: Page, options: { judging?: boolean } = {}) {
+/** IDE 에서 CLI 로 낸 제출 — 시작 저장소를 고치고 테스트를 하나 더했다 (시안 24) */
+const FROM_CLI = {
+  ...DONE,
+  id: 'ps-cli',
+  source: 'CLI',
+  device: 'MacBook-Pro (zsh)',
+  files: { 'src/queue/JobQueue.kt': 'class JobQueue // done', 'tests/PublicJobQueueTest.kt': 'class PublicJobQueueTest', 'tests/MyEdgeTest.kt': 'class MyEdgeTest' },
+}
+
+async function mockApi(page: Page, options: { judging?: boolean; cli?: boolean } = {}) {
   await page.addInitScript(() => {
     localStorage.setItem('codedrill.session', JSON.stringify({ accessToken: 't', refreshToken: 'r', userId: 'u1', displayName: '시험' }))
   })
@@ -52,7 +61,8 @@ async function mockApi(page: Page, options: { judging?: boolean } = {}) {
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (path === '/projects/job-queue') return json(VIEW)
     if (path === '/projects/job-queue/draft') return route.fulfill({ status: 204 })
-    if (path === '/projects/submissions') return json(options.judging ? [] : [DONE])
+    if (path === '/projects/submissions') return json(options.judging ? [] : options.cli ? [{ ...FROM_CLI, files: null }, DONE] : [DONE])
+    if (path === '/projects/submissions/ps-cli') return json(FROM_CLI)
     if (path === '/projects/submissions/ps-1') return json(DONE)
     if (path === '/projects/job-queue/submissions')
       return json({ ...DONE, id: 'ps-2', status: 'LEASED', verdict: null, score: null, tests: [], hiddenPassed: null, hiddenTotal: null, probe: null })
@@ -146,4 +156,31 @@ test('작업 공간에 접근성 위반이 없다', async ({ page }) => {
   await expect(page.locator('.monaco-editor')).toBeVisible()
   const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).exclude('.monaco-editor').analyze()
   expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([])
+})
+
+test('CLI 로 낸 파일이 초안과 다르면 알리고, 그 제출로 초안을 바꿀 수 있다', async ({ page }) => {
+  await mockApi(page, { cli: true })
+  await page.goto('/projects/job-queue')
+  const banner = page.getByRole('status').filter({ hasText: 'MacBook-Pro (zsh) 에서 CLI 로 낸 파일이 웹 초안과 2곳 다릅니다' })
+  await expect(banner).toBeVisible()
+  const axe = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+  expect(axe.violations).toEqual([])
+
+  await banner.getByRole('button', { name: '달라진 것 보기' }).click()
+  const dialog = page.getByRole('dialog', { name: 'CLI 제출과 웹 초안의 차이' })
+  await expect(dialog.getByRole('listitem')).toHaveText(['src/queue/JobQueue.kt내용이 다름', 'tests/MyEdgeTest.kt제출에만 있음'])
+
+  await dialog.getByRole('button', { name: '이 제출로 초안 바꾸기' }).click()
+  await expect(banner).toBeHidden()
+  await expect(page.getByRole('button', { name: 'MyEdgeTest.kt', exact: true })).toBeVisible()
+})
+
+test('닫은 CLI 알림은 같은 제출로 다시 뜨지 않는다', async ({ page }) => {
+  await mockApi(page, { cli: true })
+  await page.goto('/projects/job-queue')
+  await page.getByRole('button', { name: '이 알림 닫기' }).click()
+  await expect(page.getByText('에서 CLI 로 낸 파일이')).toBeHidden()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '재시도가 있는 작업 큐' })).toBeVisible()
+  await expect(page.getByText('에서 CLI 로 낸 파일이')).toBeHidden()
 })

@@ -11,7 +11,7 @@ import {
 import type { ProjectDraft, ProjectSubmission, ProjectView } from '../../shared/types'
 import { useDraftSync } from '../workspace/useDraftSync'
 import { isKitOrBuildFile } from './kitFiles'
-import { firstFile } from './projectView'
+import { fileChanges, firstFile } from './projectView'
 
 /** 서버의 파일 한도(256KB)와 같다. 넘는 것은 어차피 제출이 거절된다. */
 const MAX_IMPORT_BYTES = 256 * 1024
@@ -38,6 +38,9 @@ export function useProjectWorkspace(id: string) {
   const [fromDraft, setFromDraft] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
+  /** 가장 최근 제출이 CLI 의 것이면 그 제출(파일 포함) — 웹 초안과 다를 수 있다 (디자인 시안 24) */
+  const [cliSubmission, setCliSubmission] = useState<ProjectSubmission | null>(null)
+  const [dismissedCli, setDismissedCli] = useState<string | null>(() => readDismissed(id))
   const poll = useRef<number | null>(null)
 
   const draftSync = useDraftSync<Record<string, string>, ProjectDraft>({
@@ -83,6 +86,37 @@ export function useProjectWorkspace(id: string) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, id])
+
+  // 기록의 맨 위가 CLI 제출이면 그 파일을 받아 둔다. 다른지는 그릴 때 견준다 — 초안을 고치면 배너도 따라 바뀐다.
+  const latest = history[0]
+  useEffect(() => {
+    if (!latest || latest.source !== 'CLI' || latest.id === dismissedCli) {
+      setCliSubmission(null)
+      return
+    }
+    if (cliSubmission?.id === latest.id) return
+    getProjectSubmission(latest.id)
+      .then((detail) => setCliSubmission(detail.files ? detail : null))
+      .catch(() => setCliSubmission(null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latest?.id, latest?.source, dismissedCli])
+
+  const cliChanges = cliSubmission?.files && project ? fileChanges(files, cliSubmission.files) : []
+
+  /** CLI 제출의 파일로 초안을 바꾼다 — 웹에서 이어 쓰려고. 다음 자동 저장이 초안에 적는다 */
+  const adoptCliSubmission = () => {
+    if (!cliSubmission?.files) return
+    setFiles(cliSubmission.files)
+    setCurrent((cur) => (cur && cliSubmission.files![cur] !== undefined ? cur : firstFile(cliSubmission.files!)))
+    setTouched(true)
+    dismissCli()
+  }
+
+  const dismissCli = () => {
+    if (!cliSubmission) return
+    setDismissedCli(cliSubmission.id)
+    writeDismissed(id, cliSubmission.id)
+  }
 
   const judging = result !== null && result.status !== 'COMPLETED'
 
@@ -192,6 +226,9 @@ export function useProjectWorkspace(id: string) {
   }
 
   return {
+    cli: cliSubmission && cliChanges.length > 0 ? { submission: cliSubmission, changes: cliChanges } : null,
+    adoptCliSubmission,
+    dismissCli,
     project,
     files,
     current,
@@ -212,5 +249,24 @@ export function useProjectWorkspace(id: string) {
     startOver,
     openSubmission,
     resolveConflict,
+  }
+}
+
+/** "이 CLI 제출은 봤다" — 같은 제출로 배너가 다시 뜨지 않게. 저장소가 막혀도 배너가 한 번 더 뜰 뿐이다 */
+const DISMISSED_KEY = (id: string) => `codedrill.project.${id}.cliDismissed`
+
+function readDismissed(id: string): string | null {
+  try {
+    return window.localStorage.getItem(DISMISSED_KEY(id))
+  } catch {
+    return null
+  }
+}
+
+function writeDismissed(id: string, submissionId: string) {
+  try {
+    window.localStorage.setItem(DISMISSED_KEY(id), submissionId)
+  } catch {
+    // 기억하지 못해도 동작은 같다
   }
 }

@@ -75,3 +75,27 @@ export function hiddenCells(passed: number | null, total: number | null): boolea
   const ok = Math.max(0, Math.min(passed ?? 0, total))
   return Array.from({ length: total }, (_, index) => index < ok)
 }
+
+/** 웹 초안과 CLI 제출을 견준 한 파일 (디자인 시안 24) */
+export interface FileChange {
+  path: string
+  /** added: 제출에만 있다 · modified: 내용이 다르다 · removed: 초안에만 있다(제출에 없다) */
+  change: 'added' | 'modified' | 'removed'
+}
+
+/**
+ * 웹 초안([draft])과 CLI 로 낸 파일([submitted])이 어디서 다른가. 줄 끝(CRLF·LF)은 같다고 본다 — Windows 에서
+ * 낸 파일이 줄마다 "다르다"고 뜨면 정말 다른 곳이 묻힌다.
+ */
+export function fileChanges(draft: Record<string, string>, submitted: Record<string, string>): FileChange[] {
+  const same = (a: string, b: string) => a.replace(/\r\n/g, '\n') === b.replace(/\r\n/g, '\n')
+  const changes: FileChange[] = []
+  for (const path of new Set([...Object.keys(draft), ...Object.keys(submitted)])) {
+    const mine = draft[path]
+    const theirs = submitted[path]
+    if (mine === undefined) changes.push({ path, change: 'added' })
+    else if (theirs === undefined) changes.push({ path, change: 'removed' })
+    else if (!same(mine, theirs)) changes.push({ path, change: 'modified' })
+  }
+  return changes.sort((a, b) => a.path.localeCompare(b.path))
+}
