@@ -168,9 +168,15 @@ class IdentitySecurityConfig(
     private val identity: IdentityService,
     private val json: ObjectMapper,
     private val sanctions: SanctionService,
+    private val properties: IdentityProperties,
 ) : WebMvcConfigurer {
 
     override fun addInterceptors(registry: InterceptorRegistry) {
+        // 낡은 CLI 는 로그인보다 먼저 거절한다 — 로그인조차 옛 규칙으로 할 수 있다
+        registry.addInterceptor(CliVersionInterceptor(properties.cliMinimumVersion, json))
+            .addPathPatterns("/api/v1/**")
+            .order(AUTHENTICATION_ORDER - 1)
+
         registry.addInterceptor(AuthInterceptor(identity, json, sanctions))
             // 사용자의 것: 제출·초안·자기 정보. 소유자만 열 수 있어야 한다.
             .addPathPatterns(

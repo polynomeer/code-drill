@@ -344,6 +344,8 @@ class IdentityService(
  */
 @ConfigurationProperties(prefix = "codedrill.auth")
 data class IdentityProperties(
+    /** 받는 CLI 의 최소 판 ([CliVersion]). 키트 형식이나 제출 규칙이 옛 CLI 와 어긋나게 바뀔 때 올린다 */
+    val cliMinimumVersion: String = "0.1.0",
     val accessTtl: Duration = Duration.ofMinutes(30),
     val refreshTtl: Duration = Duration.ofDays(14),
     /** 기기(CLI) 세션의 refresh 수명. 회전마다 다시 늘어나므로 "이만큼 안 쓰면 끊긴다"는 뜻이다 */

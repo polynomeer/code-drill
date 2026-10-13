@@ -48,6 +48,9 @@ const defaultServer = "http://localhost:8080"
 func main() {
 	if err := run(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "codedrill:", err)
+		if hint := upgradeHint(err); hint != "" {
+			fmt.Fprintln(os.Stderr, hint)
+		}
 		os.Exit(1)
 	}
 }
@@ -374,4 +377,15 @@ func printVerdict(s *api.Submission, out io.Writer) {
 	if s.Log != nil && *s.Log != "" && (s.Verdict == nil || *s.Verdict == "COMPILE_ERROR") {
 		fmt.Fprintf(out, "\n%s\n", *s.Log)
 	}
+}
+
+// upgradeHint 는 서버가 이 판을 받지 않을 때(426) 올리는 길을 말한다 — 깐 길마다 명령이 다르다.
+func upgradeHint(err error) string {
+	if api.Code(err) != "UPGRADE_REQUIRED" {
+		return ""
+	}
+	return `업그레이드:
+  brew upgrade --cask codedrill        # Homebrew
+  scoop update codedrill               # Scoop
+  curl -fsSL https://github.com/polynomeer/code-drill/releases/latest/download/install.sh | sh`
 }

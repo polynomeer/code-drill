@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -123,5 +124,24 @@ func TestSubmitSendsKeyAndVersion(t *testing.T) {
 	client.Session = &api.Session{AccessToken: "a"}
 	if s, err := client.Submit("job-queue", 3, map[string]string{"a": "b"}); err != nil || s.ID != "ps-1" {
 		t.Fatalf("%v %v", s, err)
+	}
+}
+
+// 서버가 판을 받지 않으면(426) 업그레이드 길을 말한다.
+func TestUpgradeHint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("User-Agent"), "codedrill/") {
+			t.Errorf("User-Agent 에 판을 실어야 한다: %q", r.Header.Get("User-Agent"))
+		}
+		w.WriteHeader(426)
+		json.NewEncoder(w).Encode(map[string]string{"errorCode": "UPGRADE_REQUIRED", "message": "codedrill 0.2.0 이상이 필요하다"})
+	}))
+	defer server.Close()
+	_, err := api.New(server.URL, userAgent()).Me()
+	if hint := upgradeHint(err); !strings.Contains(hint, "brew upgrade") || !strings.Contains(err.Error(), "0.2.0") {
+		t.Fatalf("%v / %q", err, hint)
+	}
+	if upgradeHint(errors.New("다른 오류")) != "" {
+		t.Fatal("다른 오류에는 말하지 않는다")
 	}
 }

@@ -23,6 +23,8 @@ enum class ErrorCode(val category: Category, val retry: Retry) {
     ACCESS_DENIED(Category.AUTH, Retry.AFTER_FIX),
     /** 기기 승인 — 코드가 만료됐거나 이미 썼다. 처음부터 다시 */
     DEVICE_CODE_EXPIRED(Category.AUTH, Retry.AFTER_FIX),
+    /** CLI 가 서버가 받는 최소 판보다 낡았다 (426). 업그레이드한 뒤 다시 한다 */
+    UPGRADE_REQUIRED(Category.POLICY, Retry.AFTER_FIX),
 
     LANGUAGE_NOT_ALLOWED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),
     QUOTA_EXCEEDED(Category.POLICY, Retry.AFTER_POLICY_WINDOW),

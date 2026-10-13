@@ -43,3 +43,9 @@ go run . help
 태그를 쓰지 않으므로 `v*` 는 CLI 의 것이다. Homebrew 탭·Scoop 버킷은 `polynomeer/homebrew-tap`(`Casks/`),
 `polynomeer/scoop-bucket`(`bucket/`)에 쓴다. 두 저장소에 Contents 쓰기 권한만 있는 fine-grained 토큰을
 이 저장소의 `TAP_GITHUB_TOKEN` 비밀로 넣어야 올라간다 — 없으면 Releases 만.
+
+## 최소 판
+
+서버는 `User-Agent: codedrill/<판>` 을 보고, `CLI_MINIMUM_VERSION`(기본 `0.1.0`)보다 낮은 CLI 에 426
+`UPGRADE_REQUIRED` 를 돌려준다(`CliVersion`). CLI 는 그때 업그레이드 명령을 보인다. 키트 형식이나 제출 규칙을
+옛 CLI 와 어긋나게 바꿀 때 — 새 판을 릴리스한 **뒤에** — 올린다. 판을 읽을 수 없는 것(`dev` 빌드)은 막지 않는다.
