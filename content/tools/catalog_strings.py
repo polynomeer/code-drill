@@ -1801,3 +1801,135 @@ fun longestKRepeating(s: String, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 모음만 뒤집기 -------------------------------------------------------------
+
+def _reverse_vowels(s):
+    chars = list(s)
+    vowels = set("aeiouAEIOU")
+    i, j = 0, len(chars) - 1
+    while i < j:
+        if chars[i] not in vowels:
+            i += 1
+        elif chars[j] not in vowels:
+            j -= 1
+        else:
+            chars[i], chars[j] = chars[j], chars[i]
+            i += 1
+            j -= 1
+    return "".join(chars)
+
+
+def _sentence(n, salt):
+    alphabet = "aAbBcdeEfghiIjklmnoOpqrstuUvwxyYz  .,!"
+    return "".join(alphabet[v] for v in randoms(n, 0, len(alphabet) - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="reverse-vowels",
+    title="모음만 뒤집기",
+    summary="""
+문자열 `s` 에서 모음(`a e i o u` 와 대문자 `A E I O U`)만 순서를 뒤집고, 나머지 글자는 제자리에 둔 문자열을 반환한다.
+""",
+    notes="""
+양 끝에서 포인터 둘이 안쪽으로 온다. 왼쪽 포인터는 모음을 만날 때까지, 오른쪽 포인터도 모음을 만날 때까지 움직이고, 둘 다
+모음이면 맞바꾼 뒤 한 칸씩 안으로 간다. 포인터가 만나면 끝난다 — 글자 배열 하나 안에서 제자리로 한다.
+
+대문자 모음도 모음이고, `y` 는 모음이 아니다.
+""",
+    drill_doc="""
+Drill.swap(i, j)   // 두 모음을 맞바꿨다
+""",
+    constraints="""
+- `1 <= s.length <= 200_000`, `s` 는 출력 가능한 ASCII 글자(공백 포함)로 이뤄진다
+""",
+    signature=dict(name="reverseVowels", parameters=[("s", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_reverse_vowels,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", ["hello"]), ("02", ["leetcode"])],
+        "boundary": [
+            ("01-single-vowel", ["a"]),
+            ("02-no-vowels", ["rhythm"]),
+            # 대문자 모음도 모음이다.
+            ("03-mixed-case", ["Ab cdE"]),
+            ("04-all-vowels", ["aeiou"]),
+            # y 는 모음이 아니다.
+            ("05-y-stays", ["yay oy"]),
+            ("06-punctuation", ["a.b,E!"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_sentence(30, salt=10659)]),
+            ("02-random-large", [_sentence(200_000, salt=10661)]),
+            ("03-odd-vowel-count", ["xaxexix"]),
+            ("04-long-consonants", ["b" * 100_000 + "aE" + "c" * 99_998]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 양 끝의 포인터가 모음에서 멈추면 맞바꾸고 안으로 온다.
+fun reverseVowels(s: String): String {
+    val chars = s.toCharArray()
+    fun vowel(c: Char) = c in "aeiouAEIOU"
+    var i = 0
+    var j = chars.size - 1
+    while (i < j) {
+        when {
+            !vowel(chars[i]) -> i += 1
+            !vowel(chars[j]) -> j -= 1
+            else -> {
+                val t = chars[i]; chars[i] = chars[j]; chars[j] = t
+                Drill.swap(i, j)
+                i += 1; j -= 1
+            }
+        }
+    }
+    return String(chars)
+}
+""",
+    mutants=[
+        ("lowercase-only", "MISSING_EDGE_CASE",
+         "소문자 모음만 본다. 대문자 모음도 모음이다.",
+         """
+fun reverseVowels(s: String): String {
+    val chars = s.toCharArray()
+    fun vowel(c: Char) = c in "aeiou"
+    var i = 0; var j = chars.size - 1
+    while (i < j) {
+        if (!vowel(chars[i])) i += 1 else if (!vowel(chars[j])) j -= 1 else { val t = chars[i]; chars[i] = chars[j]; chars[j] = t; i += 1; j -= 1 }
+    }
+    return String(chars)
+}
+"""),
+        ("y-is-a-vowel", "WRONG_BRANCH",
+         "y 도 모음으로 본다. 모음은 a e i o u 뿐이다.",
+         """
+fun reverseVowels(s: String): String {
+    val chars = s.toCharArray()
+    fun vowel(c: Char) = c in "aeiouyAEIOUY"
+    var i = 0; var j = chars.size - 1
+    while (i < j) {
+        if (!vowel(chars[i])) i += 1 else if (!vowel(chars[j])) j -= 1 else { val t = chars[i]; chars[i] = chars[j]; chars[j] = t; i += 1; j -= 1 }
+    }
+    return String(chars)
+}
+"""),
+        ("reverses-everything", "WRONG_ALGORITHM",
+         "문자열 전체를 뒤집는다. 모음만 자리를 바꾼다.",
+         """
+fun reverseVowels(s: String): String = s.reversed()
+"""),
+        ("first-and-last-only", "WRONG_BRANCH",
+         "처음 모음과 마지막 모음만 맞바꾼다. 안쪽 모음들도 차례로 바꿔야 한다.",
+         """
+fun reverseVowels(s: String): String {
+    val chars = s.toCharArray()
+    fun vowel(c: Char) = c in "aeiouAEIOU"
+    val i = chars.indexOfFirst { vowel(it) }; val j = chars.indexOfLast { vowel(it) }
+    if (i in 0 until j) { val t = chars[i]; chars[i] = chars[j]; chars[j] = t }
+    return String(chars)
+}
+"""),
+    ],
+))

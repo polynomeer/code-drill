@@ -8766,3 +8766,350 @@ fun minHeightRoots(n: Int, edges: IntArray): IntArray {
 """),
     ],
 ))
+
+
+# --- 가장 넓은 길 --------------------------------------------------------------
+
+def _widest_path(n, edges, s, t):
+    order = sorted(range(0, len(edges), 3), key=lambda i: -edges[i + 2])
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in order:
+        parent[find(edges[i])] = find(edges[i + 1])
+        if find(s) == find(t):
+            return edges[i + 2]
+    return -1
+
+
+def _road_network(n, m, salt, connect=True):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    edges = []
+    for _ in range(m):
+        u, v = source.sample(range(n), 2)
+        edges.append((u, v, source.randint(1, 1_000_000_000)))
+    if connect:
+        order = list(range(n))
+        source.shuffle(order)
+        for i in range(n - 1):
+            edges.append((order[i], order[i + 1], source.randint(1, 1000)))
+    source.shuffle(edges)
+    s, t = source.sample(range(n), 2)
+    return [n, flat(list(e) for e in edges), s, t]
+
+
+PROBLEMS.append(Problem(
+    id="widest-path",
+    title="가장 넓은 길",
+    summary="""
+정점 `0..n-1` 의 **방향 없는** 그래프가 간선 `edges = [u1, v1, w1, ...]` 로 주어진다 — `w` 는 그 길로 한 번에 실어 나를 수 있는
+무게(폭)다. 길의 폭은 그 길에 든 간선 폭의 최솟값이다. `s` 에서 `t` 로 가는 길 가운데 폭이 가장 큰 길의 폭을 반환한다. 길이
+없으면 `-1` 이다.
+""",
+    notes="""
+간선을 폭이 큰 것부터 하나씩 그래프에 넣는다고 하자. `s` 와 `t` 가 처음 이어지는 순간 넣은 간선의 폭이 답이다 — 그때까지 넣은
+간선은 모두 그 폭 이상이니 그 폭의 길이 있고, 그보다 큰 폭만으로는 이어지지 않았다. 이어졌는지는 유니온 파인드로 본다(크루스칼과
+같은 순서다).
+
+다익스트라를 고쳐 "지금까지의 최솟값이 가장 큰 정점"부터 꺼내도 같은 답이다. 길이를 더하는 다익스트라는 다른 문제다.
+""",
+    drill_doc="""
+Drill.edge("u", "v")   // 이 간선을 넣었다
+""",
+    constraints="""
+- `2 <= n <= 100_000`, 간선은 `1..200_000` 개, `u != v`
+- `1 <= w <= 10^9`, `s != t`
+""",
+    signature=dict(name="widestPath",
+                   parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("s", "INT"), ("t", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_widest_path,
+    cases={
+        "sample": [
+            ("01", [4, [0, 1, 5, 1, 3, 3, 0, 2, 4, 2, 3, 4], 0, 3]),
+            ("02", [3, [0, 1, 7], 0, 2]),
+        ],
+        "boundary": [
+            ("01-one-edge", [2, [0, 1, 9], 0, 1]),
+            ("02-direct-is-narrow", [3, [0, 2, 1, 0, 1, 10, 1, 2, 10], 0, 2]),
+            # 방향이 없다 — 간선은 양쪽으로 쓴다.
+            ("03-edge-given-backwards", [3, [1, 0, 5, 2, 1, 6], 0, 2]),
+            ("04-parallel-edges", [2, [0, 1, 3, 1, 0, 8, 0, 1, 5], 0, 1]),
+            ("05-huge-widths", [3, [0, 1, 1_000_000_000, 1, 2, 999_999_999], 0, 2]),
+            # 길이를 더하는 최단 경로와 폭이 가장 큰 길은 다르다.
+            ("06-short-vs-wide", [4, [0, 3, 2, 0, 1, 9, 1, 2, 9, 2, 3, 9], 0, 3]),
+        ],
+        "hidden": [
+            ("01-random-small", _road_network(8, 10, salt=10679)),
+            ("02-random-medium", _road_network(2000, 5000, salt=10681)),
+            ("03-disconnected", _road_network(3000, 1000, salt=10683, connect=False)),
+        ],
+        # 폭마다 그 폭 이상의 간선으로 BFS 를 다시 하면 간선 × 서로 다른 폭이다.
+        "performance": [
+            ("01-random-large", _road_network(100_000, 100_000, salt=10685)),
+            ("02-chain-only", _road_network(100_000, 1, salt=10687)),
+            ("03-dense-ish", _road_network(30_000, 170_000, salt=10689)),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 간선을 폭이 큰 것부터 유니온 파인드에 넣고, s 와 t 가 처음 이어지는 간선의 폭을 낸다.
+fun widestPath(n: Int, edges: IntArray, s: Int, t: Int): Int {
+    val m = edges.size / 3
+    // (폭, 간선 번호)를 Long 하나에 담아 기본형 배열로 정렬한다 — 상자에 담긴 정수 20 만 개를 정렬하는 것보다 훨씬 가볍다
+    val keys = LongArray(m) { (edges[3 * it + 2].toLong() shl 20) or it.toLong() }
+    keys.sort()
+    val order = IntArray(m) { (keys[m - 1 - it] and 0xFFFFF).toInt() }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    for (e in order) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]
+        val ru = find(u); val rv = find(v)
+        if (ru != rv) { parent[ru] = rv; Drill.edge(u.toString(), v.toString()) }
+        if (find(s) == find(t)) return edges[3 * e + 2]
+    }
+    return -1
+}
+""",
+    mutants=[
+        ("narrowest-first", "WRONG_BRANCH",
+         "폭이 작은 것부터 넣는다. 그러면 s 와 t 가 이어지는 순간의 폭은 가장 좁은 길의 가장 넓은 간선이다.",
+         """
+fun widestPath(n: Int, edges: IntArray, s: Int, t: Int): Int {
+    val m = edges.size / 3
+    val order = (0 until m).sortedBy { edges[3 * it + 2] }
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }; return r }
+    for (e in order) { parent[find(edges[3 * e])] = find(edges[3 * e + 1]); if (find(s) == find(t)) return edges[3 * e + 2] }
+    return -1
+}
+"""),
+        ("shortest-path-width", "WRONG_ALGORITHM",
+         "길이(폭의 합)가 가장 짧은 길을 찾고 그 길의 폭을 낸다. 짧은 길이 넓은 길은 아니다.",
+         """
+fun widestPath(n: Int, edges: IntArray, s: Int, t: Int): Int {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (e in 0 until edges.size / 3) { adj[edges[3 * e]].add(intArrayOf(edges[3 * e + 1], edges[3 * e + 2])); adj[edges[3 * e + 1]].add(intArrayOf(edges[3 * e], edges[3 * e + 2])) }
+    val dist = LongArray(n) { Long.MAX_VALUE }; val width = IntArray(n)
+    dist[s] = 0; width[s] = Int.MAX_VALUE
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] }); heap.add(longArrayOf(0, s.toLong()))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1].toInt()
+        if (top[0] != dist[u]) continue
+        for (edge in adj[u]) {
+            val v = edge[0]; val d = dist[u] + edge[1]
+            if (d < dist[v]) { dist[v] = d; width[v] = minOf(width[u], edge[1]); heap.add(longArrayOf(d, v.toLong())) }
+        }
+    }
+    return if (dist[t] == Long.MAX_VALUE) -1 else width[t]
+}
+"""),
+        ("one-way-edges", "WRONG_BRANCH",
+         "간선을 u → v 한쪽으로만 쓴다. 그래프는 방향이 없다.",
+         """
+fun widestPath(n: Int, edges: IntArray, s: Int, t: Int): Int {
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (e in 0 until edges.size / 3) adj[edges[3 * e]].add(intArrayOf(edges[3 * e + 1], edges[3 * e + 2]))
+    val best = IntArray(n) { -1 }; best[s] = Int.MAX_VALUE
+    val heap = java.util.PriorityQueue<IntArray>(compareByDescending { it[0] }); heap.add(intArrayOf(Int.MAX_VALUE, s))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1]
+        if (top[0] != best[u]) continue
+        for (edge in adj[u]) { val w = minOf(best[u], edge[1]); if (w > best[edge[0]]) { best[edge[0]] = w; heap.add(intArrayOf(w, edge[0])) } }
+    }
+    return best[t]
+}
+"""),
+        ("bfs-per-width", "PERFORMANCE",
+         "서로 다른 폭마다 그 폭 이상의 간선만으로 BFS 를 다시 한다. 맞지만, 간선 × 서로 다른 폭이다.",
+         """
+fun widestPath(n: Int, edges: IntArray, s: Int, t: Int): Int {
+    val m = edges.size / 3
+    val widths = (0 until m).map { edges[3 * it + 2] }.distinct().sortedDescending()
+    val adj = Array(n) { ArrayList<IntArray>() }
+    for (e in 0 until m) { adj[edges[3 * e]].add(intArrayOf(edges[3 * e + 1], edges[3 * e + 2])); adj[edges[3 * e + 1]].add(intArrayOf(edges[3 * e], edges[3 * e + 2])) }
+    val seen = IntArray(n) { -1 }
+    val queue = IntArray(n)
+    for ((round, w) in widths.withIndex()) {
+        var head = 0; var tail = 0
+        queue[tail++] = s; seen[s] = round
+        while (head < tail) {
+            val u = queue[head++]
+            for (edge in adj[u]) if (edge[1] >= w && seen[edge[0]] != round) { seen[edge[0]] = round; queue[tail++] = edge[0] }
+        }
+        if (seen[t] == round) return w
+    }
+    return -1
+}
+"""),
+    ],
+))
+
+
+# --- 위상 순서의 수 ------------------------------------------------------------
+
+def _topological_orders(n, edges):
+    need = [0] * n
+    for i in range(0, len(edges), 2):
+        need[edges[i + 1]] |= 1 << edges[i]
+    ways = [0] * (1 << n)
+    ways[0] = 1
+    for mask in range(1 << n):
+        if not ways[mask]:
+            continue
+        for v in range(n):
+            if not mask >> v & 1 and need[v] & mask == need[v]:
+                ways[mask | 1 << v] = (ways[mask | 1 << v] + ways[mask]) % 1_000_000_007
+    return ways[(1 << n) - 1]
+
+
+def _small_dag(n, m, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    order = list(range(n))
+    source.shuffle(order)
+    edges = set()
+    while len(edges) < m:
+        i, j = sorted(source.sample(range(n), 2))
+        edges.add((order[i], order[j]))
+    return flat(list(e) for e in sorted(edges))
+
+
+PROBLEMS.append(Problem(
+    id="topological-orders-count",
+    title="위상 순서의 수",
+    summary="""
+정점 `0..n-1` 의 방향 비순환 그래프(DAG)가 간선 `edges = [u1, v1, u2, v2, ...]` 로 주어진다(`u` 가 `v` 보다 먼저). 모든 간선을
+지키는 정점의 순서(위상 순서)가 몇 가지인지 `1_000_000_007` 로 나눈 나머지로 반환한다.
+""",
+    notes="""
+순서를 하나씩 만들어 가면 그 수만큼 걸린다 — 간선이 없으면 `18!` 이다. 대신 "이미 놓은 정점의 집합"만 기억한다: 집합 `S` 를
+놓는 방법의 수를 `ways[S]` 라 하면, `S` 에 없는 정점 `v` 의 앞선 정점이 모두 `S` 안에 있을 때 `v` 를 다음에 놓을 수 있고
+`ways[S ∪ {v}]` 에 `ways[S]` 를 더한다. 정점마다 앞선 정점의 집합을 비트로 미리 만들어 두면 확인은 비트 연산 한 번이다.
+
+Kahn 알고리즘으로 하나의 순서를 만들며 매번 고를 수 있는 정점의 수를 곱하는 것은 틀린다 — 무엇을 골랐느냐에 따라 다음에 고를
+수 있는 정점의 수가 달라진다.
+""",
+    drill_doc="""
+Drill.write(mask, ways)   // 이 집합을 놓는 방법의 수
+""",
+    constraints="""
+- `1 <= n <= 18`, 간선은 `0..153` 개, `u != v`, 같은 간선은 한 번만, 순환이 없다
+""",
+    signature=dict(name="topologicalOrdersCount", parameters=[("n", "INT"), ("edges", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_topological_orders,
+    cases={
+        "sample": [("01", [3, [0, 1]]), ("02", [4, [0, 1, 0, 2, 1, 3, 2, 3]])],
+        "boundary": [
+            ("01-single", [1, []]),
+            ("02-chain", [5, [0, 1, 1, 2, 2, 3, 3, 4]]),
+            ("03-no-edges", [5, []]),
+            # 매번 고를 수 있는 수를 곱하면 틀리는 모양.
+            ("04-uneven-branches", [4, [0, 1, 2, 3]]),
+            ("05-star-out", [5, [0, 1, 0, 2, 0, 3, 0, 4]]),
+            # 순서가 Int 를 넘는다 — 나머지를 취하는 곳.
+            ("06-no-edges-large", [13, []]),
+        ],
+        "hidden": [
+            ("01-random-small", [6, _small_dag(6, 5, salt=10691)]),
+            ("02-random-medium", [12, _small_dag(12, 20, salt=10693)]),
+            ("03-sparse-18", [18, _small_dag(18, 12, salt=10695)]),
+        ],
+        # 순서를 하나씩 만들면 답만큼 걸린다 — 간선이 거의 없으면 수조다.
+        "performance": [
+            ("01-no-edges-18", [18, []]),
+            ("02-few-edges-18", [18, _small_dag(18, 5, salt=10697)]),
+            ("03-two-chains", [18, flat([[i, i + 1] for i in range(8)] + [[i, i + 1] for i in range(9, 17)])]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 놓은 정점의 집합마다 방법의 수 — 앞선 정점이 모두 놓인 정점을 다음에 놓는다.
+fun topologicalOrdersCount(n: Int, edges: IntArray): Int {
+    val mod = 1_000_000_007L
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    val ways = LongArray(1 shl n)
+    ways[0] = 1
+    for (mask in 0 until (1 shl n)) {
+        if (ways[mask] == 0L) continue
+        for (v in 0 until n) {
+            if (mask shr v and 1 == 0 && need[v] and mask == need[v]) {
+                val next = mask or (1 shl v)
+                ways[next] = (ways[next] + ways[mask]) % mod
+            }
+        }
+    }
+    Drill.write(0, ways[(1 shl n) - 1].toInt())
+    return ways[(1 shl n) - 1].toInt()
+}
+""",
+    mutants=[
+        ("factorial", "WRONG_ALGORITHM",
+         "간선을 무시하고 n! 을 낸다. 간선이 순서를 줄인다.",
+         """
+fun topologicalOrdersCount(n: Int, edges: IntArray): Int {
+    var f = 1L
+    for (i in 2..n) f = f * i % 1_000_000_007
+    return f.toInt()
+}
+"""),
+        ("multiplies-choices", "WRONG_ALGORITHM",
+         "Kahn 알고리즘으로 순서 하나를 만들며 매번 고를 수 있는 정점의 수를 곱한다. 무엇을 고르느냐에 따라 다음 선택지가 달라진다.",
+         """
+fun topologicalOrdersCount(n: Int, edges: IntArray): Int {
+    val indegree = IntArray(n); val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); indegree[edges[i + 1]] += 1 }
+    val ready = java.util.ArrayDeque<Int>()
+    for (v in 0 until n) if (indegree[v] == 0) ready.add(v)
+    var total = 1L
+    while (ready.isNotEmpty()) {
+        total = total * ready.size % 1_000_000_007
+        val v = ready.poll()
+        for (u in adj[v]) { indegree[u] -= 1; if (indegree[u] == 0) ready.add(u) }
+    }
+    return total.toInt()
+}
+"""),
+        ("int-counts", "MISSING_EDGE_CASE",
+         "방법의 수를 나머지 없이 Int 로 더한다. 13! 부터 Int 를 넘는다.",
+         """
+fun topologicalOrdersCount(n: Int, edges: IntArray): Int {
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    val ways = IntArray(1 shl n); ways[0] = 1
+    for (mask in 0 until (1 shl n)) {
+        if (ways[mask] == 0) continue
+        for (v in 0 until n) if (mask shr v and 1 == 0 && need[v] and mask == need[v]) ways[mask or (1 shl v)] += ways[mask]
+    }
+    return ways[(1 shl n) - 1]
+}
+"""),
+        ("enumerates-orders", "PERFORMANCE",
+         "순서를 하나씩 만들어 센다. 맞지만, 답만큼 걸린다 — 간선이 없으면 18! 이다.",
+         """
+fun topologicalOrdersCount(n: Int, edges: IntArray): Int {
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    var count = 0L
+    fun go(mask: Int) {
+        if (mask == (1 shl n) - 1) { count = (count + 1) % 1_000_000_007; return }
+        for (v in 0 until n) if (mask shr v and 1 == 0 && need[v] and mask == need[v]) go(mask or (1 shl v))
+    }
+    go(0)
+    return count.toInt()
+}
+"""),
+    ],
+))

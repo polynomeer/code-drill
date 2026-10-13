@@ -3011,3 +3011,282 @@ fun inequalityPairs(nums1: IntArray, nums2: IntArray, diff: Int): Int {
 """),
     ],
 ))
+
+
+# --- 늘어나는 세 수 세기 -------------------------------------------------------
+
+def _increasing_triplets(nums):
+    """가운데 원소마다 (왼쪽의 더 작은 수) × (오른쪽의 더 큰 수). 펜윅 트리로 센다 — 코틀린 정답(병합 정렬)과 다른 길이다."""
+    values = sorted(set(nums))
+    rank = {v: i + 1 for i, v in enumerate(values)}
+    m = len(values)
+
+    def query(tree, i):
+        s = 0
+        while i > 0:
+            s += tree[i]
+            i -= i & -i
+        return s
+
+    def add(tree, i):
+        while i <= m:
+            tree[i] += 1
+            i += i & -i
+
+    tree = [0] * (m + 1)
+    left = []
+    for v in nums:
+        left.append(query(tree, rank[v] - 1))
+        add(tree, rank[v])
+    tree = [0] * (m + 1)
+    right = [0] * len(nums)
+    seen = 0
+    for k in range(len(nums) - 1, -1, -1):
+        v = nums[k]
+        right[k] = seen - query(tree, rank[v])
+        add(tree, rank[v])
+        seen += 1
+    return sum(l * r for l, r in zip(left, right)) % 1_000_000_007
+
+
+PROBLEMS.append(Problem(
+    id="increasing-triplets-count",
+    title="늘어나는 세 수 세기",
+    summary="""
+정수 배열 `nums` 에서 `i < j < k` 이고 `nums[i] < nums[j] < nums[k]` 인 세 자리 `(i, j, k)` 의 수를 `1_000_000_007` 로 나눈
+나머지로 반환한다.
+""",
+    notes="""
+가운데 `j` 를 정하면 세 쌍의 수는 (`j` 왼쪽에서 `nums[j]` 보다 **작은** 수의 개수) × (`j` 오른쪽에서 `nums[j]` 보다 **큰** 수의
+개수)다. 두 개수를 원소마다 구하면 된다.
+
+원소마다 "왼쪽에서 나보다 작은 수"를 세는 것은 뒤집힌 쌍 세기와 같은 틀이다 — 병합 정렬로 (값, 원래 자리)를 정렬하며, 오른쪽
+반의 원소가 내려갈 때 그보다 작은 왼쪽 반 원소가 이미 몇 개 내려갔는지 더한다. 같은 값은 작은 것이 아니다. 오른쪽에서 더 큰
+수도 같은 방법으로 센다.
+
+세 쌍은 10^15 까지 가므로 `Long` 으로 곱하고 더한다.
+""",
+    drill_doc="""
+Drill.write(j, left[j])   // j 왼쪽의 더 작은 수
+""",
+    constraints="""
+- `1 <= nums.size <= 200_000`
+- `-10^9 <= nums[i] <= 10^9`
+""",
+    signature=dict(name="increasingTripletsCount", parameters=[("nums", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_increasing_triplets,
+    cases={
+        "sample": [("01", [[1, 2, 3, 4]]), ("02", [[4, 1, 3, 2, 5]])],
+        "boundary": [
+            ("01-too-short", [[1, 2]]),
+            ("02-decreasing", [[5, 4, 3, 2, 1]]),
+            # 같은 값은 늘어나는 것이 아니다.
+            ("03-duplicates", [[1, 1, 2, 2, 3, 3]]),
+            ("04-all-equal", [[7, 7, 7, 7]]),
+            ("05-extremes", [[-1_000_000_000, 0, 1_000_000_000]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 1, 6, salt=10671)]),
+            ("02-random-medium", [randoms(3000, -50, 50, salt=10673)]),
+            # 세 쌍의 수가 Int 를 한참 넘는다.
+            ("03-increasing", [list(range(5000))]),
+        ],
+        # 가운데마다 양쪽을 다 세면 n² — 20 만이면 400 억 번의 비교다.
+        "performance": [
+            ("01-random-large", [randoms(200_000, -1_000_000_000, 1_000_000_000, salt=10675)]),
+            ("02-increasing-large", [list(range(200_000))]),
+            ("03-few-values", [randoms(200_000, 1, 10, salt=10677)]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 병합 정렬로 원소마다 왼쪽의 더 작은 수와 오른쪽의 더 큰 수를 센다. 가운데마다 둘을 곱해 더한다.
+fun increasingTripletsCount(nums: IntArray): Int {
+    val n = nums.size
+    // 자리 배열을 값으로 병합 정렬하며, 오른쪽 반의 자리가 내려갈 때 이미 내려간 왼쪽 반(더 작은 값)의 수를 더한다
+    fun smallerOnTheLeft(values: IntArray): LongArray {
+        val counts = LongArray(n)
+        var order = IntArray(n) { it }
+        var buffer = IntArray(n)
+        var width = 1
+        while (width < n) {
+            var low = 0
+            while (low < n) {
+                val mid = minOf(low + width, n); val high = minOf(low + 2 * width, n)
+                var a = low; var b = mid; var k = low
+                while (a < mid || b < high) {
+                    // 같은 값이면 오른쪽 반을 먼저 내린다 — 같은 값은 더 작은 것으로 세지 않는다
+                    if (b < high && (a >= mid || values[order[b]] <= values[order[a]])) {
+                        counts[order[b]] += (a - low).toLong()
+                        buffer[k++] = order[b++]
+                    } else {
+                        buffer[k++] = order[a++]
+                    }
+                }
+                low += 2 * width
+            }
+            val t = order; order = buffer; buffer = t
+            width *= 2
+        }
+        return counts
+    }
+    val left = smallerOnTheLeft(nums)
+    // 오른쪽의 더 큰 수 = 뒤집고 부호를 바꾼 배열에서 왼쪽의 더 작은 수
+    val mirrored = IntArray(n) { -nums[n - 1 - it] }
+    val rightMirrored = smallerOnTheLeft(mirrored)
+    var total = 0L
+    for (j in 0 until n) {
+        total = (total + left[j] % 1_000_000_007 * (rightMirrored[n - 1 - j] % 1_000_000_007)) % 1_000_000_007
+        Drill.write(j, left[j].toInt())
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("equal-counts-as-smaller", "OFF_BY_ONE",
+         "같은 값도 더 작은 것으로 센다. 늘어나는 세 수는 순증가다.",
+         """
+fun increasingTripletsCount(nums: IntArray): Int {
+    val n = nums.size
+    // 자리 배열을 값으로 병합 정렬하며, 오른쪽 반의 자리가 내려갈 때 이미 내려간 왼쪽 반(더 작은 값)의 수를 더한다
+    fun smallerOnTheLeft(values: IntArray): LongArray {
+        val counts = LongArray(n)
+        var order = IntArray(n) { it }
+        var buffer = IntArray(n)
+        var width = 1
+        while (width < n) {
+            var low = 0
+            while (low < n) {
+                val mid = minOf(low + width, n); val high = minOf(low + 2 * width, n)
+                var a = low; var b = mid; var k = low
+                while (a < mid || b < high) {
+                    // 같은 값이면 오른쪽 반을 먼저 내린다 — 같은 값은 더 작은 것으로 세지 않는다
+                    if (b < high && (a >= mid || values[order[b]] < values[order[a]])) {
+                        counts[order[b]] += (a - low).toLong()
+                        buffer[k++] = order[b++]
+                    } else {
+                        buffer[k++] = order[a++]
+                    }
+                }
+                low += 2 * width
+            }
+            val t = order; order = buffer; buffer = t
+            width *= 2
+        }
+        return counts
+    }
+    val left = smallerOnTheLeft(nums)
+    // 오른쪽의 더 큰 수 = 뒤집고 부호를 바꾼 배열에서 왼쪽의 더 작은 수
+    val mirrored = IntArray(n) { -nums[n - 1 - it] }
+    val rightMirrored = smallerOnTheLeft(mirrored)
+    var total = 0L
+    for (j in 0 until n) {
+        total = (total + left[j] % 1_000_000_007 * (rightMirrored[n - 1 - j] % 1_000_000_007)) % 1_000_000_007
+        Drill.write(j, left[j].toInt())
+    }
+    return total.toInt()
+}
+"""),
+        ("int-product", "MISSING_EDGE_CASE",
+         "두 개수의 곱과 합을 Int 로 한다. 세 쌍은 10^15 까지 가서 넘친다.",
+         """
+fun increasingTripletsCount(nums: IntArray): Int {
+    val n = nums.size
+    // 자리 배열을 값으로 병합 정렬하며, 오른쪽 반의 자리가 내려갈 때 이미 내려간 왼쪽 반(더 작은 값)의 수를 더한다
+    fun smallerOnTheLeft(values: IntArray): LongArray {
+        val counts = LongArray(n)
+        var order = IntArray(n) { it }
+        var buffer = IntArray(n)
+        var width = 1
+        while (width < n) {
+            var low = 0
+            while (low < n) {
+                val mid = minOf(low + width, n); val high = minOf(low + 2 * width, n)
+                var a = low; var b = mid; var k = low
+                while (a < mid || b < high) {
+                    // 같은 값이면 오른쪽 반을 먼저 내린다 — 같은 값은 더 작은 것으로 세지 않는다
+                    if (b < high && (a >= mid || values[order[b]] <= values[order[a]])) {
+                        counts[order[b]] += (a - low).toLong()
+                        buffer[k++] = order[b++]
+                    } else {
+                        buffer[k++] = order[a++]
+                    }
+                }
+                low += 2 * width
+            }
+            val t = order; order = buffer; buffer = t
+            width *= 2
+        }
+        return counts
+    }
+    val left = smallerOnTheLeft(nums)
+    // 오른쪽의 더 큰 수 = 뒤집고 부호를 바꾼 배열에서 왼쪽의 더 작은 수
+    val mirrored = IntArray(n) { -nums[n - 1 - it] }
+    val rightMirrored = smallerOnTheLeft(mirrored)
+    var total = 0
+    for (j in 0 until n) total = (total + left[j].toInt() * rightMirrored[n - 1 - j].toInt()) % 1_000_000_007
+    return total
+}
+"""),
+        ("larger-on-the-left", "WRONG_BRANCH",
+         "오른쪽의 더 큰 수 대신 왼쪽의 더 큰 수를 센다. 세 번째 수는 가운데보다 오른쪽에 있다.",
+         """
+fun increasingTripletsCount(nums: IntArray): Int {
+    val n = nums.size
+    // 자리 배열을 값으로 병합 정렬하며, 오른쪽 반의 자리가 내려갈 때 이미 내려간 왼쪽 반(더 작은 값)의 수를 더한다
+    fun smallerOnTheLeft(values: IntArray): LongArray {
+        val counts = LongArray(n)
+        var order = IntArray(n) { it }
+        var buffer = IntArray(n)
+        var width = 1
+        while (width < n) {
+            var low = 0
+            while (low < n) {
+                val mid = minOf(low + width, n); val high = minOf(low + 2 * width, n)
+                var a = low; var b = mid; var k = low
+                while (a < mid || b < high) {
+                    // 같은 값이면 오른쪽 반을 먼저 내린다 — 같은 값은 더 작은 것으로 세지 않는다
+                    if (b < high && (a >= mid || values[order[b]] <= values[order[a]])) {
+                        counts[order[b]] += (a - low).toLong()
+                        buffer[k++] = order[b++]
+                    } else {
+                        buffer[k++] = order[a++]
+                    }
+                }
+                low += 2 * width
+            }
+            val t = order; order = buffer; buffer = t
+            width *= 2
+        }
+        return counts
+    }
+    val left = smallerOnTheLeft(nums)
+    // 오른쪽의 더 큰 수 = 뒤집고 부호를 바꾼 배열에서 왼쪽의 더 작은 수
+    val negated = IntArray(n) { -nums[it] }
+    val largerLeft = smallerOnTheLeft(negated)
+    val rightMirrored = LongArray(n) { largerLeft[n - 1 - it] }
+    var total = 0L
+    for (j in 0 until n) {
+        total = (total + left[j] % 1_000_000_007 * (rightMirrored[n - 1 - j] % 1_000_000_007)) % 1_000_000_007
+        Drill.write(j, left[j].toInt())
+    }
+    return total.toInt()
+}
+"""),
+        ("both-sides-by-scanning", "PERFORMANCE",
+         "가운데마다 양쪽을 다 훑어 센다. 맞지만, 20 만이면 400 억 번의 비교다.",
+         """
+fun increasingTripletsCount(nums: IntArray): Int {
+    val n = nums.size
+    var total = 0L
+    for (j in 0 until n) {
+        var left = 0L; var right = 0L
+        for (i in 0 until j) if (nums[i] < nums[j]) left += 1
+        for (k in j + 1 until n) if (nums[k] > nums[j]) right += 1
+        total = (total + left * right) % 1_000_000_007
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))

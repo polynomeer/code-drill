@@ -257,3 +257,9 @@
 1247: flood-fill
 1248: count-ones-submatrices
 1249: remove-adjacent-duplicates
+1250: widest-path
+1251: topological-orders-count
+1252: binary-watch
+1253: increasing-triplets-count
+1254: lunch-queue
+1255: reverse-vowels

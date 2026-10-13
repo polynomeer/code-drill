@@ -1,0 +1,16 @@
+# lunch-queue 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - queue
+  - simulation
+  - counting
+competencies:
+  - READING
+  - MODELING
+  - EDGE_CASES
+prerequisites:
+  - ticket-queue-time
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "종류별로 원하는 학생 수를 센 뒤 더미를 한 번 내려간다"

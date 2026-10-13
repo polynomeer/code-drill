@@ -3237,3 +3237,99 @@ fun distributeCookies(bags: IntArray, k: Int): Int {
 """),
     ],
 ))
+
+
+# --- 이진 시계 ----------------------------------------------------------------
+
+def _binary_watch(lit):
+    out = []
+    for hour in range(12):
+        for minute in range(60):
+            if bin(hour).count("1") + bin(minute).count("1") == lit:
+                out.append(f"{hour}:{minute:02d}")
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="binary-watch",
+    title="이진 시계",
+    summary="""
+이진 시계는 시를 LED 4 개(`0..11`)로, 분을 LED 6 개(`0..59`)로 나타낸다 — 켜진 LED 가 그 자리의 비트다. 켜진 LED 가 정확히
+`lit` 개일 때 시계가 나타낼 수 있는 시각을 모두 담은 배열을 반환한다. 시각은 `"h:mm"` 꼴(시는 앞에 0 을 붙이지 않고, 분은
+두 자리)이고, 배열은 **이른 시각부터** 정렬한다.
+""",
+    notes="""
+LED 10 개 가운데 `lit` 개를 고르는 백트래킹으로 만들 수도 있고, 시 `0..11` 과 분 `0..59` 를 모두 돌며 켜진 비트 수의 합이 `lit` 인
+것을 고를 수도 있다(720 가지뿐이다). 어느 쪽이든 시가 11 을, 분이 59 를 넘는 조합은 버린다 — 시 LED 넷을 다 켜면 15 다.
+
+정렬은 시각 순서다. 문자열로 정렬하면 `"10:00"` 이 `"2:00"` 보다 앞에 온다.
+""",
+    drill_doc="""
+Drill.call("h:mm")   // 이 시각을 담았다
+""",
+    constraints="""
+- `0 <= lit <= 10`
+""",
+    signature=dict(name="binaryWatch", parameters=[("lit", "INT")], returns="STRING_ARRAY"),
+    groups=standard_groups(),
+    reference=_binary_watch,
+    cases={
+        "sample": [("01", [1]), ("02", [0])],
+        "boundary": [
+            # 시 넷과 분 다섯이 최대 — 9 개면 없다.
+            ("01-nine", [9]),
+            ("02-ten", [10]),
+            ("03-eight", [8]),
+            ("04-two", [2]),
+        ],
+        "hidden": [
+            ("01-three", [3]),
+            ("02-four", [4]),
+            ("03-five", [5]),
+            ("04-seven", [7]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 시 0..11 과 분 0..59 를 이른 순서로 돌며 켜진 비트 수의 합이 lit 인 것을 담는다.
+fun binaryWatch(lit: Int): Array<String> {
+    val out = ArrayList<String>()
+    for (hour in 0 until 12) for (minute in 0 until 60) {
+        if (Integer.bitCount(hour) + Integer.bitCount(minute) == lit) {
+            val time = "$hour:" + (if (minute < 10) "0" else "") + minute
+            out.add(time)
+            Drill.call(time)
+        }
+    }
+    return out.toTypedArray()
+}
+""",
+    mutants=[
+        ("minutes-not-padded", "MISSING_EDGE_CASE",
+         "분을 두 자리로 맞추지 않는다. 1:5 가 아니라 1:05 다.",
+         """
+fun binaryWatch(lit: Int): Array<String> {
+    val out = ArrayList<String>()
+    for (hour in 0 until 12) for (minute in 0 until 60) if (Integer.bitCount(hour) + Integer.bitCount(minute) == lit) out.add("$hour:$minute")
+    return out.toTypedArray()
+}
+"""),
+        ("string-order", "WRONG_BRANCH",
+         "시각을 문자열로 정렬한다. 10:00 이 2:00 보다 앞에 온다 — 시각 순서여야 한다.",
+         """
+fun binaryWatch(lit: Int): Array<String> {
+    val out = ArrayList<String>()
+    for (hour in 0 until 12) for (minute in 0 until 60) if (Integer.bitCount(hour) + Integer.bitCount(minute) == lit) out.add("$hour:" + (if (minute < 10) "0" else "") + minute)
+    return out.sorted().toTypedArray()
+}
+"""),
+        ("all-led-values", "OFF_BY_ONE",
+         "LED 가 나타낼 수 있는 값을 모두 쓴다 — 시 0..15, 분 0..63. 시는 11, 분은 59 까지다.",
+         """
+fun binaryWatch(lit: Int): Array<String> {
+    val out = ArrayList<String>()
+    for (hour in 0 until 16) for (minute in 0 until 64) if (Integer.bitCount(hour) + Integer.bitCount(minute) == lit) out.add("$hour:" + (if (minute < 10) "0" else "") + minute)
+    return out.toTypedArray()
+}
+"""),
+    ],
+))

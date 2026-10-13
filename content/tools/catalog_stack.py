@@ -3886,3 +3886,96 @@ fun removeAdjacentDuplicates(s: String): String {
 """),
     ],
 ))
+
+
+# --- 점심을 못 먹은 학생 -------------------------------------------------------
+
+def _lunch_queue(students, sandwiches):
+    want = [students.count(0), students.count(1)]
+    for k, s in enumerate(sandwiches):
+        if want[s] == 0:
+            return len(sandwiches) - k
+        want[s] -= 1
+    return 0
+
+
+PROBLEMS.append(Problem(
+    id="lunch-queue",
+    title="점심을 못 먹은 학생",
+    summary="""
+학생들이 줄을 서 있고 `students[i]` 는 앞에서 `i` 번째 학생이 좋아하는 샌드위치(`0` 동그란 것, `1` 네모난 것)다. 샌드위치는
+더미로 쌓여 있고 `sandwiches[0]` 이 맨 위다. 줄 맨 앞의 학생은 더미 맨 위의 샌드위치가 좋아하는 것이면 가져가고 줄을 떠나고,
+아니면 줄 맨 뒤로 간다. 줄의 누구도 맨 위 샌드위치를 원하지 않게 되면 멈춘다. 점심을 못 먹은 학생 수를 반환한다.
+""",
+    notes="""
+그대로 흉내 내도 된다 — 큐 하나와, 한 바퀴 돌도록 아무도 가져가지 않았는지 세는 수 하나. 더 짧게는: 줄의 순서는 결국 상관없다.
+맨 위 샌드위치를 원하는 학생이 줄 어딘가에 있으면 언젠가 맨 앞에 와서 가져간다. 그러니 종류별로 원하는 학생 수만 세고, 더미를
+위에서부터 내려가며 그 종류를 원하는 학생이 남아 있지 않은 순간 남은 샌드위치 수가 답이다.
+""",
+    drill_doc="""
+Drill.dequeue(s)   // 맨 위 샌드위치가 나갔다
+""",
+    constraints="""
+- `1 <= students.size == sandwiches.size <= 1000`
+- 값은 `0` 이나 `1`
+""",
+    signature=dict(name="lunchQueue", parameters=[("students", "INT_ARRAY"), ("sandwiches", "INT_ARRAY")], returns="INT"),
+    groups=standard_groups(),
+    reference=_lunch_queue,
+    cases={
+        "sample": [("01", [[1, 1, 0, 0], [0, 1, 0, 1]]), ("02", [[1, 1, 1, 0, 0, 1], [1, 0, 0, 0, 1, 1]])],
+        "boundary": [
+            ("01-one-happy", [[0], [0]]),
+            ("02-one-hungry", [[1], [0]]),
+            # 줄의 순서가 섞여도 결국 다 먹는다.
+            ("03-everyone-eats-after-rotation", [[1, 0, 1, 0], [0, 0, 1, 1]]),
+            ("04-stuck-at-once", [[1, 1, 1], [0, 1, 1]]),
+            ("05-stuck-at-the-end", [[0, 0, 1], [0, 0, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(10, 0, 1, salt=10663), randoms(10, 0, 1, salt=10665)]),
+            ("02-random-large", [randoms(1000, 0, 1, salt=10667), randoms(1000, 0, 1, salt=10669)]),
+            ("03-balanced", [[0, 1] * 500, [1, 0] * 500]),
+            ("04-all-want-zero", [[0] * 1000, [0] * 999 + [1]]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 줄의 순서는 상관없다 — 종류별로 원하는 학생 수를 세고, 더미를 위에서부터 내려가다 막히면 멈춘다.
+fun lunchQueue(students: IntArray, sandwiches: IntArray): Int {
+    val want = IntArray(2)
+    for (s in students) want[s] += 1
+    for (k in sandwiches.indices) {
+        val s = sandwiches[k]
+        if (want[s] == 0) return sandwiches.size - k
+        want[s] -= 1
+        Drill.dequeue(s)
+    }
+    return 0
+}
+""",
+    mutants=[
+        ("compares-in-place", "WRONG_ALGORITHM",
+         "같은 자리의 학생과 샌드위치가 다르면 못 먹은 것으로 센다. 학생은 줄 뒤로 가서 다시 기다린다.",
+         """
+fun lunchQueue(students: IntArray, sandwiches: IntArray): Int = students.indices.count { students[it] != sandwiches[it] }
+"""),
+        ("counts-mismatch", "WRONG_BRANCH",
+         "종류별 학생 수와 샌드위치 수의 차를 답으로 낸다. 위에서 막힌 샌드위치 아래의 것은 아무도 못 먹는다.",
+         """
+fun lunchQueue(students: IntArray, sandwiches: IntArray): Int {
+    val zeros = students.count { it == 0 } - sandwiches.count { it == 0 }
+    return Math.abs(zeros)
+}
+"""),
+        ("one-short", "OFF_BY_ONE",
+         "막힌 샌드위치를 빼고 센다. 막힌 것부터 아래가 모두 남는다.",
+         """
+fun lunchQueue(students: IntArray, sandwiches: IntArray): Int {
+    val want = IntArray(2)
+    for (s in students) want[s] += 1
+    for (k in sandwiches.indices) { val s = sandwiches[k]; if (want[s] == 0) return sandwiches.size - k - 1; want[s] -= 1 }
+    return 0
+}
+"""),
+    ],
+))
