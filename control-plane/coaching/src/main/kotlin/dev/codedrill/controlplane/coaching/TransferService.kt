@@ -186,7 +186,7 @@ class TransferService(
         candidates.ids().mapNotNull { id -> catalogOf(id)?.let { id to it } }.toMap()
 
     private fun catalogOf(problemId: String): ProblemCatalog? =
-        runCatching { packages.load(problemId).catalog }.getOrNull()
+        runCatching { packages.listing(problemId).catalog }.getOrNull()
 
     sealed interface Outcome {
         data class Assigned(val task: TransferTask) : Outcome

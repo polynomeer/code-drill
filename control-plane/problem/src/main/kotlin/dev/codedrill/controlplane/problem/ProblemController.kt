@@ -3,6 +3,7 @@ package dev.codedrill.controlplane.problem
 import dev.codedrill.platform.common.Principal
 import dev.codedrill.platform.problempackage.Competency
 import dev.codedrill.platform.problempackage.Difficulty
+import dev.codedrill.platform.problempackage.ProblemListing
 import dev.codedrill.platform.problempackage.ProblemNumbers
 import dev.codedrill.platform.problempackage.ProblemPackage
 import dev.codedrill.platform.problempackage.ProblemPackageLoader
@@ -147,7 +148,7 @@ class ProblemController(
 
         // 태그를 뺀 나머지 조건까지만 좁힌 집합. 태그 후보를 여기서 센다.
         val base = availableProblems()
-            .map { id -> ProblemSummary.of(packages.load(id), numbers.of(id), accuracy[id], id in solved) }
+            .map { id -> ProblemSummary.of(packages.listing(id), numbers.of(id), accuracy[id], id in solved) }
             .filter { it.matches(query) }
             .filter { difficulty.isNullOrEmpty() || it.difficulty in difficulty }
             .filter { competency.isNullOrEmpty() || it.competencies.any { c -> c in competency } }
@@ -275,7 +276,7 @@ data class ProblemSummary(
 
     companion object {
         fun of(
-            pkg: ProblemPackage,
+            pkg: ProblemListing,
             number: Int?,
             accuracy: ProblemProgress.Accuracy?,
             solved: Boolean,

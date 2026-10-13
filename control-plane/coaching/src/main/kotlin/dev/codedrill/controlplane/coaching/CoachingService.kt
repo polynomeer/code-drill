@@ -35,7 +35,7 @@ class CoachingService(
     fun open(userId: String, problemId: String): CoachingSession {
         repository.open(userId, problemId)?.let { return it }
 
-        val competencies = runCatching { packages.load(problemId).catalog.competencies }
+        val competencies = runCatching { packages.listing(problemId).catalog.competencies }
             .getOrDefault(emptyList())
 
         // **도울 수 있는 것 중에서** 약한 것을 고른다. 사다리가 빈 역량을 초점으로

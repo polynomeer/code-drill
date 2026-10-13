@@ -24,8 +24,25 @@ class ProblemPackageLoader(private val root: Path) {
     private val yaml = ObjectMapper(YAMLFactory()).registerKotlinModule()
     private val json = ObjectMapper().registerKotlinModule()
 
-    fun load(problemId: String): ProblemPackage = try {
-        read(problemId)
+    fun load(problemId: String): ProblemPackage = guarded(problemId) { read(problemId) }
+
+    /**
+     * 목록에 쓰는 것만 — 매니페스트와 카탈로그. [load] 는 테스트 데이터를 전부 읽고 digest 를 낸다(성능 그룹이면
+     * 문제 하나에 수십 MB). 문제 목록이 요청마다 수백 문제를 그렇게 읽어 3~4초가 걸렸다. 제목·난이도·태그만 필요한
+     * 곳은 이것을 쓴다. 패키지를 검증하지는 않는다 — 채점과 공개는 [load] 를 거친다.
+     */
+    fun listing(problemId: String): ProblemListing = guarded(problemId) {
+        val dir = root.resolve(problemId)
+        require(dir.isDirectory()) { "문제 디렉터리가 없다: $dir" }
+        val manifest = yaml.readValue<ProblemManifest>(dir.resolve("manifest.yaml").readText())
+        require(manifest.id == problemId) { "manifest id 와 디렉터리 이름이 다르다: ${manifest.id} != $problemId" }
+        val catalogFile = dir.resolve("catalog.yaml")
+        require(catalogFile.isRegularFile()) { "catalog.yaml 이 없다. 난이도·태그·역량이 없으면 목록에서 찾을 수 없다" }
+        ProblemListing(manifest, yaml.readValue<ProblemCatalog>(catalogFile.readText()))
+    }
+
+    private fun <T> guarded(problemId: String, block: () -> T): T = try {
+        block()
     } catch (e: InvalidProblemPackageException) {
         throw e
     } catch (e: IllegalArgumentException) {
@@ -192,3 +209,6 @@ class ProblemPackageLoader(private val root: Path) {
 
     private data class RawCase(val args: List<Any>, val expected: Any)
 }
+
+/** 목록에 쓰는 문제의 얼굴 — 매니페스트와 카탈로그 ([ProblemPackageLoader.listing]) */
+data class ProblemListing(val manifest: ProblemManifest, val catalog: ProblemCatalog)

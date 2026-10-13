@@ -50,7 +50,7 @@ class ProfileAssembly {
         /** 난이도는 문제 카탈로그에서. 카탈로그를 못 읽는 문제(프로젝트형, 내려간 문제)는 세지 않는다. */
         override fun solved(userId: String): Solved {
             val difficulties = progress.solvedBy(userId).mapNotNull { id ->
-                runCatching { packages.load(id).catalog.difficulty.name }.getOrNull()
+                runCatching { packages.listing(id).catalog.difficulty.name }.getOrNull()
             }
             return Solved(total = difficulties.size, byDifficulty = difficulties.groupingBy { it }.eachCount())
         }

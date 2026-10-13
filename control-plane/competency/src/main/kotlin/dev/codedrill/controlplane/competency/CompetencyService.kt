@@ -300,7 +300,7 @@ class CompetencyService(
         repository.of(userId, competency, limit)
 
     private fun competenciesOf(problemId: String): List<Competency>? =
-        runCatching { packages.load(problemId).catalog.competencies }
+        runCatching { packages.listing(problemId).catalog.competencies }
             .onFailure { log.warn("문제를 읽지 못해 증거를 만들지 않는다: {} ({})", problemId, it.message) }
             .getOrNull()
             ?.takeIf { it.isNotEmpty() }
