@@ -1,0 +1,29 @@
+name: content-full
+
+# 캐시 없이 모든 패키지를 다시 검증한다 (§6.3).
+#
+# CI 의 검증은 바뀌지 않은 패키지의 지난 결과를 쓴다 (ValidationCache). 그것이 다시 재지 않는 것이
+# 하나 있다 — 성능 여유. 시간으로 잡는 오답이 한도의 몇 배인지는 러너의 CPU 를 타서, 지난번 러너에서
+# 넘긴 여유가 더 빠른 러너에서는 모자랄 수 있다. 그래서 주마다 전부 다시 잰다. 떨어지면 그 문제의
+# 성능 그룹을 조인다 (content/tools/README.md 의 성능 여유).
+
+on:
+  schedule:
+    - cron: '0 18 * * 0' # 월요일 03:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: corretto
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :judge:runner-agent:validateContent

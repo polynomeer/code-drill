@@ -299,8 +299,11 @@ def start_apps(ports: dict, env: dict, with_web: bool) -> dict:
 
 
 def seed(ports: dict, env: dict) -> None:
-    print("문제 검증·공개 (몇 분 걸린다)", flush=True)
-    subprocess.run(["./gradlew", ":judge:runner-agent:validateContent"], cwd=ROOT, env=env, check=True)
+    print("문제 검증·공개 (처음엔 오래 걸린다 — 바뀌지 않은 패키지는 지난 결과를 쓴다)", flush=True)
+    # 검증 캐시 (ValidationCache). 바뀐 패키지와 검증기가 바뀌면 다시 잰다. 캐시 없이 재려면 비운다.
+    cache = env.get("CODEDRILL_VALIDATION_CACHE", str(ROOT / "build" / "validation-cache"))
+    subprocess.run(["./gradlew", ":judge:runner-agent:validateContent"], cwd=ROOT,
+                   env={**env, "CODEDRILL_VALIDATION_CACHE": cache}, check=True)
     subprocess.run(
         [sys.executable, "scripts/publish-content.py"], cwd=ROOT,
         env={**env, "CODEDRILL_BASE": f"http://localhost:{ports['control-plane']}"}, check=True,

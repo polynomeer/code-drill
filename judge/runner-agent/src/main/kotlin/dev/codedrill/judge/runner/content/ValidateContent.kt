@@ -14,7 +14,12 @@ import dev.codedrill.judge.runner.execution.project.ProjectEngine
 import dev.codedrill.judge.runner.execution.sandbox.ProcessSandbox
 import dev.codedrill.platform.storage.DirectoryBlobStore
 import java.nio.file.Path
+import dev.codedrill.platform.problempackage.ProblemNumbers
+import dev.codedrill.platform.problempackage.ProblemPackageLoader
 import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.name
+import kotlin.io.path.readText
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeText
@@ -37,6 +42,9 @@ import kotlin.system.exitProcess
  *
  * 프로젝트형 문제(`content/projects`, 첫 인자의 형제 디렉터리)도 같은 명령이 검증하고 같은
  * 디렉터리에 보고서를 남긴다. 공개 흐름은 보고서만 보므로 둘을 가르지 않는다.
+ *
+ * `CODEDRILL_VALIDATION_CACHE` 에 디렉터리를 주면 바뀌지 않은 패키지는 지난번 통과한 보고서를 쓴다
+ * ([ValidationCache] — 무엇이 바뀌면 다시 재는지는 거기). CI 와 `up.py --seed` 가 쓴다.
  */
 object ValidateContent {
 
@@ -83,8 +91,30 @@ object ValidateContent {
         if (only.isEmpty()) reportRoot.listDirectoryEntries("*.json").forEach { it.deleteExisting() }
 
         val projectIds = projects.ids()
+        val cache = System.getenv("CODEDRILL_VALIDATION_CACHE")?.takeIf { it.isNotBlank() && only.isEmpty() }
+            ?.let { ValidationCache(Path.of(it), ValidationCache.validatorFingerprint()) }
         val reports = if (only.isEmpty()) {
-            validator.validateAll() + projectIds.map(projects::validate)
+            val problemIds = contentRoot.listDirectoryEntries()
+                .filter { it.resolve("manifest.yaml").exists() }
+                .map { it.name }
+                .sorted()
+            if (cache == null) {
+                problemIds.map(validator::validate) + projectIds.map(projects::validate)
+            } else {
+                val shared = shared(contentRoot, problemIds)
+                val tags = shared(contentRoot, emptyList())
+                // 번호표는 문제를 더할 때마다 자란다 — 통째로 넣으면 커밋마다 전부 다시 잰다. 검증이 보는 것은
+                // 이 문제의 번호가 있는가 하나다. 표가 깨졌으면 그 사실이 키에 들어가고 검증은 떨어진다.
+                val numbers = runCatching { ProblemNumbers.load(contentRoot) }
+                val found = problemIds.map { id ->
+                    val number = numbers.map { it.of(id) }.getOrElse { "읽지 못함: ${it.message}" }
+                    cached(cache, "problem", id, contentRoot.resolve(id), "$shared\nnumber=$number") { validator.validate(id) }
+                } + projectIds.map { id ->
+                    cached(cache, "project", id, contentRoot.resolveSibling("projects").resolve(id), tags) { projects.validate(id) }
+                }
+                println("캐시: ${found.count { it.second }}/${found.size} 재사용, 지난 항목 ${cache.prune()} 개 지움")
+                found.map { it.first }
+            }
         } else {
             only.map { id -> if (id in projectIds) projects.validate(id) else validator.validate(id) }
         }
@@ -108,5 +138,27 @@ object ValidateContent {
         println()
         println("${reports.size - failed}/${reports.size} 통과")
         if (failed > 0) exitProcess(1)
+    }
+
+    /** 패키지 밖에서 검증이 읽는 것 — 태그 어휘와 (문제라면) 선수 관계 그래프 */
+    private fun shared(contentRoot: Path, problemIds: List<String>): String {
+        val tags = contentRoot.parent?.resolve("tags.yaml")?.takeIf { it.exists() }?.readText().orEmpty()
+        val loader = ProblemPackageLoader(contentRoot)
+        // 읽지 못하는 카탈로그는 빈 것으로 둔다 — 그 문제는 검증에서 떨어지고, 실패는 캐시에 담기지 않는다
+        val edges = problemIds.associateWith { id -> runCatching { loader.load(id).catalog.prerequisites }.getOrDefault(emptyList()) }
+        return ValidationCache.sharedFingerprint(tags, edges) { contentRoot.resolve(it).resolve("manifest.yaml").exists() }
+    }
+
+    private fun cached(
+        cache: ValidationCache,
+        kind: String,
+        id: String,
+        dir: Path,
+        shared: String,
+        validate: () -> ValidationReport,
+    ): Pair<ValidationReport, Boolean> {
+        val key = cache.key(kind, id, ValidationCache.directoryFingerprint(dir), shared)
+        cache.find(key)?.let { return it to true }
+        return validate().also { cache.store(key, it) } to false
     }
 }
