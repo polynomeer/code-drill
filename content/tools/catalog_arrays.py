@@ -5990,3 +5990,97 @@ fun fixedBoundSubarrays(nums: IntArray, minK: Int, maxK: Int): Int {
 """),
     ],
 ))
+
+
+# --- 오른쪽에서 가장 큰 값 ------------------------------------------------------
+
+def _greatest_on_right(nums):
+    out = list(nums)
+    best = -1
+    for i in range(len(nums) - 1, -1, -1):
+        out[i], best = best, max(best, nums[i])
+    return out
+
+
+PROBLEMS.append(Problem(
+    id="greatest-on-right",
+    title="오른쪽에서 가장 큰 값",
+    summary="""
+배열 `nums` 의 각 원소를 **그 오른쪽에 있는 원소들 가운데 가장 큰 값**으로 바꾼 배열을 반환한다. 마지막 원소는 오른쪽에 아무것도
+없으니 `-1` 이다.
+""",
+    notes="""
+왼쪽부터 원소마다 오른쪽을 다 훑으면 n² 이다. 오른쪽 끝에서 왼쪽으로 가며 "지금까지 본 가장 큰 값"을 들고 다니면 한 번이면 된다:
+자리 `i` 에는 그 값을 쓰고, 그다음에 `nums[i]` 로 그 값을 갱신한다 — 순서가 바뀌면 자기 자신이 섞인다. 같은 배열 안에서 제자리로
+할 수 있다(원래 값을 먼저 꺼내 둔다).
+""",
+    drill_doc="""
+Drill.write(i, best)   // 이 자리에 오른쪽의 최댓값을 썼다
+""",
+    constraints="""
+- `1 <= nums.size <= 100_000`
+- `1 <= nums[i] <= 100_000`
+""",
+    signature=dict(name="greatestOnRight", parameters=[("nums", "INT_ARRAY")], returns="INT_ARRAY"),
+    groups=standard_groups(),
+    reference=_greatest_on_right,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 4000000},
+    cases={
+        "sample": [("01", [[17, 18, 5, 4, 6, 1]]), ("02", [[400]])],
+        "boundary": [
+            ("01-two", [[3, 9]]),
+            ("02-decreasing", [[5, 4, 3, 2, 1]]),
+            ("03-increasing", [[1, 2, 3, 4, 5]]),
+            ("04-all-equal", [[7, 7, 7]]),
+        ],
+        "hidden": [
+            ("01-random-small", [randoms(12, 1, 20, salt=10741)]),
+            ("02-random-large", [randoms(100_000, 1, 100_000, salt=10743)]),
+            ("03-peak-at-end", [list(range(1, 100_001))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 오른쪽 끝에서 왼쪽으로, 지금까지 본 가장 큰 값을 먼저 쓰고 그다음 갱신한다 — 제자리로.
+fun greatestOnRight(nums: IntArray): IntArray {
+    val a = nums.copyOf()
+    var best = -1
+    for (i in a.indices.reversed()) {
+        val original = a[i]
+        a[i] = best
+        Drill.write(i, best)
+        if (original > best) best = original
+    }
+    return a
+}
+""",
+    mutants=[
+        ("includes-itself", "OFF_BY_ONE",
+         "자기 자신까지 넣은 최댓값을 쓴다. 오른쪽의 원소들만 본다.",
+         """
+fun greatestOnRight(nums: IntArray): IntArray {
+    val a = nums.copyOf(); var best = -1
+    for (i in a.indices.reversed()) { best = maxOf(best, a[i]); a[i] = best }
+    a[a.size - 1] = -1
+    return a
+}
+"""),
+        ("last-kept", "MISSING_EDGE_CASE",
+         "마지막 원소를 그대로 둔다. 오른쪽에 아무것도 없으면 -1 이다.",
+         """
+fun greatestOnRight(nums: IntArray): IntArray {
+    val a = nums.copyOf(); var best = a[a.size - 1]
+    for (i in a.size - 2 downTo 0) { val original = a[i]; a[i] = best; if (original > best) best = original }
+    return a
+}
+"""),
+        ("greatest-on-left", "WRONG_ALGORITHM",
+         "왼쪽에서 오른쪽으로 가며 왼쪽의 최댓값을 쓴다. 오른쪽의 최댓값이다.",
+         """
+fun greatestOnRight(nums: IntArray): IntArray {
+    val a = nums.copyOf(); var best = -1
+    for (i in a.indices) { val original = a[i]; a[i] = best; if (original > best) best = original }
+    return a
+}
+"""),
+    ],
+))

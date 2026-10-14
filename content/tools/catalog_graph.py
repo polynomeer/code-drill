@@ -9113,3 +9113,572 @@ fun topologicalOrdersCount(n: Int, edges: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 쪼갠 간선에서 닿는 정점 -----------------------------------------------------
+
+def _subdivided_reach(n, edges, max_moves):
+    import heapq
+    adj = [[] for _ in range(n)]
+    for i in range(0, len(edges), 3):
+        u, v, c = edges[i], edges[i + 1], edges[i + 2]
+        adj[u].append((v, c + 1))
+        adj[v].append((u, c + 1))
+    dist = [None] * n
+    dist[0] = 0
+    heap = [(0, 0)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d != dist[u]:
+            continue
+        for v, w in adj[u]:
+            if dist[v] is None or d + w < dist[v]:
+                dist[v] = d + w
+                heapq.heappush(heap, (dist[v], v))
+    total = sum(1 for d in dist if d is not None and d <= max_moves)
+    for i in range(0, len(edges), 3):
+        u, v, c = edges[i], edges[i + 1], edges[i + 2]
+        from_u = max(0, max_moves - dist[u]) if dist[u] is not None else 0
+        from_v = max(0, max_moves - dist[v]) if dist[v] is not None else 0
+        total += min(c, from_u + from_v)
+    return total
+
+
+def _subdivided_graph(n, m, max_count, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    pairs = set()
+    edges = []
+    while len(edges) < m:
+        u, v = source.sample(range(n), 2)
+        if (min(u, v), max(u, v)) in pairs:
+            continue
+        pairs.add((min(u, v), max(u, v)))
+        edges.append((u, v, source.randint(0, max_count)))
+    return flat(list(e) for e in edges)
+
+
+PROBLEMS.append(Problem(
+    id="subdivided-reach",
+    title="쪼갠 간선에서 닿는 정점",
+    summary="""
+정점 `0..n-1` 의 방향 없는 그래프가 `edges = [u1, v1, c1, ...]` 로 주어진다. 간선 `(u, v, c)` 는 그 사이에 새 정점 `c` 개를 끼워
+`c + 1` 개의 간선으로 쪼갠다(`c = 0` 이면 그대로다). 쪼갠 그래프에서 정점 `0` 으로부터 **많아야 `maxMoves` 번** 이동해 닿을 수
+있는 정점(원래 정점과 새 정점 모두)의 수를 반환한다.
+""",
+    notes="""
+새 정점을 실제로 만들면 수억 개다. 대신 원래 정점들만의 그래프에서 간선 `(u, v, c)` 의 무게를 `c + 1` 로 두고 다익스트라로 `0` 에서의
+거리를 구한다. 원래 정점은 거리가 `maxMoves` 이하면 닿는다.
+
+간선 위의 새 정점은 양 끝에서 들어온다: `u` 쪽에서는 남은 걸음 `maxMoves − dist[u]` 만큼(음수면 0), `v` 쪽에서도 마찬가지로 들어가고,
+둘을 더하되 그 간선의 새 정점 수 `c` 를 넘지 않는다 — 양쪽이 겹쳐 세지 않게.
+""",
+    drill_doc="""
+Drill.visit(u, dist)   // 원래 정점까지의 거리
+""",
+    constraints="""
+- `1 <= n <= 100_000`, 간선은 `0..100_000` 개, 같은 쌍은 한 번만, `u != v`
+- `0 <= c <= 10_000`, `0 <= maxMoves <= 10^9`
+""",
+    signature=dict(name="subdividedReach",
+                   parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("maxMoves", "INT")], returns="INT"),
+    groups=standard_groups(),
+    reference=_subdivided_reach,
+    cases={
+        "sample": [("01", [3, [0, 1, 10, 0, 2, 1, 1, 2, 2], 6]), ("02", [4, [0, 1, 4, 1, 2, 6, 0, 2, 8, 1, 3, 1], 10])],
+        "boundary": [
+            ("01-no-edges", [1, [], 5]),
+            ("02-zero-moves", [3, [0, 1, 3, 1, 2, 2], 0]),
+            # 양쪽에서 들어온 걸음이 겹친다 — 간선의 새 정점 수를 넘지 않는다.
+            ("03-both-ends-overlap", [2, [0, 1, 4], 10]),
+            ("04-c-zero", [3, [0, 1, 0, 1, 2, 0], 1]),
+            # 정점 0 에서 갈 수 없는 정점의 간선.
+            ("05-unreachable-part", [4, [0, 1, 2, 2, 3, 5], 100]),
+            ("06-exactly-reaches", [2, [0, 1, 3], 4]),
+        ],
+        "hidden": [
+            ("01-random-small", [6, _subdivided_graph(6, 8, 5, salt=10757), 9]),
+            ("02-random-large", [100_000, _subdivided_graph(100_000, 100_000, 10_000, salt=10759), 30_000]),
+            ("03-huge-moves", [3000, _subdivided_graph(3000, 6000, 10_000, salt=10761), 1_000_000_000]),
+            ("04-sparse", [50_000, _subdivided_graph(50_000, 2000, 100, salt=10763), 500]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 원래 정점끼리 무게 c + 1 의 다익스트라, 간선마다 양 끝에서 남은 걸음을 더하되 c 를 넘지 않는다.
+fun subdividedReach(n: Int, edges: IntArray, maxMoves: Int): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }; val next = IntArray(2 * m); val to = IntArray(2 * m); val weight = IntArray(2 * m)
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val w = edges[3 * e + 2] + 1
+        to[2 * e] = v; weight[2 * e] = w; next[2 * e] = head[u]; head[u] = 2 * e
+        to[2 * e + 1] = u; weight[2 * e + 1] = w; next[2 * e + 1] = head[v]; head[v] = 2 * e + 1
+    }
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1].toInt()
+        if (top[0] != dist[u]) continue
+        Drill.visit(u, minOf(dist[u], Int.MAX_VALUE.toLong()).toInt())
+        var e = head[u]
+        while (e != -1) {
+            val d = dist[u] + weight[e]
+            if (d < dist[to[e]]) { dist[to[e]] = d; heap.add(longArrayOf(d, to[e].toLong())) }
+            e = next[e]
+        }
+    }
+    var total = 0L
+    for (v in 0 until n) if (dist[v] <= maxMoves) total += 1
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val c = edges[3 * e + 2]
+        val fromU = if (dist[u] == Long.MAX_VALUE) 0L else maxOf(0L, maxMoves - dist[u])
+        val fromV = if (dist[v] == Long.MAX_VALUE) 0L else maxOf(0L, maxMoves - dist[v])
+        total += minOf(c.toLong(), fromU + fromV)
+    }
+    return total.toInt()
+}
+""",
+    mutants=[
+        ("both-ends-double-counted", "MISSING_EDGE_CASE",
+         "양 끝에서 들어온 걸음을 더하기만 하고 간선의 새 정점 수 c 로 자르지 않는다. 겹친 부분을 두 번 센다.",
+         """
+fun subdividedReach(n: Int, edges: IntArray, maxMoves: Int): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }; val next = IntArray(2 * m); val to = IntArray(2 * m); val weight = IntArray(2 * m)
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val w = edges[3 * e + 2] + 1
+        to[2 * e] = v; weight[2 * e] = w; next[2 * e] = head[u]; head[u] = 2 * e
+        to[2 * e + 1] = u; weight[2 * e + 1] = w; next[2 * e + 1] = head[v]; head[v] = 2 * e + 1
+    }
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1].toInt()
+        if (top[0] != dist[u]) continue
+        Drill.visit(u, minOf(dist[u], Int.MAX_VALUE.toLong()).toInt())
+        var e = head[u]
+        while (e != -1) {
+            val d = dist[u] + weight[e]
+            if (d < dist[to[e]]) { dist[to[e]] = d; heap.add(longArrayOf(d, to[e].toLong())) }
+            e = next[e]
+        }
+    }
+    var total = 0L
+    for (v in 0 until n) if (dist[v] <= maxMoves) total += 1
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val c = edges[3 * e + 2]
+        val fromU = if (dist[u] == Long.MAX_VALUE) 0L else maxOf(0L, maxMoves - dist[u])
+        val fromV = if (dist[v] == Long.MAX_VALUE) 0L else maxOf(0L, maxMoves - dist[v])
+        total += fromU + fromV
+    }
+    return total.toInt()
+}
+"""),
+        ("original-vertices-only", "WRONG_ALGORITHM",
+         "원래 정점만 센다. 간선 위의 새 정점도 닿으면 센다.",
+         """
+fun subdividedReach(n: Int, edges: IntArray, maxMoves: Int): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }; val next = IntArray(2 * m); val to = IntArray(2 * m); val weight = IntArray(2 * m)
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val w = edges[3 * e + 2] + 1
+        to[2 * e] = v; weight[2 * e] = w; next[2 * e] = head[u]; head[u] = 2 * e
+        to[2 * e + 1] = u; weight[2 * e + 1] = w; next[2 * e + 1] = head[v]; head[v] = 2 * e + 1
+    }
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1].toInt()
+        if (top[0] != dist[u]) continue
+        Drill.visit(u, minOf(dist[u], Int.MAX_VALUE.toLong()).toInt())
+        var e = head[u]
+        while (e != -1) {
+            val d = dist[u] + weight[e]
+            if (d < dist[to[e]]) { dist[to[e]] = d; heap.add(longArrayOf(d, to[e].toLong())) }
+            e = next[e]
+        }
+    }
+    var total = 0L
+    for (v in 0 until n) if (dist[v] <= maxMoves) total += 1
+    return total.toInt()
+}
+"""),
+        ("weight-c-not-c-plus-one", "OFF_BY_ONE",
+         "간선의 무게를 c 로 둔다. 새 정점 c 개를 끼우면 걸음은 c + 1 이다.",
+         """
+fun subdividedReach(n: Int, edges: IntArray, maxMoves: Int): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }; val next = IntArray(2 * m); val to = IntArray(2 * m); val weight = IntArray(2 * m)
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val w = edges[3 * e + 2]
+        to[2 * e] = v; weight[2 * e] = w; next[2 * e] = head[u]; head[u] = 2 * e
+        to[2 * e + 1] = u; weight[2 * e + 1] = w; next[2 * e + 1] = head[v]; head[v] = 2 * e + 1
+    }
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1].toInt()
+        if (top[0] != dist[u]) continue
+        Drill.visit(u, minOf(dist[u], Int.MAX_VALUE.toLong()).toInt())
+        var e = head[u]
+        while (e != -1) {
+            val d = dist[u] + weight[e]
+            if (d < dist[to[e]]) { dist[to[e]] = d; heap.add(longArrayOf(d, to[e].toLong())) }
+            e = next[e]
+        }
+    }
+    var total = 0L
+    for (v in 0 until n) if (dist[v] <= maxMoves) total += 1
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val c = edges[3 * e + 2]
+        val fromU = if (dist[u] == Long.MAX_VALUE) 0L else maxOf(0L, maxMoves - dist[u])
+        val fromV = if (dist[v] == Long.MAX_VALUE) 0L else maxOf(0L, maxMoves - dist[v])
+        total += minOf(c.toLong(), fromU + fromV)
+    }
+    return total.toInt()
+}
+"""),
+        ("negative-leftover", "WRONG_BRANCH",
+         "남은 걸음이 음수여도 그대로 더한다. 닿지 못한 쪽에서는 0 걸음이 들어간다.",
+         """
+fun subdividedReach(n: Int, edges: IntArray, maxMoves: Int): Int {
+    val m = edges.size / 3
+    val head = IntArray(n) { -1 }; val next = IntArray(2 * m); val to = IntArray(2 * m); val weight = IntArray(2 * m)
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val w = edges[3 * e + 2] + 1
+        to[2 * e] = v; weight[2 * e] = w; next[2 * e] = head[u]; head[u] = 2 * e
+        to[2 * e + 1] = u; weight[2 * e + 1] = w; next[2 * e + 1] = head[v]; head[v] = 2 * e + 1
+    }
+    val dist = LongArray(n) { Long.MAX_VALUE }
+    dist[0] = 0
+    val heap = java.util.PriorityQueue<LongArray>(compareBy { it[0] })
+    heap.add(longArrayOf(0, 0))
+    while (heap.isNotEmpty()) {
+        val top = heap.poll(); val u = top[1].toInt()
+        if (top[0] != dist[u]) continue
+        Drill.visit(u, minOf(dist[u], Int.MAX_VALUE.toLong()).toInt())
+        var e = head[u]
+        while (e != -1) {
+            val d = dist[u] + weight[e]
+            if (d < dist[to[e]]) { dist[to[e]] = d; heap.add(longArrayOf(d, to[e].toLong())) }
+            e = next[e]
+        }
+    }
+    var total = 0L
+    for (v in 0 until n) if (dist[v] <= maxMoves) total += 1
+    for (e in 0 until m) {
+        val u = edges[3 * e]; val v = edges[3 * e + 1]; val c = edges[3 * e + 2]
+        val fromU = if (dist[u] == Long.MAX_VALUE) 0L else maxMoves - dist[u]
+        val fromV = if (dist[v] == Long.MAX_VALUE) 0L else maxMoves - dist[v]
+        total += minOf(c.toLong(), fromU + fromV)
+    }
+    return total.toInt()
+}
+"""),
+    ],
+))
+
+
+# --- 학기마다 k 과목 ------------------------------------------------------------
+
+def _courses_with_limit(n, edges, k):
+    need = [0] * n
+    for i in range(0, len(edges), 2):
+        need[edges[i + 1]] |= 1 << edges[i]
+    full = (1 << n) - 1
+    inf = 10 ** 9
+    best = [inf] * (1 << n)
+    best[0] = 0
+    for mask in range(1 << n):
+        if best[mask] == inf:
+            continue
+        ready = 0
+        for v in range(n):
+            if not mask >> v & 1 and need[v] & mask == need[v]:
+                ready |= 1 << v
+        if bin(ready).count("1") <= k:
+            best[mask | ready] = min(best[mask | ready], best[mask] + 1)
+            continue
+        sub = ready
+        while sub:
+            if bin(sub).count("1") == k:
+                best[mask | sub] = min(best[mask | sub], best[mask] + 1)
+            sub = (sub - 1) & ready
+    return best[full]
+
+
+def _course_dag(n, m, salt):
+    import random
+    from author import SEED
+    source = random.Random(SEED + salt)
+    order = list(range(n))
+    source.shuffle(order)
+    edges = set()
+    while len(edges) < m:
+        i, j = sorted(source.sample(range(n), 2))
+        edges.add((order[i], order[j]))
+    return flat(list(e) for e in sorted(edges))
+
+
+PROBLEMS.append(Problem(
+    id="courses-with-limit",
+    title="학기마다 k 과목",
+    summary="""
+과목 `0..n-1` 과 선수 관계 `edges = [a1, b1, ...]`(`a` 를 들은 **다음 학기부터** `b` 를 들을 수 있다)가 주어진다. 한 학기에
+많아야 `k` 과목을 듣는다. 모든 과목을 듣는 데 필요한 학기 수의 최솟값을 반환한다. 순환은 없다.
+""",
+    notes="""
+"매 학기 들을 수 있는 과목을 아무거나 k 개 듣는다"는 탐욕은 틀린다 — 어느 과목을 먼저 듣느냐에 따라 뒤에 열리는 과목이 달라진다.
+과목이 15 개뿐이니 **들은 과목의 집합**을 상태로 한다. 집합 `S` 에서 지금 들을 수 있는 과목(선수 과목이 모두 `S` 안에 있는 과목)의
+집합 `R` 을 구하고, `R` 이 `k` 개 이하면 모두 듣고, 많으면 `R` 의 크기 `k` 부분집합마다 다음 상태로 간다 — 들을 수 있는데 덜 들을
+이유가 없다. 상태는 2^15 개다.
+""",
+    drill_doc="""
+Drill.write(mask, terms)   // 이 집합을 듣는 데 든 최소 학기
+""",
+    constraints="""
+- `1 <= n <= 15`, `1 <= k <= n`
+- 선수 관계는 `0..105` 개, `a != b`, 같은 쌍은 한 번만, 순환이 없다
+""",
+    signature=dict(name="coursesWithLimit",
+                   parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("k", "INT")], returns="INT"),
+    groups=perf_groups(),
+    reference=_courses_with_limit,
+    cases={
+        "sample": [("01", [4, [1, 0, 2, 0, 3, 1], 2]), ("02", [5, [1, 0, 2, 0, 3, 0, 4, 1], 2])],
+        "boundary": [
+            ("01-single", [1, [], 1]),
+            ("02-no-edges", [7, [], 3]),
+            ("03-chain", [5, [0, 1, 1, 2, 2, 3, 3, 4], 3]),
+            # 번호가 작은 k 개를 고르면 틀리는 모양: 사슬 5 → 4 → 3 → 2 의 머리를 첫 학기에 들어야 4 학기다.
+            ("04-greedy-trap", [6, [5, 4, 4, 3, 3, 2], 2]),
+            ("05-k-is-n", [6, [0, 1, 2, 3, 4, 5], 6]),
+            ("06-k-one", [4, [0, 1], 1]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, _course_dag(8, 8, salt=10765), 3]),
+            ("02-random-12", [12, _course_dag(12, 15, salt=10767), 4]),
+            ("03-two-chains", [10, [0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 6, 7], 2]),
+        ],
+        # 집합을 기억하지 않고 고를 수 있는 모든 순서를 따라가면 갈래가 곱으로 늘어난다.
+        "performance": [
+            # k = 2 면 갈래가 C(15,2) × C(13,2) × … 로 3 천억이다. k = 3, 4 는 1 억 남짓이라 기억 없는 탐색도 들었다.
+            ("01-few-edges-15", [15, _course_dag(15, 6, salt=10769), 2]),
+            ("02-no-edges-15", [15, [], 2]),
+            ("03-sparse-15", [15, _course_dag(15, 10, salt=10771), 2]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 들은 과목의 집합마다 최소 학기 — 들을 수 있는 과목이 k 개를 넘으면 크기 k 의 부분집합마다 넘어간다.
+fun coursesWithLimit(n: Int, edges: IntArray, k: Int): Int {
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    val full = (1 shl n) - 1
+    val inf = Int.MAX_VALUE
+    val best = IntArray(1 shl n) { inf }
+    best[0] = 0
+    for (mask in 0..full) {
+        if (best[mask] == inf) continue
+        var ready = 0
+        for (v in 0 until n) if (mask shr v and 1 == 0 && need[v] and mask == need[v]) ready = ready or (1 shl v)
+        if (Integer.bitCount(ready) <= k) {
+            val next = mask or ready
+            if (best[mask] + 1 < best[next]) best[next] = best[mask] + 1
+            continue
+        }
+        var sub = ready
+        while (sub != 0) {
+            if (Integer.bitCount(sub) == k && best[mask] + 1 < best[mask or sub]) best[mask or sub] = best[mask] + 1
+            sub = (sub - 1) and ready
+        }
+    }
+    Drill.write(full, best[full])
+    return best[full]
+}
+""",
+    mutants=[
+        ("any-k-greedy", "WRONG_ALGORITHM",
+         "매 학기 들을 수 있는 과목 가운데 번호가 작은 k 개를 듣는다. 어느 과목을 먼저 듣느냐가 뒤를 바꾼다.",
+         """
+fun coursesWithLimit(n: Int, edges: IntArray, k: Int): Int {
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    var mask = 0; var terms = 0
+    while (mask != (1 shl n) - 1) {
+        var taken = 0; var next = mask
+        for (v in 0 until n) if (taken < k && mask shr v and 1 == 0 && need[v] and mask == need[v]) { next = next or (1 shl v); taken += 1 }
+        mask = next; terms += 1
+    }
+    return terms
+}
+"""),
+        ("limit-ignored", "WRONG_BRANCH",
+         "한 학기에 들을 수 있는 과목을 모두 듣는다. 한 학기에 많아야 k 과목이다.",
+         """
+fun coursesWithLimit(n: Int, edges: IntArray, k: Int): Int {
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    var mask = 0; var terms = 0
+    while (mask != (1 shl n) - 1) {
+        var next = mask
+        for (v in 0 until n) if (mask shr v and 1 == 0 && need[v] and mask == need[v]) next = next or (1 shl v)
+        mask = next; terms += 1
+    }
+    return terms
+}
+"""),
+        ("ceiling-of-n-over-k", "WRONG_ALGORITHM",
+         "과목 수를 k 로 나눠 올린다. 선수 관계가 학기를 늘릴 수 있다.",
+         """
+fun coursesWithLimit(n: Int, edges: IntArray, k: Int): Int = (n + k - 1) / k
+"""),
+        ("search-without-memory", "PERFORMANCE",
+         "들은 집합을 기억하지 않고 고를 수 있는 모든 순서를 따라간다. 맞지만, 갈래가 곱으로 늘어난다.",
+         """
+fun coursesWithLimit(n: Int, edges: IntArray, k: Int): Int {
+    val need = IntArray(n)
+    for (i in edges.indices step 2) need[edges[i + 1]] = need[edges[i + 1]] or (1 shl edges[i])
+    val full = (1 shl n) - 1
+    fun go(mask: Int): Int {
+        if (mask == full) return 0
+        var ready = 0
+        for (v in 0 until n) if (mask shr v and 1 == 0 && need[v] and mask == need[v]) ready = ready or (1 shl v)
+        if (Integer.bitCount(ready) <= k) return 1 + go(mask or ready)
+        var best = Int.MAX_VALUE
+        var sub = ready
+        while (sub != 0) {
+            if (Integer.bitCount(sub) == k) best = minOf(best, 1 + go(mask or sub))
+            sub = (sub - 1) and ready
+        }
+        return best
+    }
+    return go(0)
+}
+"""),
+    ],
+))
+
+
+# --- 길이 있는가 ---------------------------------------------------------------
+
+def _path_exists(n, edges, source, target):
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(0, len(edges), 2):
+        parent[find(edges[i])] = find(edges[i + 1])
+    return 1 if find(source) == find(target) else 0
+
+
+def _long_path_graph(n, salt):
+    order = shuffled(range(n), salt=salt)
+    return flat([order[i], order[i + 1]] for i in range(n - 1)), order[0], order[-1]
+
+
+PROBLEMS.append(Problem(
+    id="path-exists",
+    title="길이 있는가",
+    summary="""
+정점 `0..n-1` 의 방향 없는 그래프가 간선 `edges = [u1, v1, u2, v2, ...]` 로 주어진다. `source` 에서 `target` 으로 가는 길이
+있으면 `1`, 없으면 `0` 을 반환한다. 같은 정점이면 길이 있다.
+""",
+    notes="""
+간선을 하나씩 보며 두 끝을 유니온 파인드로 묶는다. 다 묶은 뒤 `source` 와 `target` 의 대표가 같으면 길이 있다. 묶을 때는 두 정점이
+아니라 **두 정점의 대표**를 이어야 한다. BFS 나 DFS 로도 되는데, 재귀 DFS 는 20 만 정점이 한 줄이면 스택이 넘친다.
+
+방향이 없다 — 간선은 양쪽으로 쓴다.
+""",
+    drill_doc="""
+Drill.edge("u", "v")   // 두 무리를 이었다
+""",
+    constraints="""
+- `1 <= n <= 200_000`, 간선은 `0..200_000` 개, `u != v`
+- `0 <= source, target < n`
+""",
+    signature=dict(name="pathExists",
+                   parameters=[("n", "INT"), ("edges", "INT_ARRAY"), ("source", "INT"), ("target", "INT")],
+                   returns="INT"),
+    groups=standard_groups(),
+    reference=_path_exists,
+    cases={
+        "sample": [("01", [3, [0, 1, 1, 2, 2, 0], 0, 2]), ("02", [6, [0, 1, 0, 2, 3, 5, 5, 4, 4, 3], 0, 5])],
+        "boundary": [
+            ("01-same-vertex", [1, [], 0, 0]),
+            ("02-no-edges", [2, [], 0, 1]),
+            # 간선이 거꾸로 주어져도 쓸 수 있다.
+            ("03-edge-backwards", [2, [1, 0], 0, 1]),
+            # 대표끼리 이어야 한다 — 정점끼리 이으면 셋째 간선이 둘째를 덮어쓴다.
+            ("04-roots-not-nodes", [4, [0, 1, 2, 3, 0, 2], 1, 3]),
+        ],
+        "hidden": [
+            ("01-random-small", [8, randoms(10, 0, 7, salt=10773), 0, 7]),
+            ("02-long-path", [200_000, *_long_path_graph(200_000, salt=10775)]),
+            ("03-two-halves", [200_000, flat([[i, i + 1] for i in range(99_999)] + [[i, i + 1] for i in range(100_000, 199_999)]), 0, 199_999]),
+            ("04-star", [100_000, flat([[0, i] for i in range(1, 100_000)]), 99_998, 99_999]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 유니온 파인드로 간선의 두 끝의 대표를 잇고, 두 정점의 대표가 같은지 본다.
+fun pathExists(n: Int, edges: IntArray, source: Int, target: Int): Int {
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int {
+        var r = x
+        while (parent[r] != r) { parent[r] = parent[parent[r]]; r = parent[r] }
+        return r
+    }
+    for (i in edges.indices step 2) {
+        val a = find(edges[i]); val b = find(edges[i + 1])
+        if (a != b) { parent[a] = b; Drill.edge(edges[i].toString(), edges[i + 1].toString()) }
+    }
+    return if (find(source) == find(target)) 1 else 0
+}
+""",
+    mutants=[
+        ("one-way-edges", "WRONG_BRANCH",
+         "간선을 u → v 한쪽으로만 따라간다. 방향이 없다.",
+         """
+fun pathExists(n: Int, edges: IntArray, source: Int, target: Int): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) adj[edges[i]].add(edges[i + 1])
+    val seen = BooleanArray(n); val queue = ArrayDeque<Int>(); queue.addLast(source); seen[source] = true
+    while (queue.isNotEmpty()) { val u = queue.removeFirst(); for (v in adj[u]) if (!seen[v]) { seen[v] = true; queue.addLast(v) } }
+    return if (seen[target]) 1 else 0
+}
+"""),
+        ("links-nodes-not-roots", "WRONG_ALGORITHM",
+         "간선의 두 정점을 그대로 잇는다(parent[u] = v). 이미 다른 무리에 이어진 정점의 연결이 덮어써진다 — 대표끼리 이어야 한다.",
+         """
+fun pathExists(n: Int, edges: IntArray, source: Int, target: Int): Int {
+    val parent = IntArray(n) { it }
+    fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; return r }
+    for (i in edges.indices step 2) if (find(edges[i]) != find(edges[i + 1])) parent[edges[i]] = edges[i + 1]
+    return if (find(source) == find(target)) 1 else 0
+}
+"""),
+        ("recursive-dfs", "MISSING_EDGE_CASE",
+         "재귀 DFS 로 찾는다. 20 만 정점이 한 줄이면 스택이 넘친다.",
+         """
+fun pathExists(n: Int, edges: IntArray, source: Int, target: Int): Int {
+    val adj = Array(n) { ArrayList<Int>() }
+    for (i in edges.indices step 2) { adj[edges[i]].add(edges[i + 1]); adj[edges[i + 1]].add(edges[i]) }
+    val seen = BooleanArray(n)
+    fun go(u: Int) { seen[u] = true; for (v in adj[u]) if (!seen[v]) go(v) }
+    go(source)
+    return if (seen[target]) 1 else 0
+}
+"""),
+    ],
+))

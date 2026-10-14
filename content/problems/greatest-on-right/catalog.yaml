@@ -1,0 +1,15 @@
+# greatest-on-right 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: INTRO
+tags:
+  - in-place
+  - array
+competencies:
+  - READING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - pivot-index
+complexity:
+  time: LINEAR
+  space: CONSTANT
+  note: "오른쪽 끝에서 한 번 훑는다"

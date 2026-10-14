@@ -1,0 +1,18 @@
+# courses-with-limit 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - topological-sort
+  - bit-manipulation
+  - dynamic-programming
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - CORRECTNESS
+  - COMPLEXITY
+prerequisites:
+  - unique-course-order
+  - topological-orders-count
+complexity:
+  time: EXPONENTIAL
+  space: EXPONENTIAL
+  note: "들은 집합 2^n 개, 하나마다 크기 k 의 부분집합들 — 3^n 이하"

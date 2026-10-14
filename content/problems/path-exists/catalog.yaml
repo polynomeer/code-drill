@@ -1,0 +1,15 @@
+# path-exists 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EASY
+tags:
+  - union-find
+  - graph
+competencies:
+  - MODELING
+  - IMPLEMENTATION
+  - EDGE_CASES
+prerequisites:
+  - connected-components
+complexity:
+  time: LINEAR
+  space: LINEAR
+  note: "간선마다 유니온 파인드 한 번 — 거의 상수"

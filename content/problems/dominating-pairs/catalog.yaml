@@ -1,0 +1,18 @@
+# dominating-pairs 카탈로그. 판정을 바꾸지 않으므로 packageDigest 에 들어가지 않는다.
+difficulty: EXPERT
+tags:
+  - divide-conquer
+  - sorting
+  - counting
+competencies:
+  - MODELING
+  - ALGORITHM_CHOICE
+  - EDGE_CASES
+  - COMPLEXITY
+prerequisites:
+  - count-inversions
+  - increasing-triplets-count
+complexity:
+  time: LINEARITHMIC
+  space: LINEAR
+  note: "분할 정복 log n 층마다 펜윅 트리 — n log² n"

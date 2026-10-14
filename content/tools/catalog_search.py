@@ -3388,3 +3388,211 @@ fun mountainPeak(nums: IntArray): Int = nums.size / 2
 """),
     ],
 ))
+
+
+# --- 세 기준 모두 앞서는 쌍 ------------------------------------------------------
+
+def _dominating_pairs(ys, zs):
+    """CDQ 분할 정복 — 왼쪽 반에서 y 가 작은 것부터 펜윅 트리(z)에 넣고, 오른쪽 반의 각 점보다 z 가 작은 수를 센다."""
+    n = len(ys)
+    tree = [0] * (n + 1)
+
+    def add(i, d):
+        i += 1
+        while i <= n:
+            tree[i] += d
+            i += i & -i
+
+    def query(i):  # z < i 인 수
+        s = 0
+        while i > 0:
+            s += tree[i]
+            i -= i & -i
+        return s
+
+    total = 0
+    order = list(range(n))
+
+    def solve(low, high):
+        nonlocal total
+        if high - low <= 1:
+            return
+        mid = (low + high) // 2
+        solve(low, mid)
+        solve(mid, high)
+        left = sorted(order[low:mid], key=lambda i: ys[i])
+        right = sorted(order[mid:high], key=lambda i: ys[i])
+        p = 0
+        added = []
+        for j in right:
+            while p < len(left) and ys[left[p]] < ys[j]:
+                add(zs[left[p]], 1)
+                added.append(zs[left[p]])
+                p += 1
+            total += query(zs[j])
+        for z in added:
+            add(z, -1)
+
+    solve(0, n)
+    return total % 1_000_000_007
+
+
+def _two_permutations(n, salt):
+    return [shuffled(range(n), salt=salt), shuffled(range(n), salt=salt + 1)]
+
+
+PROBLEMS.append(Problem(
+    id="dominating-pairs",
+    title="세 기준 모두 앞서는 쌍",
+    summary="""
+선수 `n` 명이 등번호 순서(`0..n-1`)로 서 있고, 선수 `i` 의 두 기록이 `ys[i]`, `zs[i]` 다. `ys` 와 `zs` 는 각각 `0..n-1` 의
+순열이다. `i < j` 이고 `ys[i] < ys[j]` 이고 `zs[i] < zs[j]` 인 쌍 `(i, j)` — 세 기준(등번호, y, z) 모두에서 `i` 가 앞서는
+쌍 — 의 수를 `1_000_000_007` 로 나눈 나머지로 반환한다.
+""",
+    notes="""
+기준이 둘(등번호와 y)이면 뒤집힌 쌍 세기다. 셋이면 한 기준을 분할 정복으로 없앤다(CDQ): 등번호로 반을 갈라 각 반 안의 쌍은
+재귀로 세고, **왼쪽 반의 i 와 오른쪽 반의 j** 인 쌍은 등번호 조건이 저절로 맞으니 y 와 z 두 기준만 보면 된다. 두 반을 각각 y 로
+정렬해 두고, 오른쪽 반의 점을 y 가 작은 것부터 보며 그보다 y 가 작은 왼쪽 점의 z 를 펜윅 트리에 넣은 뒤, z 가 더 작은 개수를 센다.
+쓴 펜윅 트리는 넣은 것을 되돌려 비운다.
+
+쌍은 200 억까지 가므로 `Long` 으로 센다.
+""",
+    drill_doc="""
+Drill.call("lo..hi")          // 이 구간을 나눈다
+Drill.ret("lo..hi", count)    // 두 반을 가로지르는 쌍
+""",
+    constraints="""
+- `1 <= n <= 200_000`
+- `ys`, `zs` 는 각각 `0..n-1` 의 순열
+""",
+    signature=dict(name="dominatingPairs", parameters=[("ys", "INT_ARRAY"), ("zs", "INT_ARRAY")], returns="INT"),
+    groups=perf_groups(),
+    reference=_dominating_pairs,
+    cases={
+        "sample": [("01", [[0, 1, 2], [0, 2, 1]]), ("02", [[2, 0, 1, 3], [1, 0, 3, 2]])],
+        "boundary": [
+            ("01-single", [[0], [0]]),
+            ("02-all-increasing", [[0, 1, 2, 3, 4], [0, 1, 2, 3, 4]]),
+            ("03-y-decreasing", [[4, 3, 2, 1, 0], [0, 1, 2, 3, 4]]),
+            # y 로는 앞서지만 z 로는 뒤진다 — 두 기준을 다 봐야 한다.
+            ("04-z-against-y", [[0, 1, 2, 3], [3, 2, 1, 0]]),
+        ],
+        "hidden": [
+            ("01-random-small", _two_permutations(12, salt=10751)),
+            ("02-random-medium", _two_permutations(3000, salt=10753)),
+            # 쌍이 Int 를 넘는다.
+            ("03-increasing", [list(range(100_000)), list(range(100_000))]),
+        ],
+        # 쌍을 모두 보면 20 만 × 20 만 / 2 = 200 억 번이다.
+        "performance": [
+            ("01-random-large", _two_permutations(200_000, salt=10755)),
+            ("02-increasing-large", [list(range(200_000)), list(range(200_000))]),
+            ("03-z-reversed", [list(range(200_000)), list(range(199_999, -1, -1))]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). CDQ — 등번호로 반을 가르고, 두 반을 가로지르는 쌍은 y 로 정렬해 z 의 펜윅 트리로 센다.
+fun dominatingPairs(ys: IntArray, zs: IntArray): Int {
+    val n = ys.size
+    val tree = IntArray(n + 1)
+    fun add(z: Int, d: Int) { var i = z + 1; while (i <= n) { tree[i] += d; i += i and -i } }
+    fun countBelow(z: Int): Int { var i = z; var s = 0; while (i > 0) { s += tree[i]; i -= i and -i }; return s }
+    // order[low..high) 는 재귀가 끝나면 y 순으로 정렬돼 있다(병합 정렬처럼)
+    val order = IntArray(n) { it }
+    val buffer = IntArray(n)
+    var total = 0L
+    fun solve(low: Int, high: Int) {
+        if (high - low <= 1) return
+        val mid = (low + high) ushr 1
+        solve(low, mid); solve(mid, high)
+        var p = low
+        for (k in mid until high) {
+            val j = order[k]
+            while (p < mid && ys[order[p]] < ys[j]) { add(zs[order[p]], 1); p += 1 }
+            total += countBelow(zs[j])
+        }
+        for (k in low until p) add(zs[order[k]], -1)
+        // y 로 병합한다
+        var a = low; var b = mid; var c = low
+        while (a < mid || b < high) buffer[c++] = if (b >= high || (a < mid && ys[order[a]] < ys[order[b]])) order[a++] else order[b++]
+        for (k in low until high) order[k] = buffer[k]
+    }
+    solve(0, n)
+    Drill.ret("0..$n", (total % 1_000_000_007).toInt())
+    return (total % 1_000_000_007).toInt()
+}
+""",
+    mutants=[
+        ("ignores-z", "WRONG_ALGORITHM",
+         "등번호와 y 두 기준만 본다. z 에서도 앞서야 한다.",
+         """
+fun dominatingPairs(ys: IntArray, zs: IntArray): Int {
+    val n = ys.size
+    val tree = IntArray(n + 1)
+    var total = 0L
+    for (j in 0 until n) {
+        var i = ys[j]; var s = 0
+        while (i > 0) { s += tree[i]; i -= i and -i }
+        total += s
+        i = ys[j] + 1
+        while (i <= n) { tree[i] += 1; i += i and -i }
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("int-total", "MISSING_EDGE_CASE",
+         "쌍의 수를 Int 로 센다. 10 만 명이 모두 앞서면 50 억 쌍이라 넘친다.",
+         """
+fun dominatingPairs(ys: IntArray, zs: IntArray): Int {
+    val n = ys.size
+    val tree = IntArray(n + 1)
+    fun add(z: Int, d: Int) { var i = z + 1; while (i <= n) { tree[i] += d; i += i and -i } }
+    fun countBelow(z: Int): Int { var i = z; var s = 0; while (i > 0) { s += tree[i]; i -= i and -i }; return s }
+    val order = IntArray(n) { it }; val buffer = IntArray(n)
+    var total = 0
+    fun solve(low: Int, high: Int) {
+        if (high - low <= 1) return
+        val mid = (low + high) ushr 1
+        solve(low, mid); solve(mid, high)
+        var p = low
+        for (k in mid until high) { val j = order[k]; while (p < mid && ys[order[p]] < ys[j]) { add(zs[order[p]], 1); p += 1 }; total += countBelow(zs[j]) }
+        for (k in low until p) add(zs[order[k]], -1)
+        var a = low; var b = mid; var c = low
+        while (a < mid || b < high) buffer[c++] = if (b >= high || (a < mid && ys[order[a]] < ys[order[b]])) order[a++] else order[b++]
+        for (k in low until high) order[k] = buffer[k]
+    }
+    solve(0, n)
+    return total % 1_000_000_007
+}
+"""),
+        ("top-split-only", "WRONG_BRANCH",
+         "맨 위에서 한 번만 반을 갈라 가로지르는 쌍만 센다. 각 반 안의 쌍도 재귀로 세야 한다.",
+         """
+fun dominatingPairs(ys: IntArray, zs: IntArray): Int {
+    val n = ys.size
+    val mid = n / 2
+    var total = 0L
+    val left = (0 until mid).sortedBy { ys[it] }
+    val right = (mid until n).sortedBy { ys[it] }
+    val tree = IntArray(n + 1)
+    var p = 0
+    for (j in right) {
+        while (p < left.size && ys[left[p]] < ys[j]) { var i = zs[left[p]] + 1; while (i <= n) { tree[i] += 1; i += i and -i }; p += 1 }
+        var i = zs[j]; var s = 0
+        while (i > 0) { s += tree[i]; i -= i and -i }
+        total += s
+    }
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+        ("every-pair", "PERFORMANCE",
+         "쌍을 모두 본다. 맞지만, 20 만이면 200 억 쌍이다.",
+         """
+fun dominatingPairs(ys: IntArray, zs: IntArray): Int {
+    var total = 0L
+    for (i in ys.indices) for (j in i + 1 until ys.size) if (ys[i] < ys[j] && zs[i] < zs[j]) total += 1
+    return (total % 1_000_000_007).toInt()
+}
+"""),
+    ],
+))

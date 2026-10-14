@@ -4160,3 +4160,123 @@ fun subarrayRangesSum(nums: IntArray): Int {
 """),
     ],
 ))
+
+
+# --- 흐름의 첫 외톨이 글자 ------------------------------------------------------
+
+def _first_unique_stream(s):
+    from collections import Counter, deque
+    counts = Counter()
+    waiting = deque()
+    out = []
+    for ch in s:
+        counts[ch] += 1
+        waiting.append(ch)
+        while waiting and counts[waiting[0]] > 1:
+            waiting.popleft()
+        out.append(waiting[0] if waiting else "#")
+    return "".join(out)
+
+
+def _stream_letters(n, alphabet, salt):
+    return "".join(alphabet[v] for v in randoms(n, 0, len(alphabet) - 1, salt=salt))
+
+
+PROBLEMS.append(Problem(
+    id="first-unique-stream",
+    title="흐름의 첫 외톨이 글자",
+    summary="""
+소문자가 한 글자씩 흘러 들어온다(`s` 의 앞에서부터). 글자가 하나 들어올 때마다, 지금까지 들어온 글자들 가운데 **한 번만 나온 글자
+중 가장 먼저 들어온 것**을 적는다. 그런 글자가 없으면 `#` 을 적는다. 적은 글자들을 이은 문자열을 반환한다.
+""",
+    notes="""
+한 번만 나온 글자들을 들어온 순서대로 큐에 둔다. 새 글자가 들어오면 개수를 늘리고 큐 뒤에 넣는다. 그다음 큐 앞의 글자가 이제 두 번
+이상 나왔으면 **빼기를 되풀이한다** — 앞의 여럿이 한꺼번에 외톨이가 아니게 될 수 있다. 큐 맨 앞이 답이고, 비었으면 `#` 이다. 큐
+가운데 있는 외톨이 아닌 글자는 맨 앞에 올 때 빼면 된다(게으른 삭제).
+""",
+    drill_doc="""
+Drill.enqueue(c - 'a')   // 들어온 글자
+Drill.dequeue(c - 'a')   // 더는 외톨이가 아니다
+""",
+    constraints="""
+- `1 <= s.length <= 200_000`, `s` 는 소문자로만 이뤄진다
+""",
+    signature=dict(name="firstUniqueStream", parameters=[("s", "STRING")], returns="STRING"),
+    groups=standard_groups(),
+    reference=_first_unique_stream,
+    limits={"timeMillis": 2000, "memoryMb": 256, "outputBytes": 2000000},
+    cases={
+        "sample": [("01", ["aabc"]), ("02", ["zz"])],
+        "boundary": [
+            ("01-single", ["q"]),
+            # 앞의 둘이 한꺼번에 외톨이가 아니게 된다.
+            ("02-two-leave-at-once", ["abab"]),
+            ("03-comes-back", ["abcabd"]),
+            ("04-all-distinct", ["abcdef"]),
+            ("05-third-time", ["aaa"]),
+        ],
+        "hidden": [
+            ("01-random-small", [_stream_letters(30, "abcd", salt=10745)]),
+            ("02-random-large", [_stream_letters(200_000, "abcdefghijklmnopqrstuvwxyz", salt=10747)]),
+            ("03-few-letters", [_stream_letters(200_000, "ab", salt=10749)]),
+            ("04-alphabet-then-repeat", ["abcdefghijklmnopqrstuvwxyz" + "zyxwvutsrqponmlkjihgfedcb"]),
+        ],
+    },
+    kotlin="""
+// 검증용 정답 (§6.1 solutions/). 외톨이 후보를 들어온 순서로 큐에 두고, 맨 앞이 더는 외톨이가 아니면 빼기를 되풀이한다.
+fun firstUniqueStream(s: String): String {
+    val counts = IntArray(26)
+    val waiting = ArrayDeque<Char>()
+    val out = StringBuilder()
+    for (c in s) {
+        counts[c - 'a'] += 1
+        waiting.addLast(c)
+        Drill.enqueue(c - 'a')
+        while (waiting.isNotEmpty() && counts[waiting.first() - 'a'] > 1) {
+            Drill.dequeue(waiting.first() - 'a')
+            waiting.removeFirst()
+        }
+        out.append(if (waiting.isEmpty()) '#' else waiting.first())
+    }
+    return out.toString()
+}
+""",
+    mutants=[
+        ("one-leaves-per-step", "WRONG_BRANCH",
+         "글자마다 큐 앞에서 많아야 하나만 뺀다. 앞의 여럿이 한꺼번에 외톨이가 아니게 될 수 있다.",
+         """
+fun firstUniqueStream(s: String): String {
+    val counts = IntArray(26); val waiting = ArrayDeque<Char>(); val out = StringBuilder()
+    for (c in s) {
+        counts[c - 'a'] += 1; waiting.addLast(c)
+        if (waiting.isNotEmpty() && counts[waiting.first() - 'a'] > 1) waiting.removeFirst()
+        out.append(if (waiting.isEmpty()) '#' else waiting.first())
+    }
+    return out.toString()
+}
+"""),
+        ("latest-unique", "WRONG_BRANCH",
+         "한 번만 나온 글자 가운데 가장 늦게 들어온 것을 적는다. 가장 먼저 들어온 것이다.",
+         """
+fun firstUniqueStream(s: String): String {
+    val counts = IntArray(26); val out = StringBuilder()
+    for (i in s.indices) {
+        counts[s[i] - 'a'] += 1
+        var pick = '#'
+        for (j in i downTo maxOf(0, i - 60)) if (counts[s[j] - 'a'] == 1) { pick = s[j]; break }
+        out.append(pick)
+    }
+    return out.toString()
+}
+"""),
+        ("first-seen-stays", "MISSING_EDGE_CASE",
+         "처음 들어온 글자를 외톨이가 아니게 된 뒤에도 적는다. 다시 나오면 빠져야 한다.",
+         """
+fun firstUniqueStream(s: String): String {
+    val seen = BooleanArray(26); val order = ArrayList<Char>(); val out = StringBuilder()
+    for (c in s) { if (!seen[c - 'a']) { seen[c - 'a'] = true; order.add(c) }; out.append(order.first()) }
+    return out.toString()
+}
+"""),
+    ],
+))
