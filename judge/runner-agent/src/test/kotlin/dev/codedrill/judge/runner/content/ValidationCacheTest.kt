@@ -3,6 +3,8 @@ package dev.codedrill.judge.runner.content
 import dev.codedrill.platform.problempackage.DefectKind
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.io.path.createDirectories
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.writeText
@@ -76,5 +78,23 @@ class ValidationCacheTest {
         next.find(pass)
         assertEquals(1, next.prune())
         assertEquals(listOf("$pass.json"), dir.listDirectoryEntries("*.json").map { it.fileName.toString() })
+    }
+
+    @Test
+    fun `다시 묶은 jar 는 내용이 같으면 같은 지문이다 — 묶은 시각은 보지 않는다`() {
+        fun jar(time: Long, content: String): Path {
+            val file = Files.createTempFile("lib", ".jar")
+            ZipOutputStream(Files.newOutputStream(file)).use { zip ->
+                zip.putNextEntry(ZipEntry("A.class").apply { this.time = time })
+                zip.write(content.toByteArray())
+                zip.closeEntry()
+            }
+            return file
+        }
+        val first = jar(1_000_000_000_000, "v1")
+        val rebuilt = jar(1_700_000_000_000, "v1")
+        assertNotEquals(Files.readAllBytes(first).toList(), Files.readAllBytes(rebuilt).toList())
+        assertEquals(ValidationCache.jarFingerprint(first), ValidationCache.jarFingerprint(rebuilt))
+        assertNotEquals(ValidationCache.jarFingerprint(first), ValidationCache.jarFingerprint(jar(1_000_000_000_000, "v2")))
     }
 }

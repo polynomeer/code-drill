@@ -8,6 +8,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipFile
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.exists
@@ -118,7 +119,25 @@ class ValidationCache(private val dir: Path, private val validatorFingerprint: S
                 val path = Path.of(entry)
                 when {
                     path.isDirectory() -> digest.update(directoryFingerprint(path).toByteArray())
+                    path.name.endsWith(".jar") -> digest.update(jarFingerprint(path).toByteArray())
                     path.exists() -> digest.update(path.readBytes())
+                }
+            }
+            return hex(digest.digest())
+        }
+
+        /**
+         * jar 안의 항목 이름과 내용. 파일 바이트로 재면 안 된다 — Gradle 이 다시 묶은 jar 는 항목마다 묶은 시각이
+         * 들어가서, 클래스가 한 바이트도 같아도 jar 가 달라진다. CI 는 매번 새로 빌드하므로 그러면 캐시가 한 번도 맞지 않는다.
+         */
+        fun jarFingerprint(jar: Path): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            ZipFile(jar.toFile()).use { zip ->
+                zip.entries().toList().filterNot { it.isDirectory }.sortedBy { it.name }.forEach { entry ->
+                    digest.update(entry.name.toByteArray())
+                    digest.update(0)
+                    zip.getInputStream(entry).use { digest.update(it.readBytes()) }
+                    digest.update(0)
                 }
             }
             return hex(digest.digest())
